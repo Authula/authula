@@ -43,4 +43,9 @@ var (
 
 	// Configuration errors
 	ErrConfigInvalid = errors.New("invalid configuration")
+
+	// OAuth2 errors
+	ErrOAuth2ProviderNotConfigured = errors.New("oauth2 provider not configured")
+	ErrOAuth2ExchangeFailed        = errors.New("oauth2 token exchange failed")
+	ErrOAuth2UserInfoFailed        = errors.New("failed to get oauth2 user info")
 )

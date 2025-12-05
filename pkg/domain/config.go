@@ -79,6 +79,39 @@ type SessionConfig struct {
 }
 
 // =======================
+// Social Providers Config
+// =======================
+
+type OAuth2Config struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	Scopes       []string
+}
+
+type DefaultOAuth2ProvidersConfig struct {
+	Google  *OAuth2Config
+	GitHub  *OAuth2Config
+	Discord *OAuth2Config
+}
+
+type GenericOAuth2EndpointConfig struct {
+	AuthURL     string
+	TokenURL    string
+	UserInfoURL string
+}
+
+type GenericOAuth2Config struct {
+	OAuth2Config
+	Endpoint GenericOAuth2EndpointConfig
+}
+
+type SocialProvidersConfig struct {
+	Default DefaultOAuth2ProvidersConfig
+	Generic map[string]GenericOAuth2Config
+}
+
+// =======================
 // Trusted Origins Config
 // =======================
 
@@ -167,6 +200,7 @@ type Config struct {
 	EmailVerification EmailVerificationConfig
 	User              UserConfig
 	Session           SessionConfig
+	SocialProviders   SocialProvidersConfig
 	TrustedOrigins    TrustedOriginsConfig
 	EndpointHooks     EndpointHooksConfig
 	DatabaseHooks     DatabaseHooksConfig
@@ -323,5 +357,11 @@ func WithDatabaseHooks(databaseHooksConfig DatabaseHooksConfig) ConfigOption {
 func WithEventHooks(eventHooksConfig EventHooksConfig) ConfigOption {
 	return func(c *Config) {
 		c.EventHooks = eventHooksConfig
+	}
+}
+
+func WithSocialProviders(socialProvidersConfig SocialProvidersConfig) ConfigOption {
+	return func(c *Config) {
+		c.SocialProviders = socialProvidersConfig
 	}
 }

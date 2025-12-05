@@ -13,7 +13,6 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/internal/auth"
 	"github.com/GoBetterAuth/go-better-auth/internal/handlers"
 	"github.com/GoBetterAuth/go-better-auth/internal/middleware"
-	"github.com/GoBetterAuth/go-better-auth/internal/router"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
@@ -91,9 +90,9 @@ func (auth *Auth) DropMigrations() {
 	}
 }
 func (auth *Auth) Handler() http.Handler {
-	r := router.New()
+	r := http.NewServeMux()
 
-	authService := contructAuthService(auth.Config, auth.DB)
+	authService := constructAuthService(auth.Config, auth.DB)
 
 	// Handlers
 	signIn := &handlers.SignInHandler{
@@ -132,6 +131,14 @@ func (auth *Auth) Handler() http.Handler {
 		Config:      auth.Config,
 		AuthService: authService,
 	}
+	oauth2Login := &handlers.OAuth2LoginHandler{
+		Config:      auth.Config,
+		AuthService: authService,
+	}
+	oauth2Callback := &handlers.OAuth2CallbackHandler{
+		Config:      auth.Config,
+		AuthService: authService,
+	}
 
 	basePath := auth.Config.BasePath
 
@@ -144,15 +151,17 @@ func (auth *Auth) Handler() http.Handler {
 	}
 
 	// Routes
-	r.Handle("POST", basePath+"/sign-in/email", signIn.Handler())
-	r.Handle("POST", basePath+"/sign-up/email", signUp.Handler())
-	r.Handle("POST", basePath+"/email-verification", auth.AuthMiddleware()(sendEmailVerification.Handler()))
-	r.Handle("GET", basePath+"/verify-email", verifyEmail.Handler())
-	r.Handle("POST", basePath+"/sign-out", signOut.Handler())
-	r.Handle("POST", basePath+"/reset-password", resetPassword.Handler())
-	r.Handle("POST", basePath+"/change-password", changePassword.Handler())
-	r.Handle("POST", basePath+"/email-change", changeEmailRequest.Handler())
-	r.Handle("GET", basePath+"/me", auth.AuthMiddleware()(me.Handler()))
+	r.Handle("POST "+basePath+"/sign-in/email", signIn.Handler())
+	r.Handle("POST "+basePath+"/sign-up/email", signUp.Handler())
+	r.Handle("POST "+basePath+"/email-verification", auth.AuthMiddleware()(sendEmailVerification.Handler()))
+	r.Handle("GET "+basePath+"/verify-email", verifyEmail.Handler())
+	r.Handle("POST "+basePath+"/sign-out", signOut.Handler())
+	r.Handle("POST "+basePath+"/reset-password", resetPassword.Handler())
+	r.Handle("POST "+basePath+"/change-password", changePassword.Handler())
+	r.Handle("POST "+basePath+"/email-change", changeEmailRequest.Handler())
+	r.Handle("GET "+basePath+"/me", auth.AuthMiddleware()(me.Handler()))
+	r.Handle("GET "+basePath+"/oauth2/{provider}/login", oauth2Login.Handler())
+	r.Handle("GET "+basePath+"/oauth2/{provider}/callback", oauth2Callback.Handler())
 
 	return middleware.EndpointHooksMiddleware(auth.Config, authService)(r)
 }
@@ -160,14 +169,14 @@ func (auth *Auth) Handler() http.Handler {
 // Export middleware
 func (auth *Auth) AuthMiddleware() func(http.Handler) http.Handler {
 	return middleware.AuthMiddleware(
-		contructAuthService(auth.Config, auth.DB),
+		constructAuthService(auth.Config, auth.DB),
 		auth.Config.Session.CookieName,
 	)
 }
 
 func (auth *Auth) OptionalAuthMiddleware() func(http.Handler) http.Handler {
 	return middleware.OptionalAuthMiddleware(
-		contructAuthService(auth.Config, auth.DB),
+		constructAuthService(auth.Config, auth.DB),
 		auth.Config.Session.CookieName,
 	)
 }
@@ -178,7 +187,7 @@ func (auth *Auth) CorsAuthMiddleware() func(http.Handler) http.Handler {
 	)
 }
 
-func contructAuthService(config *domain.Config, db *gorm.DB) *auth.Service {
+func constructAuthService(config *domain.Config, db *gorm.DB) *auth.Service {
 	userService := auth.NewUserService(config, db)
 	accountService := auth.NewAccountService(config, db)
 	sessionService := auth.NewSessionService(config, db)

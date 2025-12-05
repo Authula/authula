@@ -60,6 +60,18 @@ func (s *AccountService) GetAccountByUserID(userID string) (*domain.Account, err
 	return &account, nil
 }
 
+// GetAccountByProviderAndAccountID retrieves an account by provider and provider's account ID.
+func (s *AccountService) GetAccountByProviderAndAccountID(provider domain.ProviderType, accountID string) (*domain.Account, error) {
+	var account domain.Account
+	if err := s.db.Where("provider_id = ? AND account_id = ?", provider, accountID).First(&account).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &account, nil
+}
+
 // UpdateAccount updates an existing account in the database.
 func (s *AccountService) UpdateAccount(account *domain.Account) error {
 	account.UpdatedAt = time.Now().UTC()

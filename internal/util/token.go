@@ -55,7 +55,7 @@ func GenerateToken() (string, error) {
 
 // EncryptToken encrypts the token using AES-256-GCM with the provided secret.
 // Returns the base64-encoded encrypted token.
-func EncryptToken(token, secret string) (string, error) {
+func EncryptToken(token string, secret string) (string, error) {
 	if token == "" {
 		return "", fmt.Errorf("token is required")
 	}
@@ -94,7 +94,7 @@ func EncryptToken(token, secret string) (string, error) {
 
 // DecryptToken decrypts an AES-256-GCM encrypted token.
 // Expects token in base64-encoded format.
-func DecryptToken(encryptedToken, secret string) (string, error) {
+func DecryptToken(encryptedToken string, secret string) (string, error) {
 	if encryptedToken == "" {
 		return "", fmt.Errorf("encrypted token is required")
 	}

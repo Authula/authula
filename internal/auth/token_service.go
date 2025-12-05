@@ -50,6 +50,20 @@ func (ts *TokenService) GenerateEncryptedToken() (string, error) {
 	return encryptedToken, nil
 }
 
+// EncryptToken encrypts a plain token using the application secret.
+func (ts *TokenService) EncryptToken(token string) (string, error) {
+	if ts.config.Secret == "" {
+		return "", fmt.Errorf("secret is required for token encryption")
+	}
+
+	encryptedToken, err := util.EncryptToken(token, ts.config.Secret)
+	if err != nil {
+		return "", fmt.Errorf("encrypt token: %w", err)
+	}
+
+	return encryptedToken, nil
+}
+
 // DecryptToken decrypts an encrypted token using the application secret.
 func (ts *TokenService) DecryptToken(encryptedToken string) (string, error) {
 	if ts.config.Secret == "" {
