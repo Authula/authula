@@ -46,7 +46,7 @@ func (p *GitHubProvider) Exchange(ctx context.Context, code string, opts ...oaut
 	return p.GetConfig().Exchange(ctx, code, opts...)
 }
 
-func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*domain.OAuth2UserInfo, error) {
+func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*OAuth2UserInfo, error) {
 	client := oauth2.NewClient(ctx, oauth2.StaticTokenSource(token))
 	resp, err := client.Get("https://api.github.com/user")
 	if err != nil {
@@ -70,14 +70,13 @@ func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 		AvatarURL string `json:"avatar_url"`
 		Login     string `json:"login"`
 	}
-
 	if err := json.Unmarshal(body, &githubUser); err != nil {
 		return nil, err
 	}
 
 	// GitHub email might be private, need to fetch it separately if empty
 	email := githubUser.Email
-	verified := true // Assume verified if we got it, but better to check emails endpoint
+	verified := false // Assume not verified by default
 
 	if email == "" {
 		// Fetch emails
@@ -109,7 +108,7 @@ func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 		name = githubUser.Login
 	}
 
-	return &domain.OAuth2UserInfo{
+	return &OAuth2UserInfo{
 		ID:       fmt.Sprintf("%d", githubUser.ID),
 		Email:    email,
 		Name:     name,

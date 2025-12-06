@@ -3,13 +3,12 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/auth"
-	oauth2auth "github.com/GoBetterAuth/go-better-auth/internal/auth/oauth2"
+	authoauth2 "github.com/GoBetterAuth/go-better-auth/internal/auth/oauth2"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
@@ -20,22 +19,14 @@ type OAuth2LoginHandler struct {
 }
 
 func (h *OAuth2LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
-	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 2 {
-		util.JSONResponse(w, http.StatusBadRequest, map[string]any{"message": "invalid path"})
-		return
-	}
-	// Expect path to end with /oauth2/{provider}/login
-	// So provider is at len-2
-	providerName := parts[len(parts)-2]
-
+	providerName := util.ExtractProviderName(r.URL.Path)
 	provider, err := h.AuthService.OAuth2ProviderRegistry.Get(providerName)
 	if err != nil {
 		util.JSONResponse(w, http.StatusBadRequest, map[string]any{"message": "invalid provider"})
 		return
 	}
 
-	verifier, challenge, err := oauth2auth.GeneratePKCE()
+	verifier, challenge, err := authoauth2.GeneratePKCE()
 	if err != nil {
 		util.JSONResponse(w, http.StatusInternalServerError, map[string]any{"message": "failed to generate pkce"})
 		return
@@ -47,7 +38,7 @@ func (h *OAuth2LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isSecure := strings.HasPrefix(h.Config.BaseURL, "https")
+	isSecure, sameSite := util.GetCookieOptions(h.Config)
 
 	redirectTo := r.URL.Query().Get("redirect_to")
 	if redirectTo != "" {
@@ -57,7 +48,7 @@ func (h *OAuth2LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   isSecure,
-			SameSite: http.SameSiteLaxMode,
+			SameSite: sameSite,
 			Expires:  time.Now().Add(10 * time.Minute),
 		})
 	}
@@ -68,7 +59,7 @@ func (h *OAuth2LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   isSecure,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 		Expires:  time.Now().Add(10 * time.Minute),
 	})
 
@@ -78,7 +69,7 @@ func (h *OAuth2LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   isSecure,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 		Expires:  time.Now().Add(10 * time.Minute),
 	})
 
@@ -87,6 +78,7 @@ func (h *OAuth2LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		oauth2.SetAuthURLParam("code_challenge", challenge),
 		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
 	)
+	authURL = util.AppendQueryParam(authURL, "redirect_to", redirectTo)
 	slog.Debug("Auth URL", "url", authURL)
 
 	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
@@ -102,15 +94,12 @@ type OAuth2CallbackHandler struct {
 }
 
 func (h *OAuth2CallbackHandler) Handle(w http.ResponseWriter, r *http.Request) {
-	// Extract provider from path: /auth/oauth2/{provider}/callback
-	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 2 {
-		util.JSONResponse(w, http.StatusBadRequest, map[string]any{"message": "invalid path"})
+	providerName := util.ExtractProviderName(r.URL.Path)
+	_, err := h.AuthService.OAuth2ProviderRegistry.Get(providerName)
+	if err != nil {
+		util.JSONResponse(w, http.StatusBadRequest, map[string]any{"message": "invalid provider"})
 		return
 	}
-	// Expect path to end with /oauth2/{provider}/callback
-	// So provider is at len-2
-	providerName := parts[len(parts)-2]
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -130,7 +119,7 @@ func (h *OAuth2CallbackHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isSecure := strings.HasPrefix(h.Config.BaseURL, "https")
+	isSecure, sameSite := util.GetCookieOptions(h.Config)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth2_state",
@@ -139,7 +128,7 @@ func (h *OAuth2CallbackHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   isSecure,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: sameSite,
 	})
 
 	verifierCookie, err := r.Cookie("oauth2_verifier")
@@ -147,7 +136,6 @@ func (h *OAuth2CallbackHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	if err == nil && verifierCookie.Value != "" {
 		opts = append(opts, oauth2.SetAuthURLParam("code_verifier", verifierCookie.Value))
 
-		// Clear verifier cookie
 		http.SetCookie(w, &http.Cookie{
 			Name:     "oauth2_verifier",
 			Value:    "",
@@ -155,7 +143,7 @@ func (h *OAuth2CallbackHandler) Handle(w http.ResponseWriter, r *http.Request) {
 			MaxAge:   -1,
 			HttpOnly: true,
 			Secure:   isSecure,
-			SameSite: http.SameSiteNoneMode,
+			SameSite: sameSite,
 		})
 	}
 
@@ -171,19 +159,18 @@ func (h *OAuth2CallbackHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   isSecure,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: sameSite,
 		Expires:  time.Now().Add(h.Config.Session.ExpiresIn),
 	})
 
 	target := "/"
-	if cookie, err := r.Cookie("oauth2_redirect_to"); err == nil && cookie.Value != "" {
-		target = cookie.Value
-		if !strings.HasPrefix(target, "/") {
-			target = "/"
+	if cookie, err := r.Cookie("oauth2_redirect_to"); err == nil {
+		rt := cookie.Value
+		if util.IsTrustedRedirect(rt, h.Config.TrustedOrigins.Origins) {
+			target = rt
 		}
 	}
 
-	// Clear redirect cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth2_redirect_to",
 		Value:    "",
@@ -191,7 +178,7 @@ func (h *OAuth2CallbackHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   isSecure,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: sameSite,
 	})
 
 	http.Redirect(w, r, target, http.StatusTemporaryRedirect)

@@ -27,13 +27,23 @@ func (p *DiscordProvider) GetName() string {
 }
 
 func (p *DiscordProvider) GetConfig() *oauth2.Config {
+	var scopes []string
+	if len(p.config.Scopes) > 0 {
+		scopes = p.config.Scopes
+	} else {
+		scopes = []string{
+			"email",
+			"identify",
+		}
+	}
+
 	return &oauth2.Config{
 		ClientID:     p.config.ClientID,
 		ClientSecret: p.config.ClientSecret,
 		RedirectURL:  p.config.RedirectURL,
-		Scopes:       p.config.Scopes,
+		Scopes:       scopes,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://discord.com/api/oauth2/authorize",
+			AuthURL:  "https://discord.com/oauth2/authorize?prompt=consent",
 			TokenURL: "https://discord.com/api/oauth2/token",
 		},
 	}
@@ -47,7 +57,7 @@ func (p *DiscordProvider) Exchange(ctx context.Context, code string, opts ...oau
 	return p.GetConfig().Exchange(ctx, code, opts...)
 }
 
-func (p *DiscordProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*domain.OAuth2UserInfo, error) {
+func (p *DiscordProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*OAuth2UserInfo, error) {
 	client := oauth2.NewClient(ctx, oauth2.StaticTokenSource(token))
 	resp, err := client.Get("https://discord.com/api/users/@me")
 	if err != nil {
@@ -82,7 +92,7 @@ func (p *DiscordProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) 
 		avatarURL = fmt.Sprintf("https://cdn.discordapp.com/avatars/%s/%s.png", discordUser.ID, discordUser.Avatar)
 	}
 
-	return &domain.OAuth2UserInfo{
+	return &OAuth2UserInfo{
 		ID:       discordUser.ID,
 		Email:    discordUser.Email,
 		Name:     discordUser.Username,

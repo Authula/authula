@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"golang.org/x/oauth2"
-
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
 
 // OAuth2Provider defines the interface for OAuth2 providers.
@@ -14,5 +12,5 @@ type OAuth2Provider interface {
 	GetConfig() *oauth2.Config
 	GetAuthURL(state string, opts ...oauth2.AuthCodeOption) string
 	Exchange(ctx context.Context, code string, opts ...oauth2.AuthCodeOption) (*oauth2.Token, error)
-	GetUserInfo(ctx context.Context, token *oauth2.Token) (*domain.OAuth2UserInfo, error)
+	GetUserInfo(ctx context.Context, token *oauth2.Token) (*OAuth2UserInfo, error)
 }

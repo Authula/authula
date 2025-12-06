@@ -42,7 +42,7 @@ func (p *GoogleProvider) GetConfig() *oauth2.Config {
 		RedirectURL:  p.config.RedirectURL,
 		Scopes:       scopes,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://accounts.google.com/o/oauth2/auth",
+			AuthURL:  "https://accounts.google.com/o/oauth2/auth?access_type=offline&prompt=consent",
 			TokenURL: "https://oauth2.googleapis.com/token",
 		},
 	}
@@ -56,7 +56,7 @@ func (p *GoogleProvider) Exchange(ctx context.Context, code string, opts ...oaut
 	return p.GetConfig().Exchange(ctx, code, opts...)
 }
 
-func (p *GoogleProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*domain.OAuth2UserInfo, error) {
+func (p *GoogleProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*OAuth2UserInfo, error) {
 	client := oauth2.NewClient(ctx, oauth2.StaticTokenSource(token))
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
@@ -84,7 +84,7 @@ func (p *GoogleProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 		return nil, err
 	}
 
-	return &domain.OAuth2UserInfo{
+	return &OAuth2UserInfo{
 		ID:       googleUser.ID,
 		Email:    googleUser.Email,
 		Name:     googleUser.Name,

@@ -14,6 +14,7 @@ var (
 	ErrTokenGenerationFailed = errors.New("token generation failed")
 	ErrTokenExpired          = errors.New("token expired")
 	ErrInvalidToken          = errors.New("invalid token")
+	ErrNoRefreshToken        = errors.New("no refresh token available")
 
 	// Session errors
 	ErrSessionNotFound       = errors.New("session not found")
