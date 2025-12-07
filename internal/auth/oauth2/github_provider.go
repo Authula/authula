@@ -88,10 +88,9 @@ func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 
 	// GitHub email might be private, need to fetch it separately if empty
 	email := githubUser.Email
-	verified := false // Assume not verified by default
+	verified := false
 
 	if email == "" {
-		// Fetch emails
 		resp, err := client.Get("https://api.github.com/user/emails")
 		if err == nil {
 			defer resp.Body.Close()

@@ -26,14 +26,14 @@ func NewService(
 	tokenService *TokenService,
 ) *Service {
 	oauth2ProviderRegistry := oauth2.NewOAuth2ProviderRegistry()
-	if config.SocialProviders.Default.Google != nil {
-		oauth2ProviderRegistry.Register(oauth2.NewGoogleProvider(config.SocialProviders.Default.Google))
+	if config.SocialProviders.Default.Discord != nil {
+		oauth2ProviderRegistry.Register(oauth2.NewDiscordProvider(config.SocialProviders.Default.Discord))
 	}
 	if config.SocialProviders.Default.GitHub != nil {
 		oauth2ProviderRegistry.Register(oauth2.NewGitHubProvider(config.SocialProviders.Default.GitHub))
 	}
-	if config.SocialProviders.Default.Discord != nil {
-		oauth2ProviderRegistry.Register(oauth2.NewDiscordProvider(config.SocialProviders.Default.Discord))
+	if config.SocialProviders.Default.Google != nil {
+		oauth2ProviderRegistry.Register(oauth2.NewGoogleProvider(config.SocialProviders.Default.Google))
 	}
 
 	return &Service{

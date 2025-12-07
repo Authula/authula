@@ -12,6 +12,14 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
 
+type DiscordUser struct {
+	ID       string `json:"id"`
+	Email    string `json:"email"`
+	Username string `json:"username"`
+	Avatar   string `json:"avatar"`
+	Verified bool   `json:"verified"`
+}
+
 type DiscordProvider struct {
 	config *domain.OAuth2Config
 }
@@ -78,13 +86,7 @@ func (p *DiscordProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) 
 		return nil, err
 	}
 
-	var discordUser struct {
-		ID       string `json:"id"`
-		Email    string `json:"email"`
-		Username string `json:"username"`
-		Avatar   string `json:"avatar"`
-		Verified bool   `json:"verified"`
-	}
+	var discordUser DiscordUser
 	if err := json.Unmarshal(body, &discordUser); err != nil {
 		return nil, err
 	}

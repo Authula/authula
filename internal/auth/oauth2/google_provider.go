@@ -12,6 +12,14 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
 
+type GoogleUser struct {
+	ID            string `json:"id"`
+	Email         string `json:"email"`
+	VerifiedEmail bool   `json:"verified_email"`
+	Name          string `json:"name"`
+	Picture       string `json:"picture"`
+}
+
 type GoogleProvider struct {
 	config *domain.OAuth2Config
 }
@@ -77,13 +85,7 @@ func (p *GoogleProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 		return nil, err
 	}
 
-	var googleUser struct {
-		ID            string `json:"id"`
-		Email         string `json:"email"`
-		VerifiedEmail bool   `json:"verified_email"`
-		Name          string `json:"name"`
-		Picture       string `json:"picture"`
-	}
+	var googleUser GoogleUser
 	if err := json.Unmarshal(body, &googleUser); err != nil {
 		return nil, err
 	}
