@@ -27,9 +27,10 @@ var (
 	ErrVerificationInvalid  = errors.New("invalid verification token")
 
 	// Account errors
-	ErrAccountNotFound       = errors.New("account not found")
-	ErrAccountCreationFailed = errors.New("account creation failed")
-	ErrAccountUpdateFailed   = errors.New("account update failed")
+	ErrAccountNotFound        = errors.New("account not found")
+	ErrAccountCreationFailed  = errors.New("account creation failed")
+	ErrAccountUpdateFailed    = errors.New("account update failed")
+	ErrAccountLinkingRequired = errors.New("account linking required: user exists with a different provider")
 
 	// Email verification errors
 	ErrEmailVerificationFailed = errors.New("email verification failed")

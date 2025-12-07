@@ -81,7 +81,6 @@ func (p *DiscordProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) 
 		Avatar   string `json:"avatar"`
 		Verified bool   `json:"verified"`
 	}
-
 	if err := json.Unmarshal(body, &discordUser); err != nil {
 		return nil, err
 	}
