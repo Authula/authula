@@ -12,6 +12,20 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
 
+type GitHubUser struct {
+	ID        int    `json:"id"`
+	Email     string `json:"email"`
+	Name      string `json:"name"`
+	AvatarURL string `json:"avatar_url"`
+	Login     string `json:"login"`
+}
+
+type GitHubEmailInfo struct {
+	Email    string `json:"email"`
+	Primary  bool   `json:"primary"`
+	Verified bool   `json:"verified"`
+}
+
 type GitHubProvider struct {
 	config *domain.OAuth2Config
 }
@@ -28,14 +42,18 @@ func (p *GitHubProvider) GetConfig() *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:     p.config.ClientID,
 		ClientSecret: p.config.ClientSecret,
-		RedirectURL:  p.config.RedirectURL,
 		Scopes:       p.config.Scopes,
+		RedirectURL:  p.config.RedirectURL,
 		Endpoint: oauth2.Endpoint{
 			AuthURL:       "https://github.com/login/oauth/authorize",
 			TokenURL:      "https://github.com/login/oauth/access_token",
 			DeviceAuthURL: "https://github.com/login/device/code",
 		},
 	}
+}
+
+func (p *GitHubProvider) RequiresPKCE() bool {
+	return true
 }
 
 func (p *GitHubProvider) GetAuthURL(state string, opts ...oauth2.AuthCodeOption) string {
@@ -63,13 +81,7 @@ func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 		return nil, err
 	}
 
-	var githubUser struct {
-		ID        int    `json:"id"`
-		Email     string `json:"email"`
-		Name      string `json:"name"`
-		AvatarURL string `json:"avatar_url"`
-		Login     string `json:"login"`
-	}
+	var githubUser GitHubUser
 	if err := json.Unmarshal(body, &githubUser); err != nil {
 		return nil, err
 	}
@@ -85,11 +97,7 @@ func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				body, _ := io.ReadAll(resp.Body)
-				var emails []struct {
-					Email    string `json:"email"`
-					Primary  bool   `json:"primary"`
-					Verified bool   `json:"verified"`
-				}
+				var emails []GitHubEmailInfo
 				if err := json.Unmarshal(body, &emails); err == nil {
 					for _, e := range emails {
 						if e.Primary {

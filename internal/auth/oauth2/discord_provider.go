@@ -49,6 +49,10 @@ func (p *DiscordProvider) GetConfig() *oauth2.Config {
 	}
 }
 
+func (p *DiscordProvider) RequiresPKCE() bool {
+	return true
+}
+
 func (p *DiscordProvider) GetAuthURL(state string, opts ...oauth2.AuthCodeOption) string {
 	return p.GetConfig().AuthCodeURL(state, opts...)
 }

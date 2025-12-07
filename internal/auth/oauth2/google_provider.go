@@ -48,6 +48,10 @@ func (p *GoogleProvider) GetConfig() *oauth2.Config {
 	}
 }
 
+func (p *GoogleProvider) RequiresPKCE() bool {
+	return true
+}
+
 func (p *GoogleProvider) GetAuthURL(state string, opts ...oauth2.AuthCodeOption) string {
 	return p.GetConfig().AuthCodeURL(state, opts...)
 }

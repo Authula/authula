@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -23,12 +22,6 @@ func (h *OAuth2LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	provider, err := h.AuthService.OAuth2ProviderRegistry.Get(providerName)
 	if err != nil {
 		util.JSONResponse(w, http.StatusBadRequest, map[string]any{"message": "invalid provider"})
-		return
-	}
-
-	verifier, challenge, err := authoauth2.GeneratePKCE()
-	if err != nil {
-		util.JSONResponse(w, http.StatusInternalServerError, map[string]any{"message": "failed to generate pkce"})
 		return
 	}
 
@@ -63,23 +56,32 @@ func (h *OAuth2LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		Expires:  time.Now().Add(10 * time.Minute),
 	})
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "oauth2_verifier",
-		Value:    verifier,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   isSecure,
-		SameSite: sameSite,
-		Expires:  time.Now().Add(10 * time.Minute),
-	})
+	var opts []oauth2.AuthCodeOption
 
-	authURL := provider.GetAuthURL(
-		state,
-		oauth2.SetAuthURLParam("code_challenge", challenge),
-		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
-	)
-	authURL = util.AppendQueryParam(authURL, "redirect_to", redirectTo)
-	slog.Debug("Auth URL", "url", authURL)
+	if provider.RequiresPKCE() {
+		verifier, challenge, err := authoauth2.GeneratePKCE()
+		if err != nil {
+			util.JSONResponse(w, http.StatusInternalServerError, map[string]any{"message": "failed to generate pkce"})
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "oauth2_verifier",
+			Value:    verifier,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   isSecure,
+			SameSite: sameSite,
+			Expires:  time.Now().Add(10 * time.Minute),
+		})
+
+		opts = append(opts,
+			oauth2.SetAuthURLParam("code_challenge", challenge),
+			oauth2.SetAuthURLParam("code_challenge_method", "S256"),
+		)
+	}
+
+	authURL := provider.GetAuthURL(state, opts...)
 
 	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
@@ -95,7 +97,7 @@ type OAuth2CallbackHandler struct {
 
 func (h *OAuth2CallbackHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	providerName := util.ExtractProviderName(r.URL.Path)
-	_, err := h.AuthService.OAuth2ProviderRegistry.Get(providerName)
+	provider, err := h.AuthService.OAuth2ProviderRegistry.Get(providerName)
 	if err != nil {
 		util.JSONResponse(w, http.StatusBadRequest, map[string]any{"message": "invalid provider"})
 		return
@@ -131,20 +133,22 @@ func (h *OAuth2CallbackHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		SameSite: sameSite,
 	})
 
-	verifierCookie, err := r.Cookie("oauth2_verifier")
 	var opts []oauth2.AuthCodeOption
-	if err == nil && verifierCookie.Value != "" {
-		opts = append(opts, oauth2.SetAuthURLParam("code_verifier", verifierCookie.Value))
+	if provider.RequiresPKCE() {
+		verifierCookie, err := r.Cookie("oauth2_verifier")
+		if err == nil && verifierCookie.Value != "" {
+			opts = append(opts, oauth2.SetAuthURLParam("code_verifier", verifierCookie.Value))
 
-		http.SetCookie(w, &http.Cookie{
-			Name:     "oauth2_verifier",
-			Value:    "",
-			Path:     "/",
-			MaxAge:   -1,
-			HttpOnly: true,
-			Secure:   isSecure,
-			SameSite: sameSite,
-		})
+			http.SetCookie(w, &http.Cookie{
+				Name:     "oauth2_verifier",
+				Value:    "",
+				Path:     "/",
+				MaxAge:   -1,
+				HttpOnly: true,
+				Secure:   isSecure,
+				SameSite: sameSite,
+			})
+		}
 	}
 
 	result, err := h.AuthService.SignInWithOAuth2(r.Context(), providerName, code, opts...)

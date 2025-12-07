@@ -89,6 +89,7 @@ func (auth *Auth) DropMigrations() {
 		}
 	}
 }
+
 func (auth *Auth) Handler() http.Handler {
 	r := http.NewServeMux()
 

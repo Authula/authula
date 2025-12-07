@@ -2,15 +2,6 @@ package domain
 
 import "time"
 
-type ProviderType string
-
-const (
-	ProviderEmail   ProviderType = "email"
-	ProviderGoogle  ProviderType = "google"
-	ProviderGitHub  ProviderType = "github"
-	ProviderDiscord ProviderType = "discord"
-)
-
 type Account struct {
 	ID                    string       `json:"id" gorm:"primaryKey"`
 	UserID                string       `json:"user_id" gorm:"index"`

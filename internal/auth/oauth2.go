@@ -93,7 +93,7 @@ func (s *Service) SignInWithOAuth2(ctx context.Context, providerName string, cod
 		} else {
 			// User exists but with a different provider.
 			// Return error to prevent automatic account linking.
-			// TODO: users must use the account linking feature instead. (coming soon)
+			// TODO: users must use the account linking feature instead.
 			return nil, ErrAccountLinkingRequired
 		}
 
