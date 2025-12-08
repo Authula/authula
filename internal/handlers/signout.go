@@ -33,14 +33,16 @@ func (h *SignOutHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	isSecure, sameSite := util.GetCookieOptions(h.Config)
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     h.Config.Session.CookieName,
 		Value:    "",
-		MaxAge:   -1,
 		Path:     "/",
+		MaxAge:   -1,
 		HttpOnly: true,
-		SameSite: http.SameSiteNoneMode,
-		Secure:   true,
+		Secure:   isSecure,
+		SameSite: sameSite,
 	})
 
 	if h.Config.CSRF.Enabled {
@@ -49,9 +51,9 @@ func (h *SignOutHandler) Handle(w http.ResponseWriter, r *http.Request) {
 			Value:    "",
 			Path:     "/",
 			MaxAge:   -1,
-			Secure:   true,
 			HttpOnly: false,
-			SameSite: http.SameSiteNoneMode,
+			Secure:   isSecure,
+			SameSite: sameSite,
 		})
 	}
 

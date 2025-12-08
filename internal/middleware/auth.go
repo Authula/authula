@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"crypto/subtle"
 	"net/http"
 	"slices"
 
@@ -78,8 +79,14 @@ func CorsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 func CSRFMiddleware(csrfConfig domain.CSRFConfig) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Allow GET always
-			if r.Method == http.MethodGet {
+			if r.Method == http.MethodGet ||
+				r.Method == http.MethodHead ||
+				r.Method == http.MethodOptions {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if !csrfConfig.Enabled {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -96,7 +103,7 @@ func CSRFMiddleware(csrfConfig domain.CSRFConfig) func(http.Handler) http.Handle
 				return
 			}
 
-			if cookie.Value != header {
+			if subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(header)) != 1 {
 				util.JSONResponse(w, http.StatusForbidden, map[string]any{"message": "invalid CSRF token"})
 				return
 			}

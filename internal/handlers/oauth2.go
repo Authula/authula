@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"fmt"
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -176,15 +174,13 @@ func (h *OAuth2CallbackHandler) Handle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		slog.Debug(fmt.Sprintf("Setting csrf token: %s", csrfToken))
-
 		http.SetCookie(w, &http.Cookie{
 			Name:     h.Config.CSRF.CookieName,
 			Value:    csrfToken,
 			Path:     "/",
-			Secure:   true,
 			HttpOnly: false,
-			SameSite: http.SameSiteNoneMode,
+			Secure:   isSecure,
+			SameSite: sameSite,
 			MaxAge:   int(h.Config.CSRF.ExpiresIn.Seconds()),
 		})
 	}

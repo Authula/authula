@@ -86,7 +86,6 @@ func (s *Service) SignUpWithEmailAndPassword(name string, email string, password
 			return nil, fmt.Errorf("failed to create verification: %w", err)
 		}
 
-		// Send verification email
 		if s.config.EmailVerification.SendVerificationEmail != nil {
 			url := util.BuildVerificationURL(
 				s.config.BaseURL,

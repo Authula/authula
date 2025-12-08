@@ -43,14 +43,16 @@ func (h *SignUpHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	isSecure, sameSite := util.GetCookieOptions(h.Config)
+
 	if result.Token != "" {
 		http.SetCookie(w, &http.Cookie{
 			Name:     h.Config.Session.CookieName,
 			Value:    result.Token,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   true,
-			SameSite: http.SameSiteNoneMode,
+			Secure:   isSecure,
+			SameSite: sameSite,
 			MaxAge:   int(h.Config.Session.ExpiresIn.Seconds()),
 		})
 	}
@@ -66,9 +68,9 @@ func (h *SignUpHandler) Handle(w http.ResponseWriter, r *http.Request) {
 			Name:     h.Config.CSRF.CookieName,
 			Value:    csrfToken,
 			Path:     "/",
-			Secure:   true,
 			HttpOnly: false,
-			SameSite: http.SameSiteNoneMode,
+			Secure:   isSecure,
+			SameSite: sameSite,
 			MaxAge:   int(h.Config.CSRF.ExpiresIn.Seconds()),
 		})
 

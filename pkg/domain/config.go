@@ -73,9 +73,9 @@ type UserConfig struct {
 // =======================
 
 type SessionConfig struct {
+	CookieName string
 	ExpiresIn  time.Duration
 	UpdateAge  time.Duration
-	CookieName string
 }
 
 // =======================
@@ -280,12 +280,10 @@ func NewConfig(opts ...ConfigOption) *Config {
 			HeaderName: "X-GOBETTERAUTH-CSRF-TOKEN",
 			ExpiresIn:  7 * 24 * time.Hour,
 		},
-		TrustedOrigins: TrustedOriginsConfig{
-			Origins: []string{},
-		},
-		EndpointHooks: EndpointHooksConfig{},
-		DatabaseHooks: DatabaseHooksConfig{},
-		EventHooks:    EventHooksConfig{},
+		TrustedOrigins: TrustedOriginsConfig{},
+		EndpointHooks:  EndpointHooksConfig{},
+		DatabaseHooks:  DatabaseHooksConfig{},
+		EventHooks:     EventHooksConfig{},
 	}
 
 	// Apply the options
@@ -326,19 +324,81 @@ func WithSecret(secret string) ConfigOption {
 
 func WithDatabase(db DatabaseConfig) ConfigOption {
 	return func(c *Config) {
-		c.Database = db
+		if db.Provider != "" {
+			c.Database.Provider = db.Provider
+		}
+		if db.ConnectionString != "" {
+			c.Database.ConnectionString = db.ConnectionString
+		}
+		if db.MaxOpenConns != 0 {
+			c.Database.MaxOpenConns = db.MaxOpenConns
+		}
+		if db.MaxIdleConns != 0 {
+			c.Database.MaxIdleConns = db.MaxIdleConns
+		}
+		if db.ConnMaxLifetime != 0 {
+			c.Database.ConnMaxLifetime = db.ConnMaxLifetime
+		}
 	}
 }
 
 func WithEmailPassword(config EmailPasswordConfig) ConfigOption {
 	return func(c *Config) {
-		c.EmailPassword = config
+		defaults := c.EmailPassword
+
+		if config.Enabled {
+			defaults.Enabled = config.Enabled
+		}
+		if config.MinPasswordLength != 0 {
+			defaults.MinPasswordLength = config.MinPasswordLength
+		}
+		if config.MaxPasswordLength != 0 {
+			defaults.MaxPasswordLength = config.MaxPasswordLength
+		}
+		if config.DisableSignUp {
+			defaults.DisableSignUp = config.DisableSignUp
+		}
+		if config.RequireEmailVerification {
+			defaults.RequireEmailVerification = config.RequireEmailVerification
+		}
+		if config.AutoSignIn {
+			defaults.AutoSignIn = config.AutoSignIn
+		}
+		if config.SendResetPasswordEmail != nil {
+			defaults.SendResetPasswordEmail = config.SendResetPasswordEmail
+		}
+		if config.ResetTokenExpiry != 0 {
+			defaults.ResetTokenExpiry = config.ResetTokenExpiry
+		}
+		if config.Password != nil {
+			defaults.Password = config.Password
+		}
+
+		c.EmailPassword = defaults
 	}
 }
 
 func WithEmailVerification(config EmailVerificationConfig) ConfigOption {
 	return func(c *Config) {
-		c.EmailVerification = config
+		defaults := c.EmailVerification
+
+		if config.SendVerificationEmail != nil {
+			defaults.SendVerificationEmail = config.SendVerificationEmail
+		}
+		if config.AutoSignIn {
+			defaults.AutoSignIn = config.AutoSignIn
+		}
+		if config.SendOnSignUp {
+			defaults.SendOnSignUp = config.SendOnSignUp
+		}
+		if config.SendOnSignIn {
+			defaults.SendOnSignIn = config.SendOnSignIn
+		}
+		if config.ExpiresIn != 0 {
+			defaults.ExpiresIn = config.ExpiresIn
+		}
+
+		c.EmailVerification = defaults
 	}
 }
 
@@ -350,12 +410,30 @@ func WithUser(userConfig UserConfig) ConfigOption {
 
 func WithSession(sessionConfig SessionConfig) ConfigOption {
 	return func(c *Config) {
+		if sessionConfig.CookieName == "" {
+			sessionConfig.CookieName = c.Session.CookieName
+		}
+		if sessionConfig.ExpiresIn == 0 {
+			sessionConfig.ExpiresIn = c.Session.ExpiresIn
+		}
+		if sessionConfig.UpdateAge == 0 {
+			sessionConfig.UpdateAge = c.Session.UpdateAge
+		}
 		c.Session = sessionConfig
 	}
 }
 
 func WithCSRF(csrfConfig CSRFConfig) ConfigOption {
 	return func(c *Config) {
+		if csrfConfig.CookieName == "" {
+			csrfConfig.CookieName = c.CSRF.CookieName
+		}
+		if csrfConfig.HeaderName == "" {
+			csrfConfig.HeaderName = c.CSRF.HeaderName
+		}
+		if csrfConfig.ExpiresIn == 0 {
+			csrfConfig.ExpiresIn = c.CSRF.ExpiresIn
+		}
 		c.CSRF = csrfConfig
 	}
 }

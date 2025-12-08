@@ -11,7 +11,6 @@ import (
 
 // SignInWithEmailAndPassword handles email/password authentication
 func (s *Service) SignInWithEmailAndPassword(email string, password string, callbackURL *string) (*SignInResult, error) {
-	// Get user by email
 	user, err := s.UserService.GetUserByEmail(email)
 	if err != nil {
 		slog.Error("failed to get user by email", "email", email, "error", err)
@@ -21,7 +20,6 @@ func (s *Service) SignInWithEmailAndPassword(email string, password string, call
 		return nil, ErrInvalidCredentials
 	}
 
-	// Get account for this user
 	acc, err := s.AccountService.GetAccountByUserID(user.ID)
 	if err != nil {
 		slog.Error("failed to get account", "user_id", user.ID, "error", err)
@@ -31,7 +29,6 @@ func (s *Service) SignInWithEmailAndPassword(email string, password string, call
 		return nil, ErrInvalidCredentials
 	}
 
-	// Verify password
 	if acc.Password == nil {
 		return nil, ErrInvalidCredentials
 	}
@@ -41,7 +38,6 @@ func (s *Service) SignInWithEmailAndPassword(email string, password string, call
 		return nil, ErrInvalidCredentials
 	}
 
-	// Delete existing session if any
 	existingSession, err := s.SessionService.GetSessionByUserID(user.ID)
 	if err != nil {
 		slog.Error("failed to get existing session", "user_id", user.ID, "error", err)
