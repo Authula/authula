@@ -7,6 +7,7 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/internal/auth"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
 
 type ctxKey string
@@ -66,6 +67,37 @@ func CorsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 			// Handle preflight requests
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func CSRFMiddleware(csrfConfig domain.CSRFConfig) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Allow GET always
+			if r.Method == http.MethodGet {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			cookie, err := r.Cookie(csrfConfig.CookieName)
+			if err != nil {
+				util.JSONResponse(w, http.StatusForbidden, map[string]any{"message": "missing CSRF cookie"})
+				return
+			}
+
+			header := r.Header.Get(csrfConfig.HeaderName)
+			if header == "" {
+				util.JSONResponse(w, http.StatusForbidden, map[string]any{"message": "missing CSRF header"})
+				return
+			}
+
+			if cookie.Value != header {
+				util.JSONResponse(w, http.StatusForbidden, map[string]any{"message": "invalid CSRF token"})
 				return
 			}
 

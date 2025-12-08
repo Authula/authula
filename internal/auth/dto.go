@@ -6,14 +6,16 @@ import (
 
 // SignInResult represents the result of a sign-in operation
 type SignInResult struct {
-	Token string       `json:"token"`
-	User  *domain.User `json:"user"`
+	Token     string       `json:"token"`
+	User      *domain.User `json:"user"`
+	CSRFToken string       `json:"csrf_token,omitempty"`
 }
 
 // SignUpResult represents the result of a sign-up operation
 type SignUpResult struct {
-	Token string       `json:"token,omitempty"`
-	User  *domain.User `json:"user"`
+	Token     string       `json:"token,omitempty"`
+	User      *domain.User `json:"user"`
+	CSRFToken string       `json:"csrf_token,omitempty"`
 }
 
 // SignOutResult represents the result of a sign-out operation

@@ -47,6 +47,26 @@ func (h *SignInHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		Secure:   true,
 	})
 
+	if h.Config.CSRF.Enabled {
+		csrfToken, err := h.AuthService.TokenService.GenerateToken()
+		if err != nil {
+			util.JSONResponse(w, http.StatusInternalServerError, map[string]any{"message": "failed to generate CSRF token"})
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     h.Config.CSRF.CookieName,
+			Value:    csrfToken,
+			Path:     "/",
+			Secure:   true,
+			HttpOnly: false,
+			SameSite: http.SameSiteNoneMode,
+			MaxAge:   int(h.Config.CSRF.ExpiresIn.Seconds()),
+		})
+
+		result.CSRFToken = csrfToken
+	}
+
 	util.JSONResponse(w, http.StatusOK, result)
 }
 

@@ -79,6 +79,17 @@ type SessionConfig struct {
 }
 
 // =======================
+// CSRF Config
+// =======================
+
+type CSRFConfig struct {
+	Enabled    bool
+	CookieName string
+	HeaderName string
+	ExpiresIn  time.Duration
+}
+
+// =======================
 // Social Providers Config
 // =======================
 
@@ -200,6 +211,7 @@ type Config struct {
 	EmailVerification EmailVerificationConfig
 	User              UserConfig
 	Session           SessionConfig
+	CSRF              CSRFConfig
 	SocialProviders   SocialProvidersConfig
 	TrustedOrigins    TrustedOriginsConfig
 	EndpointHooks     EndpointHooksConfig
@@ -259,8 +271,14 @@ func NewConfig(opts ...ConfigOption) *Config {
 		},
 		Session: SessionConfig{
 			CookieName: "go-better-auth.session_token",
-			ExpiresIn:  7 * 24 * time.Hour, // (default: 7 days)
+			ExpiresIn:  7 * 24 * time.Hour,
 			UpdateAge:  24 * time.Hour,
+		},
+		CSRF: CSRFConfig{
+			Enabled:    false,
+			CookieName: "gobetterauth_csrf",
+			HeaderName: "X-GOBETTERAUTH-CSRF-TOKEN",
+			ExpiresIn:  7 * 24 * time.Hour,
 		},
 		TrustedOrigins: TrustedOriginsConfig{
 			Origins: []string{},
@@ -333,6 +351,12 @@ func WithUser(userConfig UserConfig) ConfigOption {
 func WithSession(sessionConfig SessionConfig) ConfigOption {
 	return func(c *Config) {
 		c.Session = sessionConfig
+	}
+}
+
+func WithCSRF(csrfConfig CSRFConfig) ConfigOption {
+	return func(c *Config) {
+		c.CSRF = csrfConfig
 	}
 }
 

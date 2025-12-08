@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
@@ -23,7 +22,6 @@ func (s *Service) SignInWithOAuth2(ctx context.Context, providerName string, cod
 		slog.Error("failed to exchange oauth2 code", "provider", providerName, "error", err)
 		return nil, ErrOAuth2ExchangeFailed
 	}
-	slog.Debug(fmt.Sprintf("Token: %s", oauthToken.AccessToken))
 
 	userInfo, err := provider.GetUserInfo(ctx, oauthToken)
 	if err != nil {
