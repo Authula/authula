@@ -38,6 +38,7 @@
 - 📦 **Minimal Dependencies** – Standard library first, production-ready, and framework-agnostic.
 - 🧩 **Comprehensive Configuration** – Flexible, type-safe config with sensible defaults and environment variable support.
 - 🛡️ **Enhanced Security** – CSRF protection.
+- ⚡ **Rate Limiting** – Configurable rate limiting with secondary storage.
 
 ---
 
@@ -52,7 +53,6 @@ For more info and a full guide on how to use this library, check out the [Docs](
 Planned features:
 
 - 🔌 **Plugin System** – Extensible plugin architecture for custom business logic and routes. Including flexible plugin interface to implement all kinds of plugins.
-- ⚡ **Rate Limiting** – Configurable, per-endpoint rate limiting with memory or database storage
 
 ---
 

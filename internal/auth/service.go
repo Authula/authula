@@ -14,6 +14,7 @@ type Service struct {
 	VerificationService    *VerificationService
 	TokenService           *TokenService
 	OAuth2ProviderRegistry *oauth2.OAuth2ProviderRegistry
+	RateLimitService       *RateLimitService
 }
 
 // NewService creates a new Auth service with all dependencies
@@ -24,6 +25,7 @@ func NewService(
 	sessionService *SessionService,
 	verificationService *VerificationService,
 	tokenService *TokenService,
+	rateLimitService *RateLimitService,
 ) *Service {
 	oauth2ProviderRegistry := oauth2.NewOAuth2ProviderRegistry()
 	if config.SocialProviders.Default.Discord != nil {
@@ -44,5 +46,6 @@ func NewService(
 		VerificationService:    verificationService,
 		TokenService:           tokenService,
 		OAuth2ProviderRegistry: oauth2ProviderRegistry,
+		RateLimitService:       rateLimitService,
 	}
 }

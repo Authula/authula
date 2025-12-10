@@ -139,6 +139,32 @@ type TrustedOriginsConfig struct {
 }
 
 // =======================
+// Rate Limit Config
+// =======================
+
+type RateLimitCustomRule struct {
+	Disabled bool
+	Window   time.Duration
+	Max      int
+}
+
+type RateLimitCustomRuleFunc func(req *http.Request) RateLimitCustomRule
+
+type IPConfig struct {
+	Headers []string
+}
+
+type RateLimitConfig struct {
+	Enabled     bool
+	Window      time.Duration
+	Max         int
+	Algorithm   string
+	Prefix      string
+	CustomRules map[string]RateLimitCustomRuleFunc
+	IP          IPConfig
+}
+
+// =======================
 // Endpoint Hooks Config
 // =======================
 
@@ -223,6 +249,7 @@ type Config struct {
 	CSRF              CSRFConfig
 	SocialProviders   SocialProvidersConfig
 	TrustedOrigins    TrustedOriginsConfig
+	RateLimit         RateLimitConfig
 	EndpointHooks     EndpointHooksConfig
 	DatabaseHooks     DatabaseHooksConfig
 	EventHooks        EventHooksConfig
@@ -290,9 +317,21 @@ func NewConfig(opts ...ConfigOption) *Config {
 			ExpiresIn:  7 * 24 * time.Hour,
 		},
 		TrustedOrigins: TrustedOriginsConfig{},
-		EndpointHooks:  EndpointHooksConfig{},
-		DatabaseHooks:  DatabaseHooksConfig{},
-		EventHooks:     EventHooksConfig{},
+		RateLimit: RateLimitConfig{
+			Enabled:   false,
+			Window:    1 * time.Minute,
+			Max:       100,
+			Algorithm: RateLimitAlgorithmFixedWindow,
+			Prefix:    "ratelimit:",
+			IP: IPConfig{
+				Headers: []string{
+					"x-forwarded-for",
+				},
+			},
+		},
+		EndpointHooks: EndpointHooksConfig{},
+		DatabaseHooks: DatabaseHooksConfig{},
+		EventHooks:    EventHooksConfig{},
 	}
 
 	// Apply the options
@@ -453,9 +492,45 @@ func WithCSRF(csrfConfig CSRFConfig) ConfigOption {
 	}
 }
 
+func WithSocialProviders(socialProvidersConfig SocialProvidersConfig) ConfigOption {
+	return func(c *Config) {
+		c.SocialProviders = socialProvidersConfig
+	}
+}
+
 func WithTrustedOrigins(trustedOriginsConfig TrustedOriginsConfig) ConfigOption {
 	return func(c *Config) {
 		c.TrustedOrigins = trustedOriginsConfig
+	}
+}
+
+func WithRateLimit(rateLimitConfig RateLimitConfig) ConfigOption {
+	return func(c *Config) {
+		defaults := c.RateLimit
+
+		if rateLimitConfig.Enabled {
+			defaults.Enabled = rateLimitConfig.Enabled
+		}
+		if rateLimitConfig.Window != 0 {
+			defaults.Window = rateLimitConfig.Window
+		}
+		if rateLimitConfig.Max != 0 {
+			defaults.Max = rateLimitConfig.Max
+		}
+		if rateLimitConfig.Algorithm != "" {
+			defaults.Algorithm = rateLimitConfig.Algorithm
+		}
+		if rateLimitConfig.Prefix != "" {
+			defaults.Prefix = rateLimitConfig.Prefix
+		}
+		if rateLimitConfig.CustomRules != nil {
+			defaults.CustomRules = rateLimitConfig.CustomRules
+		}
+		if len(rateLimitConfig.IP.Headers) != 0 {
+			defaults.IP.Headers = rateLimitConfig.IP.Headers
+		}
+
+		c.RateLimit = defaults
 	}
 }
 
@@ -474,11 +549,5 @@ func WithDatabaseHooks(databaseHooksConfig DatabaseHooksConfig) ConfigOption {
 func WithEventHooks(eventHooksConfig EventHooksConfig) ConfigOption {
 	return func(c *Config) {
 		c.EventHooks = eventHooksConfig
-	}
-}
-
-func WithSocialProviders(socialProvidersConfig SocialProvidersConfig) ConfigOption {
-	return func(c *Config) {
-		c.SocialProviders = socialProvidersConfig
 	}
 }

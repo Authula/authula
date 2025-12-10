@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"gorm.io/gorm"
@@ -21,7 +22,6 @@ type DatabaseSecondaryStorage struct {
 	done chan struct{}
 }
 
-// NewDatabaseSecondaryStorage creates a new instance of DatabaseSecondaryStorage.
 func NewDatabaseSecondaryStorage(db *gorm.DB, config *domain.SecondaryStorageDatabaseConfig) *DatabaseSecondaryStorage {
 	cleanupInterval := 1 * time.Minute
 	if config != nil {
@@ -127,6 +127,63 @@ func (storage *DatabaseSecondaryStorage) Delete(ctx context.Context, key string)
 	}
 
 	return nil
+}
+
+// Incr increments the integer value stored at key by 1.
+// If the key does not exist, it is initialized to 0 and then incremented to 1.
+// If ttl is provided, it will be set or updated on the key.
+func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, ttl *time.Duration) (int, error) {
+	// Check context cancellation early.
+	select {
+	case <-ctx.Done():
+		return 0, fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
+	}
+
+	var count int
+
+	// Try to get existing entry
+	var entry domain.KeyValueStore
+	result := storage.db.WithContext(ctx).Where("key = ?", key).First(&entry)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return 0, fmt.Errorf("database error: %w", result.Error)
+	}
+
+	// Parse existing value if found and not expired
+	if result.Error == nil {
+		if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
+			// Treat expired entry as non-existent
+			count = 0
+		} else {
+			if num, err := strconv.Atoi(entry.Value); err == nil {
+				count = num
+			} else {
+				return 0, fmt.Errorf("value at key %s is not a valid integer: %w", key, err)
+			}
+		}
+	}
+
+	// Increment the count
+	count++
+
+	// Prepare the entry for update/insert
+	newEntry := domain.KeyValueStore{
+		Key:   key,
+		Value: strconv.Itoa(count),
+	}
+
+	if ttl != nil {
+		expiresAt := time.Now().Add(*ttl)
+		newEntry.ExpiresAt = &expiresAt
+	}
+
+	// Use upsert logic
+	if result := storage.db.WithContext(ctx).Save(&newEntry); result.Error != nil {
+		return 0, fmt.Errorf("database error: %w", result.Error)
+	}
+
+	return count, nil
 }
 
 // cleanupExpiredEntries runs periodically to remove expired entries from the database.

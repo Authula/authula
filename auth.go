@@ -20,8 +20,9 @@ import (
 
 // Auth is the main struct exposing the unified handler
 type Auth struct {
-	Config *domain.Config
-	DB     *gorm.DB
+	Config      *domain.Config
+	DB          *gorm.DB
+	authService *auth.Service
 }
 
 // New initializes the Auth library with GORM
@@ -64,8 +65,9 @@ func New(config *domain.Config, db *gorm.DB) *Auth {
 	}
 
 	return &Auth{
-		Config: config,
-		DB:     dbToUse,
+		Config:      config,
+		DB:          dbToUse,
+		authService: constructAuthService(config, dbToUse),
 	}
 }
 
@@ -102,55 +104,101 @@ func (auth *Auth) DropMigrations() {
 	}
 }
 
+func constructAuthService(config *domain.Config, db *gorm.DB) *auth.Service {
+	userService := auth.NewUserService(config, db)
+	accountService := auth.NewAccountService(config, db)
+	sessionService := auth.NewSessionService(config, db)
+	verificationService := auth.NewVerificationService(config, db)
+	tokenService := auth.NewTokenService(config)
+	rateLimitService := auth.NewRateLimitService(config)
+	authService := auth.NewService(
+		config,
+		userService,
+		accountService,
+		sessionService,
+		verificationService,
+		tokenService,
+		rateLimitService,
+	)
+
+	return authService
+}
+
+func (auth *Auth) AuthMiddleware() func(http.Handler) http.Handler {
+	return middleware.AuthMiddleware(
+		auth.authService,
+		auth.Config.Session.CookieName,
+	)
+}
+
+func (auth *Auth) OptionalAuthMiddleware() func(http.Handler) http.Handler {
+	return middleware.OptionalAuthMiddleware(
+		auth.authService,
+		auth.Config.Session.CookieName,
+	)
+}
+
+func (auth *Auth) CorsAuthMiddleware() func(http.Handler) http.Handler {
+	return middleware.CorsMiddleware(
+		auth.Config.TrustedOrigins.Origins,
+	)
+}
+
+func (auth *Auth) CSRFMiddleware() func(http.Handler) http.Handler {
+	return middleware.CSRFMiddleware(auth.Config.CSRF)
+}
+
+func (auth *Auth) RateLimitMiddleware() func(http.Handler) http.Handler {
+	return middleware.RateLimitMiddleware(auth.authService.RateLimitService)
+}
+
 func (auth *Auth) Handler() http.Handler {
 	r := http.NewServeMux()
-
-	authService := constructAuthService(auth.Config, auth.DB)
 
 	// Handlers
 	signIn := &handlers.SignInHandler{
 		Config:      auth.Config,
-		AuthService: authService,
+		AuthService: auth.authService,
 	}
 	signUp := &handlers.SignUpHandler{
 		Config:      auth.Config,
-		AuthService: authService,
+		AuthService: auth.authService,
 	}
 	signOut := &handlers.SignOutHandler{
 		Config:      auth.Config,
-		AuthService: authService,
+		AuthService: auth.authService,
 	}
 	sendEmailVerification := &handlers.SendEmailVerificationHandler{
 		Config:      auth.Config,
-		AuthService: authService,
+		AuthService: auth.authService,
 	}
 	verifyEmail := &handlers.VerifyEmailHandler{
 		Config:      auth.Config,
-		AuthService: authService,
+		AuthService: auth.authService,
 	}
 	resetPassword := &handlers.ResetPasswordHandler{
 		Config:      auth.Config,
-		AuthService: authService,
+		AuthService: auth.authService,
 	}
 	changePassword := &handlers.ChangePasswordHandler{
 		Config:      auth.Config,
-		AuthService: authService,
+		AuthService: auth.authService,
 	}
 	changeEmailRequest := &handlers.EmailChangeHandler{
 		Config:      auth.Config,
-		AuthService: authService,
+		AuthService: auth.authService,
 	}
 	me := &handlers.MeHandler{
 		Config:      auth.Config,
-		AuthService: authService,
+		AuthService: auth.authService,
 	}
 	oauth2Login := &handlers.OAuth2LoginHandler{
 		Config:      auth.Config,
-		AuthService: authService,
+		AuthService: auth.authService,
 	}
 	oauth2Callback := &handlers.OAuth2CallbackHandler{
 		Config:      auth.Config,
-		AuthService: authService,
+		AuthService: auth.authService,
 	}
 
 	basePath := auth.Config.BasePath
@@ -176,48 +224,11 @@ func (auth *Auth) Handler() http.Handler {
 	r.Handle("GET "+basePath+"/oauth2/{provider}/login", oauth2Login.Handler())
 	r.Handle("GET "+basePath+"/oauth2/{provider}/callback", oauth2Callback.Handler())
 
-	return middleware.EndpointHooksMiddleware(auth.Config, authService)(r)
-}
+	var finalHandler http.Handler = r
+	if auth.Config.RateLimit.Enabled {
+		finalHandler = auth.RateLimitMiddleware()(finalHandler)
+	}
+	finalHandler = middleware.EndpointHooksMiddleware(auth.Config, auth.authService)(finalHandler)
 
-// Export middleware
-func (auth *Auth) AuthMiddleware() func(http.Handler) http.Handler {
-	return middleware.AuthMiddleware(
-		constructAuthService(auth.Config, auth.DB),
-		auth.Config.Session.CookieName,
-	)
-}
-
-func (auth *Auth) OptionalAuthMiddleware() func(http.Handler) http.Handler {
-	return middleware.OptionalAuthMiddleware(
-		constructAuthService(auth.Config, auth.DB),
-		auth.Config.Session.CookieName,
-	)
-}
-
-func (auth *Auth) CorsAuthMiddleware() func(http.Handler) http.Handler {
-	return middleware.CorsMiddleware(
-		auth.Config.TrustedOrigins.Origins,
-	)
-}
-
-func (auth *Auth) CSRFMiddleware() func(http.Handler) http.Handler {
-	return middleware.CSRFMiddleware(auth.Config.CSRF)
-}
-
-func constructAuthService(config *domain.Config, db *gorm.DB) *auth.Service {
-	userService := auth.NewUserService(config, db)
-	accountService := auth.NewAccountService(config, db)
-	sessionService := auth.NewSessionService(config, db)
-	verificationService := auth.NewVerificationService(config, db)
-	tokenService := auth.NewTokenService(config)
-	authService := auth.NewService(
-		config,
-		userService,
-		accountService,
-		sessionService,
-		verificationService,
-		tokenService,
-	)
-
-	return authService
+	return finalHandler
 }
