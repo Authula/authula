@@ -45,7 +45,6 @@ func NewDatabaseSecondaryStorage(db *gorm.DB, config *domain.SecondaryStorageDat
 // Get retrieves a value from the database by key.
 // Returns an error if the key does not exist or has expired.
 func (storage *DatabaseSecondaryStorage) Get(ctx context.Context, key string) (any, error) {
-	// Check context cancellation early.
 	select {
 	case <-ctx.Done():
 		return nil, fmt.Errorf("context cancelled: %w", ctx.Err())
@@ -72,14 +71,12 @@ func (storage *DatabaseSecondaryStorage) Get(ctx context.Context, key string) (a
 // Set stores a value in the database with an optional TTL.
 // The value must be a string. If ttl is nil, the entry will not expire.
 func (storage *DatabaseSecondaryStorage) Set(ctx context.Context, key string, value any, ttl *time.Duration) error {
-	// Check context cancellation early.
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("context cancelled: %w", ctx.Err())
 	default:
 	}
 
-	// Type assert to string.
 	valueStr, ok := value.(string)
 	if !ok {
 		return fmt.Errorf("value must be of type string, got %T", value)
@@ -95,7 +92,6 @@ func (storage *DatabaseSecondaryStorage) Set(ctx context.Context, key string, va
 		entry.ExpiresAt = &expiresAt
 	}
 
-	// Use upsert logic: Save will insert or update based on primary key.
 	result := storage.db.WithContext(ctx).Save(&entry)
 
 	if result.Error != nil {
@@ -108,7 +104,6 @@ func (storage *DatabaseSecondaryStorage) Set(ctx context.Context, key string, va
 // Delete removes a key from the database.
 // Returns an error if the key does not exist.
 func (storage *DatabaseSecondaryStorage) Delete(ctx context.Context, key string) error {
-	// Check context cancellation early.
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("context cancelled: %w", ctx.Err())
@@ -121,7 +116,6 @@ func (storage *DatabaseSecondaryStorage) Delete(ctx context.Context, key string)
 		return fmt.Errorf("database error: %w", result.Error)
 	}
 
-	// Check if any rows were deleted.
 	if result.RowsAffected == 0 {
 		return fmt.Errorf("key not found: %s", key)
 	}
@@ -133,7 +127,6 @@ func (storage *DatabaseSecondaryStorage) Delete(ctx context.Context, key string)
 // If the key does not exist, it is initialized to 0 and then incremented to 1.
 // If ttl is provided, it will be set or updated on the key.
 func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, ttl *time.Duration) (int, error) {
-	// Check context cancellation early.
 	select {
 	case <-ctx.Done():
 		return 0, fmt.Errorf("context cancelled: %w", ctx.Err())
@@ -142,7 +135,6 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 
 	var count int
 
-	// Try to get existing entry
 	var entry domain.KeyValueStore
 	result := storage.db.WithContext(ctx).Where("key = ?", key).First(&entry)
 
@@ -150,10 +142,8 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 		return 0, fmt.Errorf("database error: %w", result.Error)
 	}
 
-	// Parse existing value if found and not expired
 	if result.Error == nil {
 		if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
-			// Treat expired entry as non-existent
 			count = 0
 		} else {
 			if num, err := strconv.Atoi(entry.Value); err == nil {
@@ -164,10 +154,8 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 		}
 	}
 
-	// Increment the count
 	count++
 
-	// Prepare the entry for update/insert
 	newEntry := domain.KeyValueStore{
 		Key:   key,
 		Value: strconv.Itoa(count),
@@ -178,7 +166,6 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 		newEntry.ExpiresAt = &expiresAt
 	}
 
-	// Use upsert logic
 	if result := storage.db.WithContext(ctx).Save(&newEntry); result.Error != nil {
 		return 0, fmt.Errorf("database error: %w", result.Error)
 	}
