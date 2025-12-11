@@ -198,6 +198,10 @@ func (auth *Auth) RateLimitMiddleware() func(http.Handler) http.Handler {
 	return middleware.RateLimitMiddleware(auth.authService.RateLimitService)
 }
 
+func (auth *Auth) EndpointHooksMiddleware() func(http.Handler) http.Handler {
+	return middleware.EndpointHooksMiddleware(auth.Config, auth.authService)
+}
+
 func (auth *Auth) Handler() http.Handler {
 	r := http.NewServeMux()
 
