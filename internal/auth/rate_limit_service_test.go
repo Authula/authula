@@ -107,14 +107,13 @@ func TestRateLimitService_CustomRule(t *testing.T) {
 			Algorithm: domain.RateLimitAlgorithmFixedWindow,
 			Prefix:    "test:",
 			CustomRules: map[string]domain.RateLimitCustomRuleFunc{
-				"strict-key": func(req *http.Request) domain.RateLimitCustomRule {
+				"/strict": func(req *http.Request) domain.RateLimitCustomRule {
 					return domain.RateLimitCustomRule{
-						Disabled: false,
-						Window:   1 * time.Minute,
-						Max:      2,
+						Window: 1 * time.Minute,
+						Max:    2,
 					}
 				},
-				"disabled-key": func(req *http.Request) domain.RateLimitCustomRule {
+				"/disabled": func(req *http.Request) domain.RateLimitCustomRule {
 					return domain.RateLimitCustomRule{
 						Disabled: true,
 					}
@@ -131,20 +130,21 @@ func TestRateLimitService_CustomRule(t *testing.T) {
 
 	service := NewRateLimitService(config)
 	ctx := context.Background()
-	req := createMockRequest()
 
 	// Test strict custom rule
-	allowed1, _ := service.Allow(ctx, "strict-key", req)
-	allowed2, _ := service.Allow(ctx, "strict-key", req)
-	allowed3, _ := service.Allow(ctx, "strict-key", req)
+	reqStrict, _ := http.NewRequest("GET", "/strict", nil)
+	allowed1, _ := service.Allow(ctx, "strict-key", reqStrict)
+	allowed2, _ := service.Allow(ctx, "strict-key", reqStrict)
+	allowed3, _ := service.Allow(ctx, "strict-key", reqStrict)
 
 	if !allowed1 || !allowed2 || allowed3 {
 		t.Errorf("Custom rule not working: %v, %v, %v (expected true, true, false)", allowed1, allowed2, allowed3)
 	}
 
 	// Test disabled rule (infinite)
+	reqDisabled, _ := http.NewRequest("GET", "/disabled", nil)
 	for i := range 100 {
-		allowed, err := service.Allow(ctx, "disabled-key", req)
+		allowed, err := service.Allow(ctx, "disabled-key", reqDisabled)
 		if err != nil {
 			t.Errorf("Disabled rule returned error: %v", err)
 		}

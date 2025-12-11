@@ -172,30 +172,28 @@ type RateLimitConfig struct {
 // =======================
 
 type EndpointHookContext struct {
-	Path    string
-	Method  string
-	Body    map[string]any
-	Headers map[string]string
-	Query   map[string]string
-	Request *http.Request
-	User    *User
+	Path            string
+	Method          string
+	Body            map[string]any
+	Headers         map[string]string
+	Query           map[string]string
+	Request         *http.Request
+	User            *User
+	ResponseHeaders map[string]string
+	ResponseCookies []*http.Cookie
+	ResponseStatus  int
+	ResponseBody    []byte
 }
 
 type EndpointHooksConfig struct {
-	Before func(ctx *EndpointHookContext) error
-	After  func(ctx *EndpointHookContext) error
+	Before   func(ctx *EndpointHookContext) error
+	Response func(ctx *EndpointHookContext) error
+	After    func(ctx *EndpointHookContext) error
 }
 
 // =======================
 // Database Hooks Config
 // =======================
-
-type DatabaseHooksConfig struct {
-	Users         *UserDatabaseHooksConfig
-	Accounts      *AccountDatabaseHooksConfig
-	Sessions      *SessionDatabaseHooksConfig
-	Verifications *VerificationDatabaseHooksConfig
-}
 
 type UserDatabaseHooksConfig struct {
 	BeforeCreate func(user *User) error
@@ -219,6 +217,13 @@ type SessionDatabaseHooksConfig struct {
 type VerificationDatabaseHooksConfig struct {
 	BeforeCreate func(verification *Verification) error
 	AfterCreate  func(verification Verification) error
+}
+
+type DatabaseHooksConfig struct {
+	Users         *UserDatabaseHooksConfig
+	Accounts      *AccountDatabaseHooksConfig
+	Sessions      *SessionDatabaseHooksConfig
+	Verifications *VerificationDatabaseHooksConfig
 }
 
 // =======================

@@ -12,20 +12,44 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
 
+type responseBuffer struct {
+	status  int
+	header  http.Header
+	body    bytes.Buffer
+	written bool
+}
+
+func (w *responseBuffer) Header() http.Header {
+	return w.header
+}
+
+func (w *responseBuffer) Write(b []byte) (int, error) {
+	if !w.written {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.body.Write(b)
+}
+
+func (w *responseBuffer) WriteHeader(statusCode int) {
+	w.status = statusCode
+	w.written = true
+}
+
 func EndpointHooksMiddleware(config *domain.Config, authService *auth.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if config.EndpointHooks.Before == nil && config.EndpointHooks.After == nil {
+			if config.EndpointHooks.Before == nil && config.EndpointHooks.After == nil && config.EndpointHooks.Response == nil {
 				next.ServeHTTP(w, r)
 				return
 			}
 
 			hookCtx := &domain.EndpointHookContext{
-				Path:    r.URL.Path,
-				Method:  r.Method,
-				Headers: make(map[string]string),
-				Query:   make(map[string]string),
-				Request: r,
+				Path:            r.URL.Path,
+				Method:          r.Method,
+				Headers:         make(map[string]string),
+				Query:           make(map[string]string),
+				Request:         r,
+				ResponseHeaders: make(map[string]string),
 			}
 
 			for k, v := range r.Header {
@@ -73,9 +97,74 @@ func EndpointHooksMiddleware(config *domain.Config, authService *auth.Service) f
 					util.JSONResponse(w, http.StatusBadRequest, map[string]any{"message": err.Error()})
 					return
 				}
+
+				if len(hookCtx.ResponseHeaders) > 0 {
+					for k, v := range hookCtx.ResponseHeaders {
+						w.Header().Set(k, v)
+					}
+				}
+
+				if len(hookCtx.ResponseCookies) > 0 {
+					for _, cookie := range hookCtx.ResponseCookies {
+						http.SetCookie(w, cookie)
+					}
+				}
+
+				if hookCtx.ResponseStatus != 0 || hookCtx.ResponseBody != nil {
+					status := hookCtx.ResponseStatus
+					if status == 0 {
+						status = http.StatusOK
+					}
+					w.WriteHeader(status)
+					if hookCtx.ResponseBody != nil {
+						w.Write(hookCtx.ResponseBody)
+					}
+					return
+				}
 			}
 
-			next.ServeHTTP(w, r)
+			if config.EndpointHooks.Response != nil {
+				buf := &responseBuffer{
+					header: make(http.Header),
+				}
+				next.ServeHTTP(buf, r)
+
+				hookCtx.ResponseStatus = buf.status
+				hookCtx.ResponseBody = buf.body.Bytes()
+				for k, v := range buf.header {
+					if len(v) > 0 {
+						hookCtx.ResponseHeaders[k] = v[0]
+					}
+				}
+
+				if err := config.EndpointHooks.Response(hookCtx); err != nil {
+					slog.Error("Error in Response Hook for %s: %v", hookCtx.Path, err)
+					util.JSONResponse(w, http.StatusInternalServerError, map[string]any{"message": "Internal Server Error"})
+					return
+				}
+
+				// Write final response
+				for k, v := range hookCtx.ResponseHeaders {
+					w.Header().Set(k, v)
+				}
+
+				if len(hookCtx.ResponseCookies) > 0 {
+					for _, cookie := range hookCtx.ResponseCookies {
+						http.SetCookie(w, cookie)
+					}
+				}
+
+				status := hookCtx.ResponseStatus
+				if status == 0 {
+					status = http.StatusOK
+				}
+				w.WriteHeader(status)
+				if hookCtx.ResponseBody != nil {
+					w.Write(hookCtx.ResponseBody)
+				}
+			} else {
+				next.ServeHTTP(w, r)
+			}
 
 			if config.EndpointHooks.After != nil {
 				go func() {
