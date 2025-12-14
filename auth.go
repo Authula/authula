@@ -9,8 +9,10 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/internal/auth"
 	"github.com/GoBetterAuth/go-better-auth/internal/auth/storage"
+	"github.com/GoBetterAuth/go-better-auth/internal/events"
 	"github.com/GoBetterAuth/go-better-auth/internal/handlers"
 	"github.com/GoBetterAuth/go-better-auth/internal/middleware"
+	"github.com/GoBetterAuth/go-better-auth/internal/plugins"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
@@ -29,11 +31,12 @@ type Api struct {
 }
 
 type Auth struct {
-	Config       *domain.Config
-	authService  *auth.Service
-	Api          Api
-	mux          *http.ServeMux
-	customRoutes []domain.CustomRoute
+	Config         *domain.Config
+	mux            *http.ServeMux
+	authService    *auth.Service
+	Api            Api
+	customRoutes   []domain.CustomRoute
+	pluginRegistry *plugins.PluginRegistry
 }
 
 func New(config *domain.Config) *Auth {
@@ -41,7 +44,19 @@ func New(config *domain.Config) *Auth {
 	initStorage(config)
 	mux := http.NewServeMux()
 
-	authService := constructAuthService(config)
+	// Initialize event bus
+	var eventBus domain.EventBus
+	if config.EventBus.Enabled {
+		eventBus = events.NewEventBus(config, config.EventBus.PubSub)
+	}
+
+	pluginRegistry := plugins.NewPluginRegistry(config, eventBus)
+	for _, p := range config.Plugins.Plugins {
+		pluginRegistry.Register(p)
+	}
+	_ = pluginRegistry.InitAll()
+
+	authService := constructAuthService(config, eventBus, pluginRegistry)
 
 	api := Api{
 		Users:         authService.UserService,
@@ -52,11 +67,12 @@ func New(config *domain.Config) *Auth {
 	}
 
 	auth := &Auth{
-		Config:       config,
-		authService:  authService,
-		Api:          api,
-		mux:          mux,
-		customRoutes: []domain.CustomRoute{},
+		Config:         config,
+		mux:            mux,
+		authService:    authService,
+		Api:            api,
+		customRoutes:   make([]domain.CustomRoute, 0),
+		pluginRegistry: pluginRegistry,
 	}
 
 	return auth
@@ -102,6 +118,7 @@ func (auth *Auth) RunMigrations() {
 		logger.Error("failed to auto migrate database", slog.Any("error", err))
 		panic(err)
 	}
+	_ = auth.pluginRegistry.RunMigrations()
 }
 
 func (auth *Auth) DropMigrations() {
@@ -125,15 +142,17 @@ func (auth *Auth) DropMigrations() {
 // MIDDLEWARES & HANDLERS
 // ---------------------------------
 
-func constructAuthService(config *domain.Config) *auth.Service {
+func constructAuthService(config *domain.Config, eventBus domain.EventBus, pluginRegistry *plugins.PluginRegistry) *auth.Service {
 	userService := auth.NewUserService(config, config.DB)
 	accountService := auth.NewAccountService(config, config.DB)
 	sessionService := auth.NewSessionService(config, config.DB)
 	verificationService := auth.NewVerificationService(config, config.DB)
 	tokenService := auth.NewTokenService(config)
-	rateLimitService := auth.NewRateLimitService(config)
+	rateLimitService := auth.NewRateLimitService(config, pluginRegistry)
+
 	authService := auth.NewService(
 		config,
+		eventBus,
 		userService,
 		accountService,
 		sessionService,
@@ -187,8 +206,8 @@ func (auth *Auth) GetUserIDFromContext(ctx context.Context) (string, bool) {
 	return id, ok
 }
 
-func (auth *Auth) GetUserIDFromRequest(r *http.Request) (string, bool) {
-	return auth.GetUserIDFromContext(r.Context())
+func (auth *Auth) GetUserIDFromRequest(req *http.Request) (string, bool) {
+	return auth.GetUserIDFromContext(req.Context())
 }
 
 func (auth *Auth) RegisterRoute(route domain.CustomRoute) {
@@ -204,8 +223,8 @@ func (auth *Auth) RegisterRoute(route domain.CustomRoute) {
 	auth.customRoutes = append(auth.customRoutes, route)
 }
 
+// Handler sets up all routes and returns the final http.Handler
 func (auth *Auth) Handler() http.Handler {
-	// Handlers
 	signIn := &handlers.SignInHandler{
 		Config:      auth.Config,
 		AuthService: auth.authService,
@@ -274,11 +293,8 @@ func (auth *Auth) Handler() http.Handler {
 	auth.mux.Handle("GET "+basePath+"/oauth2/{provider}/login", oauth2Login.Handler())
 	auth.mux.Handle("GET "+basePath+"/oauth2/{provider}/callback", oauth2Callback.Handler())
 
-	// Register custom routes
-	for _, customRoute := range auth.customRoutes {
-		path := fmt.Sprintf("%s/%s", basePath, customRoute.Path)
-		auth.mux.Handle(fmt.Sprintf("%s %s", customRoute.Method, path), customRoute.Handler(auth.Config))
-	}
+	auth.registerCustomRoutes(basePath)
+	auth.registerPluginRoutes(basePath)
 
 	var finalHandler http.Handler = auth.mux
 	finalHandler = middleware.EndpointHooksMiddleware(auth.Config, auth.authService)(finalHandler)
@@ -287,4 +303,54 @@ func (auth *Auth) Handler() http.Handler {
 	}
 
 	return finalHandler
+}
+
+func (auth *Auth) registerCustomRoutes(basePath string) {
+	if len(auth.customRoutes) > 0 {
+		for _, customRoute := range auth.customRoutes {
+			path := fmt.Sprintf("%s%s", basePath, customRoute.Path)
+			auth.mux.Handle(fmt.Sprintf("%s %s", customRoute.Method, path), customRoute.Handler(auth.Config))
+		}
+	}
+}
+
+// RegisterPluginRoutes registers routes from plugins
+func (auth *Auth) registerPluginRoutes(basePath string) {
+	if auth.pluginRegistry == nil {
+		return
+	}
+
+	plugins := auth.pluginRegistry.Plugins()
+	if len(plugins) == 0 {
+		return
+	}
+
+	for _, plugin := range plugins {
+		pluginRoutes := plugin.Routes()
+		if len(pluginRoutes) == 0 {
+			continue
+		}
+
+		for _, route := range pluginRoutes {
+			path := fmt.Sprintf("%s%s", basePath, route.Path)
+			handler := route.Handler()
+
+			for i := len(route.Middleware) - 1; i >= 0; i-- {
+				handler = route.Middleware[i](handler)
+			}
+
+			auth.mux.Handle(fmt.Sprintf("%s %s", route.Method, path), handler)
+		}
+	}
+}
+
+// ClosePlugins calls Close for all registered plugins
+func (auth *Auth) ClosePlugins() error {
+	if auth.pluginRegistry == nil {
+		return nil
+	}
+
+	auth.pluginRegistry.CloseAll()
+
+	return nil
 }

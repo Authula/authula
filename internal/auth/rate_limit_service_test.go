@@ -7,8 +7,64 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/auth/storage"
+	"github.com/GoBetterAuth/go-better-auth/internal/plugins"
 	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
+
+// ------------------------------------
+
+type mockPlugin struct{}
+
+func (m *mockPlugin) Metadata() domain.PluginMetadata {
+	return domain.PluginMetadata{
+		Name:        "Mock Plugin",
+		Version:     "0.0.1",
+		Description: "A mock plugin.",
+	}
+}
+
+func (m *mockPlugin) Config() domain.PluginConfig {
+	return domain.PluginConfig{Enabled: true}
+}
+
+func (m *mockPlugin) Init(ctx *domain.PluginContext) error {
+	return nil
+}
+
+func (m *mockPlugin) Migrations() []any {
+	return []any{}
+}
+
+func (m *mockPlugin) Routes() []domain.PluginRoute {
+	return []domain.PluginRoute{}
+}
+
+func (m *mockPlugin) RateLimit() *domain.PluginRateLimit {
+	return &domain.PluginRateLimit{
+		CustomRules: map[string]domain.RateLimitCustomRuleFunc{
+			"/plugin": func(req *http.Request) domain.RateLimitCustomRule {
+				return domain.RateLimitCustomRule{
+					Window: 1 * time.Minute,
+					Max:    1,
+				}
+			},
+		},
+	}
+}
+
+func (m *mockPlugin) DatabaseHooks() *domain.PluginDatabaseHooks {
+	return nil
+}
+
+func (m *mockPlugin) EventHooks() *domain.PluginEventHooks {
+	return nil
+}
+
+func (m *mockPlugin) Close() error {
+	return nil
+}
+
+// ------------------------------------
 
 // createMockRequest creates a basic mock HTTP request for testing
 func createMockRequest() *http.Request {
@@ -61,24 +117,28 @@ func TestRateLimitService_Allow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := &domain.Config{
-				RateLimit: domain.RateLimitConfig{
-					Enabled:     tt.enabled,
-					Window:      tt.window,
-					Max:         tt.max,
-					Algorithm:   domain.RateLimitAlgorithmFixedWindow,
-					Prefix:      "test:",
-					CustomRules: map[string]domain.RateLimitCustomRuleFunc{},
-					IP: domain.IPConfig{
-						Headers: []string{"X-Forwarded-For", "X-Real-IP"},
+			config := domain.NewConfig(
+				domain.WithSecondaryStorage(
+					domain.SecondaryStorageConfig{
+						Storage: storage.NewMemorySecondaryStorage(nil),
 					},
-				},
-				SecondaryStorage: domain.SecondaryStorageConfig{
-					Storage: storage.NewMemorySecondaryStorage(nil),
-				},
-			}
+				),
+				domain.WithRateLimit(
+					domain.RateLimitConfig{
+						Enabled:     tt.enabled,
+						Window:      tt.window,
+						Max:         tt.max,
+						Algorithm:   domain.RateLimitAlgorithmFixedWindow,
+						Prefix:      "test:",
+						CustomRules: map[string]domain.RateLimitCustomRuleFunc{},
+						IP: domain.IPConfig{
+							Headers: []string{"X-Forwarded-For", "X-Real-IP"},
+						},
+					},
+				),
+			)
 
-			service := NewRateLimitService(config)
+			service := NewRateLimitService(config, plugins.NewPluginRegistry(config, nil))
 			ctx := context.Background()
 			req := createMockRequest()
 
@@ -128,7 +188,7 @@ func TestRateLimitService_CustomRule(t *testing.T) {
 		},
 	}
 
-	service := NewRateLimitService(config)
+	service := NewRateLimitService(config, plugins.NewPluginRegistry(config, nil))
 	ctx := context.Background()
 
 	// Test strict custom rule
@@ -224,7 +284,7 @@ func TestRateLimitService_ClientIP(t *testing.T) {
 				},
 			}
 
-			service := NewRateLimitService(config)
+			service := NewRateLimitService(config, plugins.NewPluginRegistry(config, nil))
 
 			req, _ := http.NewRequest("GET", "/test", nil)
 			req.RemoteAddr = tt.remoteAddr
@@ -237,5 +297,49 @@ func TestRateLimitService_ClientIP(t *testing.T) {
 				t.Errorf("GetClientIP() = %v, want %v", ip, tt.expected)
 			}
 		})
+	}
+}
+
+func TestRateLimitService_PluginRule(t *testing.T) {
+	config := &domain.Config{
+		RateLimit: domain.RateLimitConfig{
+			Enabled:     true,
+			Window:      1 * time.Minute,
+			Max:         100,
+			Algorithm:   domain.RateLimitAlgorithmFixedWindow,
+			Prefix:      "test:",
+			CustomRules: map[string]domain.RateLimitCustomRuleFunc{},
+			IP: domain.IPConfig{
+				Headers: []string{"X-Forwarded-For", "X-Real-IP"},
+			},
+		},
+		SecondaryStorage: domain.SecondaryStorageConfig{
+			Storage: storage.NewMemorySecondaryStorage(nil),
+		},
+	}
+
+	registry := plugins.NewPluginRegistry(config, nil)
+
+	registry.Register(&mockPlugin{})
+
+	service := NewRateLimitService(config, registry)
+	ctx := context.Background()
+
+	req, _ := http.NewRequest("GET", "/plugin", nil)
+
+	allowed1, err1 := service.Allow(ctx, "plugin-key", req)
+	if err1 != nil {
+		t.Fatalf("unexpected error on first allow: %v", err1)
+	}
+	if !allowed1 {
+		t.Fatalf("expected first request to be allowed")
+	}
+
+	allowed2, err2 := service.Allow(ctx, "plugin-key", req)
+	if err2 != nil {
+		t.Fatalf("unexpected error on second allow: %v", err2)
+	}
+	if allowed2 {
+		t.Fatalf("expected second request to be blocked by plugin rate limit")
 	}
 }

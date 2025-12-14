@@ -39,20 +39,13 @@
 - 🧩 **Comprehensive Configuration** – Flexible, type-safe config with sensible defaults and environment variable support.
 - 🛡️ **Enhanced Security** – CSRF protection.
 - ⚡ **Rate Limiting** – Configurable rate limiting with secondary storage.
+- 🔌 **Plugin System** – Extensible plugin architecture for custom business logic and routes. Including flexible plugin interface to implement all kinds of plugins.
 
 ---
 
 ### Docs
 
 For more info and a full guide on how to use this library, check out the [Docs](https://go-better-auth.vercel.app/docs).
-
----
-
-### Roadmap
-
-Planned features:
-
-- 🔌 **Plugin System** – Extensible plugin architecture for custom business logic and routes. Including flexible plugin interface to implement all kinds of plugins.
 
 ---
 

@@ -60,6 +60,7 @@ func (s *Service) SignInWithEmailAndPassword(email string, password string, call
 	}
 
 	s.callHook(s.config.EventHooks.OnUserLoggedIn, user)
+	s.emitEvent(domain.EventUserLoggedIn, user)
 
 	if s.config.EmailVerification.SendOnSignIn && !user.EmailVerified {
 		token, err := s.TokenService.GenerateToken()

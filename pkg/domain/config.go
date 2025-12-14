@@ -246,6 +246,20 @@ type EventHooksConfig struct {
 }
 
 // =======================
+// Event Bus Config
+// =======================
+
+type EventBusConfig struct {
+	Enabled bool
+	Prefix  string
+	PubSub  PubSub
+}
+
+type PluginsConfig struct {
+	Plugins []Plugin
+}
+
+// =======================
 // Main Config Structure
 // =======================
 
@@ -269,6 +283,8 @@ type Config struct {
 	EndpointHooks     EndpointHooksConfig
 	DatabaseHooks     DatabaseHooksConfig
 	EventHooks        EventHooksConfig
+	EventBus          EventBusConfig
+	Plugins           PluginsConfig
 }
 
 // =======================
@@ -352,6 +368,7 @@ func NewConfig(opts ...ConfigOption) *Config {
 		EndpointHooks: EndpointHooksConfig{},
 		DatabaseHooks: DatabaseHooksConfig{},
 		EventHooks:    EventHooksConfig{},
+		EventBus:      EventBusConfig{},
 	}
 
 	// Apply the options
@@ -621,5 +638,17 @@ func WithDatabaseHooks(databaseHooksConfig DatabaseHooksConfig) ConfigOption {
 func WithEventHooks(eventHooksConfig EventHooksConfig) ConfigOption {
 	return func(c *Config) {
 		c.EventHooks = eventHooksConfig
+	}
+}
+
+func WithEventBus(eventBusConfig EventBusConfig) ConfigOption {
+	return func(c *Config) {
+		c.EventBus = eventBusConfig
+	}
+}
+
+func WithPlugins(config PluginsConfig) ConfigOption {
+	return func(c *Config) {
+		c.Plugins = config
 	}
 }

@@ -66,6 +66,7 @@ func (s *Service) handleEmailVerification(ver *domain.Verification) (*VerifyEmai
 	}
 
 	s.callHook(s.config.EventHooks.OnEmailVerified, user)
+	s.emitEvent(domain.EventEmailVerified, user)
 
 	return &VerifyEmailResult{
 		Message: "Email verified successfully",
@@ -108,6 +109,7 @@ func (s *Service) handleEmailChange(ver *domain.Verification) (*VerifyEmailResul
 	}
 
 	s.callHook(s.config.EventHooks.OnEmailChanged, user)
+	s.emitEvent(domain.EventEmailChanged, user)
 
 	return &VerifyEmailResult{
 		Message: "Email changed successfully",

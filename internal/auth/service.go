@@ -8,6 +8,7 @@ import (
 // Service encapsulates all authentication use-cases
 type Service struct {
 	config                 *domain.Config
+	EventBus               domain.EventBus
 	UserService            *UserService
 	AccountService         *AccountService
 	SessionService         *SessionService
@@ -20,6 +21,7 @@ type Service struct {
 // NewService creates a new Auth service with all dependencies
 func NewService(
 	config *domain.Config,
+	eventBus domain.EventBus,
 	userService *UserService,
 	accountService *AccountService,
 	sessionService *SessionService,
@@ -40,6 +42,7 @@ func NewService(
 
 	return &Service{
 		config:                 config,
+		EventBus:               eventBus,
 		UserService:            userService,
 		AccountService:         accountService,
 		SessionService:         sessionService,

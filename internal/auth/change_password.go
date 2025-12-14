@@ -68,6 +68,7 @@ func (s *Service) ChangePassword(rawToken, newPassword string) error {
 	}
 
 	s.callHook(s.config.EventHooks.OnPasswordChanged, user)
+	s.emitEvent(domain.EventPasswordChanged, user)
 
 	return nil
 }

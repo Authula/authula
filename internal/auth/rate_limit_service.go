@@ -9,25 +9,42 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoBetterAuth/go-better-auth/internal/plugins"
 	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
 
 type RateLimitService struct {
-	config  *domain.Config
-	storage domain.SecondaryStorage
-	logger  *slog.Logger
+	config         *domain.Config
+	storage        domain.SecondaryStorage
+	logger         *slog.Logger
+	pluginRegistry *plugins.PluginRegistry
 }
 
-func NewRateLimitService(config *domain.Config) *RateLimitService {
+func NewRateLimitService(config *domain.Config, pluginRegistry *plugins.PluginRegistry) *RateLimitService {
 	return &RateLimitService{
-		config:  config,
-		storage: config.SecondaryStorage.Storage,
-		logger:  slog.Default(),
+		config:         config,
+		storage:        config.SecondaryStorage.Storage,
+		logger:         slog.Default(),
+		pluginRegistry: pluginRegistry,
 	}
 }
 
 // ruleFor returns the active rate limit rule for a given key/request
 func (s *RateLimitService) ruleFor(key string, req *http.Request) (time.Duration, int, bool) {
+	if s.pluginRegistry != nil {
+		for _, plugin := range s.pluginRegistry.Plugins() {
+			if rateLimitConfig := plugin.RateLimit(); rateLimitConfig != nil {
+				if ruleFn, ok := rateLimitConfig.CustomRules[key]; ok {
+					rule := ruleFn(req)
+					if rule.Disabled {
+						continue
+					}
+					return rule.Window, rule.Max, false
+				}
+			}
+		}
+	}
+
 	if ruleFn, ok := s.config.RateLimit.CustomRules[key]; ok {
 		rule := ruleFn(req)
 		if rule.Disabled {
@@ -78,26 +95,29 @@ func (s *RateLimitService) Allow(ctx context.Context, key string, req *http.Requ
 }
 
 // GetClientIP extracts the client's IP address from the request based on configured headers
-func (s *RateLimitService) GetClientIP(req *http.Request) string {
-	for _, h := range s.config.RateLimit.IP.Headers {
-		if val := req.Header.Get(h); val != "" {
-			// X-Forwarded-For may contain comma-separated list
-			parts := strings.Split(val, ",")
-			ip := strings.TrimSpace(parts[0])
-			// Strip port if present
-			if host, _, err := net.SplitHostPort(ip); err == nil {
-				return host
-			}
-			return ip
-		}
+func (s *RateLimitService) GetClientIP(r *http.Request) string {
+	// Get IP from X-Forwarded-For header
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded != "" {
+		// The header can contain a comma-separated list of IPs. The first one is the original client.
+		parts := strings.Split(forwarded, ",")
+		return strings.TrimSpace(parts[0])
 	}
 
-	// fallback to RemoteAddr
-	if host, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
-		return host
+	// Get IP from X-Real-IP header
+	realIP := r.Header.Get("X-Real-IP")
+	if realIP != "" {
+		return realIP
 	}
 
-	return req.RemoteAddr
+	// Fallback to RemoteAddr
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		// If splitting fails, it might be just the IP address without a port.
+		return r.RemoteAddr
+	}
+
+	return ip
 }
 
 // BuildKey constructs a rate limit key for storage

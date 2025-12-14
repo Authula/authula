@@ -3,10 +3,11 @@ module github.com/GoBetterAuth/go-better-auth
 go 1.25.4
 
 require (
+	github.com/ThreeDotsLabs/watermill v1.5.1
 	github.com/alexedwards/argon2id v1.0.0
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/google/uuid v1.6.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.11.0
 	golang.org/x/oauth2 v0.33.0
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/driver/postgres v1.6.0
@@ -27,9 +28,11 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
+	github.com/lithammer/shortuuid/v3 v3.0.7 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
+	github.com/oklog/ulid v1.3.1 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	golang.org/x/crypto v0.42.0 // indirect
