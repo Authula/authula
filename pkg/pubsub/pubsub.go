@@ -8,8 +8,6 @@ import (
 )
 
 // NewInMemoryPubSub creates a simple in-memory PubSub implementation
-// with no external dependencies (not even Watermill).
-// This is the most lightweight option.
 func NewInMemoryPubSub() domain.PubSub {
 	return pubsub.NewInMemoryPubSub()
 }
