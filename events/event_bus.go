@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/pubsub"
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
@@ -26,7 +25,7 @@ func NewEventBus(config *models.Config, ps models.PubSub) models.EventBus {
 	}
 
 	if ps == nil {
-		ps = pubsub.NewInMemoryPubSub()
+		ps = NewInMemoryPubSub()
 	}
 
 	return &eventBus{

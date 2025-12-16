@@ -4,9 +4,10 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 type SessionServiceImpl struct {

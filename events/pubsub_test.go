@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/pubsub"
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
@@ -33,7 +32,7 @@ func newTestGoChannelPubSub(logger watermill.LoggerAdapter, bufferSize int) mode
 		logger,
 	)
 
-	return pubsub.NewWatermillPubSub(goChannel, goChannel)
+	return NewWatermillPubSub(goChannel, goChannel)
 }
 
 func TestNewGoChannelPubSub_Default(t *testing.T) {

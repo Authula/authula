@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"github.com/GoBetterAuth/go-better-auth/internal/services"
 	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/GoBetterAuth/go-better-auth/providers"
 )
@@ -10,12 +9,12 @@ import (
 type Service struct {
 	config                 *models.Config
 	EventBus               models.EventBus
-	UserService            services.UserService
-	AccountService         services.AccountService
-	SessionService         services.SessionService
-	VerificationService    services.VerificationService
-	TokenService           services.TokenService
-	RateLimitService       services.RateLimitService
+	UserService            models.UserService
+	AccountService         models.AccountService
+	SessionService         models.SessionService
+	VerificationService    models.VerificationService
+	TokenService           models.TokenService
+	RateLimitService       models.RateLimitService
 	OAuth2ProviderRegistry *providers.OAuth2ProviderRegistry
 }
 
@@ -23,12 +22,12 @@ type Service struct {
 func NewService(
 	config *models.Config,
 	eventBus models.EventBus,
-	userService services.UserService,
-	accountService services.AccountService,
-	sessionService services.SessionService,
-	verificationService services.VerificationService,
-	tokenService services.TokenService,
-	rateLimitService services.RateLimitService,
+	userService models.UserService,
+	accountService models.AccountService,
+	sessionService models.SessionService,
+	verificationService models.VerificationService,
+	tokenService models.TokenService,
+	rateLimitService models.RateLimitService,
 ) *Service {
 	oauth2ProviderRegistry := providers.NewOAuth2ProviderRegistry()
 	if config.SocialProviders.Default.Discord != nil {

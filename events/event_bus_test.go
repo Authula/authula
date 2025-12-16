@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -11,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/GoBetterAuth/go-better-auth/config"
-	"github.com/GoBetterAuth/go-better-auth/internal/pubsub"
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
@@ -23,12 +23,14 @@ func TestEventBus_Publish(t *testing.T) {
 	bus := NewEventBus(getMockConfig(), nil)
 	defer bus.Close()
 
+	payload, _ := json.Marshal(map[string]string{
+		"user_id": "123",
+	})
+
 	event := models.Event{
 		Type:      models.EventUserSignedUp,
 		Timestamp: time.Now().UTC(),
-		Payload: map[string]any{
-			"user_id": "123",
-		},
+		Payload:   payload,
 		Metadata: map[string]string{
 			"source": "test",
 		},
@@ -41,12 +43,14 @@ func TestWatermillEventBus_Publish(t *testing.T) {
 	bus := NewEventBus(getMockConfig(), nil)
 	defer bus.Close()
 
+	payload, _ := json.Marshal(map[string]string{
+		"user_id": "123",
+	})
+
 	event := models.Event{
 		Type:      models.EventUserSignedUp,
 		Timestamp: time.Now().UTC(),
-		Payload: map[string]any{
-			"user_id": "123",
-		},
+		Payload:   payload,
 		Metadata: map[string]string{
 			"source": "test",
 		},
@@ -73,13 +77,15 @@ func TestWatermillEventBus_Subscribe(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
+		payload, _ := json.Marshal(map[string]string{
+			"user_id": "456",
+		})
+
 		event := models.Event{
 			Type:      models.EventUserSignedUp,
 			Timestamp: time.Now().UTC(),
-			Payload: map[string]any{
-				"user_id": "456",
-			},
-			Metadata: map[string]string{"source": "test"},
+			Payload:   payload,
+			Metadata:  map[string]string{"source": "test"},
 		}
 		err = bus.Publish(context.Background(), event)
 		assert.NoError(t, err)
@@ -115,16 +121,19 @@ func TestWatermillEventBus_MultipleEvents(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
+		signupPayload, _ := json.Marshal(map[string]string{"user_id": "789"})
+		loginPayload, _ := json.Marshal(map[string]string{"user_id": "789"})
+
 		signupEvent := models.Event{
 			Type:      models.EventUserSignedUp,
 			Timestamp: time.Now().UTC(),
-			Payload:   map[string]any{"user_id": "789"},
+			Payload:   signupPayload,
 			Metadata:  map[string]string{"source": "test"},
 		}
 		loginEvent := models.Event{
 			Type:      models.EventUserLoggedIn,
 			Timestamp: time.Now().UTC(),
-			Payload:   map[string]any{"user_id": "789"},
+			Payload:   loginPayload,
 			Metadata:  map[string]string{"source": "test"},
 		}
 		bus.Publish(context.Background(), signupEvent)
@@ -142,7 +151,7 @@ func TestWatermillEventBus_EventData(t *testing.T) {
 		defer bus.Close()
 
 		var wg sync.WaitGroup
-		var receivedPayload map[string]any
+		var receivedPayload json.RawMessage
 
 		wg.Add(1)
 		err := bus.Subscribe(context.Background(), models.EventUserLoggedIn, func(ctx context.Context, event models.Event) error {
@@ -152,22 +161,28 @@ func TestWatermillEventBus_EventData(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
+		payload, _ := json.Marshal(map[string]string{
+			"user_id":  "123",
+			"username": "testuser",
+			"email":    "test@example.com",
+		})
+
 		event := models.Event{
 			Type:      models.EventUserLoggedIn,
 			Timestamp: time.Now().UTC(),
-			Payload: map[string]any{
-				"user_id":  "123",
-				"username": "testuser",
-				"email":    "test@example.com",
-			},
-			Metadata: map[string]string{"source": "test"},
+			Payload:   payload,
+			Metadata:  map[string]string{"source": "test"},
 		}
 		err = bus.Publish(context.Background(), event)
 		assert.NoError(t, err)
 
 		wg.Wait()
 		assert.NotNil(t, receivedPayload)
-		assert.Equal(t, "123", receivedPayload["user_id"])
+
+		// Unmarshal to verify the data
+		var data map[string]string
+		json.Unmarshal(receivedPayload, &data)
+		assert.Equal(t, "123", data["user_id"])
 	})
 }
 
@@ -175,7 +190,7 @@ func TestEventBus_WithCustomPubSub(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		// Test that EventBus works with a custom PubSub implementation
 		config := getMockConfig()
-		customPubSub := pubsub.NewInMemoryPubSub()
+		customPubSub := NewInMemoryPubSub()
 		bus := NewEventBus(config, customPubSub)
 		defer bus.Close()
 
@@ -193,13 +208,15 @@ func TestEventBus_WithCustomPubSub(t *testing.T) {
 		// Give subscription time to set up
 		time.Sleep(10 * time.Millisecond)
 
+		payload, _ := json.Marshal(map[string]string{
+			"user_id": "custom-transport-test",
+			"email":   "test@example.com",
+		})
+
 		event := models.Event{
 			Type:      models.EventUserSignedUp,
 			Timestamp: time.Now().UTC(),
-			Payload: map[string]any{
-				"user_id": "custom-transport-test",
-				"email":   "test@example.com",
-			},
+			Payload:   payload,
 			Metadata: map[string]string{
 				"source": "custom_pubsub_test",
 			},
@@ -210,6 +227,10 @@ func TestEventBus_WithCustomPubSub(t *testing.T) {
 
 		wg.Wait()
 		assert.Equal(t, models.EventUserSignedUp, receivedEvent.Type)
-		assert.Equal(t, "custom-transport-test", receivedEvent.Payload["user_id"])
+
+		// Unmarshal to verify the payload
+		var data map[string]string
+		json.Unmarshal(receivedEvent.Payload, &data)
+		assert.Equal(t, "custom-transport-test", data["user_id"])
 	})
 }

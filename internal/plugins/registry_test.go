@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/GoBetterAuth/go-better-auth/config"
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -94,7 +95,7 @@ func getMockConfig() *models.Config {
 
 func TestNewPluginRegistry(t *testing.T) {
 	config := getMockConfig()
-	registry := NewPluginRegistry(config, nil, nil)
+	registry := NewPluginRegistry(config, nil, nil, nil)
 
 	assert.NotNil(t, registry)
 	assert.Equal(t, config, registry.config)
@@ -104,7 +105,7 @@ func TestNewPluginRegistry(t *testing.T) {
 
 func TestPluginRegistry_Register(t *testing.T) {
 	config := getMockConfig()
-	registry := NewPluginRegistry(config, nil, nil)
+	registry := NewPluginRegistry(config, nil, nil, nil)
 
 	plugin := &mockPlugin{name: "test"}
 	registry.Register(plugin)
@@ -116,7 +117,7 @@ func TestPluginRegistry_Register(t *testing.T) {
 func TestPluginRegistry_InitAll(t *testing.T) {
 	t.Run("should init enabled plugins", func(t *testing.T) {
 		config := getMockConfig()
-		registry := NewPluginRegistry(config, nil, nil)
+		registry := NewPluginRegistry(config, nil, nil, nil)
 
 		plugin1 := &mockPlugin{name: "p1", enabled: true}
 		plugin2 := &mockPlugin{name: "p2", enabled: false}
@@ -129,7 +130,7 @@ func TestPluginRegistry_InitAll(t *testing.T) {
 
 	t.Run("should return error on init fail", func(t *testing.T) {
 		config := getMockConfig()
-		registry := NewPluginRegistry(config, nil, nil)
+		registry := NewPluginRegistry(config, nil, nil, nil)
 
 		plugin := &mockPlugin{name: "p1", enabled: true, initFails: true}
 		registry.Register(plugin)
@@ -146,7 +147,7 @@ func TestPluginRegistry_RunMigrations(t *testing.T) {
 
 	t.Run("should run migrations for enabled plugins", func(t *testing.T) {
 		config := getMockConfig()
-		registry := NewPluginRegistry(config, nil, nil)
+		registry := NewPluginRegistry(config, nil, nil, nil)
 
 		plugin1 := &mockPlugin{name: "p1", enabled: true, migrations: []any{&MyEntity{}}}
 		plugin2 := &mockPlugin{name: "p2", enabled: false, migrations: []any{&MyEntity{}}}
@@ -160,7 +161,7 @@ func TestPluginRegistry_RunMigrations(t *testing.T) {
 
 func TestPluginRegistry_Routes(t *testing.T) {
 	config := getMockConfig()
-	registry := NewPluginRegistry(config, nil, nil)
+	registry := NewPluginRegistry(config, nil, nil, nil)
 
 	plugin1 := &mockPlugin{name: "p1", enabled: true, hasRoutes: true}
 	plugin2 := &mockPlugin{name: "p2", enabled: false, hasRoutes: true}
@@ -172,7 +173,9 @@ func TestPluginRegistry_Routes(t *testing.T) {
 	plugins := registry.Plugins()
 	routes := make([]models.PluginRoute, 0)
 	for _, p := range plugins {
-		routes = append(routes, p.Routes()...)
+		if p.Config().Enabled && p.Routes() != nil {
+			routes = append(routes, p.Routes()...)
+		}
 	}
 	assert.Len(t, routes, 1)
 	assert.Equal(t, "test", routes[0].Path)
@@ -180,7 +183,7 @@ func TestPluginRegistry_Routes(t *testing.T) {
 
 func TestPluginRegistry_Plugins(t *testing.T) {
 	config := getMockConfig()
-	registry := NewPluginRegistry(config, nil, nil)
+	registry := NewPluginRegistry(config, nil, nil, nil)
 
 	plugin1 := &mockPlugin{name: "p1", enabled: true}
 	plugin2 := &mockPlugin{name: "p2", enabled: false}
@@ -195,7 +198,7 @@ func TestPluginRegistry_Plugins(t *testing.T) {
 func TestPluginRegistry_CloseAll(t *testing.T) {
 	t.Run("should close enabled plugins", func(t *testing.T) {
 		config := getMockConfig()
-		registry := NewPluginRegistry(config, nil, nil)
+		registry := NewPluginRegistry(config, nil, nil, nil)
 
 		plugin1 := &mockPlugin{name: "p1", enabled: true}
 		plugin2 := &mockPlugin{name: "p2", enabled: false}
@@ -207,7 +210,7 @@ func TestPluginRegistry_CloseAll(t *testing.T) {
 
 	t.Run("should log error on close fail", func(t *testing.T) {
 		config := getMockConfig()
-		registry := NewPluginRegistry(config, nil, nil)
+		registry := NewPluginRegistry(config, nil, nil, nil)
 
 		plugin := &mockPlugin{name: "p1", enabled: true, closeFails: true}
 		registry.Register(plugin)

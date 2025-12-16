@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"time"
 
@@ -15,30 +16,42 @@ func (s *Service) callHook(hook func(models.User) error, user *models.User) {
 	}
 }
 
-// emitEvent safely emits an event using a hook function if it's not nil
+// emitEvent publishes an event to the EventBus
 func (s *Service) emitEvent(eventType string, data any) {
-	if s.EventBus != nil {
-		go func() {
-			// Convert data to map[string]any for payload
-			payload, ok := data.(map[string]any)
-			if !ok {
-				payload = map[string]any{
-					"data": data,
-				}
-			}
-
-			event := models.Event{
-				Type:      eventType,
-				Timestamp: time.Now().UTC(),
-				Payload:   payload,
-				Metadata: map[string]string{
-					"source": "auth_service",
-				},
-			}
-
-			if err := s.EventBus.Publish(context.Background(), event); err != nil {
-				slog.Error("failed to publish event", "event_type", eventType, "error", err)
-			}
-		}()
+	if s.EventBus == nil {
+		return
 	}
+
+	// Use a goroutine to keep the call non-blocking,
+	// TODO: consider a buffered channel + worker pool for extreme high-throughput.
+	go func() {
+		payload, err := json.Marshal(data)
+		if err != nil {
+			slog.Error("failed to marshal event payload",
+				"event_type", eventType,
+				"error", err,
+			)
+			return
+		}
+
+		event := models.Event{
+			Type:      eventType,
+			Timestamp: time.Now().UTC(),
+			Payload:   payload,
+			Metadata: map[string]string{
+				"source": "auth_service",
+			},
+		}
+
+		// Use a context with a timeout so a hung EventBus doesn't leak goroutines
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := s.EventBus.Publish(ctx, event); err != nil {
+			slog.Error("failed to publish event",
+				"event_type", eventType,
+				"error", err,
+			)
+		}
+	}()
 }

@@ -30,6 +30,7 @@ type PluginMiddleware struct {
 
 type PluginContext struct {
 	Config     *Config
+	Api        *Api
 	EventBus   EventBus
 	Middleware *PluginMiddleware
 }

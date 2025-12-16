@@ -25,7 +25,7 @@ type Auth struct {
 	Config         *models.Config
 	mux            *http.ServeMux
 	service        *auth.Service
-	Api            services.Api
+	Api            *models.Api
 	customRoutes   []models.CustomRoute
 	pluginRegistry *plugins.PluginRegistry
 }
@@ -55,21 +55,28 @@ func New(config *models.Config) *Auth {
 		EndpointHooks: auth.EndpointHooksMiddleware,
 	}
 
-	pluginRegistry := plugins.NewPluginRegistry(config, eventBus, pluginMiddleware)
+	pluginRateLimits := []models.PluginRateLimit{}
 	for _, p := range config.Plugins.Plugins {
-		pluginRegistry.Register(p)
+		if rateLimit := p.RateLimit(); rateLimit != nil && rateLimit.Enabled {
+			pluginRateLimits = append(pluginRateLimits, *rateLimit)
+		}
 	}
-	_ = pluginRegistry.InitAll()
 
-	authService := constructAuthService(config, eventBus, pluginRegistry)
+	authService := constructAuthService(config, eventBus, pluginRateLimits)
 
-	api := services.Api{
+	api := &models.Api{
 		Users:         authService.UserService,
 		Accounts:      authService.AccountService,
 		Sessions:      authService.SessionService,
 		Verifications: authService.VerificationService,
 		Tokens:        authService.TokenService,
 	}
+
+	pluginRegistry := plugins.NewPluginRegistry(config, api, eventBus, pluginMiddleware)
+	for _, p := range config.Plugins.Plugins {
+		pluginRegistry.Register(p)
+	}
+	_ = pluginRegistry.InitAll()
 
 	auth.service = authService
 	auth.Api = api
@@ -144,22 +151,12 @@ func (auth *Auth) DropMigrations() {
 // MIDDLEWARES & HANDLERS
 // ---------------------------------
 
-func constructAuthService(config *models.Config, eventBus models.EventBus, pluginRegistry *plugins.PluginRegistry) *auth.Service {
+func constructAuthService(config *models.Config, eventBus models.EventBus, pluginRateLimits []models.PluginRateLimit) *auth.Service {
 	userService := services.NewUserServiceImpl(config, config.DB)
 	accountService := services.NewAccountServiceImpl(config, config.DB)
 	sessionService := services.NewSessionServiceImpl(config, config.DB)
 	verificationService := services.NewVerificationServiceImpl(config, config.DB)
 	tokenService := services.NewTokenServiceImpl(config)
-
-	pluginRateLimits := []models.PluginRateLimit{}
-	if pluginRegistry != nil {
-		plugins := pluginRegistry.Plugins()
-		for _, plugin := range plugins {
-			if rateLimitConfig := plugin.RateLimit(); rateLimitConfig != nil {
-				pluginRateLimits = append(pluginRateLimits, *rateLimitConfig)
-			}
-		}
-	}
 	rateLimitService := services.NewRateLimitServiceImpl(config, pluginRateLimits)
 
 	authService := auth.NewService(

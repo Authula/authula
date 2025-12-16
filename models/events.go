@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 )
 
@@ -19,7 +20,7 @@ type Event struct {
 	ID        string            `json:"id"`
 	Type      string            `json:"type"`
 	Timestamp time.Time         `json:"timestamp"`
-	Payload   map[string]any    `json:"payload"`
+	Payload   json.RawMessage   `json:"payload"`
 	Metadata  map[string]string `json:"metadata"`
 }
 

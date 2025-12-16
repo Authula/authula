@@ -3,11 +3,11 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/services"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
-func RateLimitMiddleware(rateLimitService services.RateLimitService) func(http.Handler) http.Handler {
+func RateLimitMiddleware(rateLimitService models.RateLimitService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := req.Context()
