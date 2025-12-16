@@ -11,6 +11,7 @@ type PluginMetadata struct {
 	Description string
 }
 
+// PluginOptions represents dynamic configuration options for a plugin.
 type PluginOptions = map[string]any
 
 // PluginConfig holds per-plugin configuration.
@@ -19,12 +20,23 @@ type PluginConfig struct {
 	Options PluginOptions
 }
 
+type PluginMiddleware struct {
+	Auth          func() func(http.Handler) http.Handler
+	OptionalAuth  func() func(http.Handler) http.Handler
+	CorsAuth      func() func(http.Handler) http.Handler
+	CSRF          func() func(http.Handler) http.Handler
+	RateLimit     func() func(http.Handler) http.Handler
+	EndpointHooks func() func(http.Handler) http.Handler
+}
+
 type PluginContext struct {
-	Config   *Config
-	EventBus EventBus
+	Config     *Config
+	EventBus   EventBus
+	Middleware *PluginMiddleware
 }
 
 type PluginRouteMiddleware func(http.Handler) http.Handler
+
 type PluginRouteHandler func() http.Handler
 
 type PluginRoute struct {
@@ -90,6 +102,7 @@ func WrapEventHook[T any](hook TypedPluginEventHook[T]) PluginEventHookFunc {
 type Plugin interface {
 	Metadata() PluginMetadata
 	Config() PluginConfig
+	Ctx() *PluginContext
 	Init(ctx *PluginContext) error
 	Migrations() []any
 	Routes() []PluginRoute
@@ -97,68 +110,4 @@ type Plugin interface {
 	DatabaseHooks() *PluginDatabaseHooks
 	EventHooks() *PluginEventHooks
 	Close() error
-}
-
-// BasePlugin provides default implementations for the Plugin interface.
-// Plugins can embed this struct and override only what they need.
-type BasePlugin struct {
-	metadata      PluginMetadata
-	config        PluginConfig
-	ctx           *PluginContext
-	migrations    []any
-	routes        []PluginRoute
-	rateLimit     *PluginRateLimit
-	databaseHooks *PluginDatabaseHooks
-	eventHooks    *PluginEventHooks
-}
-
-// NewPlugin creates a new BasePlugin with the provided metadata and config.
-func NewPlugin(metadata PluginMetadata, config PluginConfig) *BasePlugin {
-	return &BasePlugin{
-		metadata:      metadata,
-		config:        config,
-		ctx:           nil,
-		migrations:    []any{},
-		routes:        []PluginRoute{},
-		rateLimit:     &PluginRateLimit{},
-		databaseHooks: &PluginDatabaseHooks{},
-		eventHooks:    &PluginEventHooks{},
-	}
-}
-
-func (plugin *BasePlugin) Metadata() PluginMetadata {
-	return plugin.metadata
-}
-
-func (plugin *BasePlugin) Config() PluginConfig {
-	return plugin.config
-}
-
-func (plugin *BasePlugin) Init(ctx *PluginContext) error {
-	plugin.ctx = ctx
-	return nil
-}
-
-func (plugin *BasePlugin) Migrations() []any {
-	return plugin.migrations
-}
-
-func (plugin *BasePlugin) Routes() []PluginRoute {
-	return plugin.routes
-}
-
-func (plugin *BasePlugin) RateLimit() *PluginRateLimit {
-	return plugin.rateLimit
-}
-
-func (plugin *BasePlugin) DatabaseHooks() *PluginDatabaseHooks {
-	return plugin.databaseHooks
-}
-
-func (plugin *BasePlugin) EventHooks() *PluginEventHooks {
-	return plugin.eventHooks
-}
-
-func (plugin *BasePlugin) Close() error {
-	return nil
 }

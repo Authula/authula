@@ -95,9 +95,9 @@ func (s *RateLimitService) Allow(ctx context.Context, key string, req *http.Requ
 }
 
 // GetClientIP extracts the client's IP address from the request based on configured headers
-func (s *RateLimitService) GetClientIP(r *http.Request) string {
+func (s *RateLimitService) GetClientIP(req *http.Request) string {
 	// Get IP from X-Forwarded-For header
-	forwarded := r.Header.Get("X-Forwarded-For")
+	forwarded := req.Header.Get("X-Forwarded-For")
 	if forwarded != "" {
 		// The header can contain a comma-separated list of IPs. The first one is the original client.
 		parts := strings.Split(forwarded, ",")
@@ -105,16 +105,16 @@ func (s *RateLimitService) GetClientIP(r *http.Request) string {
 	}
 
 	// Get IP from X-Real-IP header
-	realIP := r.Header.Get("X-Real-IP")
+	realIP := req.Header.Get("X-Real-IP")
 	if realIP != "" {
 		return realIP
 	}
 
 	// Fallback to RemoteAddr
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	ip, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
 		// If splitting fails, it might be just the IP address without a port.
-		return r.RemoteAddr
+		return req.RemoteAddr
 	}
 
 	return ip

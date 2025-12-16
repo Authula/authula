@@ -13,16 +13,17 @@ type PluginRegistry struct {
 	plugins   []domain.Plugin
 }
 
-func NewPluginRegistry(config *domain.Config, eventBus domain.EventBus) *PluginRegistry {
+func NewPluginRegistry(config *domain.Config, eventBus domain.EventBus, middleware *domain.PluginMiddleware) *PluginRegistry {
 	ctx := &domain.PluginContext{
-		Config:   config,
-		EventBus: eventBus,
+		Config:     config,
+		EventBus:   eventBus,
+		Middleware: middleware,
 	}
 
 	return &PluginRegistry{
 		config:    config,
 		pluginCtx: ctx,
-		plugins:   make([]domain.Plugin, 0),
+		plugins:   []domain.Plugin{},
 	}
 }
 

@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/auth"
+	authinternal "github.com/GoBetterAuth/go-better-auth/internal/auth"
 	"github.com/GoBetterAuth/go-better-auth/internal/auth/storage"
 	"github.com/GoBetterAuth/go-better-auth/internal/events"
 	"github.com/GoBetterAuth/go-better-auth/internal/handlers"
@@ -22,18 +21,18 @@ import (
 // ---------------------------------
 
 type Api struct {
-	Users         *auth.UserService
-	Accounts      *auth.AccountService
-	Sessions      *auth.SessionService
-	Verifications *auth.VerificationService
-	Tokens        *auth.TokenService
-	// TODO: KeyValueStore *auth.KeyValueStoreService
+	Users         *authinternal.UserService
+	Accounts      *authinternal.AccountService
+	Sessions      *authinternal.SessionService
+	Verifications *authinternal.VerificationService
+	Tokens        *authinternal.TokenService
+	// TODO: KeyValueStore *authinternal.KeyValueStoreService
 }
 
 type Auth struct {
 	Config         *domain.Config
 	mux            *http.ServeMux
-	authService    *auth.Service
+	service        *authinternal.Service
 	Api            Api
 	customRoutes   []domain.CustomRoute
 	pluginRegistry *plugins.PluginRegistry
@@ -44,13 +43,27 @@ func New(config *domain.Config) *Auth {
 	initStorage(config)
 	mux := http.NewServeMux()
 
-	// Initialize event bus
 	var eventBus domain.EventBus
 	if config.EventBus.Enabled {
 		eventBus = events.NewEventBus(config, config.EventBus.PubSub)
 	}
 
-	pluginRegistry := plugins.NewPluginRegistry(config, eventBus)
+	auth := &Auth{
+		Config:       config,
+		mux:          mux,
+		customRoutes: []domain.CustomRoute{},
+	}
+
+	pluginMiddleware := &domain.PluginMiddleware{
+		Auth:          auth.AuthMiddleware,
+		OptionalAuth:  auth.OptionalAuthMiddleware,
+		CorsAuth:      auth.CorsAuthMiddleware,
+		CSRF:          auth.CSRFMiddleware,
+		RateLimit:     auth.RateLimitMiddleware,
+		EndpointHooks: auth.EndpointHooksMiddleware,
+	}
+
+	pluginRegistry := plugins.NewPluginRegistry(config, eventBus, pluginMiddleware)
 	for _, p := range config.Plugins.Plugins {
 		pluginRegistry.Register(p)
 	}
@@ -66,14 +79,9 @@ func New(config *domain.Config) *Auth {
 		Tokens:        authService.TokenService,
 	}
 
-	auth := &Auth{
-		Config:         config,
-		mux:            mux,
-		authService:    authService,
-		Api:            api,
-		customRoutes:   make([]domain.CustomRoute, 0),
-		pluginRegistry: pluginRegistry,
-	}
+	auth.service = authService
+	auth.Api = api
+	auth.pluginRegistry = pluginRegistry
 
 	return auth
 }
@@ -114,11 +122,14 @@ func (auth *Auth) RunMigrations() {
 		&domain.KeyValueStore{},
 	}
 	if err := auth.Config.DB.AutoMigrate(models...); err != nil {
-		logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-		logger.Error("failed to auto migrate database", slog.Any("error", err))
+		slog.Error("failed to auto migrate database", slog.Any("error", err))
 		panic(err)
 	}
-	_ = auth.pluginRegistry.RunMigrations()
+
+	if err := auth.pluginRegistry.RunMigrations(); err != nil {
+		slog.Error("failed to run plugin migrations", slog.Any("error", err))
+		panic(err)
+	}
 }
 
 func (auth *Auth) DropMigrations() {
@@ -131,8 +142,7 @@ func (auth *Auth) DropMigrations() {
 	}
 	for _, model := range models {
 		if err := auth.Config.DB.Migrator().DropTable(model); err != nil {
-			logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-			logger.Error("failed to drop table", slog.Any("model", model), slog.Any("error", err))
+			slog.Error("failed to drop table", slog.Any("model", model), slog.Any("error", err))
 			panic(err)
 		}
 	}
@@ -142,15 +152,15 @@ func (auth *Auth) DropMigrations() {
 // MIDDLEWARES & HANDLERS
 // ---------------------------------
 
-func constructAuthService(config *domain.Config, eventBus domain.EventBus, pluginRegistry *plugins.PluginRegistry) *auth.Service {
-	userService := auth.NewUserService(config, config.DB)
-	accountService := auth.NewAccountService(config, config.DB)
-	sessionService := auth.NewSessionService(config, config.DB)
-	verificationService := auth.NewVerificationService(config, config.DB)
-	tokenService := auth.NewTokenService(config)
-	rateLimitService := auth.NewRateLimitService(config, pluginRegistry)
+func constructAuthService(config *domain.Config, eventBus domain.EventBus, pluginRegistry *plugins.PluginRegistry) *authinternal.Service {
+	userService := authinternal.NewUserService(config, config.DB)
+	accountService := authinternal.NewAccountService(config, config.DB)
+	sessionService := authinternal.NewSessionService(config, config.DB)
+	verificationService := authinternal.NewVerificationService(config, config.DB)
+	tokenService := authinternal.NewTokenService(config)
+	rateLimitService := authinternal.NewRateLimitService(config, pluginRegistry)
 
-	authService := auth.NewService(
+	authService := authinternal.NewService(
 		config,
 		eventBus,
 		userService,
@@ -166,14 +176,14 @@ func constructAuthService(config *domain.Config, eventBus domain.EventBus, plugi
 
 func (auth *Auth) AuthMiddleware() func(http.Handler) http.Handler {
 	return middleware.AuthMiddleware(
-		auth.authService,
+		auth.service,
 		auth.Config.Session.CookieName,
 	)
 }
 
 func (auth *Auth) OptionalAuthMiddleware() func(http.Handler) http.Handler {
 	return middleware.OptionalAuthMiddleware(
-		auth.authService,
+		auth.service,
 		auth.Config.Session.CookieName,
 	)
 }
@@ -189,11 +199,11 @@ func (auth *Auth) CSRFMiddleware() func(http.Handler) http.Handler {
 }
 
 func (auth *Auth) RateLimitMiddleware() func(http.Handler) http.Handler {
-	return middleware.RateLimitMiddleware(auth.authService.RateLimitService)
+	return middleware.RateLimitMiddleware(auth.service.RateLimitService)
 }
 
 func (auth *Auth) EndpointHooksMiddleware() func(http.Handler) http.Handler {
-	return middleware.EndpointHooksMiddleware(auth.Config, auth.authService)
+	return middleware.EndpointHooksMiddleware(auth.Config, auth.service)
 }
 
 func (auth *Auth) GetUserIDFromContext(ctx context.Context) (string, bool) {
@@ -227,47 +237,47 @@ func (auth *Auth) RegisterRoute(route domain.CustomRoute) {
 func (auth *Auth) Handler() http.Handler {
 	signIn := &handlers.SignInHandler{
 		Config:      auth.Config,
-		AuthService: auth.authService,
+		AuthService: auth.service,
 	}
 	signUp := &handlers.SignUpHandler{
 		Config:      auth.Config,
-		AuthService: auth.authService,
+		AuthService: auth.service,
 	}
 	signOut := &handlers.SignOutHandler{
 		Config:      auth.Config,
-		AuthService: auth.authService,
+		AuthService: auth.service,
 	}
 	sendEmailVerification := &handlers.SendEmailVerificationHandler{
 		Config:      auth.Config,
-		AuthService: auth.authService,
+		AuthService: auth.service,
 	}
 	verifyEmail := &handlers.VerifyEmailHandler{
 		Config:      auth.Config,
-		AuthService: auth.authService,
+		AuthService: auth.service,
 	}
 	resetPassword := &handlers.ResetPasswordHandler{
 		Config:      auth.Config,
-		AuthService: auth.authService,
+		AuthService: auth.service,
 	}
 	changePassword := &handlers.ChangePasswordHandler{
 		Config:      auth.Config,
-		AuthService: auth.authService,
+		AuthService: auth.service,
 	}
 	changeEmailRequest := &handlers.EmailChangeHandler{
 		Config:      auth.Config,
-		AuthService: auth.authService,
+		AuthService: auth.service,
 	}
 	me := &handlers.MeHandler{
 		Config:      auth.Config,
-		AuthService: auth.authService,
+		AuthService: auth.service,
 	}
 	oauth2Login := &handlers.OAuth2LoginHandler{
 		Config:      auth.Config,
-		AuthService: auth.authService,
+		AuthService: auth.service,
 	}
 	oauth2Callback := &handlers.OAuth2CallbackHandler{
 		Config:      auth.Config,
-		AuthService: auth.authService,
+		AuthService: auth.service,
 	}
 
 	basePath := auth.Config.BasePath
@@ -297,7 +307,7 @@ func (auth *Auth) Handler() http.Handler {
 	auth.registerPluginRoutes(basePath)
 
 	var finalHandler http.Handler = auth.mux
-	finalHandler = middleware.EndpointHooksMiddleware(auth.Config, auth.authService)(finalHandler)
+	finalHandler = middleware.EndpointHooksMiddleware(auth.Config, auth.service)(finalHandler)
 	if auth.Config.RateLimit.Enabled {
 		finalHandler = auth.RateLimitMiddleware()(finalHandler)
 	}

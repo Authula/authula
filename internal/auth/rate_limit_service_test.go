@@ -27,6 +27,10 @@ func (m *mockPlugin) Config() domain.PluginConfig {
 	return domain.PluginConfig{Enabled: true}
 }
 
+func (m *mockPlugin) Ctx() *domain.PluginContext {
+	return &domain.PluginContext{Config: nil, EventBus: nil, Middleware: nil}
+}
+
 func (m *mockPlugin) Init(ctx *domain.PluginContext) error {
 	return nil
 }
@@ -138,7 +142,7 @@ func TestRateLimitService_Allow(t *testing.T) {
 				),
 			)
 
-			service := NewRateLimitService(config, plugins.NewPluginRegistry(config, nil))
+			service := NewRateLimitService(config, plugins.NewPluginRegistry(config, nil, nil))
 			ctx := context.Background()
 			req := createMockRequest()
 
@@ -188,7 +192,7 @@ func TestRateLimitService_CustomRule(t *testing.T) {
 		},
 	}
 
-	service := NewRateLimitService(config, plugins.NewPluginRegistry(config, nil))
+	service := NewRateLimitService(config, plugins.NewPluginRegistry(config, nil, nil))
 	ctx := context.Background()
 
 	// Test strict custom rule
@@ -284,7 +288,7 @@ func TestRateLimitService_ClientIP(t *testing.T) {
 				},
 			}
 
-			service := NewRateLimitService(config, plugins.NewPluginRegistry(config, nil))
+			service := NewRateLimitService(config, plugins.NewPluginRegistry(config, nil, nil))
 
 			req, _ := http.NewRequest("GET", "/test", nil)
 			req.RemoteAddr = tt.remoteAddr
@@ -318,7 +322,7 @@ func TestRateLimitService_PluginRule(t *testing.T) {
 		},
 	}
 
-	registry := plugins.NewPluginRegistry(config, nil)
+	registry := plugins.NewPluginRegistry(config, nil, nil)
 
 	registry.Register(&mockPlugin{})
 
