@@ -8,7 +8,7 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/internal/auth"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 type ctxKey string
@@ -76,7 +76,7 @@ func CorsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 	}
 }
 
-func CSRFMiddleware(csrfConfig domain.CSRFConfig) func(http.Handler) http.Handler {
+func CSRFMiddleware(csrfConfig models.CSRFConfig) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet ||

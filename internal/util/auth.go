@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 func ExtractProviderName(path string) string {
@@ -18,7 +18,7 @@ func ExtractProviderName(path string) string {
 	return ""
 }
 
-func GetCookieOptions(cfg *domain.Config) (isSecure bool, sameSite http.SameSite) {
+func GetCookieOptions(cfg *models.Config) (isSecure bool, sameSite http.SameSite) {
 	isSecure = strings.HasPrefix(cfg.BaseURL, "https")
 	sameSite = http.SameSiteLaxMode
 	if isSecure {

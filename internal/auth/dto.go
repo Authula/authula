@@ -1,20 +1,18 @@
 package auth
 
-import (
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
-)
+import "github.com/GoBetterAuth/go-better-auth/models"
 
 // SignInResult represents the result of a sign-in operation
 type SignInResult struct {
 	Token     string       `json:"token"`
-	User      *domain.User `json:"user"`
+	User      *models.User `json:"user"`
 	CSRFToken string       `json:"csrf_token,omitempty"`
 }
 
 // SignUpResult represents the result of a sign-up operation
 type SignUpResult struct {
 	Token     string       `json:"token,omitempty"`
-	User      *domain.User `json:"user"`
+	User      *models.User `json:"user"`
 	CSRFToken string       `json:"csrf_token,omitempty"`
 }
 
@@ -26,7 +24,7 @@ type SignOutResult struct {
 // VerifyEmailResult represents the result of email verification
 type VerifyEmailResult struct {
 	Message string       `json:"message"`
-	User    *domain.User `json:"user,omitempty"`
+	User    *models.User `json:"user,omitempty"`
 }
 
 // PasswordResetRequestResult represents the result of a password reset request
@@ -47,5 +45,5 @@ type EmailChangeRequestResult struct {
 // EmailChangeResult represents the result of confirming an email change
 type EmailChangeResult struct {
 	Message string       `json:"message"`
-	User    *domain.User `json:"user,omitempty"`
+	User    *models.User `json:"user,omitempty"`
 }

@@ -5,7 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/config"
+	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,19 +24,19 @@ type mockPlugin struct {
 	migrations []any
 }
 
-func (m *mockPlugin) Metadata() domain.PluginMetadata {
-	return domain.PluginMetadata{Name: m.name}
+func (m *mockPlugin) Metadata() models.PluginMetadata {
+	return models.PluginMetadata{Name: m.name}
 }
 
-func (m *mockPlugin) Config() domain.PluginConfig {
-	return domain.PluginConfig{Enabled: m.enabled}
+func (m *mockPlugin) Config() models.PluginConfig {
+	return models.PluginConfig{Enabled: m.enabled}
 }
 
-func (m *mockPlugin) Ctx() *domain.PluginContext {
-	return &domain.PluginContext{Config: nil, EventBus: nil, Middleware: nil}
+func (m *mockPlugin) Ctx() *models.PluginContext {
+	return &models.PluginContext{Config: nil, EventBus: nil, Middleware: nil}
 }
 
-func (m *mockPlugin) Init(_ *domain.PluginContext) error {
+func (m *mockPlugin) Init(_ *models.PluginContext) error {
 	if m.initFails {
 		return errInit
 	}
@@ -46,9 +47,9 @@ func (m *mockPlugin) Migrations() []any {
 	return m.migrations
 }
 
-func (m *mockPlugin) Routes() []domain.PluginRoute {
+func (m *mockPlugin) Routes() []models.PluginRoute {
 	if m.hasRoutes {
-		return []domain.PluginRoute{
+		return []models.PluginRoute{
 			{
 				Path:   "test",
 				Method: http.MethodGet,
@@ -61,15 +62,15 @@ func (m *mockPlugin) Routes() []domain.PluginRoute {
 	return nil
 }
 
-func (m *mockPlugin) RateLimit() *domain.PluginRateLimit {
+func (m *mockPlugin) RateLimit() *models.PluginRateLimit {
 	return nil
 }
 
-func (m *mockPlugin) DatabaseHooks() *domain.PluginDatabaseHooks {
+func (m *mockPlugin) DatabaseHooks() *models.PluginDatabaseHooks {
 	return nil
 }
 
-func (m *mockPlugin) EventHooks() *domain.PluginEventHooks {
+func (m *mockPlugin) EventHooks() *models.PluginEventHooks {
 	return nil
 }
 
@@ -80,10 +81,10 @@ func (m *mockPlugin) Close() error {
 	return nil
 }
 
-func getMockConfig() *domain.Config {
-	return domain.NewConfig(
-		domain.WithDatabase(
-			domain.DatabaseConfig{
+func getMockConfig() *models.Config {
+	return config.NewConfig(
+		config.WithDatabase(
+			models.DatabaseConfig{
 				Provider:         "sqlite",
 				ConnectionString: "file::memory:?cache=shared",
 			},
@@ -169,7 +170,7 @@ func TestPluginRegistry_Routes(t *testing.T) {
 	registry.Register(plugin3)
 
 	plugins := registry.Plugins()
-	routes := make([]domain.PluginRoute, 0)
+	routes := make([]models.PluginRoute, 0)
 	for _, p := range plugins {
 		routes = append(routes, p.Routes()...)
 	}

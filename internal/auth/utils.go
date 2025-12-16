@@ -5,11 +5,11 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 // callHook safely calls a hook function if it's not nil
-func (s *Service) callHook(hook func(domain.User) error, user *domain.User) {
+func (s *Service) callHook(hook func(models.User) error, user *models.User) {
 	if hook != nil && user != nil {
 		go hook(*user)
 	}
@@ -27,7 +27,7 @@ func (s *Service) emitEvent(eventType string, data any) {
 				}
 			}
 
-			event := domain.Event{
+			event := models.Event{
 				Type:      eventType,
 				Timestamp: time.Now().UTC(),
 				Payload:   payload,

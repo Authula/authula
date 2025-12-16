@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 // SignUpWithEmailAndPassword handles user registration with email and password
@@ -20,7 +20,7 @@ func (s *Service) SignUpWithEmailAndPassword(name string, email string, password
 		return nil, ErrUserAlreadyExists
 	}
 
-	newUser := &domain.User{
+	newUser := &models.User{
 		Name:          name,
 		Email:         email,
 		EmailVerified: !s.config.EmailPassword.RequireEmailVerification,
@@ -39,9 +39,9 @@ func (s *Service) SignUpWithEmailAndPassword(name string, email string, password
 		return nil, fmt.Errorf("%w: %w", ErrPasswordHashingFailed, err)
 	}
 
-	newAccount := &domain.Account{
+	newAccount := &models.Account{
 		UserID:     newUser.ID,
-		ProviderID: domain.ProviderEmail,
+		ProviderID: models.ProviderEmail,
 		Password:   &hashedPassword,
 		CreatedAt:  time.Now().UTC(),
 		UpdatedAt:  time.Now().UTC(),
@@ -74,11 +74,11 @@ func (s *Service) SignUpWithEmailAndPassword(name string, email string, password
 			return nil, fmt.Errorf("%w: %w", ErrTokenGenerationFailed, err)
 		}
 
-		ver := &domain.Verification{
+		ver := &models.Verification{
 			UserID:     &newUser.ID,
 			Identifier: newUser.Email,
 			Token:      s.TokenService.HashToken(token),
-			Type:       domain.TypeEmailVerification,
+			Type:       models.TypeEmailVerification,
 			ExpiresAt:  time.Now().UTC().Add(s.config.EmailVerification.ExpiresIn),
 		}
 		if err := s.VerificationService.CreateVerification(ver); err != nil {
@@ -102,7 +102,7 @@ func (s *Service) SignUpWithEmailAndPassword(name string, email string, password
 	}
 
 	s.callHook(s.config.EventHooks.OnUserSignedUp, newUser)
-	s.emitEvent(domain.EventUserSignedUp, newUser)
+	s.emitEvent(models.EventUserSignedUp, newUser)
 
 	return &SignUpResult{
 		Token: sessionToken,

@@ -7,7 +7,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/internal/auth"
 	"github.com/GoBetterAuth/go-better-auth/internal/middleware"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 type SendEmailVerificationResponse struct {
@@ -19,7 +19,7 @@ type SendEmailVerificationHandlerPayload struct {
 }
 
 type SendEmailVerificationHandler struct {
-	Config      *domain.Config
+	Config      *models.Config
 	AuthService *auth.Service
 }
 

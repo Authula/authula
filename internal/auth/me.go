@@ -1,12 +1,10 @@
 package auth
 
-import (
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
-)
+import "github.com/GoBetterAuth/go-better-auth/models"
 
 type MeResult struct {
-	User    *domain.User    `json:"user"`
-	Session *domain.Session `json:"session"`
+	User    *models.User    `json:"user"`
+	Session *models.Session `json:"session"`
 }
 
 // GetMe retrieves the current user and their session

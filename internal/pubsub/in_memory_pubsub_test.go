@@ -5,16 +5,15 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
 
 func TestSimplePubSub_Publish(t *testing.T) {
 	pubsub := NewInMemoryPubSub()
 	defer pubsub.Close()
 
-	msg := &domain.Message{
+	msg := &models.Message{
 		UUID:    "test-123",
 		Payload: []byte("test payload"),
 		Metadata: map[string]string{
@@ -35,7 +34,7 @@ func TestSimplePubSub_Subscribe(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Publish message
-	msg := &domain.Message{
+	msg := &models.Message{
 		UUID:    "test-456",
 		Payload: []byte("hello world"),
 		Metadata: map[string]string{
@@ -46,7 +45,7 @@ func TestSimplePubSub_Subscribe(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	var received *domain.Message
+	var received *models.Message
 	go func() {
 		received = <-ch
 		wg.Done()
@@ -73,7 +72,7 @@ func TestSimplePubSub_MultipleSubscribers(t *testing.T) {
 	ch2, err := pubsub.Subscribe(context.Background(), "test.topic")
 	assert.NoError(t, err)
 
-	msg := &domain.Message{
+	msg := &models.Message{
 		UUID:    "broadcast-789",
 		Payload: []byte("broadcast message"),
 	}
@@ -81,7 +80,7 @@ func TestSimplePubSub_MultipleSubscribers(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	var received1, received2 *domain.Message
+	var received1, received2 *models.Message
 
 	go func() {
 		received1 = <-ch1

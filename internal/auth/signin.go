@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 // SignInWithEmailAndPassword handles email/password authentication
@@ -60,7 +60,7 @@ func (s *Service) SignInWithEmailAndPassword(email string, password string, call
 	}
 
 	s.callHook(s.config.EventHooks.OnUserLoggedIn, user)
-	s.emitEvent(domain.EventUserLoggedIn, user)
+	s.emitEvent(models.EventUserLoggedIn, user)
 
 	if s.config.EmailVerification.SendOnSignIn && !user.EmailVerified {
 		token, err := s.TokenService.GenerateToken()
@@ -68,11 +68,11 @@ func (s *Service) SignInWithEmailAndPassword(email string, password string, call
 			slog.Error("failed to generate verification token", "error", err)
 			// Don't fail the signin, just log
 		} else {
-			ver := &domain.Verification{
+			ver := &models.Verification{
 				UserID:     &user.ID,
 				Identifier: user.Email,
 				Token:      s.TokenService.HashToken(token),
-				Type:       domain.TypeEmailVerification,
+				Type:       models.TypeEmailVerification,
 				ExpiresAt:  time.Now().UTC().Add(s.config.EmailVerification.ExpiresIn),
 			}
 			if err := s.VerificationService.CreateVerification(ver); err != nil {

@@ -6,44 +6,36 @@ import (
 	"log/slog"
 	"net/http"
 
-	authinternal "github.com/GoBetterAuth/go-better-auth/internal/auth"
-	"github.com/GoBetterAuth/go-better-auth/internal/auth/storage"
-	"github.com/GoBetterAuth/go-better-auth/internal/events"
+	"github.com/GoBetterAuth/go-better-auth/events"
+	"github.com/GoBetterAuth/go-better-auth/internal/auth"
 	"github.com/GoBetterAuth/go-better-auth/internal/handlers"
 	"github.com/GoBetterAuth/go-better-auth/internal/middleware"
 	"github.com/GoBetterAuth/go-better-auth/internal/plugins"
+	"github.com/GoBetterAuth/go-better-auth/internal/services"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/storage"
 )
 
 // ---------------------------------
 // INITIALISATION
 // ---------------------------------
 
-type Api struct {
-	Users         *authinternal.UserService
-	Accounts      *authinternal.AccountService
-	Sessions      *authinternal.SessionService
-	Verifications *authinternal.VerificationService
-	Tokens        *authinternal.TokenService
-	// TODO: KeyValueStore *authinternal.KeyValueStoreService
-}
-
 type Auth struct {
-	Config         *domain.Config
+	Config         *models.Config
 	mux            *http.ServeMux
-	service        *authinternal.Service
-	Api            Api
-	customRoutes   []domain.CustomRoute
+	service        *auth.Service
+	Api            services.Api
+	customRoutes   []models.CustomRoute
 	pluginRegistry *plugins.PluginRegistry
 }
 
-func New(config *domain.Config) *Auth {
+func New(config *models.Config) *Auth {
 	util.InitValidator()
 	initStorage(config)
 	mux := http.NewServeMux()
 
-	var eventBus domain.EventBus
+	var eventBus models.EventBus
 	if config.EventBus.Enabled {
 		eventBus = events.NewEventBus(config, config.EventBus.PubSub)
 	}
@@ -51,10 +43,10 @@ func New(config *domain.Config) *Auth {
 	auth := &Auth{
 		Config:       config,
 		mux:          mux,
-		customRoutes: []domain.CustomRoute{},
+		customRoutes: []models.CustomRoute{},
 	}
 
-	pluginMiddleware := &domain.PluginMiddleware{
+	pluginMiddleware := &models.PluginMiddleware{
 		Auth:          auth.AuthMiddleware,
 		OptionalAuth:  auth.OptionalAuthMiddleware,
 		CorsAuth:      auth.CorsAuthMiddleware,
@@ -71,7 +63,7 @@ func New(config *domain.Config) *Auth {
 
 	authService := constructAuthService(config, eventBus, pluginRegistry)
 
-	api := Api{
+	api := services.Api{
 		Users:         authService.UserService,
 		Accounts:      authService.AccountService,
 		Sessions:      authService.SessionService,
@@ -86,22 +78,22 @@ func New(config *domain.Config) *Auth {
 	return auth
 }
 
-func initStorage(config *domain.Config) {
+func initStorage(config *models.Config) {
 	if config.SecondaryStorage.Type == "" {
 		if config.SecondaryStorage.Storage != nil {
 			panic("secondary storage type of 'custom' must be specified")
 		}
 
 		// Default to in-memory secondary storage
-		config.SecondaryStorage.Type = domain.SecondaryStorageTypeMemory
+		config.SecondaryStorage.Type = models.SecondaryStorageTypeMemory
 		config.SecondaryStorage.Storage = storage.NewMemorySecondaryStorage(config.SecondaryStorage.MemoryOptions)
 	} else {
 		switch config.SecondaryStorage.Type {
-		case domain.SecondaryStorageTypeMemory:
+		case models.SecondaryStorageTypeMemory:
 			config.SecondaryStorage.Storage = storage.NewMemorySecondaryStorage(config.SecondaryStorage.MemoryOptions)
-		case domain.SecondaryStorageTypeDatabase:
+		case models.SecondaryStorageTypeDatabase:
 			config.SecondaryStorage.Storage = storage.NewDatabaseSecondaryStorage(config.DB, config.SecondaryStorage.DatabaseOptions)
-		case domain.SecondaryStorageTypeCustom:
+		case models.SecondaryStorageTypeCustom:
 			// Valid, do nothing
 		default:
 			panic("unsupported secondary storage type: " + config.SecondaryStorage.Type)
@@ -115,11 +107,11 @@ func initStorage(config *domain.Config) {
 
 func (auth *Auth) RunMigrations() {
 	models := []any{
-		&domain.User{},
-		&domain.Account{},
-		&domain.Session{},
-		&domain.Verification{},
-		&domain.KeyValueStore{},
+		&models.User{},
+		&models.Account{},
+		&models.Session{},
+		&models.Verification{},
+		&models.KeyValueStore{},
 	}
 	if err := auth.Config.DB.AutoMigrate(models...); err != nil {
 		slog.Error("failed to auto migrate database", slog.Any("error", err))
@@ -134,11 +126,11 @@ func (auth *Auth) RunMigrations() {
 
 func (auth *Auth) DropMigrations() {
 	models := []any{
-		&domain.KeyValueStore{},
-		&domain.Verification{},
-		&domain.Session{},
-		&domain.Account{},
-		&domain.User{},
+		&models.KeyValueStore{},
+		&models.Verification{},
+		&models.Session{},
+		&models.Account{},
+		&models.User{},
 	}
 	for _, model := range models {
 		if err := auth.Config.DB.Migrator().DropTable(model); err != nil {
@@ -152,15 +144,25 @@ func (auth *Auth) DropMigrations() {
 // MIDDLEWARES & HANDLERS
 // ---------------------------------
 
-func constructAuthService(config *domain.Config, eventBus domain.EventBus, pluginRegistry *plugins.PluginRegistry) *authinternal.Service {
-	userService := authinternal.NewUserService(config, config.DB)
-	accountService := authinternal.NewAccountService(config, config.DB)
-	sessionService := authinternal.NewSessionService(config, config.DB)
-	verificationService := authinternal.NewVerificationService(config, config.DB)
-	tokenService := authinternal.NewTokenService(config)
-	rateLimitService := authinternal.NewRateLimitService(config, pluginRegistry)
+func constructAuthService(config *models.Config, eventBus models.EventBus, pluginRegistry *plugins.PluginRegistry) *auth.Service {
+	userService := services.NewUserServiceImpl(config, config.DB)
+	accountService := services.NewAccountServiceImpl(config, config.DB)
+	sessionService := services.NewSessionServiceImpl(config, config.DB)
+	verificationService := services.NewVerificationServiceImpl(config, config.DB)
+	tokenService := services.NewTokenServiceImpl(config)
 
-	authService := authinternal.NewService(
+	pluginRateLimits := []models.PluginRateLimit{}
+	if pluginRegistry != nil {
+		plugins := pluginRegistry.Plugins()
+		for _, plugin := range plugins {
+			if rateLimitConfig := plugin.RateLimit(); rateLimitConfig != nil {
+				pluginRateLimits = append(pluginRateLimits, *rateLimitConfig)
+			}
+		}
+	}
+	rateLimitService := services.NewRateLimitServiceImpl(config, pluginRateLimits)
+
+	authService := auth.NewService(
 		config,
 		eventBus,
 		userService,
@@ -220,9 +222,9 @@ func (auth *Auth) GetUserIDFromRequest(req *http.Request) (string, bool) {
 	return auth.GetUserIDFromContext(req.Context())
 }
 
-func (auth *Auth) RegisterRoute(route domain.CustomRoute) {
+func (auth *Auth) RegisterRoute(route models.CustomRoute) {
 	originalHandler := route.Handler
-	route.Handler = func(config *domain.Config) http.Handler {
+	route.Handler = func(config *models.Config) http.Handler {
 		handler := originalHandler(config)
 		finalHandler := handler
 		for i := len(route.Middleware) - 1; i >= 0; i-- {

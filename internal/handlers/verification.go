@@ -5,11 +5,11 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/internal/auth"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 type VerifyEmailHandler struct {
-	Config      *domain.Config
+	Config      *models.Config
 	AuthService *auth.Service
 }
 

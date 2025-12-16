@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 // VerifyEmailToken handles all email verification types: verification, password reset confirmation, and email change confirmation
@@ -29,11 +29,11 @@ func (s *Service) VerifyEmailToken(rawToken string) (*VerifyEmailResult, error) 
 	}
 
 	switch ver.Type {
-	case domain.TypeEmailVerification:
+	case models.TypeEmailVerification:
 		return s.handleEmailVerification(ver)
-	case domain.TypePasswordReset:
+	case models.TypePasswordReset:
 		return s.handlePasswordResetConfirmation(ver)
-	case domain.TypeEmailChange:
+	case models.TypeEmailChange:
 		return s.handleEmailChange(ver)
 	default:
 		return nil, fmt.Errorf("unknown verification type: %s", ver.Type)
@@ -41,7 +41,7 @@ func (s *Service) VerifyEmailToken(rawToken string) (*VerifyEmailResult, error) 
 }
 
 // handleEmailVerification verifies a user's email address
-func (s *Service) handleEmailVerification(ver *domain.Verification) (*VerifyEmailResult, error) {
+func (s *Service) handleEmailVerification(ver *models.Verification) (*VerifyEmailResult, error) {
 	if ver.UserID == nil {
 		return nil, ErrUserNotFound
 	}
@@ -66,7 +66,7 @@ func (s *Service) handleEmailVerification(ver *domain.Verification) (*VerifyEmai
 	}
 
 	s.callHook(s.config.EventHooks.OnEmailVerified, user)
-	s.emitEvent(domain.EventEmailVerified, user)
+	s.emitEvent(models.EventEmailVerified, user)
 
 	return &VerifyEmailResult{
 		Message: "Email verified successfully",
@@ -75,7 +75,7 @@ func (s *Service) handleEmailVerification(ver *domain.Verification) (*VerifyEmai
 }
 
 // handlePasswordResetConfirmation confirms a password reset token
-func (s *Service) handlePasswordResetConfirmation(ver *domain.Verification) (*VerifyEmailResult, error) {
+func (s *Service) handlePasswordResetConfirmation(ver *models.Verification) (*VerifyEmailResult, error) {
 	// Just confirm that the token is valid
 	// The actual password reset happens in ResetPassword
 	return &VerifyEmailResult{
@@ -84,7 +84,7 @@ func (s *Service) handlePasswordResetConfirmation(ver *domain.Verification) (*Ve
 }
 
 // handleEmailChange confirms an email change
-func (s *Service) handleEmailChange(ver *domain.Verification) (*VerifyEmailResult, error) {
+func (s *Service) handleEmailChange(ver *models.Verification) (*VerifyEmailResult, error) {
 	if ver.UserID == nil {
 		return nil, ErrUserNotFound
 	}
@@ -109,7 +109,7 @@ func (s *Service) handleEmailChange(ver *domain.Verification) (*VerifyEmailResul
 	}
 
 	s.callHook(s.config.EventHooks.OnEmailChanged, user)
-	s.emitEvent(domain.EventEmailChanged, user)
+	s.emitEvent(models.EventEmailChanged, user)
 
 	return &VerifyEmailResult{
 		Message: "Email changed successfully",
@@ -138,11 +138,11 @@ func (s *Service) SendVerificationEmail(userID string, callbackURL *string) erro
 		return fmt.Errorf("%w: %w", ErrTokenGenerationFailed, err)
 	}
 
-	ver := &domain.Verification{
+	ver := &models.Verification{
 		UserID:     &u.ID,
 		Identifier: u.Email,
 		Token:      s.TokenService.HashToken(token),
-		Type:       domain.TypeEmailVerification,
+		Type:       models.TypeEmailVerification,
 		ExpiresAt:  time.Now().UTC().Add(s.config.EmailVerification.ExpiresIn),
 	}
 	if err := s.VerificationService.CreateVerification(ver); err != nil {

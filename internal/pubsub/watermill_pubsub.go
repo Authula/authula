@@ -4,9 +4,8 @@ import (
 	"context"
 	"maps"
 
+	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/ThreeDotsLabs/watermill/message"
-
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
 
 // watermillPubSub adapts Watermill's PubSub to implement our domain.PubSub interface.
@@ -18,7 +17,7 @@ type watermillPubSub struct {
 
 // NewWatermillPubSub creates a PubSub adapter for Watermill transports.
 // Users can pass any Watermill-compatible publisher and subscriber.
-func NewWatermillPubSub(publisher message.Publisher, subscriber message.Subscriber) domain.PubSub {
+func NewWatermillPubSub(publisher message.Publisher, subscriber message.Subscriber) models.PubSub {
 	return &watermillPubSub{
 		publisher:  publisher,
 		subscriber: subscriber,
@@ -26,7 +25,7 @@ func NewWatermillPubSub(publisher message.Publisher, subscriber message.Subscrib
 }
 
 // Publish sends a message to the specified topic using Watermill.
-func (w *watermillPubSub) Publish(ctx context.Context, topic string, msg *domain.Message) error {
+func (w *watermillPubSub) Publish(ctx context.Context, topic string, msg *models.Message) error {
 	watermillMsg := message.NewMessage(
 		msg.UUID,
 		msg.Payload,
@@ -40,24 +39,23 @@ func (w *watermillPubSub) Publish(ctx context.Context, topic string, msg *domain
 }
 
 // Subscribe returns a channel that receives messages from the specified topic.
-func (w *watermillPubSub) Subscribe(ctx context.Context, topic string) (<-chan *domain.Message, error) {
+func (w *watermillPubSub) Subscribe(ctx context.Context, topic string) (<-chan *models.Message, error) {
 	watermillCh, err := w.subscriber.Subscribe(ctx, topic)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create a channel to convert Watermill messages to our domain messages
-	domainCh := make(chan *domain.Message)
+	// Create a channel to convert Watermill messages to our models messages
+	domainCh := make(chan *models.Message)
 
 	go func() {
 		defer close(domainCh)
 
 		for watermillMsg := range watermillCh {
-			// Convert Watermill message to domain message
 			metadata := make(map[string]string)
 			maps.Copy(metadata, watermillMsg.Metadata)
 
-			domainMsg := &domain.Message{
+			domainMsg := &models.Message{
 				UUID:     watermillMsg.UUID,
 				Payload:  watermillMsg.Payload,
 				Metadata: metadata,

@@ -10,7 +10,7 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/internal/auth"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 type responseBuffer struct {
@@ -36,7 +36,7 @@ func (w *responseBuffer) WriteHeader(statusCode int) {
 	w.written = true
 }
 
-func EndpointHooksMiddleware(config *domain.Config, authService *auth.Service) func(http.Handler) http.Handler {
+func EndpointHooksMiddleware(config *models.Config, authService *auth.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if config.EndpointHooks.Before == nil && config.EndpointHooks.After == nil && config.EndpointHooks.Response == nil {
@@ -44,7 +44,7 @@ func EndpointHooksMiddleware(config *domain.Config, authService *auth.Service) f
 				return
 			}
 
-			hookCtx := &domain.EndpointHookContext{
+			hookCtx := &models.EndpointHookContext{
 				Path:            r.URL.Path,
 				Method:          r.Method,
 				Headers:         make(map[string][]string),

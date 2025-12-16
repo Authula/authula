@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 func (s *Service) SignInWithOAuth2(ctx context.Context, providerName string, code string, opts ...oauth2.AuthCodeOption) (*SignInResult, error) {
@@ -29,12 +29,12 @@ func (s *Service) SignInWithOAuth2(ctx context.Context, providerName string, cod
 		return nil, ErrOAuth2UserInfoFailed
 	}
 
-	account, err := s.AccountService.GetAccountByProviderAndAccountID(domain.ProviderType(providerName), userInfo.ID)
+	account, err := s.AccountService.GetAccountByProviderAndAccountID(models.ProviderType(providerName), userInfo.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	var user *domain.User
+	var user *models.User
 
 	if account != nil {
 		user, err = s.UserService.GetUserByID(account.UserID)
@@ -79,7 +79,7 @@ func (s *Service) SignInWithOAuth2(ctx context.Context, providerName string, cod
 		}
 
 		if user == nil {
-			user = &domain.User{
+			user = &models.User{
 				Name:          userInfo.Name,
 				Email:         userInfo.Email,
 				Image:         &userInfo.Picture,
@@ -113,10 +113,10 @@ func (s *Service) SignInWithOAuth2(ctx context.Context, providerName string, cod
 			refreshTokenExpiresAt = extractRefreshTokenExpiry(oauthToken)
 		}
 
-		account = &domain.Account{
+		account = &models.Account{
 			UserID:                user.ID,
 			AccountID:             userInfo.ID,
-			ProviderID:            domain.ProviderType(providerName),
+			ProviderID:            models.ProviderType(providerName),
 			AccessToken:           &encryptedAccessToken,
 			RefreshToken:          refreshToken,
 			AccessTokenExpiresAt:  &oauthToken.Expiry,
@@ -144,7 +144,7 @@ func (s *Service) SignInWithOAuth2(ctx context.Context, providerName string, cod
 }
 
 // GetValidAccessToken ensures the access token is valid and refreshes it if expired or near expiry.
-func (s *Service) GetValidAccessToken(ctx context.Context, account *domain.Account, providerName string) (string, error) {
+func (s *Service) GetValidAccessToken(ctx context.Context, account *models.Account, providerName string) (string, error) {
 	// Consider token "expired" if less than 1 minute remains
 	const refreshBefore = 1 * time.Minute
 	now := time.Now()
@@ -167,7 +167,7 @@ func (s *Service) GetValidAccessToken(ctx context.Context, account *domain.Accou
 }
 
 // RefreshOAuth2AccessToken refreshes the access token for a given account if a valid refresh token exists.
-func (s *Service) RefreshOAuth2AccessToken(ctx context.Context, account *domain.Account, providerName string) (string, error) {
+func (s *Service) RefreshOAuth2AccessToken(ctx context.Context, account *models.Account, providerName string) (string, error) {
 	if account.RefreshToken == nil {
 		return "", ErrNoRefreshToken
 	}

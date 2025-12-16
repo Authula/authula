@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 // ChangePassword completes a password reset with a verification token and new password
@@ -21,7 +21,7 @@ func (s *Service) ChangePassword(rawToken, newPassword string) error {
 		slog.Error("failed to get verification token", "error", err)
 		return fmt.Errorf("%w: %w", ErrVerificationNotFound, err)
 	}
-	if ver == nil || ver.Type != domain.TypePasswordReset {
+	if ver == nil || ver.Type != models.TypePasswordReset {
 		return ErrVerificationInvalid
 	}
 
@@ -68,7 +68,7 @@ func (s *Service) ChangePassword(rawToken, newPassword string) error {
 	}
 
 	s.callHook(s.config.EventHooks.OnPasswordChanged, user)
-	s.emitEvent(domain.EventPasswordChanged, user)
+	s.emitEvent(models.EventPasswordChanged, user)
 
 	return nil
 }

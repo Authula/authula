@@ -4,17 +4,17 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 type PluginRegistry struct {
-	config    *domain.Config
-	pluginCtx *domain.PluginContext
-	plugins   []domain.Plugin
+	config    *models.Config
+	pluginCtx *models.PluginContext
+	plugins   []models.Plugin
 }
 
-func NewPluginRegistry(config *domain.Config, eventBus domain.EventBus, middleware *domain.PluginMiddleware) *PluginRegistry {
-	ctx := &domain.PluginContext{
+func NewPluginRegistry(config *models.Config, eventBus models.EventBus, middleware *models.PluginMiddleware) *PluginRegistry {
+	ctx := &models.PluginContext{
 		Config:     config,
 		EventBus:   eventBus,
 		Middleware: middleware,
@@ -23,11 +23,11 @@ func NewPluginRegistry(config *domain.Config, eventBus domain.EventBus, middlewa
 	return &PluginRegistry{
 		config:    config,
 		pluginCtx: ctx,
-		plugins:   []domain.Plugin{},
+		plugins:   []models.Plugin{},
 	}
 }
 
-func (r *PluginRegistry) Register(p domain.Plugin) {
+func (r *PluginRegistry) Register(p models.Plugin) {
 	r.plugins = append(r.plugins, p)
 }
 
@@ -62,8 +62,8 @@ func (r *PluginRegistry) RunMigrations() error {
 	return nil
 }
 
-func (r *PluginRegistry) Plugins() []domain.Plugin {
-	plugins := make([]domain.Plugin, 0)
+func (r *PluginRegistry) Plugins() []models.Plugin {
+	plugins := make([]models.Plugin, 0)
 	for _, plugin := range r.plugins {
 		if !plugin.Config().Enabled {
 			continue

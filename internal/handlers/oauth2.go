@@ -7,13 +7,12 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/auth"
-	authoauth2 "github.com/GoBetterAuth/go-better-auth/internal/auth/oauth2"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 type OAuth2LoginHandler struct {
-	Config      *domain.Config
+	Config      *models.Config
 	AuthService *auth.Service
 }
 
@@ -59,7 +58,7 @@ func (h *OAuth2LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	var opts []oauth2.AuthCodeOption
 
 	if provider.RequiresPKCE() {
-		verifier, challenge, err := authoauth2.GeneratePKCE()
+		verifier, challenge, err := util.GeneratePKCE()
 		if err != nil {
 			util.JSONResponse(w, http.StatusInternalServerError, map[string]any{"message": "failed to generate pkce"})
 			return
@@ -91,7 +90,7 @@ func (h *OAuth2LoginHandler) Handler() http.Handler {
 }
 
 type OAuth2CallbackHandler struct {
-	Config      *domain.Config
+	Config      *models.Config
 	AuthService *auth.Service
 }
 

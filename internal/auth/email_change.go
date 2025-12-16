@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 // EmailChange initiates an email change by sending a verification email to the new address
@@ -35,11 +35,11 @@ func (s *Service) EmailChange(userID string, newEmail string, callbackURL *strin
 		return fmt.Errorf("%w: %w", ErrTokenGenerationFailed, err)
 	}
 
-	ver := &domain.Verification{
+	ver := &models.Verification{
 		UserID:     &user.ID,
 		Identifier: newEmail, // store new email in identifier
 		Token:      s.TokenService.HashToken(token),
-		Type:       domain.TypeEmailChange,
+		Type:       models.TypeEmailChange,
 		ExpiresAt:  time.Now().UTC().Add(s.config.EmailVerification.ExpiresIn),
 	}
 	if err := s.VerificationService.CreateVerification(ver); err != nil {

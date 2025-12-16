@@ -7,17 +7,17 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/GoBetterAuth/go-better-auth/config"
+	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
 )
 
 func TestEndpointHooksMiddleware_BeforeHook_ModifyRequestHeader(t *testing.T) {
 	// Setup
-	config := domain.NewConfig(
-		domain.WithEndpointHooks(
-			domain.EndpointHooksConfig{
-				Before: func(ctx *domain.EndpointHookContext) error {
+	config := config.NewConfig(
+		config.WithEndpointHooks(
+			models.EndpointHooksConfig{
+				Before: func(ctx *models.EndpointHookContext) error {
 					// Set a request header that the handler will read
 					ctx.Request.Header.Set("X-Test-From-Before", "from-before")
 					return nil
@@ -50,9 +50,9 @@ func TestEndpointHooksMiddleware_BeforeHook_ModifyRequestHeader(t *testing.T) {
 
 func TestEndpointHooksMiddleware_Response_JSONToHTML(t *testing.T) {
 	// Setup
-	config := domain.NewConfig(
-		domain.WithEndpointHooks(domain.EndpointHooksConfig{
-			Response: func(ctx *domain.EndpointHookContext) error {
+	config := config.NewConfig(
+		config.WithEndpointHooks(models.EndpointHooksConfig{
+			Response: func(ctx *models.EndpointHookContext) error {
 				// Check if original response was JSON
 				if len(ctx.ResponseHeaders["Content-Type"]) > 0 && ctx.ResponseHeaders["Content-Type"][0] == "application/json" {
 					var response struct {
@@ -95,9 +95,9 @@ func TestEndpointHooksMiddleware_Response_JSONToHTML(t *testing.T) {
 
 func TestEndpointHooksMiddleware_Response_Error(t *testing.T) {
 	// Setup
-	config := domain.NewConfig(
-		domain.WithEndpointHooks(domain.EndpointHooksConfig{
-			Response: func(ctx *domain.EndpointHookContext) error {
+	config := config.NewConfig(
+		config.WithEndpointHooks(models.EndpointHooksConfig{
+			Response: func(ctx *models.EndpointHookContext) error {
 				return assert.AnError
 			},
 		}),

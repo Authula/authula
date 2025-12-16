@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 // ResetPassword initiates a password reset by sending a verification email
@@ -36,11 +36,11 @@ func (s *Service) ResetPassword(email string, callbackURL *string) error {
 		resetTokenExpiry = time.Hour
 	}
 
-	ver := &domain.Verification{
+	ver := &models.Verification{
 		UserID:     &user.ID,
 		Identifier: user.Email,
 		Token:      s.TokenService.HashToken(token),
-		Type:       domain.TypePasswordReset,
+		Type:       models.TypePasswordReset,
 		ExpiresAt:  time.Now().UTC().Add(resetTokenExpiry),
 	}
 	if err := s.VerificationService.CreateVerification(ver); err != nil {

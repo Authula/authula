@@ -4,25 +4,25 @@ import (
 	"context"
 	"sync"
 
-	"github.com/GoBetterAuth/go-better-auth/pkg/domain"
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 type InMemoryPubSub struct {
 	mu          sync.RWMutex
-	subscribers map[string][]chan *domain.Message
+	subscribers map[string][]chan *models.Message
 	closed      bool
-	closedChans []chan *domain.Message
+	closedChans []chan *models.Message
 }
 
 // NewInMemoryPubSub creates an in-memory PubSub implementation.
-func NewInMemoryPubSub() domain.PubSub {
+func NewInMemoryPubSub() models.PubSub {
 	return &InMemoryPubSub{
-		subscribers: make(map[string][]chan *domain.Message),
-		closedChans: make([]chan *domain.Message, 0),
+		subscribers: make(map[string][]chan *models.Message),
+		closedChans: make([]chan *models.Message, 0),
 	}
 }
 
-func (s *InMemoryPubSub) Publish(ctx context.Context, topic string, msg *domain.Message) error {
+func (s *InMemoryPubSub) Publish(ctx context.Context, topic string, msg *models.Message) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -48,18 +48,18 @@ func (s *InMemoryPubSub) Publish(ctx context.Context, topic string, msg *domain.
 	return nil
 }
 
-func (s *InMemoryPubSub) Subscribe(ctx context.Context, topic string) (<-chan *domain.Message, error) {
+func (s *InMemoryPubSub) Subscribe(ctx context.Context, topic string) (<-chan *models.Message, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.closed {
-		ch := make(chan *domain.Message)
+		ch := make(chan *models.Message)
 		close(ch)
 		return ch, nil
 	}
 
 	// Create buffered channel for this subscriber
-	ch := make(chan *domain.Message, 100)
+	ch := make(chan *models.Message, 100)
 
 	s.subscribers[topic] = append(s.subscribers[topic], ch)
 	s.closedChans = append(s.closedChans, ch)
