@@ -3,20 +3,16 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/auth"
+	me "github.com/GoBetterAuth/go-better-auth/internal/auth/me"
+	"github.com/GoBetterAuth/go-better-auth/internal/common"
 	"github.com/GoBetterAuth/go-better-auth/internal/middleware"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
-type MeResponse struct {
-	User    *models.User    `json:"user"`
-	Session *models.Session `json:"session"`
-}
-
 type MeHandler struct {
-	Config      *models.Config
-	AuthService *auth.Service
+	Config  *models.Config
+	UseCase me.MeUseCase
 }
 
 func (h *MeHandler) Handle(w http.ResponseWriter, r *http.Request) {
@@ -26,34 +22,23 @@ func (h *MeHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.AuthService.UserService.GetUserByID(userID)
+	result, err := h.UseCase.GetMe(r.Context(), userID)
 	if err != nil {
-		util.JSONResponse(w, http.StatusInternalServerError, map[string]any{"message": "failed to retrieve user"})
+		util.JSONResponse(w, http.StatusInternalServerError, map[string]any{"message": err.Error()})
 		return
 	}
-	if user == nil {
+	if result.User == nil {
 		util.JSONResponse(w, http.StatusNotFound, map[string]any{"message": "user not found"})
 		return
 	}
-
-	session, err := h.AuthService.SessionService.GetSessionByUserID(userID)
-	if err != nil {
-		util.JSONResponse(w, http.StatusInternalServerError, map[string]any{"message": "failed to retrieve session"})
-		return
-	}
-	if session == nil {
+	if result.Session == nil {
 		util.JSONResponse(w, http.StatusNotFound, map[string]any{"message": "session not found"})
 		return
 	}
 
-	response := MeResponse{
-		User:    user,
-		Session: session,
-	}
-
-	util.JSONResponse(w, http.StatusOK, response)
+	util.JSONResponse(w, http.StatusOK, result)
 }
 
-func (h *MeHandler) Handler() http.Handler {
-	return Wrap(h)
+func (h *MeHandler) Handler() models.CustomRouteHandler {
+	return common.WrapHandler(h)
 }

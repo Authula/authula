@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/auth"
+	sendemailverification "github.com/GoBetterAuth/go-better-auth/internal/auth/send-email-verification"
+	"github.com/GoBetterAuth/go-better-auth/internal/common"
 	"github.com/GoBetterAuth/go-better-auth/internal/middleware"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
@@ -19,8 +20,8 @@ type SendEmailVerificationHandlerPayload struct {
 }
 
 type SendEmailVerificationHandler struct {
-	Config      *models.Config
-	AuthService *auth.Service
+	Config  *models.Config
+	UseCase sendemailverification.SendEmailVerificationUseCase
 }
 
 func (h *SendEmailVerificationHandler) Handle(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +41,7 @@ func (h *SendEmailVerificationHandler) Handle(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := h.AuthService.SendVerificationEmail(userID, payload.CallbackURL); err != nil {
+	if err := h.UseCase.SendEmailVerification(r.Context(), userID, payload.CallbackURL); err != nil {
 		util.JSONResponse(w, http.StatusInternalServerError, map[string]any{"message": err.Error()})
 		return
 	}
@@ -49,6 +50,6 @@ func (h *SendEmailVerificationHandler) Handle(w http.ResponseWriter, r *http.Req
 	util.JSONResponse(w, http.StatusOK, resp)
 }
 
-func (h *SendEmailVerificationHandler) Handler() http.Handler {
-	return Wrap(h)
+func (h *SendEmailVerificationHandler) Handler() models.CustomRouteHandler {
+	return common.WrapHandler(h)
 }

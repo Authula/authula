@@ -1,14 +1,9 @@
 package config
 
 import (
-	"fmt"
-	"log/slog"
 	"os"
 	"time"
 
-	"gorm.io/driver/mysql"
-	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"github.com/GoBetterAuth/go-better-auth/models"
@@ -16,28 +11,12 @@ import (
 
 // NewConfig builds a Config using functional options with sensible defaults.
 func NewConfig(options ...models.ConfigOption) *models.Config {
-	baseURL := os.Getenv("GO_BETTER_AUTH_BASE_URL")
-	if baseURL == "" {
-		baseURL = "http://localhost:8080"
-	}
-
-	secret := os.Getenv("GO_BETTER_AUTH_SECRET")
-	if secret == "" {
-		env := os.Getenv("GO_ENV")
-		// Must be set in production
-		if env == "production" {
-			panic("GO_BETTER_AUTH_SECRET environment variable must be set in production")
-		}
-		// Use default secret for non-production environments
-		secret = "go-better-auth-secret-0123456789"
-	}
-
 	// Define sensible defaults first
 	config := &models.Config{
 		AppName:  "GoBetterAuth",
-		BaseURL:  baseURL,
+		BaseURL:  "",
 		BasePath: "/auth",
-		Secret:   secret,
+		Secret:   "",
 		DB:       nil,
 		Database: models.DatabaseConfig{
 			MaxOpenConns:    25,
@@ -91,7 +70,7 @@ func NewConfig(options ...models.ConfigOption) *models.Config {
 		EventHooks:    models.EventHooksConfig{},
 		EventBus: models.EventBusConfig{
 			Enabled:               false,
-			MaxConcurrentHandlers: 64,
+			MaxConcurrentHandlers: 10,
 		},
 	}
 
@@ -100,52 +79,43 @@ func NewConfig(options ...models.ConfigOption) *models.Config {
 		option(config)
 	}
 
-	// initialize DB using the configured DatabaseConfig if not already set
-	if config.DB == nil && config.Database.Provider != "" && config.Database.ConnectionString != "" {
-		var err error
-		config.DB, err = initDatabase(config.Database)
-		if err != nil {
-			logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-			logger.Error(
-				"failed to open database",
-				slog.String("provider", config.Database.Provider),
-				slog.String("connection_string", config.Database.ConnectionString),
-				slog.Any("error", err),
-			)
-			panic(err)
+	// Environment variable overrides
+
+	// Set Mode
+	if mode := os.Getenv("GO_BETTER_AUTH_MODE"); mode != "" {
+		switch mode {
+		case string(models.ModeLibrary), string(models.ModeFile), string(models.ModeDatabase):
+			config.Mode = models.Mode(mode)
+		default:
+			panic("Invalid mode specified in GO_BETTER_AUTH_MODE environment variable")
 		}
+	} else if config.Mode == "" {
+		config.Mode = models.ModeLibrary
 	}
 
-	// Apply database connection pool settings to the GORM DB if it's set
-	if config.DB != nil {
-		sqlDB, err := config.DB.DB()
-		if err != nil {
-			logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-			logger.Error(
-				"failed to get underlying sql.DB",
-				slog.Any("error", err),
-			)
-			panic(err)
+	// Set BaseURL
+	if baseURL := os.Getenv("GO_BETTER_AUTH_BASE_URL"); baseURL != "" {
+		config.BaseURL = baseURL
+	} else if config.BaseURL == "" {
+		config.BaseURL = "http://localhost:8080"
+	}
+
+	// Set Secret
+	if secret := os.Getenv("GO_BETTER_AUTH_SECRET"); secret != "" {
+		config.Secret = secret
+	} else if config.Secret == "" {
+		if os.Getenv("GO_ENV") == "production" {
+			panic("GO_BETTER_AUTH_SECRET environment variable must be set in production")
 		}
-		sqlDB.SetMaxOpenConns(config.Database.MaxOpenConns)
-		sqlDB.SetMaxIdleConns(config.Database.MaxIdleConns)
-		sqlDB.SetConnMaxLifetime(config.Database.ConnMaxLifetime)
+		config.Secret = "go-better-auth-secret-0123456789"
 	}
 
 	return config
 }
 
-// initDatabase creates a GORM DB connection based on provider.
-func initDatabase(dbConfig models.DatabaseConfig) (*gorm.DB, error) {
-	switch dbConfig.Provider {
-	case "sqlite":
-		return gorm.Open(sqlite.Open(dbConfig.ConnectionString), &gorm.Config{})
-	case "postgres":
-		return gorm.Open(postgres.Open(dbConfig.ConnectionString), &gorm.Config{})
-	case "mysql":
-		return gorm.Open(mysql.Open(dbConfig.ConnectionString), &gorm.Config{})
-	default:
-		return nil, fmt.Errorf("unsupported database provider: %s", dbConfig.Provider)
+func WithMode(mode models.Mode) models.ConfigOption {
+	return func(c *models.Config) {
+		c.Mode = mode
 	}
 }
 
@@ -173,29 +143,48 @@ func WithSecret(secret string) models.ConfigOption {
 	}
 }
 
+func WithLogger(config models.LoggerConfig) models.ConfigOption {
+	return func(c *models.Config) {
+		defaults := c.Logger
+
+		if config.Level != "" {
+			defaults.Level = config.Level
+		}
+		if config.Logger != nil {
+			defaults.Logger = config.Logger
+		}
+
+		c.Logger = defaults
+	}
+}
+
 func WithDB(db *gorm.DB) models.ConfigOption {
 	return func(c *models.Config) {
 		c.DB = db
 	}
 }
 
-func WithDatabase(db models.DatabaseConfig) models.ConfigOption {
+func WithDatabase(config models.DatabaseConfig) models.ConfigOption {
 	return func(c *models.Config) {
-		if db.Provider != "" {
-			c.Database.Provider = db.Provider
+		defaults := c.Database
+
+		if config.Provider != "" {
+			defaults.Provider = config.Provider
 		}
-		if db.ConnectionString != "" {
-			c.Database.ConnectionString = db.ConnectionString
+		if config.ConnectionString != "" {
+			defaults.ConnectionString = config.ConnectionString
 		}
-		if db.MaxOpenConns != 0 {
-			c.Database.MaxOpenConns = db.MaxOpenConns
+		if config.MaxOpenConns != 0 {
+			defaults.MaxOpenConns = config.MaxOpenConns
 		}
-		if db.MaxIdleConns != 0 {
-			c.Database.MaxIdleConns = db.MaxIdleConns
+		if config.MaxIdleConns != 0 {
+			defaults.MaxIdleConns = config.MaxIdleConns
 		}
-		if db.ConnMaxLifetime != 0 {
-			c.Database.ConnMaxLifetime = db.ConnMaxLifetime
+		if config.ConnMaxLifetime != 0 {
+			defaults.ConnMaxLifetime = config.ConnMaxLifetime
 		}
+
+		c.Database = defaults
 	}
 }
 
@@ -233,8 +222,11 @@ func WithEmailPassword(config models.EmailPasswordConfig) models.ConfigOption {
 		if config.ResetTokenExpiry != 0 {
 			defaults.ResetTokenExpiry = config.ResetTokenExpiry
 		}
-		if config.Password != nil {
-			defaults.Password = config.Password
+		if config.Password.Hash != nil {
+			defaults.Password.Hash = config.Password.Hash
+		}
+		if config.Password.Verify != nil {
+			defaults.Password.Verify = config.Password.Verify
 		}
 
 		c.EmailPassword = defaults
@@ -374,6 +366,9 @@ func WithEventBus(eventBusConfig models.EventBusConfig) models.ConfigOption {
 		if eventBusConfig.MaxConcurrentHandlers != 0 {
 			defaults.MaxConcurrentHandlers = eventBusConfig.MaxConcurrentHandlers
 		}
+		if eventBusConfig.PubSubType != "" {
+			defaults.PubSubType = eventBusConfig.PubSubType
+		}
 		if eventBusConfig.PubSub != nil {
 			defaults.PubSub = eventBusConfig.PubSub
 		}
@@ -385,5 +380,18 @@ func WithEventBus(eventBusConfig models.EventBusConfig) models.ConfigOption {
 func WithPlugins(config models.PluginsConfig) models.ConfigOption {
 	return func(c *models.Config) {
 		c.Plugins = config
+	}
+}
+
+func WithWebhooks(config models.WebhooksConfig) models.ConfigOption {
+	return func(c *models.Config) {
+		c.Webhooks = config
+	}
+}
+
+// WithEmailConfig sets the email configuration for sending emails in standalone mode
+func WithEmailConfig(emailConfig models.EmailConfig) models.ConfigOption {
+	return func(c *models.Config) {
+		c.Email = emailConfig
 	}
 }

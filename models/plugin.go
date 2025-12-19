@@ -16,20 +16,12 @@ type PluginConfig struct {
 	Options any
 }
 
-type PluginMiddleware struct {
-	Auth          func() func(http.Handler) http.Handler
-	OptionalAuth  func() func(http.Handler) http.Handler
-	CorsAuth      func() func(http.Handler) http.Handler
-	CSRF          func() func(http.Handler) http.Handler
-	RateLimit     func() func(http.Handler) http.Handler
-	EndpointHooks func() func(http.Handler) http.Handler
-}
-
 type PluginContext struct {
-	Config     *Config
-	Api        *Api
-	EventBus   EventBus
-	Middleware *PluginMiddleware
+	Config          *Config
+	Api             AuthApi
+	EventBus        EventBus
+	Middleware      *ApiMiddleware
+	WebhookExecutor WebhookExecutor
 }
 
 type PluginRouteMiddleware func(http.Handler) http.Handler
@@ -73,6 +65,9 @@ type Plugin interface {
 	EventHooks() any
 	SetEventHooks(hooks any)
 
+	EndpointHooks() any
+	SetEndpointHooks(hooks any)
+
 	Close() error
 	SetClose(fn func() error)
 }
@@ -89,6 +84,7 @@ type BasePlugin struct {
 	rateLimit     *PluginRateLimit
 	databaseHooks any
 	eventHooks    any
+	endpointHooks any
 	close         func() error
 }
 
@@ -167,6 +163,14 @@ func (p *BasePlugin) SetEventHooks(hooks any) {
 	p.eventHooks = hooks
 }
 
+func (p *BasePlugin) EndpointHooks() any {
+	return p.endpointHooks
+}
+
+func (p *BasePlugin) SetEndpointHooks(hooks any) {
+	p.endpointHooks = hooks
+}
+
 func (p *BasePlugin) Close() error {
 	if p.close != nil {
 		return p.close()
@@ -176,4 +180,12 @@ func (p *BasePlugin) Close() error {
 
 func (p *BasePlugin) SetClose(fn func() error) {
 	p.close = fn
+}
+
+type PluginRegistry interface {
+	Register(p Plugin)
+	InitAll() error
+	RunMigrations() error
+	Plugins() []Plugin
+	CloseAll()
 }

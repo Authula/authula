@@ -1,12 +1,12 @@
-.PHONY: help build run test clean install setup
-.PHONY: test test-coverage
-.PHONY: lint fmt vet deps-update all check quick-check ci
-
 # Variables
 APP_NAME=go-better-auth
-BINARY_PATH=./bin/$(APP_NAME)
-SQLITE_DB?=app.db
-POSTGRES_URL?=host=localhost user=postgres dbname=gobetterauth sslmode=disable
+BINARY_PATH=./tmp/$(APP_NAME)
+SQLITE_DB?=auth.db
+POSTGRES_URL?=host=host.docker.internal user=postgres dbname=gobetterauth sslmode=disable
+
+.PHONY: help build build-exe run test clean install setup
+.PHONY: test test-coverage
+.PHONY: lint fmt vet deps-update all check quick-check ci
 
 # Help command
 help: ## Display this help screen
@@ -17,6 +17,17 @@ build: ## Build the package (library)
 	@echo "Building $(APP_NAME) package..."
 	@go build ./...
 	@echo "Build complete!"
+
+build-exe: ## Build the binary executable
+	@echo "Building $(APP_NAME) binary..."
+	@mkdir -p ./tmp
+	@rm -rf ./tmp/$(APP_NAME)
+	@go build -o $(BINARY_PATH) ./cmd/main.go
+	@echo "Binary built: $(BINARY_PATH)"
+
+run: ## Run the application with live reloading using air
+	@rm -f ./tmp/$(APP_NAME)
+	@CGO_ENABLED=1 ./bin/air --build.cmd "go build -o ./tmp/$(APP_NAME) ./cmd/main.go" --build.entrypoint "./tmp/$(APP_NAME)"
 
 # Test commands
 test: ## Run all tests

@@ -5,17 +5,23 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 
 	"github.com/GoBetterAuth/go-better-auth/config"
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 var (
-	errInit  = errors.New("init error")
-	errClose = errors.New("close error")
+	errInit = errors.New("init error")
 )
 
 func getMockConfig() *models.Config {
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		panic("failed to initialize test database: " + err.Error())
+	}
+
 	return config.NewConfig(
 		config.WithDatabase(
 			models.DatabaseConfig{
@@ -23,6 +29,7 @@ func getMockConfig() *models.Config {
 				ConnectionString: "file::memory:?cache=shared",
 			},
 		),
+		config.WithDB(db),
 	)
 }
 

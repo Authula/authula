@@ -7,8 +7,7 @@ WORKDIR /root
 
 RUN apt update && apt install -y \
   apt-transport-https ca-certificates gnupg lsb-release iputils-ping net-tools \
-  curl wget git zip unzip less zsh jq lsof build-essential docker.io \
-  && apt clean && rm -rf /var/lib/apt/lists/*
+  curl wget git zip unzip less zsh jq lsof
 
 ENV HOME="/root"
 # Required for some cgo operations such as using certain database drivers like SQLite
@@ -39,6 +38,17 @@ ENV SHELL=/bin/zsh
 RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
 && go install github.com/go-delve/delve/cmd/dlv@latest \
 && go install golang.org/x/tools/gopls@latest
+# --------------------------------------
+
+# --------------------------------------
+# Ngrok
+# --------------------------------------
+RUN curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+  | tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null \
+  && echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
+  | tee /etc/apt/sources.list.d/ngrok.list \
+  && apt update \
+  && apt install -y ngrok
 # --------------------------------------
 
 # --------------------------------------

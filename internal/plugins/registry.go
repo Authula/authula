@@ -13,7 +13,7 @@ type PluginRegistry struct {
 	plugins   []models.Plugin
 }
 
-func NewPluginRegistry(config *models.Config, api *models.Api, eventBus models.EventBus, middleware *models.PluginMiddleware) *PluginRegistry {
+func NewPluginRegistry(config *models.Config, api models.AuthApi, eventBus models.EventBus, middleware *models.ApiMiddleware) *PluginRegistry {
 	ctx := &models.PluginContext{
 		Config:     config,
 		Api:        api,

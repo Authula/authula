@@ -71,6 +71,21 @@ This will automatically select the workspace folder. But if you need to find the
 
 - Then as a test run `make build` to ensure the project builds successfully, this could take a few seconds to a minute.
 
+- Now install air for hot reloading of your server:
+
+  ```bash
+  # install it into ./bin/
+  $ curl -sSfL https://raw.githubusercontent.com/air-verse/air/master/install.sh | sh -s
+  ```
+
+- Make a copy of the `config.example.toml` and rename it to `config.toml`. Replace any of the necessary properties.
+
+- Then you can run the dev server:
+
+  ```bash
+  $ make run
+  ```
+
 2. **Project Structure**
 
 - Code is organised as follows:

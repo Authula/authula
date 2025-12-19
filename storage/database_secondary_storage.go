@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
@@ -20,14 +21,14 @@ type DatabaseSecondaryStorage struct {
 	stopCleanup chan struct{}
 	// done signals that the cleanup goroutine has stopped.
 	done chan struct{}
+	// cleanupStarted tracks whether the cleanup goroutine has been started.
+	cleanupStarted bool
 }
 
-func NewDatabaseSecondaryStorage(db *gorm.DB, config *models.SecondaryStorageDatabaseOptions) *DatabaseSecondaryStorage {
+func NewDatabaseSecondaryStorage(db *gorm.DB, config models.SecondaryStorageDatabaseOptions) *DatabaseSecondaryStorage {
 	cleanupInterval := 1 * time.Minute
-	if config != nil {
-		if config.CleanupInterval != 0 {
-			cleanupInterval = config.CleanupInterval
-		}
+	if config.CleanupInterval != 0 {
+		cleanupInterval = config.CleanupInterval
 	}
 
 	storage := &DatabaseSecondaryStorage{
@@ -35,11 +36,21 @@ func NewDatabaseSecondaryStorage(db *gorm.DB, config *models.SecondaryStorageDat
 		cleanupInterval: cleanupInterval,
 		stopCleanup:     make(chan struct{}),
 		done:            make(chan struct{}),
+		cleanupStarted:  false,
 	}
 
-	go storage.cleanupExpiredEntries()
-
 	return storage
+}
+
+// StartCleanup starts the background cleanup goroutine that removes expired entries.
+// This should be called after database migrations have completed.
+// It is safe to call this multiple times - subsequent calls will be no-ops.
+func (storage *DatabaseSecondaryStorage) StartCleanup() {
+	if storage.cleanupStarted {
+		return
+	}
+	storage.cleanupStarted = true
+	go storage.cleanupExpiredEntries()
 }
 
 // Get retrieves a value from the database by key.
@@ -199,15 +210,16 @@ func (storage *DatabaseSecondaryStorage) removeExpiredEntries() {
 		Delete(&models.KeyValueStore{})
 
 	if result.Error != nil {
-		// Log error but don't fail - cleanup is best-effort
-		// In production, this should be logged properly
-		fmt.Printf("error cleaning up expired entries: %v\n", result.Error)
+		slog.Error("error cleaning up expired entries from key_value_store", slog.Any("error", result.Error))
 	}
 }
 
 // Close gracefully shuts down the storage by stopping the cleanup goroutine.
 // This should be called when the application is shutting down.
 func (storage *DatabaseSecondaryStorage) Close() error {
+	if !storage.cleanupStarted {
+		return nil
+	}
 	close(storage.stopCleanup)
 	<-storage.done
 	return nil

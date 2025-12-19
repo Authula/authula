@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"golang.org/x/oauth2"
 
@@ -25,6 +26,12 @@ type DiscordProvider struct {
 }
 
 func NewDiscordProvider(config *models.OAuth2Config) *DiscordProvider {
+	if envClientID := os.Getenv("DISCORD_CLIENT_ID"); envClientID != "" {
+		config.ClientID = envClientID
+	}
+	if envClientSecret := os.Getenv("DISCORD_CLIENT_SECRET"); envClientSecret != "" {
+		config.ClientSecret = envClientSecret
+	}
 	return &DiscordProvider{
 		config: config,
 	}

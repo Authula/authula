@@ -5,50 +5,71 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 
-	"github.com/GoBetterAuth/go-better-auth/events"
+	"github.com/GoBetterAuth/go-better-auth/internal/admin"
 	"github.com/GoBetterAuth/go-better-auth/internal/auth"
 	"github.com/GoBetterAuth/go-better-auth/internal/handlers"
 	"github.com/GoBetterAuth/go-better-auth/internal/middleware"
-	"github.com/GoBetterAuth/go-better-auth/internal/plugins"
-	"github.com/GoBetterAuth/go-better-auth/internal/services"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/GoBetterAuth/go-better-auth/storage"
 )
 
-// ---------------------------------
-// INITIALISATION
-// ---------------------------------
-
 type Auth struct {
-	Config         *models.Config
-	mux            *http.ServeMux
-	service        *auth.Service
-	Api            *models.Api
-	customRoutes   []models.CustomRoute
-	EventBus       models.EventBus
-	pluginRegistry *plugins.PluginRegistry
+	Config            *models.Config
+	configManager     models.ConfigManager
+	mux               *http.ServeMux
+	Service           *auth.Service
+	Api               models.AuthApi
+	routes            []models.CustomRoute
+	middleware        *models.ApiMiddleware
+	EventBus          models.EventBus
+	pluginRegistry    models.PluginRegistry
+	OnRestartRequired func() error
 }
 
-func New(config *models.Config) *Auth {
-	util.InitValidator()
-	initStorage(config)
+// New creates a new Auth instance using the provided config and options.
+func New(baseConfig *models.Config) *Auth {
+	activeConfig := baseConfig
+
+	InitDefaults(activeConfig)
+
+	configManager, err := InitConfigManager(activeConfig)
+	if err != nil {
+		activeConfig.Logger.Logger.Error("Failed to initialize config manager", "error", err)
+		panic(err.Error())
+	}
+
+	if err := InitSecondaryStorage(activeConfig); err != nil {
+		activeConfig.Logger.Logger.Error("Failed to initialize secondary storage", "error", err)
+		panic(err.Error())
+	}
+
+	eventBus, err := InitEventBus(activeConfig)
+	if err != nil {
+		activeConfig.Logger.Logger.Error("Failed to initialise event bus", "error", err)
+		panic(err.Error())
+	}
+
 	mux := http.NewServeMux()
 
-	var eventBus models.EventBus
-	if config.EventBus.Enabled {
-		eventBus = events.NewEventBus(config, config.EventBus.PubSub)
-	}
-
 	auth := &Auth{
-		Config:       config,
-		mux:          mux,
-		customRoutes: []models.CustomRoute{},
-		EventBus:     eventBus,
+		Config:        activeConfig,
+		configManager: configManager,
+		mux:           mux,
+		routes:        []models.CustomRoute{},
+		EventBus:      eventBus,
 	}
 
-	pluginMiddleware := &models.PluginMiddleware{
+	apiKey := os.Getenv("GO_BETTER_AUTH_ADMIN_API_KEY")
+	adminAuth := func() func(http.Handler) http.Handler {
+		return middleware.AdminAuth(apiKey)
+	}
+	apiMiddleware := &models.ApiMiddleware{
+		// Admin
+		AdminAuth: adminAuth,
+		// Auth
 		Auth:          auth.AuthMiddleware,
 		OptionalAuth:  auth.OptionalAuthMiddleware,
 		CorsAuth:      auth.CorsAuthMiddleware,
@@ -56,56 +77,58 @@ func New(config *models.Config) *Auth {
 		RateLimit:     auth.RateLimitMiddleware,
 		EndpointHooks: auth.EndpointHooksMiddleware,
 	}
+	auth.middleware = apiMiddleware
 
 	pluginRateLimits := []models.PluginRateLimit{}
-	for _, p := range config.Plugins.Plugins {
+	for _, p := range activeConfig.Plugins.Plugins {
 		if rateLimit := p.RateLimit(); rateLimit != nil && rateLimit.Enabled {
 			pluginRateLimits = append(pluginRateLimits, *rateLimit)
 		}
 	}
 
-	authService := constructAuthService(config, eventBus, pluginRateLimits)
+	authService := InitServices(activeConfig, eventBus, pluginRateLimits)
+	auth.Service = authService
 
-	api := &models.Api{
-		Users:         authService.UserService,
-		Accounts:      authService.AccountService,
-		Sessions:      authService.SessionService,
-		Verifications: authService.VerificationService,
-		Tokens:        authService.TokenService,
-	}
-
-	pluginRegistry := plugins.NewPluginRegistry(config, api, eventBus, pluginMiddleware)
-	for _, p := range config.Plugins.Plugins {
-		pluginRegistry.Register(p)
-	}
-	_ = pluginRegistry.InitAll()
-
-	auth.service = authService
+	api := InitApi(activeConfig, authService)
 	auth.Api = api
+
+	pluginRegistry := InitPluginRegistry(activeConfig, api, eventBus, apiMiddleware)
 	auth.pluginRegistry = pluginRegistry
+
+	if configManager != nil {
+		go auth.watchForConfigChanges()
+	}
 
 	return auth
 }
 
-func initStorage(config *models.Config) {
-	if config.SecondaryStorage.Type == "" {
-		if config.SecondaryStorage.Storage != nil {
-			panic("secondary storage type of 'custom' must be specified")
-		}
+// watchForConfigChanges watches for configuration changes and updates the active config.
+func (auth *Auth) watchForConfigChanges() {
+	ctx := context.Background()
+	configChan, err := auth.configManager.Watch(ctx)
+	if err != nil {
+		auth.Config.Logger.Logger.Error("Failed to start watching config changes", "error", err)
+		return
+	}
 
-		// Default to in-memory secondary storage
-		config.SecondaryStorage.Type = models.SecondaryStorageTypeMemory
-		config.SecondaryStorage.Storage = storage.NewMemorySecondaryStorage(config.SecondaryStorage.MemoryOptions)
-	} else {
-		switch config.SecondaryStorage.Type {
-		case models.SecondaryStorageTypeMemory:
-			config.SecondaryStorage.Storage = storage.NewMemorySecondaryStorage(config.SecondaryStorage.MemoryOptions)
-		case models.SecondaryStorageTypeDatabase:
-			config.SecondaryStorage.Storage = storage.NewDatabaseSecondaryStorage(config.DB, config.SecondaryStorage.DatabaseOptions)
-		case models.SecondaryStorageTypeCustom:
-			// Valid, do nothing
-		default:
-			panic("unsupported secondary storage type: " + config.SecondaryStorage.Type)
+	for updatedConfig := range configChan {
+		if updatedConfig != nil {
+			restartRequired := util.RequiresRestart(auth.Config, updatedConfig)
+
+			util.PreserveNonSerializableFieldsOnConfig(auth.Config, updatedConfig)
+			auth.Config = updatedConfig
+			auth.Config.Logger.Logger.Debug("Configuration updated via watcher")
+
+			if restartRequired {
+				auth.Config.Logger.Logger.Info("Configuration change requires server restart")
+				if auth.OnRestartRequired != nil {
+					if err := auth.OnRestartRequired(); err != nil {
+						auth.Config.Logger.Logger.Error("Failed to handle restart requirement", "error", err)
+					}
+				} else {
+					auth.Config.Logger.Logger.Warn("Configuration change requires restart but no restart handler is set")
+				}
+			}
 		}
 	}
 }
@@ -115,31 +138,45 @@ func initStorage(config *models.Config) {
 // ---------------------------------
 
 func (auth *Auth) RunMigrations() {
-	models := []any{
+	// Auth
+	dbModels := []any{
+		// Admin
+		&models.AuthSettings{},
 		&models.User{},
 		&models.Account{},
 		&models.Session{},
 		&models.Verification{},
 		&models.KeyValueStore{},
 	}
-	if err := auth.Config.DB.AutoMigrate(models...); err != nil {
+
+	if err := auth.Config.DB.AutoMigrate(dbModels...); err != nil {
 		slog.Error("failed to auto migrate database", slog.Any("error", err))
 		panic(err)
 	}
 
+	//
 	if err := auth.pluginRegistry.RunMigrations(); err != nil {
 		slog.Error("failed to run plugin migrations", slog.Any("error", err))
 		panic(err)
+	}
+
+	if auth.Config.SecondaryStorage.Type == models.SecondaryStorageTypeDatabase {
+		if dbStorage, ok := auth.Config.SecondaryStorage.Storage.(*storage.DatabaseSecondaryStorage); ok {
+			dbStorage.StartCleanup()
+		}
 	}
 }
 
 func (auth *Auth) DropMigrations() {
 	models := []any{
+		// Auth
 		&models.KeyValueStore{},
 		&models.Verification{},
 		&models.Session{},
 		&models.Account{},
 		&models.User{},
+		// Admin
+		&models.AuthSettings{},
 	}
 	for _, model := range models {
 		if err := auth.Config.DB.Migrator().DropTable(model); err != nil {
@@ -167,38 +204,16 @@ func (auth *Auth) DropMigrations() {
 // MIDDLEWARES & HANDLERS
 // ---------------------------------
 
-func constructAuthService(config *models.Config, eventBus models.EventBus, pluginRateLimits []models.PluginRateLimit) *auth.Service {
-	userService := services.NewUserServiceImpl(config, config.DB)
-	accountService := services.NewAccountServiceImpl(config, config.DB)
-	sessionService := services.NewSessionServiceImpl(config, config.DB)
-	verificationService := services.NewVerificationServiceImpl(config, config.DB)
-	tokenService := services.NewTokenServiceImpl(config)
-	rateLimitService := services.NewRateLimitServiceImpl(config, pluginRateLimits)
-
-	authService := auth.NewService(
-		config,
-		eventBus,
-		userService,
-		accountService,
-		sessionService,
-		verificationService,
-		tokenService,
-		rateLimitService,
-	)
-
-	return authService
-}
-
 func (auth *Auth) AuthMiddleware() func(http.Handler) http.Handler {
 	return middleware.AuthMiddleware(
-		auth.service,
+		auth.Service,
 		auth.Config.Session.CookieName,
 	)
 }
 
 func (auth *Auth) OptionalAuthMiddleware() func(http.Handler) http.Handler {
 	return middleware.OptionalAuthMiddleware(
-		auth.service,
+		auth.Service,
 		auth.Config.Session.CookieName,
 	)
 }
@@ -214,15 +229,15 @@ func (auth *Auth) CSRFMiddleware() func(http.Handler) http.Handler {
 }
 
 func (auth *Auth) RateLimitMiddleware() func(http.Handler) http.Handler {
-	return middleware.RateLimitMiddleware(auth.service.RateLimitService)
+	return middleware.RateLimitMiddleware(auth.Service.RateLimitService)
 }
 
 func (auth *Auth) EndpointHooksMiddleware() func(http.Handler) http.Handler {
-	return middleware.EndpointHooksMiddleware(auth.Config, auth.service)
+	return middleware.EndpointHooksMiddleware(auth.Config, auth.Service)
 }
 
 func (auth *Auth) RedirectAuthMiddleware(redirectURL string, status int) func(http.Handler) http.Handler {
-	return middleware.RedirectAuthMiddleware(auth.service, auth.Config.Session.CookieName, redirectURL, status)
+	return middleware.RedirectAuthMiddleware(auth.Service, auth.Config.Session.CookieName, redirectURL, status)
 }
 
 func (auth *Auth) GetUserIDFromContext(ctx context.Context) (string, bool) {
@@ -249,56 +264,11 @@ func (auth *Auth) RegisterRoute(route models.CustomRoute) {
 		}
 		return finalHandler
 	}
-	auth.customRoutes = append(auth.customRoutes, route)
+	auth.routes = append(auth.routes, route)
 }
 
 // Handler sets up all routes and returns the final http.Handler
 func (auth *Auth) Handler() http.Handler {
-	signIn := &handlers.SignInHandler{
-		Config:      auth.Config,
-		AuthService: auth.service,
-	}
-	signUp := &handlers.SignUpHandler{
-		Config:      auth.Config,
-		AuthService: auth.service,
-	}
-	signOut := &handlers.SignOutHandler{
-		Config:      auth.Config,
-		AuthService: auth.service,
-	}
-	sendEmailVerification := &handlers.SendEmailVerificationHandler{
-		Config:      auth.Config,
-		AuthService: auth.service,
-	}
-	verifyEmail := &handlers.VerifyEmailHandler{
-		Config:      auth.Config,
-		AuthService: auth.service,
-	}
-	resetPassword := &handlers.ResetPasswordHandler{
-		Config:      auth.Config,
-		AuthService: auth.service,
-	}
-	changePassword := &handlers.ChangePasswordHandler{
-		Config:      auth.Config,
-		AuthService: auth.service,
-	}
-	changeEmailRequest := &handlers.EmailChangeHandler{
-		Config:      auth.Config,
-		AuthService: auth.service,
-	}
-	me := &handlers.MeHandler{
-		Config:      auth.Config,
-		AuthService: auth.service,
-	}
-	oauth2Login := &handlers.OAuth2LoginHandler{
-		Config:      auth.Config,
-		AuthService: auth.service,
-	}
-	oauth2Callback := &handlers.OAuth2CallbackHandler{
-		Config:      auth.Config,
-		AuthService: auth.service,
-	}
-
 	basePath := auth.Config.BasePath
 
 	// Ensure basePath starts with "/" and does not end with "/"
@@ -309,24 +279,28 @@ func (auth *Auth) Handler() http.Handler {
 		basePath = basePath[:len(basePath)-1]
 	}
 
-	// Base routes
-	auth.mux.Handle("POST "+basePath+"/sign-in/email", signIn.Handler())
-	auth.mux.Handle("POST "+basePath+"/sign-up/email", signUp.Handler())
-	auth.mux.Handle("POST "+basePath+"/email-verification", auth.AuthMiddleware()(auth.CSRFMiddleware()(sendEmailVerification.Handler())))
-	auth.mux.Handle("GET "+basePath+"/verify-email", verifyEmail.Handler())
-	auth.mux.Handle("POST "+basePath+"/sign-out", auth.AuthMiddleware()(auth.CSRFMiddleware()(signOut.Handler())))
-	auth.mux.Handle("POST "+basePath+"/reset-password", resetPassword.Handler())
-	auth.mux.Handle("POST "+basePath+"/change-password", changePassword.Handler())
-	auth.mux.Handle("POST "+basePath+"/email-change", changeEmailRequest.Handler())
-	auth.mux.Handle("GET "+basePath+"/me", auth.AuthMiddleware()(me.Handler()))
-	auth.mux.Handle("GET "+basePath+"/oauth2/{provider}/login", oauth2Login.Handler())
-	auth.mux.Handle("GET "+basePath+"/oauth2/{provider}/callback", oauth2Callback.Handler())
+	// Register Admin Routes if configManager is set. Otherwise we're running in Library mode
+	if auth.configManager != nil {
+		// We purposely set basePath to "" here so that admin routes are always available at /admin/*
+		adminRoutes := admin.GetRoutes(auth.Config, auth.configManager, auth.Service, "", auth.middleware)
+		auth.registerBaseRoutes(auth.Config, "", adminRoutes)
 
-	auth.registerCustomRoutes(basePath)
+	}
+
+	// Register Auth Base Routes
+	authBaseRoutes := handlers.GetRoutes(auth.Config, auth.Service, basePath, auth.middleware)
+	auth.registerBaseRoutes(auth.Config, basePath, authBaseRoutes)
+
 	auth.registerPluginRoutes(basePath)
 
+	// Add catch-all handler for unmatched routes
+	auth.mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth.Config.Logger.Logger.Info("Catch-all handler triggered", "method", r.Method, "path", r.URL.Path)
+		util.JSONResponse(w, http.StatusNotFound, map[string]any{"message": "Endpoint not found"})
+	}))
+
 	var finalHandler http.Handler = auth.mux
-	finalHandler = middleware.EndpointHooksMiddleware(auth.Config, auth.service)(finalHandler)
+	finalHandler = middleware.EndpointHooksMiddleware(auth.Config, auth.Service)(finalHandler)
 	if auth.Config.RateLimit.Enabled {
 		finalHandler = auth.RateLimitMiddleware()(finalHandler)
 	}
@@ -334,16 +308,21 @@ func (auth *Auth) Handler() http.Handler {
 	return finalHandler
 }
 
-func (auth *Auth) registerCustomRoutes(basePath string) {
-	if len(auth.customRoutes) > 0 {
-		for _, customRoute := range auth.customRoutes {
-			path := fmt.Sprintf("%s%s", basePath, customRoute.Path)
-			auth.mux.Handle(fmt.Sprintf("%s %s", customRoute.Method, path), customRoute.Handler(auth.Config))
+// registerBaseRoutes registers base routes
+func (auth *Auth) registerBaseRoutes(config *models.Config, basePath string, routes []models.CustomRoute) {
+	for _, route := range routes {
+		path := fmt.Sprintf("%s%s", basePath, route.Path)
+		handler := route.Handler(config)
+
+		for i := len(route.Middleware) - 1; i >= 0; i-- {
+			handler = route.Middleware[i](handler)
 		}
+
+		auth.mux.Handle(fmt.Sprintf("%s %s", route.Method, path), handler)
 	}
 }
 
-// RegisterPluginRoutes registers routes from plugins
+// registerPluginRoutes registers routes from plugins
 func (auth *Auth) registerPluginRoutes(basePath string) {
 	if auth.pluginRegistry == nil {
 		return

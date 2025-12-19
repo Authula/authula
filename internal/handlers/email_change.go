@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/auth"
+	emailchange "github.com/GoBetterAuth/go-better-auth/internal/auth/email-change"
+	"github.com/GoBetterAuth/go-better-auth/internal/common"
+	"github.com/GoBetterAuth/go-better-auth/internal/constants"
 	"github.com/GoBetterAuth/go-better-auth/internal/middleware"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
@@ -20,13 +22,13 @@ type EmailChangeHandlerPayload struct {
 }
 
 type EmailChangeHandler struct {
-	Config      *models.Config
-	AuthService *auth.Service
+	Config  *models.Config
+	UseCase emailchange.EmailChangeUseCase
 }
 
 func (h *EmailChangeHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	if !h.Config.User.ChangeEmail.Enabled {
-		util.JSONResponse(w, http.StatusNotImplemented, map[string]any{"message": "email change is disabled"})
+		util.JSONResponse(w, http.StatusNotImplemented, map[string]any{"message": constants.ErrEmailChangeDisabled.Error()})
 		return
 	}
 
@@ -46,7 +48,7 @@ func (h *EmailChangeHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.AuthService.EmailChange(userID, payload.Email, payload.CallbackURL); err != nil {
+	if err := h.UseCase.EmailChange(r.Context(), userID, payload.Email, payload.CallbackURL); err != nil {
 		util.JSONResponse(w, http.StatusBadRequest, map[string]any{"message": err.Error()})
 		return
 	}
@@ -55,6 +57,6 @@ func (h *EmailChangeHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	util.JSONResponse(w, http.StatusOK, resp)
 }
 
-func (h *EmailChangeHandler) Handler() http.Handler {
-	return Wrap(h)
+func (h *EmailChangeHandler) Handler() models.CustomRouteHandler {
+	return common.WrapHandler(h)
 }

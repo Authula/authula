@@ -68,3 +68,8 @@ type EventBus interface {
 	EventPublisher
 	EventSubscriber
 }
+
+// WebhookExecutor defines the interface for executing webhooks
+type WebhookExecutor interface {
+	ExecuteWebhook(ctx context.Context, webhook *WebhookConfig, payload any) error
+}

@@ -16,7 +16,7 @@ type Account struct {
 	RefreshTokenExpiresAt *time.Time   `json:"refresh_token_expires_at,omitempty"`
 	Scope                 *string      `json:"scope,omitempty"`
 	Password              *string      `json:"password,omitempty"` // for email/password auth
-	CreatedAt             time.Time    `json:"created_at"`
-	UpdatedAt             time.Time    `json:"updated_at"`
+	CreatedAt             time.Time    `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt             time.Time    `json:"updated_at" gorm:"autoUpdateTime"`
 	User                  User         `gorm:"foreignKey:UserID"`
 }

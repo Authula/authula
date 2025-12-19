@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/auth"
+	changepassword "github.com/GoBetterAuth/go-better-auth/internal/auth/change-password"
+	"github.com/GoBetterAuth/go-better-auth/internal/common"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
@@ -19,8 +20,8 @@ type ChangePasswordHandlerPayload struct {
 }
 
 type ChangePasswordHandler struct {
-	Config      *models.Config
-	AuthService *auth.Service
+	Config  *models.Config
+	UseCase changepassword.ChangePasswordUseCase
 }
 
 func (h *ChangePasswordHandler) Handle(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +35,7 @@ func (h *ChangePasswordHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.AuthService.ChangePassword(payload.Token, payload.NewPassword); err != nil {
+	if err := h.UseCase.ChangePassword(r.Context(), payload.Token, payload.NewPassword); err != nil {
 		util.JSONResponse(w, http.StatusBadRequest, map[string]any{"message": "password reset failed"})
 		return
 	}
@@ -43,6 +44,6 @@ func (h *ChangePasswordHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	util.JSONResponse(w, http.StatusOK, resp)
 }
 
-func (h *ChangePasswordHandler) Handler() http.Handler {
-	return Wrap(h)
+func (h *ChangePasswordHandler) Handler() models.CustomRouteHandler {
+	return common.WrapHandler(h)
 }

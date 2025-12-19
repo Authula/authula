@@ -7,75 +7,10 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/config"
+	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/GoBetterAuth/go-better-auth/storage"
 )
-
-// ------------------------------------
-
-type mockPlugin struct{}
-
-func (m *mockPlugin) Metadata() models.PluginMetadata {
-	return models.PluginMetadata{
-		Name:        "Mock Plugin",
-		Version:     "0.0.1",
-		Description: "A mock plugin.",
-	}
-}
-
-func (m *mockPlugin) Config() models.PluginConfig {
-	return models.PluginConfig{Enabled: true}
-}
-
-func (m *mockPlugin) Ctx() *models.PluginContext {
-	return &models.PluginContext{Config: nil, EventBus: nil, Middleware: nil}
-}
-
-func (m *mockPlugin) Init(ctx *models.PluginContext) error {
-	return nil
-}
-
-func (m *mockPlugin) Migrations() []any {
-	return []any{}
-}
-
-func (m *mockPlugin) Routes() []models.PluginRoute {
-	return []models.PluginRoute{}
-}
-
-func (m *mockPlugin) RateLimit() *models.PluginRateLimit {
-	return &models.PluginRateLimit{
-		Enabled: true,
-		CustomRules: map[string]models.RateLimitCustomRuleFunc{
-			"/plugin": func(req *http.Request) models.RateLimitCustomRule {
-				return models.RateLimitCustomRule{
-					Window: 1 * time.Minute,
-					Max:    1,
-				}
-			},
-		},
-	}
-}
-
-func (m *mockPlugin) DatabaseHooks() any {
-	return nil
-}
-
-func (m *mockPlugin) EventHooks() any {
-	return nil
-}
-
-func (m *mockPlugin) Close() error {
-	return nil
-}
-
-// ------------------------------------
-
-// createMockRequest creates a basic mock HTTP request for testing
-func createMockRequest() *http.Request {
-	req, _ := http.NewRequest("POST", "/test", nil)
-	return req
-}
 
 func TestRateLimitService_Allow(t *testing.T) {
 	tests := []struct {
@@ -122,10 +57,12 @@ func TestRateLimitService_Allow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			mockLogger := util.NewMockLogger()
+
 			config := config.NewConfig(
 				config.WithSecondaryStorage(
 					models.SecondaryStorageConfig{
-						Storage: storage.NewMemorySecondaryStorage(nil),
+						Storage: storage.NewMemorySecondaryStorage(models.SecondaryStorageMemoryOptions{}),
 					},
 				),
 				config.WithRateLimit(
@@ -135,17 +72,22 @@ func TestRateLimitService_Allow(t *testing.T) {
 						Max:         tt.max,
 						Algorithm:   models.RateLimitAlgorithmFixedWindow,
 						Prefix:      "test:",
-						CustomRules: map[string]models.RateLimitCustomRuleFunc{},
+						CustomRules: map[string]models.RateLimitCustomRule{},
 						IP: models.IPConfig{
 							Headers: []string{"X-Forwarded-For", "X-Real-IP"},
 						},
 					},
 				),
+				config.WithLogger(
+					models.LoggerConfig{
+						Logger: mockLogger,
+					},
+				),
 			)
 
-			service := NewRateLimitServiceImpl(config, []models.PluginRateLimit{})
+			service := NewRateLimitServiceImpl(config, config.Logger.Logger, []models.PluginRateLimit{})
 			ctx := context.Background()
-			req := createMockRequest()
+			req := util.CreateMockRequest("GET", "/test", nil, nil, nil)
 
 			for i := 0; i < tt.requests; i++ {
 				allowed, err := service.Allow(ctx, tt.key, req)
@@ -164,36 +106,43 @@ func TestRateLimitService_Allow(t *testing.T) {
 }
 
 func TestRateLimitService_CustomRule(t *testing.T) {
-	config := &models.Config{
-		RateLimit: models.RateLimitConfig{
-			Enabled:   true,
-			Window:    1 * time.Minute,
-			Max:       10,
-			Algorithm: models.RateLimitAlgorithmFixedWindow,
-			Prefix:    "test:",
-			CustomRules: map[string]models.RateLimitCustomRuleFunc{
-				"/strict": func(req *http.Request) models.RateLimitCustomRule {
-					return models.RateLimitCustomRule{
+	mockLogger := util.NewMockLogger()
+
+	config := config.NewConfig(
+		config.WithSecondaryStorage(
+			models.SecondaryStorageConfig{
+				Storage: storage.NewMemorySecondaryStorage(models.SecondaryStorageMemoryOptions{}),
+			},
+		),
+		config.WithRateLimit(
+			models.RateLimitConfig{
+				Enabled:   true,
+				Window:    1 * time.Minute,
+				Max:       10,
+				Algorithm: models.RateLimitAlgorithmFixedWindow,
+				Prefix:    "test:",
+				CustomRules: map[string]models.RateLimitCustomRule{
+					"/strict": {
 						Window: 1 * time.Minute,
 						Max:    2,
-					}
-				},
-				"/disabled": func(req *http.Request) models.RateLimitCustomRule {
-					return models.RateLimitCustomRule{
+					},
+					"/disabled": {
 						Disabled: true,
-					}
+					},
+				},
+				IP: models.IPConfig{
+					Headers: []string{"X-Forwarded-For", "X-Real-IP"},
 				},
 			},
-			IP: models.IPConfig{
-				Headers: []string{"X-Forwarded-For", "X-Real-IP"},
+		),
+		config.WithLogger(
+			models.LoggerConfig{
+				Logger: mockLogger,
 			},
-		},
-		SecondaryStorage: models.SecondaryStorageConfig{
-			Storage: storage.NewMemorySecondaryStorage(nil),
-		},
-	}
+		),
+	)
 
-	service := NewRateLimitServiceImpl(config, []models.PluginRateLimit{})
+	service := NewRateLimitServiceImpl(config, config.Logger.Logger, []models.PluginRateLimit{})
 	ctx := context.Background()
 
 	// Test strict custom rule
@@ -272,24 +221,35 @@ func TestRateLimitService_ClientIP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := &models.Config{
-				RateLimit: models.RateLimitConfig{
-					Enabled:     true,
-					Window:      1 * time.Minute,
-					Max:         10,
-					Algorithm:   models.RateLimitAlgorithmFixedWindow,
-					Prefix:      "test:",
-					CustomRules: map[string]models.RateLimitCustomRuleFunc{},
-					IP: models.IPConfig{
-						Headers: tt.ipHeaders,
-					},
-				},
-				SecondaryStorage: models.SecondaryStorageConfig{
-					Storage: storage.NewMemorySecondaryStorage(nil),
-				},
-			}
+			mockLogger := util.NewMockLogger()
 
-			service := NewRateLimitServiceImpl(config, []models.PluginRateLimit{})
+			config := config.NewConfig(
+				config.WithSecondaryStorage(
+					models.SecondaryStorageConfig{
+						Storage: storage.NewMemorySecondaryStorage(models.SecondaryStorageMemoryOptions{}),
+					},
+				),
+				config.WithRateLimit(
+					models.RateLimitConfig{
+						Enabled:     true,
+						Window:      1 * time.Minute,
+						Max:         10,
+						Algorithm:   models.RateLimitAlgorithmFixedWindow,
+						Prefix:      "test:",
+						CustomRules: map[string]models.RateLimitCustomRule{},
+						IP: models.IPConfig{
+							Headers: tt.ipHeaders,
+						},
+					},
+				),
+				config.WithLogger(
+					models.LoggerConfig{
+						Logger: mockLogger,
+					},
+				),
+			)
+
+			service := NewRateLimitServiceImpl(config, config.Logger.Logger, []models.PluginRateLimit{})
 
 			req, _ := http.NewRequest("GET", "/test", nil)
 			req.RemoteAddr = tt.remoteAddr
@@ -306,29 +266,40 @@ func TestRateLimitService_ClientIP(t *testing.T) {
 }
 
 func TestRateLimitService_PluginRule(t *testing.T) {
-	config := &models.Config{
-		RateLimit: models.RateLimitConfig{
-			Enabled:     true,
-			Window:      1 * time.Minute,
-			Max:         100,
-			Algorithm:   models.RateLimitAlgorithmFixedWindow,
-			Prefix:      "test:",
-			CustomRules: map[string]models.RateLimitCustomRuleFunc{},
-			IP: models.IPConfig{
-				Headers: []string{"X-Forwarded-For", "X-Real-IP"},
-			},
-		},
-		SecondaryStorage: models.SecondaryStorageConfig{
-			Storage: storage.NewMemorySecondaryStorage(nil),
-		},
-	}
+	mockLogger := util.NewMockLogger()
 
-	plugin := &mockPlugin{}
-	service := NewRateLimitServiceImpl(config, []models.PluginRateLimit{*plugin.RateLimit()})
+	config := config.NewConfig(
+		config.WithSecondaryStorage(
+			models.SecondaryStorageConfig{
+				Storage: storage.NewMemorySecondaryStorage(models.SecondaryStorageMemoryOptions{}),
+			},
+		),
+		config.WithRateLimit(
+			models.RateLimitConfig{
+				Enabled:     true,
+				Window:      1 * time.Minute,
+				Max:         100,
+				Algorithm:   models.RateLimitAlgorithmFixedWindow,
+				Prefix:      "test:",
+				CustomRules: map[string]models.RateLimitCustomRule{},
+				IP: models.IPConfig{
+					Headers: []string{"X-Forwarded-For", "X-Real-IP"},
+				},
+			},
+		),
+		config.WithLogger(
+			models.LoggerConfig{
+				Logger: mockLogger,
+			},
+		),
+	)
+
+	plugin := util.NewMockPlugin()
+	service := NewRateLimitServiceImpl(config, config.Logger.Logger, []models.PluginRateLimit{*plugin.RateLimit()})
 
 	ctx := context.Background()
 
-	req, _ := http.NewRequest("GET", "/plugin", nil)
+	req := util.CreateMockRequest("GET", "/plugin", nil, nil, nil)
 
 	allowed1, err1 := service.Allow(ctx, "plugin-key", req)
 	if err1 != nil {

@@ -1,0 +1,182 @@
+# GoBetterAuth Configuration Example
+# This file demonstrates all available configuration options for GoBetterAuth.
+# Copy this file to config.toml and modify the values as needed.
+
+# Mode: Runs as a standalone server - "file" or "database" mode
+mode = "file"
+
+# Application Name
+app_name = "GoBetterAuth"
+
+# Base URL for the application (used for redirects, emails, etc.)
+base_url = "http://localhost:8080"
+
+# Base Path for API endpoints (e.g., "/auth")
+base_path = "/auth"
+
+# SECURITY NOTE: It is recommended to set the 'secret' via the 
+# GO_BETTER_AUTH_SECRET environment variable rather than hardcoding it here.
+# However, if you want then generate using `openssl rand -base64 50 | tr -dc 'A-Za-z0-9' | cut -c -40`
+secret = ""
+
+[logger]
+level = "debug"  # Options: "debug", "info", "warn", "error"
+
+# Database Configuration
+[database]
+provider = "sqlite"
+# SECURITY NOTE: It is recommended to set the 'connection_string' via the 
+# DATABASE_URL environment variable rather than hardcoding it here.
+connection_string = ""
+max_open_conns = 25
+max_idle_conns = 25
+conn_max_lifetime = "1m"
+
+# Email Configuration
+[email]
+provider = "smtp"
+smtp_host = "localhost"
+smtp_port = 2525
+smtp_user = "user"
+smtp_pass = "pass"
+from = "noreply@example.com"
+
+# Secondary Storage Configuration
+[secondary_storage]
+type = "memory"  # or "database" or "custom"
+
+# Memory options (if type = "memory")
+[secondary_storage.memory_options]
+cleanup_interval = "1m"
+
+# Database options (if type = "database")
+[secondary_storage.database_options]
+cleanup_interval = "1m"
+
+# Email/Password Authentication Configuration
+[email_password]
+enabled = true
+min_password_length = 8
+max_password_length = 128
+disable_sign_up = false
+require_email_verification = true
+auto_sign_in = true
+reset_token_expiry = "24h"
+
+# Password Configuration (functions not configurable via TOML)
+[email_password.password]
+# Hash and Verify functions are set programmatically
+
+# Email Verification Configuration
+[email_verification]
+auto_sign_in = true
+send_on_sign_up = true
+send_on_sign_in = false
+expires_in = "24h"
+
+# User Configuration
+[user]
+[user.change_email]
+enabled = true
+
+# Session Configuration
+[session]
+cookie_name = "gobetterauth.session_token"
+expires_in = "168h"  # in hours (7 days)
+update_age = "24h"
+
+# CSRF Configuration
+[csrf]
+enabled = true
+cookie_name = "gobetterauth_csrf"
+header_name = "X-GOBETTERAUTH-CSRF-TOKEN"
+expires_in = "1h"
+
+# Social Providers Configuration
+# SECURITY NOTE: It is recommended to set the 'client_secret' for each of these via their 
+# respective environment variables as shown in the .env.example file rather than hardcoding it here.
+[social_providers]
+[social_providers.default]
+[social_providers.default.discord]
+client_id = "your-discord-client-id"
+client_secret = "your-discord-client-secret"
+redirect_url = "http://localhost:8080/auth/oauth2/discord/callback"
+scopes = []
+
+[social_providers.default.github]
+client_id = "your-github-client-id"
+client_secret = "your-github-client-secret"
+redirect_url = "http://localhost:8080/auth/oauth2/github/callback"
+scopes = []
+
+[social_providers.default.google]
+client_id = "your-google-client-id"
+client_secret = "your-google-client-secret"
+redirect_url = "http://localhost:8080/auth/oauth2/google/callback"
+scopes = []
+
+# Generic OAuth2 providers (example)
+[social_providers.generic.custom_provider]
+client_id = "custom-client-id"
+client_secret = "custom-client-secret"
+redirect_url = "http://localhost:8080/auth/oauth2/custom/callback"
+scopes = ["read"]
+[social_providers.generic.custom_provider.endpoint]
+auth_url = "https://custom-provider.com/oauth/authorize"
+token_url = "https://custom-provider.com/oauth/token"
+user_info_url = "https://custom-provider.com/api/user"
+
+# Trusted Origins Configuration
+[trusted_origins]
+origins = ["http://localhost:3000", "https://yourdomain.com"]
+
+# Rate Limit Configuration
+[rate_limit]
+enabled = true
+window = "1m"
+max = 100
+algorithm = "fixed_window"
+prefix = "rate_limit:"
+[rate_limit.ip]
+headers = ["X-Forwarded-For", "X-Real-IP"]
+# [rate_limit.custom_rules]
+# "path/to/your/endpoint" = { disabled = false, window = "1m", max = 5 }
+
+# Event Bus Configuration
+[event_bus]
+enabled = true
+prefix = "gobetterauth"
+max_concurrent_handlers = 10
+pubsub_type = "memory"  # or "custom", etc.
+
+# =======================
+# Webhooks Configuration
+# =======================
+# Configure HTTP webhooks for authentication events
+# Webhooks are called asynchronously when events occur
+# Use these to integrate with external services (CRM, analytics, notifications, etc.)
+
+# [webhooks.on_user_signed_up]
+# url = "https://myapp.com/webhooks/user-signed-up"
+# headers = { "Authorization" = "Bearer your-secret-token", "X-Custom-Header" = "value" }
+# timeout_seconds = 5
+
+# [webhooks.on_user_logged_in]
+# url = "https://myapp.com/webhooks/user-logged-in"
+# headers = { "Authorization" = "Bearer your-secret-token" }
+# timeout_seconds = 5
+
+# [webhooks.on_email_verified]
+# url = "https://myapp.com/webhooks/email-verified"
+# headers = { "Authorization" = "Bearer your-secret-token" }
+# timeout_seconds = 5
+
+# [webhooks.on_password_changed]
+# url = "https://myapp.com/webhooks/password-changed"
+# headers = { "Authorization" = "Bearer your-secret-token" }
+# timeout_seconds = 5
+
+# [webhooks.on_email_changed]
+# url = "https://myapp.com/webhooks/email-changed"
+# headers = { "Authorization" = "Bearer your-secret-token" }
+# timeout_seconds = 5

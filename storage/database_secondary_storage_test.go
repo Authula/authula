@@ -30,7 +30,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 
 // Helper function to create a database storage with default config
 func newTestDatabaseStorage(t *testing.T, db *gorm.DB) *DatabaseSecondaryStorage {
-	return NewDatabaseSecondaryStorage(db, &models.SecondaryStorageDatabaseOptions{
+	return NewDatabaseSecondaryStorage(db, models.SecondaryStorageDatabaseOptions{
 		CleanupInterval: 1 * time.Minute,
 	})
 }
@@ -488,6 +488,8 @@ func TestDatabaseStorage_CleanupExpiredEntries(t *testing.T) {
 func TestDatabaseStorage_Close_StopsCleanup(t *testing.T) {
 	db := newTestDB(t)
 	storage := newTestDatabaseStorage(t, db)
+
+	storage.StartCleanup()
 
 	// Verify cleanup goroutine is running
 	select {

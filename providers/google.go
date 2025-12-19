@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"golang.org/x/oauth2"
 
@@ -25,6 +26,12 @@ type GoogleProvider struct {
 }
 
 func NewGoogleProvider(config *models.OAuth2Config) *GoogleProvider {
+	if envClientID := os.Getenv("GOOGLE_CLIENT_ID"); envClientID != "" {
+		config.ClientID = envClientID
+	}
+	if envClientSecret := os.Getenv("GOOGLE_CLIENT_SECRET"); envClientSecret != "" {
+		config.ClientSecret = envClientSecret
+	}
 	return &GoogleProvider{config: config}
 }
 

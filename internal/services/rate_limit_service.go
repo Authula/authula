@@ -15,26 +15,25 @@ import (
 type RateLimitServiceImpl struct {
 	config           *models.Config
 	storage          models.SecondaryStorage
-	logger           *slog.Logger
+	logger           models.Logger
 	pluginRateLimits []models.PluginRateLimit
 }
 
-func NewRateLimitServiceImpl(config *models.Config, pluginRateLimits []models.PluginRateLimit) *RateLimitServiceImpl {
+func NewRateLimitServiceImpl(config *models.Config, logger models.Logger, pluginRateLimits []models.PluginRateLimit) *RateLimitServiceImpl {
 	return &RateLimitServiceImpl{
 		config:           config,
 		storage:          config.SecondaryStorage.Storage,
-		logger:           slog.Default(),
+		logger:           logger,
 		pluginRateLimits: pluginRateLimits,
 	}
 }
 
 // ruleFor returns the active rate limit rule for a given key/request
-func (s *RateLimitServiceImpl) ruleFor(key string, req *http.Request) (time.Duration, int, bool) {
+func (s *RateLimitServiceImpl) ruleFor(key string) (time.Duration, int, bool) {
 	if len(s.pluginRateLimits) > 0 {
 		for _, rateLimitConfig := range s.pluginRateLimits {
 			if rateLimitConfig.Enabled && rateLimitConfig.CustomRules != nil {
-				if ruleFn, ok := rateLimitConfig.CustomRules[key]; ok {
-					rule := ruleFn(req)
+				if rule, ok := rateLimitConfig.CustomRules[key]; ok {
 					if rule.Disabled {
 						continue
 					}
@@ -44,8 +43,7 @@ func (s *RateLimitServiceImpl) ruleFor(key string, req *http.Request) (time.Dura
 		}
 	}
 
-	if ruleFn, ok := s.config.RateLimit.CustomRules[key]; ok {
-		rule := ruleFn(req)
+	if rule, ok := s.config.RateLimit.CustomRules[key]; ok {
 		if rule.Disabled {
 			return 0, 0, true
 		}
@@ -61,7 +59,7 @@ func (s *RateLimitServiceImpl) Allow(ctx context.Context, key string, req *http.
 		return true, nil
 	}
 
-	window, max, disabled := s.ruleFor(req.URL.Path, req)
+	window, max, disabled := s.ruleFor(req.URL.Path)
 	if disabled {
 		return true, nil
 	}

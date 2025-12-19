@@ -28,12 +28,10 @@ type MemorySecondaryStorage struct {
 	done chan struct{}
 }
 
-func NewMemorySecondaryStorage(config *models.SecondaryStorageMemoryOptions) *MemorySecondaryStorage {
+func NewMemorySecondaryStorage(config models.SecondaryStorageMemoryOptions) *MemorySecondaryStorage {
 	cleanupInterval := 1 * time.Minute
-	if config != nil {
-		if config.CleanupInterval != 0 {
-			cleanupInterval = config.CleanupInterval
-		}
+	if config.CleanupInterval != 0 {
+		cleanupInterval = config.CleanupInterval
 	}
 
 	storage := &MemorySecondaryStorage{
@@ -64,6 +62,7 @@ func (storage *MemorySecondaryStorage) Get(ctx context.Context, key string) (any
 	if !exists {
 		return nil, fmt.Errorf("key not found: %s", key)
 	}
+	fmt.Printf("Key: %s\n", key)
 
 	if entry.expiresAt != nil && time.Now().After(*entry.expiresAt) {
 		return nil, fmt.Errorf("key expired: %s", key)

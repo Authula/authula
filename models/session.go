@@ -9,6 +9,6 @@ type Session struct {
 	ExpiresAt time.Time `json:"expires_at"`
 	IPAddress *string   `json:"ip_address,omitempty"`
 	UserAgent *string   `json:"user_agent,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 }

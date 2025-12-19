@@ -5,16 +5,7 @@
     "dockerfile": "Dockerfile"
   },
   "workspaceFolder": "/workspaces/go-better-auth",
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {
-      "moby": false
-    }
-  },
-  "containerEnv": {
-    "DISPLAY": "host.docker.internal:0.0",
-    "LIBGL_ALWAYS_INDIRECT": "0"
-  },
-  "forwardPorts": [],
+  "forwardPorts": [8080],
   "customizations": {
     "vscode": {
       "settings": {
@@ -37,7 +28,6 @@
       "extensions": [
         "golang.go",
         "redhat.vscode-yaml",
-        "dbaeumer.vscode-eslint",
         "vscode-icons-team.vscode-icons",
         "eamodio.gitlens",
         "aaron-bond.better-comments",
@@ -46,7 +36,8 @@
         "IronGeek.vscode-env",
         "github.vscode-github-actions",
         "Gruntfuggly.todo-tree",
-        "ms-azuretools.vscode-containers"
+        "ms-azuretools.vscode-containers",
+        "tamasfe.even-better-toml"
       ]
     }
   }

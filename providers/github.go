@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"golang.org/x/oauth2"
 
@@ -31,6 +32,12 @@ type GitHubProvider struct {
 }
 
 func NewGitHubProvider(config *models.OAuth2Config) *GitHubProvider {
+	if envClientID := os.Getenv("GITHUB_CLIENT_ID"); envClientID != "" {
+		config.ClientID = envClientID
+	}
+	if envClientSecret := os.Getenv("GITHUB_CLIENT_SECRET"); envClientSecret != "" {
+		config.ClientSecret = envClientSecret
+	}
 	return &GitHubProvider{config: config}
 }
 

@@ -14,7 +14,7 @@ import (
 
 // Helper function to create a memory storage with default config
 func newTestMemorySecondaryStorage() *MemorySecondaryStorage {
-	return NewMemorySecondaryStorage(&models.SecondaryStorageMemoryOptions{
+	return NewMemorySecondaryStorage(models.SecondaryStorageMemoryOptions{
 		CleanupInterval: 1 * time.Minute,
 	})
 }

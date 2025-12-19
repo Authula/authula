@@ -8,51 +8,93 @@ import (
 )
 
 // =======================
+// Mode
+// =======================
+
+type Mode string
+
+const (
+	ModeLibrary  Mode = "library"  // Library mode: embedded in another application
+	ModeFile     Mode = "file"     // File mode: standalone with file-based configuration
+	ModeDatabase Mode = "database" // Database mode: standalone with database-backed configuration
+)
+
+// =======================
+// Logger Config
+// =======================
+
+type LoggerConfig struct {
+	Level  string `json:"level" toml:"level"`
+	Logger Logger `json:"-" toml:"-"`
+}
+
+// =======================
 // Database Config
 // =======================
 
 type DatabaseConfig struct {
-	Provider         string
-	ConnectionString string
-	MaxOpenConns     int
-	MaxIdleConns     int
-	ConnMaxLifetime  time.Duration
+	Provider         string        `json:"provider" toml:"provider"`
+	ConnectionString string        `json:"connection_string" toml:"connection_string"`
+	MaxOpenConns     int           `json:"max_open_conns" toml:"max_open_conns"`
+	MaxIdleConns     int           `json:"max_idle_conns" toml:"max_idle_conns"`
+	ConnMaxLifetime  time.Duration `json:"conn_max_lifetime" toml:"conn_max_lifetime"`
 }
 
 // =======================
 // Secondary Storage Config
 // =======================
 
+type SecondaryStorageMemoryOptions struct {
+	// CleanupInterval controls how often expired entries are cleaned up.
+	CleanupInterval time.Duration `json:"cleanup_interval" toml:"cleanup_interval"`
+}
+
+type SecondaryStorageDatabaseOptions struct {
+	// CleanupInterval controls how often expired entries are cleaned up.
+	CleanupInterval time.Duration `json:"cleanup_interval" toml:"cleanup_interval"`
+}
+
 type SecondaryStorageConfig struct {
-	Type            SecondaryStorageType
-	MemoryOptions   *SecondaryStorageMemoryOptions
-	DatabaseOptions *SecondaryStorageDatabaseOptions
-	Storage         SecondaryStorage
+	Type            SecondaryStorageType            `json:"type" toml:"type"`
+	MemoryOptions   SecondaryStorageMemoryOptions   `json:"memory_options" toml:"memory_options"`
+	DatabaseOptions SecondaryStorageDatabaseOptions `json:"database_options" toml:"database_options"`
+	Storage         SecondaryStorage                `json:"-" toml:"-"`
 }
 
 // =======================
-// Email/Password Auth Config
+// Email Config
 // =======================
+
+type EmailConfig struct {
+	Provider string `json:"provider" toml:"provider"`
+	SMTPHost string `json:"smtp_host" toml:"smtp_host"`
+	SMTPPort int    `json:"smtp_port" toml:"smtp_port"`
+	SMTPUser string `json:"smtp_user" toml:"smtp_user"`
+	SMTPPass string `json:"smtp_pass" toml:"smtp_pass"`
+	From     string `json:"from" toml:"from"`
+}
+
+// =======================
+// Email Password Config
+// =======================
+
+// Library mode only
+type PasswordConfig struct {
+	Hash   func(password string) (string, error)      `json:"-" toml:"-"`
+	Verify func(hashedPassword, password string) bool `json:"-" toml:"-"`
+}
 
 type EmailPasswordConfig struct {
-	Enabled                  bool
-	MinPasswordLength        int
-	MaxPasswordLength        int
-	DisableSignUp            bool
-	RequireEmailVerification bool
-	AutoSignIn               bool
-	SendResetPasswordEmail   func(user User, url string, token string) error
-	ResetTokenExpiry         time.Duration
-	Password                 *PasswordConfig
-}
-
-// =======================
-// Password Config
-// =======================
-
-type PasswordConfig struct {
-	Hash   func(password string) (string, error)
-	Verify func(hashedPassword, password string) bool
+	Enabled                  bool          `json:"enabled" toml:"enabled"`
+	MinPasswordLength        int           `json:"min_password_length" toml:"min_password_length"`
+	MaxPasswordLength        int           `json:"max_password_length" toml:"max_password_length"`
+	DisableSignUp            bool          `json:"disable_sign_up" toml:"disable_sign_up"`
+	RequireEmailVerification bool          `json:"require_email_verification" toml:"require_email_verification"`
+	AutoSignIn               bool          `json:"auto_sign_in" toml:"auto_sign_in"`
+	ResetTokenExpiry         time.Duration `json:"reset_token_expiry" toml:"reset_token_expiry"`
+	// Library mode only
+	Password               PasswordConfig                                  `json:"-" toml:"-"`
+	SendResetPasswordEmail func(user User, url string, token string) error `json:"-" toml:"-"`
 }
 
 // =======================
@@ -60,11 +102,12 @@ type PasswordConfig struct {
 // =======================
 
 type EmailVerificationConfig struct {
-	SendVerificationEmail func(user User, url string, token string) error
-	AutoSignIn            bool
-	SendOnSignUp          bool
-	SendOnSignIn          bool
-	ExpiresIn             time.Duration
+	AutoSignIn   bool          `json:"auto_sign_in" toml:"auto_sign_in"`
+	SendOnSignUp bool          `json:"send_on_sign_up" toml:"send_on_sign_up"`
+	SendOnSignIn bool          `json:"send_on_sign_in" toml:"send_on_sign_in"`
+	ExpiresIn    time.Duration `json:"expires_in" toml:"expires_in"`
+	// Library mode only
+	SendVerificationEmail func(user User, url string, token string) error `json:"-" toml:"-"`
 }
 
 // =======================
@@ -72,12 +115,13 @@ type EmailVerificationConfig struct {
 // =======================
 
 type ChangeEmailConfig struct {
-	Enabled                          bool
-	SendEmailChangeVerificationEmail func(user User, newEmail string, url string, token string) error
+	Enabled bool `json:"enabled" toml:"enabled"`
+	// Library mode only
+	SendEmailChangeVerificationEmail func(user User, newEmail string, url string, token string) error `json:"-" toml:"-"`
 }
 
 type UserConfig struct {
-	ChangeEmail ChangeEmailConfig
+	ChangeEmail ChangeEmailConfig `json:"change_email" toml:"change_email"`
 }
 
 // =======================
@@ -85,9 +129,9 @@ type UserConfig struct {
 // =======================
 
 type SessionConfig struct {
-	CookieName string
-	ExpiresIn  time.Duration
-	UpdateAge  time.Duration
+	CookieName string        `json:"cookie_name" toml:"cookie_name"`
+	ExpiresIn  time.Duration `json:"expires_in" toml:"expires_in"`
+	UpdateAge  time.Duration `json:"update_age" toml:"update_age"`
 }
 
 // =======================
@@ -95,10 +139,10 @@ type SessionConfig struct {
 // =======================
 
 type CSRFConfig struct {
-	Enabled    bool
-	CookieName string
-	HeaderName string
-	ExpiresIn  time.Duration
+	Enabled    bool          `json:"enabled" toml:"enabled"`
+	CookieName string        `json:"cookie_name" toml:"cookie_name"`
+	HeaderName string        `json:"header_name" toml:"header_name"`
+	ExpiresIn  time.Duration `json:"expires_in" toml:"expires_in"`
 }
 
 // =======================
@@ -106,32 +150,32 @@ type CSRFConfig struct {
 // =======================
 
 type OAuth2Config struct {
-	ClientID     string
-	ClientSecret string
-	RedirectURL  string
-	Scopes       []string
+	ClientID     string   `json:"client_id" toml:"client_id"`
+	ClientSecret string   `json:"client_secret" toml:"client_secret"`
+	RedirectURL  string   `json:"redirect_url" toml:"redirect_url"`
+	Scopes       []string `json:"scopes" toml:"scopes"`
 }
 
 type DefaultOAuth2ProvidersConfig struct {
-	Google  *OAuth2Config
-	GitHub  *OAuth2Config
-	Discord *OAuth2Config
+	Google  *OAuth2Config `json:"google" toml:"google"`
+	GitHub  *OAuth2Config `json:"github" toml:"github"`
+	Discord *OAuth2Config `json:"discord" toml:"discord"`
 }
 
 type GenericOAuth2EndpointConfig struct {
-	AuthURL     string
-	TokenURL    string
-	UserInfoURL string
+	AuthURL     string `json:"auth_url" toml:"auth_url"`
+	TokenURL    string `json:"token_url" toml:"token_url"`
+	UserInfoURL string `json:"user_info_url" toml:"user_info_url"`
 }
 
 type GenericOAuth2Config struct {
 	OAuth2Config
-	Endpoint GenericOAuth2EndpointConfig
+	Endpoint GenericOAuth2EndpointConfig `json:"endpoint" toml:"endpoint"`
 }
 
 type SocialProvidersConfig struct {
-	Default DefaultOAuth2ProvidersConfig
-	Generic map[string]GenericOAuth2Config
+	Default DefaultOAuth2ProvidersConfig   `json:"default" toml:"default"`
+	Generic map[string]GenericOAuth2Config `json:"generic" toml:"generic"`
 }
 
 // =======================
@@ -139,7 +183,7 @@ type SocialProvidersConfig struct {
 // =======================
 
 type TrustedOriginsConfig struct {
-	Origins []string
+	Origins []string `json:"origins" toml:"origins"`
 }
 
 // =======================
@@ -147,29 +191,27 @@ type TrustedOriginsConfig struct {
 // =======================
 
 type RateLimitCustomRule struct {
-	Disabled bool
-	Window   time.Duration
-	Max      int
+	Disabled bool          `json:"disabled" toml:"disabled"`
+	Window   time.Duration `json:"window" toml:"window"`
+	Max      int           `json:"max" toml:"max"`
 }
 
-type RateLimitCustomRuleFunc func(req *http.Request) RateLimitCustomRule
-
 type IPConfig struct {
-	Headers []string
+	Headers []string `json:"headers" toml:"headers"`
 }
 
 type RateLimitConfig struct {
-	Enabled     bool
-	Window      time.Duration
-	Max         int
-	Algorithm   string
-	Prefix      string
-	CustomRules map[string]RateLimitCustomRuleFunc
-	IP          IPConfig
+	Enabled     bool                           `json:"enabled" toml:"enabled"`
+	Window      time.Duration                  `json:"window" toml:"window"`
+	Max         int                            `json:"max" toml:"max"`
+	Algorithm   string                         `json:"algorithm" toml:"algorithm"`
+	Prefix      string                         `json:"prefix" toml:"prefix"`
+	CustomRules map[string]RateLimitCustomRule `json:"custom_rules" toml:"custom_rules"`
+	IP          IPConfig                       `json:"ip" toml:"ip"`
 }
 
 // =======================
-// Endpoint Hooks Config
+// Endpoint Hooks Config (Library mode only)
 // =======================
 
 type EndpointHookContext struct {
@@ -195,7 +237,7 @@ type EndpointHooksConfig struct {
 }
 
 // =======================
-// Database Hooks Config
+// Database Hooks Config (Library mode only)
 // =======================
 
 type UserDatabaseHooksConfig struct {
@@ -230,7 +272,7 @@ type DatabaseHooksConfig struct {
 }
 
 // =======================
-// Event Hooks Config
+// Event Hooks Config (Library mode only)
 // =======================
 
 type EventHooksConfig struct {
@@ -242,16 +284,36 @@ type EventHooksConfig struct {
 }
 
 // =======================
+// Webhook Config
+// =======================
+
+type WebhookConfig struct {
+	URL            string            `json:"url" toml:"url"`
+	Headers        map[string]string `json:"headers" toml:"headers"`
+	TimeoutSeconds int               `json:"timeout_seconds" toml:"timeout_seconds"`
+}
+
+type WebhooksConfig struct {
+	OnUserSignedUp    *WebhookConfig `json:"on_user_signed_up" toml:"on_user_signed_up"`
+	OnUserLoggedIn    *WebhookConfig `json:"on_user_logged_in" toml:"on_user_logged_in"`
+	OnEmailVerified   *WebhookConfig `json:"on_email_verified" toml:"on_email_verified"`
+	OnPasswordChanged *WebhookConfig `json:"on_password_changed" toml:"on_password_changed"`
+	OnEmailChanged    *WebhookConfig `json:"on_email_changed" toml:"on_email_changed"`
+}
+
+// =======================
 // Event Bus Config
 // =======================
 
 type EventBusConfig struct {
-	Enabled               bool
-	Prefix                string
-	MaxConcurrentHandlers int
-	PubSub                PubSub
+	Enabled               bool   `json:"enabled" toml:"enabled"`
+	Prefix                string `json:"prefix" toml:"prefix"`
+	MaxConcurrentHandlers int    `json:"max_concurrent_handlers" toml:"max_concurrent_handlers"`
+	PubSubType            string `json:"pubsub_type" toml:"pubsub_type"`
+	PubSub                PubSub `json:"-" toml:"-"`
 }
 
+// Library mode only
 type PluginsConfig struct {
 	Plugins []Plugin
 }
@@ -262,26 +324,30 @@ type PluginsConfig struct {
 
 // Config holds all configurable options for the GoBetterAuth library.
 type Config struct {
-	AppName           string
-	BaseURL           string
-	BasePath          string
-	Secret            string
-	DB                *gorm.DB
-	Database          DatabaseConfig
-	SecondaryStorage  SecondaryStorageConfig
-	EmailPassword     EmailPasswordConfig
-	EmailVerification EmailVerificationConfig
-	User              UserConfig
-	Session           SessionConfig
-	CSRF              CSRFConfig
-	SocialProviders   SocialProvidersConfig
-	TrustedOrigins    TrustedOriginsConfig
-	RateLimit         RateLimitConfig
-	EndpointHooks     EndpointHooksConfig
-	DatabaseHooks     DatabaseHooksConfig
-	EventHooks        EventHooksConfig
-	EventBus          EventBusConfig
-	Plugins           PluginsConfig
+	Mode              Mode                    `json:"mode" toml:"mode"`
+	AppName           string                  `json:"app_name" toml:"app_name"`
+	BaseURL           string                  `json:"base_url" toml:"base_url"`
+	BasePath          string                  `json:"base_path" toml:"base_path"`
+	Secret            string                  `json:"secret" toml:"secret"`
+	Logger            LoggerConfig            `json:"logger" toml:"logger"`
+	DB                *gorm.DB                `json:"-" toml:"-"`
+	Database          DatabaseConfig          `json:"database" toml:"database"`
+	Email             EmailConfig             `json:"email" toml:"email"`
+	SecondaryStorage  SecondaryStorageConfig  `json:"secondary_storage" toml:"secondary_storage"`
+	EmailPassword     EmailPasswordConfig     `json:"email_password" toml:"email_password"`
+	EmailVerification EmailVerificationConfig `json:"email_verification" toml:"email_verification"`
+	User              UserConfig              `json:"user" toml:"user"`
+	Session           SessionConfig           `json:"session" toml:"session"`
+	CSRF              CSRFConfig              `json:"csrf" toml:"csrf"`
+	SocialProviders   SocialProvidersConfig   `json:"social_providers" toml:"social_providers"`
+	TrustedOrigins    TrustedOriginsConfig    `json:"trusted_origins" toml:"trusted_origins"`
+	RateLimit         RateLimitConfig         `json:"rate_limit" toml:"rate_limit"`
+	EndpointHooks     EndpointHooksConfig     `json:"-" toml:"-"`
+	DatabaseHooks     DatabaseHooksConfig     `json:"-" toml:"-"`
+	EventHooks        EventHooksConfig        `json:"-" toml:"-"`
+	Webhooks          WebhooksConfig          `json:"webhooks" toml:"webhooks"`
+	EventBus          EventBusConfig          `json:"event_bus" toml:"event_bus"`
+	Plugins           PluginsConfig           `json:"-" toml:"-"`
 }
 
 type ConfigOption func(*Config)

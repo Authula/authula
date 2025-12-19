@@ -11,9 +11,9 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
-type ctxKey string
+type AuthContextKey string
 
-const ContextUserID ctxKey = "user_id"
+const ContextUserID AuthContextKey = "user_id"
 
 // getUserIDFromCookie extracts the user ID from the session cookie.
 // Returns an error if the cookie is missing, invalid, or session is not found.
@@ -86,6 +86,8 @@ func CorsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
+
+			// Check if origin is allowed
 			allowed := slices.Contains(allowedOrigins, origin)
 
 			if allowed {
@@ -98,6 +100,11 @@ func CorsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 
 			// Handle preflight requests
 			if r.Method == http.MethodOptions {
+				// Only respond with 204 if origin is allowed, otherwise respond with 403
+				if !allowed && origin != "" {
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}

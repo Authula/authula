@@ -47,3 +47,6 @@ logs/
 # Temporary files
 tmp/
 temp/
+
+# Custom
+config.toml

@@ -78,6 +78,12 @@ func WithPluginEventHooks(eventHooks any) models.PluginOption {
 	}
 }
 
+func WithPluginEndpointHooks(endpointHooks any) models.PluginOption {
+	return func(p models.Plugin) {
+		p.SetEndpointHooks(endpointHooks)
+	}
+}
+
 func WithPluginClose(close func() error) models.PluginOption {
 	return func(p models.Plugin) {
 		p.SetClose(close)
