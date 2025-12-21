@@ -65,49 +65,64 @@ func InitDefaults(config *models.Config) {
 func InitDatabase(config *models.Config) (*gorm.DB, error) {
 	logger := config.Logger.Logger
 
-	if config.Mode != models.ModeLibrary {
-		// Validate configuration values at startup to catch errors early.
-		if config.Database.Provider == "" && config.DB == nil {
-			return nil, fmt.Errorf("database provider must be specified or DB must be pre-initialized")
-		}
-		if config.Database.ConnectionString == "" && config.DB == nil {
-			return nil, fmt.Errorf("database connection string must be specified or DB must be pre-initialized")
-		}
-	}
-
-	// Initialize DB using the configured DatabaseConfig if not already set.
-	if config.DB == nil {
-		var dialector gorm.Dialector
-		switch config.Database.Provider {
-		case "sqlite":
-			dialector = sqlite.Open(config.Database.ConnectionString)
-		case "postgres":
-			dialector = postgres.Open(config.Database.ConnectionString)
-		case "mysql":
-			dialector = mysql.Open(config.Database.ConnectionString)
-		default:
-			return nil, fmt.Errorf("unsupported database provider: %s", config.Database.Provider)
-		}
-
-		// Create GORM config and suppress query logging unless in debug mode
-		gormConfig := &gorm.Config{
-			SkipDefaultTransaction: true,
-		}
-
-		// In non-debug modes, disable GORM's internal logger
-		if config.Logger.Level != "debug" {
-			gormConfig.Logger = nil
-		}
-
-		db, err := gorm.Open(dialector, gormConfig)
+	// If DB is already initialized, apply pool settings and return
+	if config.DB != nil {
+		sqlDB, err := config.DB.DB()
 		if err != nil {
-			return nil, fmt.Errorf("failed to open database connection: %w", err)
+			logger.Error("failed to get underlying sql.DB", "error", err)
+			return nil, fmt.Errorf("failed to get underlying sql.DB: %w", err)
 		}
-		config.DB = db
-		logger.Info("database connection initialized", "provider", config.Database.Provider)
+		sqlDB.SetMaxOpenConns(config.Database.MaxOpenConns)
+		sqlDB.SetMaxIdleConns(config.Database.MaxIdleConns)
+		sqlDB.SetConnMaxLifetime(config.Database.ConnMaxLifetime)
+		return config.DB, nil
 	}
 
-	// Apply database connection pool settings to the GORM DB if it's set.
+	// Check if database config is valid
+	if config.Database.Provider == "" {
+		return nil, fmt.Errorf("database provider must be specified")
+	}
+
+	databaseUrl := os.Getenv("DATABASE_URL")
+	if databaseUrl == "" {
+		if config.Database.ConnectionString == "" {
+			return nil, fmt.Errorf("database connection string must be specified via DATABASE_URL environment variable or config")
+		} else {
+			databaseUrl = config.Database.ConnectionString
+		}
+	} else {
+		config.Database.ConnectionString = databaseUrl
+	}
+
+	// Initialize database connection
+	var dialector gorm.Dialector
+	switch config.Database.Provider {
+	case "sqlite":
+		dialector = sqlite.Open(databaseUrl)
+	case "postgres":
+		dialector = postgres.Open(databaseUrl)
+	case "mysql":
+		dialector = mysql.Open(databaseUrl)
+	default:
+		return nil, fmt.Errorf("unsupported database provider: %s", config.Database.Provider)
+	}
+
+	gormConfig := &gorm.Config{
+		SkipDefaultTransaction: true,
+		Logger:                 nil,
+	}
+	if config.Logger.Level == "debug" {
+		gormConfig.Logger = nil // Use GORM's default debug logger
+	}
+
+	db, err := gorm.Open(dialector, gormConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database connection: %w", err)
+	}
+	config.DB = db
+	logger.Info("database connection initialized", "provider", config.Database.Provider)
+
+	// Apply connection pool settings
 	sqlDB, err := config.DB.DB()
 	if err != nil {
 		logger.Error("failed to get underlying sql.DB", "error", err)
@@ -120,6 +135,33 @@ func InitDatabase(config *models.Config) (*gorm.DB, error) {
 	return config.DB, nil
 }
 
+func RunCoreMigrations(db *gorm.DB) {
+	dbModels := []any{
+		// Admin
+		&models.AuthSettings{},
+		// Auth
+		&models.User{},
+		&models.Account{},
+		&models.Session{},
+		&models.Verification{},
+		&models.KeyValueStore{},
+	}
+
+	// Auto-migrate core models
+	if err := db.AutoMigrate(dbModels...); err != nil {
+		slog.Error("failed to auto migrate database", slog.Any("error", err))
+		panic(err)
+	}
+}
+
+func RunPluginMigrations(pluginRegistry models.PluginRegistry) {
+	// Auto-migrate plugin models
+	if err := pluginRegistry.RunMigrations(); err != nil {
+		slog.Error("failed to run plugin migrations", slog.Any("error", err))
+		panic(err)
+	}
+}
+
 // -------------------------------
 // CONFIG MANAGER
 // -------------------------------
@@ -127,7 +169,6 @@ func InitDatabase(config *models.Config) (*gorm.DB, error) {
 // InitConfigManager initializes the appropriate config manager based on mode
 func InitConfigManager(config *models.Config) (models.ConfigManager, error) {
 	var manager models.ConfigManager
-	var err error
 
 	switch config.Mode {
 	case models.ModeLibrary:
@@ -135,31 +176,15 @@ func InitConfigManager(config *models.Config) (models.ConfigManager, error) {
 			slog.Debug("Running in library mode - no config manager needed")
 			return nil, nil
 		}
-	case models.ModeDatabase:
+	case models.ModeStandalone:
 		{
-			slog.Info("Initializing database-backed config manager")
-			// Init database first
-			_, err = InitDatabase(config)
-			if err != nil {
-				return nil, fmt.Errorf("failed to initialize database for config manager: %w", err)
-			}
 			manager = internalconfig.NewConfigManager(config)
+			if err := manager.Init(); err != nil {
+				return nil, fmt.Errorf("failed to initialize config manager: %w", err)
+			}
 			// Get config and override
 			loadedConfig := manager.GetConfig()
 			*config = *loadedConfig
-		}
-	case models.ModeFile:
-		{
-			slog.Debug("Initializing file-based config manager")
-			manager = internalconfig.NewConfigManager(config)
-			// Get config and override
-			loadedConfig := manager.GetConfig()
-			*config = *loadedConfig
-			// Then init database
-			_, err = InitDatabase(config)
-			if err != nil {
-				return nil, fmt.Errorf("failed to initialize database after config load: %w", err)
-			}
 		}
 	default:
 		{
@@ -234,7 +259,7 @@ func InitEventBus(config *models.Config) (models.EventBus, error) {
 	return events.NewEventBus(config, pubsub), nil
 }
 
-func InitServices(config *models.Config, eventBus models.EventBus, pluginRateLimits []models.PluginRateLimit) *internalauth.Service {
+func InitServices(config *models.Config, configManager models.ConfigManager, eventBus models.EventBus, pluginRateLimits []models.PluginRateLimit) *internalauth.Service {
 	userService := services.NewUserServiceImpl(config, config.DB)
 	accountService := services.NewAccountServiceImpl(config, config.DB)
 	sessionService := services.NewSessionServiceImpl(config, config.DB)
@@ -244,7 +269,7 @@ func InitServices(config *models.Config, eventBus models.EventBus, pluginRateLim
 	rateLimitService := services.NewRateLimitServiceImpl(config, config.Logger.Logger, pluginRateLimits)
 	mailerService := services.NewMailerServiceImpl(config)
 	webhookExecutor := internalevents.NewWebhookExecutor(config.Logger.Logger)
-	eventEmitter := internalevents.NewEventEmitter(config, config.Logger.Logger, eventBus, webhookExecutor)
+	eventEmitter := internalevents.NewEventEmitter(configManager, config.Logger.Logger, eventBus, webhookExecutor)
 
 	oauth2ProviderRegistry := providers.NewOAuth2ProviderRegistry()
 	if config.SocialProviders.Default.Discord != nil {

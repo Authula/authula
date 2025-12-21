@@ -3,6 +3,17 @@ SET NAMES utf8mb4;
 SET CHARACTER SET utf8mb4;
 
 -- ---------------------------
+-- AUTH SETTINGS
+-- ---------------------------
+
+CREATE TABLE IF NOT EXISTS auth_settings (
+  `key` VARCHAR(255) PRIMARY KEY,
+  `value` JSON NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------
 -- USERS
 -- ---------------------------
 

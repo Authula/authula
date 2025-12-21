@@ -12,6 +12,7 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/logger"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
@@ -33,12 +34,36 @@ func NewDatabaseConfigManager(initialConfig *models.Config) models.ConfigManager
 	// Initialize with provided config
 	cm.activeConfig.Store(initialConfig)
 
-	// Try to load from DB to override
-	if cm.db != nil {
-		_ = cm.Load()
+	return cm
+}
+
+// Init creates the initial config in the database from the current active config,
+// but only if the "runtime_config" key does not already exist.
+func (cm *DatabaseConfigManager) Init() error {
+	var count int64
+	if err := cm.db.Model(&models.AuthSettings{}).
+		Where("key = ?", "runtime_config").
+		Count(&count).Error; err != nil {
+		return fmt.Errorf("failed to check for existing runtime_config: %w", err)
+	}
+	if count > 0 {
+		// Config already exists, just load it
+		if err := cm.Load(); err != nil {
+			return err
+		}
+		return nil
 	}
 
-	return cm
+	current := cm.GetConfig()
+	jsonData, err := json.Marshal(current)
+	if err != nil {
+		return fmt.Errorf("failed to marshal initial config: %w", err)
+	}
+
+	return cm.db.Create(&models.AuthSettings{
+		Key:   "runtime_config",
+		Value: jsonData,
+	}).Error
 }
 
 // GetConfig returns the current active configuration.
@@ -55,7 +80,7 @@ func (cm *DatabaseConfigManager) Load() error {
 	var settings models.AuthSettings
 	if err := cm.db.First(&settings, "key = ?", "runtime_config").Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return cm.initConfig()
+			return fmt.Errorf("runtime_config not found. It needs to be initialized first: %w", err)
 		}
 		return err
 	}
@@ -75,21 +100,6 @@ func (cm *DatabaseConfigManager) Load() error {
 	cm.activeConfig.Store(&newCfg)
 
 	return nil
-}
-
-// initConfig creates the initial config in the database from the current active config.
-func (cm *DatabaseConfigManager) initConfig() error {
-	current := cm.GetConfig()
-
-	jsonData, err := json.Marshal(current)
-	if err != nil {
-		return fmt.Errorf("failed to marshal initial config: %w", err)
-	}
-
-	return cm.db.Create(&models.AuthSettings{
-		Key:   "runtime_config",
-		Value: jsonData,
-	}).Error
 }
 
 // Update updates a specific configuration value by key (dot notation) and persists it.
@@ -196,7 +206,12 @@ func (cm *DatabaseConfigManager) watchPolling(ctx context.Context, configChan ch
 
 		case <-ticker.C:
 			var settings models.AuthSettings
-			if err := cm.db.First(&settings, "key = ?", "runtime_config").Error; err != nil {
+			// Use a session with silent logger to avoid logging expected "record not found" errors
+			err := cm.db.Session(&gorm.Session{
+				Logger: cm.db.Logger.LogMode(logger.Silent),
+			}).First(&settings, "key = ?", "runtime_config").Error
+
+			if err != nil {
 				if err != gorm.ErrRecordNotFound {
 					slog.Error("Failed to check for config updates", "error", err)
 				}

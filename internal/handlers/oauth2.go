@@ -22,7 +22,7 @@ func (h *OAuth2LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	// This generates the state, PKCE verifier if needed, and the authorization URL
 	loginResult, err := h.UseCase.PrepareOAuth2Login(r.Context(), providerName)
 	if err != nil {
-		util.JSONResponse(w, http.StatusBadRequest, map[string]any{"message": "invalid provider"})
+		util.JSONResponse(w, http.StatusBadRequest, map[string]any{"message": err.Error()})
 		return
 	}
 

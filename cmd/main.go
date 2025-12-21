@@ -30,7 +30,12 @@ func getEnv(key, fallback string) string {
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		env := os.Getenv("GO_ENV")
+		if env != "production" {
+			// Production-specific logic
+			log.Fatal("No .env file found", "error", err)
+			return
+		}
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -68,17 +73,14 @@ func runServer(port string, restartChan chan struct{}, shutdownChan chan os.Sign
 	// Apply environment variable overrides and defaults
 	applyConfigDefaults(&tomlConfig)
 
-	logger.Info("Configuration loaded", "mode", tomlConfig.Mode)
-
 	// Library mode is not supported in standalone executable
 	if tomlConfig.Mode == models.ModeLibrary {
 		panic("Library mode is not supported in standalone executable")
 	}
 
-	// Build config using functional options pattern (source of truth)
-	// This approach works for both file and database modes
+	// Build config using functional options pattern to ensure all fields are set
 	authConfig := config.NewConfig(
-		config.WithMode(tomlConfig.Mode),
+		config.WithMode(models.ModeStandalone),
 		config.WithAppName(tomlConfig.AppName),
 		config.WithBaseURL(tomlConfig.BaseURL),
 		config.WithBasePath(tomlConfig.BasePath),
@@ -103,8 +105,6 @@ func runServer(port string, restartChan chan struct{}, shutdownChan chan os.Sign
 	)
 
 	auth := gobetterauth.New(authConfig)
-	// auth.DropMigrations()
-	// os.Exit(0)
 	auth.RunMigrations()
 
 	// Set the restart handler - called when config changes require restart
@@ -138,7 +138,7 @@ func runServer(port string, restartChan chan struct{}, shutdownChan chan os.Sign
 	// Start server in a goroutine
 	serverErrors := make(chan error, 1)
 	go func() {
-		logger.Info("Starting GoBetterAuth standalone server", "port", port, "mode", authConfig.Mode)
+		logger.Info("Starting GoBetterAuth standalone server", "port", port)
 		serverErrors <- server.ListenAndServe()
 	}()
 
@@ -198,24 +198,7 @@ func loadConfigFromFile() models.Config {
 
 // applyConfigDefaults applies environment variable overrides and sensible defaults
 func applyConfigDefaults(config *models.Config) {
-	// Override mode from environment if specified
-	if mode := os.Getenv("GO_BETTER_AUTH_MODE"); mode != "" {
-		config.Mode = models.Mode(mode)
-	}
-
-	// Auto-detect mode based on database environment variables if not explicitly set
-	if config.Mode == "" {
-		if os.Getenv("DATABASE_URL") != "" || os.Getenv("DB_HOST") != "" {
-			config.Mode = models.ModeDatabase
-		} else {
-			config.Mode = models.ModeFile
-		}
-	}
-
 	// Override other critical settings from environment variables
-	if appName := os.Getenv("GO_BETTER_AUTH_APP_NAME"); appName != "" {
-		config.AppName = appName
-	}
 	if baseURL := os.Getenv("GO_BETTER_AUTH_BASE_URL"); baseURL != "" {
 		config.BaseURL = baseURL
 	}

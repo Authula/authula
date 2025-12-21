@@ -9,24 +9,32 @@ import (
 )
 
 type EventEmitterImpl struct {
-	config          *models.Config
+	configManager   models.ConfigManager
 	logger          models.Logger
 	eventBus        models.EventBus
 	webhookExecutor *WebhookExecutor
 }
 
 func NewEventEmitter(
-	config *models.Config,
+	configManager models.ConfigManager,
 	logger models.Logger,
 	eventBus models.EventBus,
 	webhookExecutor *WebhookExecutor,
 ) models.EventEmitter {
 	return &EventEmitterImpl{
-		config:          config,
+		configManager:   configManager,
 		logger:          logger,
 		eventBus:        eventBus,
 		webhookExecutor: webhookExecutor,
 	}
+}
+
+// getConfig returns the current active config from the manager
+func (e *EventEmitterImpl) getConfig() *models.Config {
+	if e.configManager != nil {
+		return e.configManager.GetConfig()
+	}
+	return nil
 }
 
 func (e *EventEmitterImpl) callEventHook(hook func(models.User) error, user *models.User) {
@@ -39,7 +47,7 @@ func (e *EventEmitterImpl) callEventHook(hook func(models.User) error, user *mod
 	}
 }
 
-func (e *EventEmitterImpl) callEventHookWebhook(webhook *models.WebhookConfig, eventType string, user *models.User) {
+func (e *EventEmitterImpl) callWebhook(webhook *models.WebhookConfig, eventType string, user *models.User) {
 	// Execute webhook if configured
 	if webhook != nil && webhook.URL != "" {
 		go func() {
@@ -108,34 +116,55 @@ func (e *EventEmitterImpl) emitEvent(eventType string, data any) {
 
 // OnUserSignedUp implements the user signup event logic.
 func (e *EventEmitterImpl) OnUserSignedUp(user models.User) {
-	e.callEventHook(e.config.EventHooks.OnUserSignedUp, &user)
-	e.callEventHookWebhook(e.config.Webhooks.OnUserSignedUp, models.EventUserSignedUp, &user)
+	cfg := e.getConfig()
+	if cfg == nil {
+		return
+	}
+	e.callEventHook(cfg.EventHooks.OnUserSignedUp, &user)
+	e.callWebhook(cfg.Webhooks.OnUserSignedUp, models.EventUserSignedUp, &user)
+	e.emitEvent(models.EventUserSignedUp, user)
 }
 
 // OnUserLoggedIn implements the user login event logic.
 func (e *EventEmitterImpl) OnUserLoggedIn(user models.User) {
-	e.callEventHook(e.config.EventHooks.OnUserLoggedIn, &user)
-	e.callEventHookWebhook(e.config.Webhooks.OnUserLoggedIn, models.EventUserLoggedIn, &user)
+	cfg := e.getConfig()
+	if cfg == nil {
+		return
+	}
+	e.callEventHook(cfg.EventHooks.OnUserLoggedIn, &user)
+	e.callWebhook(cfg.Webhooks.OnUserLoggedIn, models.EventUserLoggedIn, &user)
 	e.emitEvent(models.EventUserLoggedIn, user)
 }
 
 // OnEmailVerified implements the email verification event logic.
 func (e *EventEmitterImpl) OnEmailVerified(user models.User) {
-	e.callEventHook(e.config.EventHooks.OnEmailVerified, &user)
-	e.callEventHookWebhook(e.config.Webhooks.OnEmailVerified, models.EventEmailVerified, &user)
+	cfg := e.getConfig()
+	if cfg == nil {
+		return
+	}
+	e.callEventHook(cfg.EventHooks.OnEmailVerified, &user)
+	e.callWebhook(cfg.Webhooks.OnEmailVerified, models.EventEmailVerified, &user)
 	e.emitEvent(models.EventEmailVerified, user)
 }
 
 // OnEmailChanged implements the email changed event logic.
 func (e *EventEmitterImpl) OnEmailChanged(user models.User) {
-	e.callEventHook(e.config.EventHooks.OnEmailChanged, &user)
-	e.callEventHookWebhook(e.config.Webhooks.OnEmailChanged, models.EventEmailChanged, &user)
+	cfg := e.getConfig()
+	if cfg == nil {
+		return
+	}
+	e.callEventHook(cfg.EventHooks.OnEmailChanged, &user)
+	e.callWebhook(cfg.Webhooks.OnEmailChanged, models.EventEmailChanged, &user)
 	e.emitEvent(models.EventEmailChanged, user)
 }
 
 // OnPasswordChanged implements the password changed event logic.
 func (e *EventEmitterImpl) OnPasswordChanged(user models.User) {
-	e.callEventHook(e.config.EventHooks.OnPasswordChanged, &user)
-	e.callEventHookWebhook(e.config.Webhooks.OnPasswordChanged, models.EventPasswordChanged, &user)
+	cfg := e.getConfig()
+	if cfg == nil {
+		return
+	}
+	e.callEventHook(cfg.EventHooks.OnPasswordChanged, &user)
+	e.callWebhook(cfg.Webhooks.OnPasswordChanged, models.EventPasswordChanged, &user)
 	e.emitEvent(models.EventPasswordChanged, user)
 }

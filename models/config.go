@@ -14,9 +14,8 @@ import (
 type Mode string
 
 const (
-	ModeLibrary  Mode = "library"  // Library mode: embedded in another application
-	ModeFile     Mode = "file"     // File mode: standalone with file-based configuration
-	ModeDatabase Mode = "database" // Database mode: standalone with database-backed configuration
+	ModeLibrary    Mode = "library"    // Library mode: embedded in another application
+	ModeStandalone Mode = "standalone" // Server mode: standalone server with database-backed configuration
 )
 
 // =======================

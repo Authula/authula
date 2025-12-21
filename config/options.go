@@ -13,8 +13,8 @@ import (
 func NewConfig(options ...models.ConfigOption) *models.Config {
 	// Define sensible defaults first
 	config := &models.Config{
+		Mode:     models.ModeLibrary,
 		AppName:  "GoBetterAuth",
-		BaseURL:  "",
 		BasePath: "/auth",
 		Secret:   "",
 		DB:       nil,
@@ -80,18 +80,6 @@ func NewConfig(options ...models.ConfigOption) *models.Config {
 	}
 
 	// Environment variable overrides
-
-	// Set Mode
-	if mode := os.Getenv("GO_BETTER_AUTH_MODE"); mode != "" {
-		switch mode {
-		case string(models.ModeLibrary), string(models.ModeFile), string(models.ModeDatabase):
-			config.Mode = models.Mode(mode)
-		default:
-			panic("Invalid mode specified in GO_BETTER_AUTH_MODE environment variable")
-		}
-	} else if config.Mode == "" {
-		config.Mode = models.ModeLibrary
-	}
 
 	// Set BaseURL
 	if baseURL := os.Getenv("GO_BETTER_AUTH_BASE_URL"); baseURL != "" {

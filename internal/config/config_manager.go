@@ -8,7 +8,6 @@ import (
 
 // NewConfigManager creates a config manager based on the runtime mode and settings.
 // - Library mode: no config manager needed (embedded in another app)
-// - File mode: uses file-based TOML configuration
 // - Database mode: uses database-backed configuration
 func NewConfigManager(config *models.Config) models.ConfigManager {
 	// Library mode doesn't use a config manager
@@ -17,12 +16,8 @@ func NewConfigManager(config *models.Config) models.ConfigManager {
 		return nil
 	}
 
-	if config.Mode == models.ModeDatabase {
+	if config.Mode == models.ModeStandalone {
 		return NewDatabaseConfigManager(config)
-	}
-
-	if config.Mode == models.ModeFile {
-		return NewFileConfigManager(config)
 	}
 
 	return nil

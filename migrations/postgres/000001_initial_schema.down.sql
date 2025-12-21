@@ -10,6 +10,7 @@ DROP TABLE IF EXISTS verifications;
 DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS accounts;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS auth_settings;
 
 -- Drop extension (be careful - this might affect other schemas)
 -- DROP EXTENSION IF EXISTS pgcrypto;

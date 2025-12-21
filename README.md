@@ -21,11 +21,11 @@
 
 ✨ Overview
 
-**GoBetterAuth** is a comprehensive, authentication and authorization library/framework for Go applications. It provides secure email/password authentication, session management, email verification, password reset, and more, all built with clean architecture.
+**GoBetterAuth** is an open-source authentication solution that scales with you. Embed it as a library in your Go app, or run it as a standalone auth server for any language or framework. It provides secure email/password authentication, session management, email verification, password reset, and more, all built with clean architecture.
 
 💭 Why GoBetterAuth?
 
-**GoBetterAuth** is designed to be a comprehensive authentication and authorization solution for Go applications. It simplifies the implementation of common security features while providing a clean and modular architecture. This way developers can focus on building their applications without worrying about the complexities of authentication and the time it takes to implement these features.
+**GoBetterAuth** offers a robust authentication and authorization solution built using Go, yet flexible enough to integrate with any technology stack. It streamlines the implementation of essential security features through a clean, modular architecture, allowing developers to concentrate on building their applications without the overhead of managing authentication complexities.
 
 ---
 
@@ -37,6 +37,7 @@
 - 🗄️ **Secondary Storage** – Supports in-memory/database storage and a custom interface to implement Redis and other key-value stores. Use secondary storage to manage session data, rate limiting counters, and other high-frequency records. This enables offloading intensive data to high-performance storage solutions or RAM for optimal scalability and speed.
 - 📦 **Minimal Dependencies** – Standard library first, production-ready, and framework-agnostic.
 - 🧩 **Comprehensive Configuration** – Flexible, type-safe config with sensible defaults and environment variable support.
+- ⚙️ **Flexible Configuration** – Whether you're embedding as a library or running as a server, GoBetterAuth gives you full control over your authentication logic.
 - 🛡️ **Enhanced Security** – CSRF protection.
 - ⚡ **Rate Limiting** – Configurable rate limiting with secondary storage.
 - 🪝 **Hooks System** – Powerful hooks for deep customisation: Database hooks allow developers to hook into DB events like BeforeCreate and AfterCreate on entities, plus create custom ones in plugins. Event hooks execute after key actions, enabling event-driven workflows. Endpoint hooks allow you to integrate into the request/response lifecycle giving you the ability to modify requests/responses.

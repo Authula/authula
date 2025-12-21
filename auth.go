@@ -35,6 +35,13 @@ func New(baseConfig *models.Config) *Auth {
 
 	InitDefaults(activeConfig)
 
+	if _, err := InitDatabase(activeConfig); err != nil {
+		panic(fmt.Sprintf("failed to initialize database: %s", err.Error()))
+	}
+	// Auto-migrate core models. This is crucial to run here to ensure that the core tables
+	// exist before following the next steps as some of these functions rely on core tables to exist.
+	RunCoreMigrations(activeConfig.DB)
+
 	configManager, err := InitConfigManager(activeConfig)
 	if err != nil {
 		activeConfig.Logger.Logger.Error("Failed to initialize config manager", "error", err)
@@ -44,6 +51,12 @@ func New(baseConfig *models.Config) *Auth {
 	if err := InitSecondaryStorage(activeConfig); err != nil {
 		activeConfig.Logger.Logger.Error("Failed to initialize secondary storage", "error", err)
 		panic(err.Error())
+	} else {
+		if activeConfig.SecondaryStorage.Type == models.SecondaryStorageTypeDatabase {
+			if dbStorage, ok := activeConfig.SecondaryStorage.Storage.(*storage.DatabaseSecondaryStorage); ok {
+				dbStorage.StartCleanup()
+			}
+		}
 	}
 
 	eventBus, err := InitEventBus(activeConfig)
@@ -86,7 +99,7 @@ func New(baseConfig *models.Config) *Auth {
 		}
 	}
 
-	authService := InitServices(activeConfig, eventBus, pluginRateLimits)
+	authService := InitServices(activeConfig, configManager, eventBus, pluginRateLimits)
 	auth.Service = authService
 
 	api := InitApi(activeConfig, authService)
@@ -138,33 +151,8 @@ func (auth *Auth) watchForConfigChanges() {
 // ---------------------------------
 
 func (auth *Auth) RunMigrations() {
-	// Auth
-	dbModels := []any{
-		// Admin
-		&models.AuthSettings{},
-		&models.User{},
-		&models.Account{},
-		&models.Session{},
-		&models.Verification{},
-		&models.KeyValueStore{},
-	}
-
-	if err := auth.Config.DB.AutoMigrate(dbModels...); err != nil {
-		slog.Error("failed to auto migrate database", slog.Any("error", err))
-		panic(err)
-	}
-
-	//
-	if err := auth.pluginRegistry.RunMigrations(); err != nil {
-		slog.Error("failed to run plugin migrations", slog.Any("error", err))
-		panic(err)
-	}
-
-	if auth.Config.SecondaryStorage.Type == models.SecondaryStorageTypeDatabase {
-		if dbStorage, ok := auth.Config.SecondaryStorage.Storage.(*storage.DatabaseSecondaryStorage); ok {
-			dbStorage.StartCleanup()
-		}
-	}
+	RunCoreMigrations(auth.Config.DB)
+	RunPluginMigrations(auth.pluginRegistry)
 }
 
 func (auth *Auth) DropMigrations() {
@@ -284,7 +272,6 @@ func (auth *Auth) Handler() http.Handler {
 		// We purposely set basePath to "" here so that admin routes are always available at /admin/*
 		adminRoutes := admin.GetRoutes(auth.Config, auth.configManager, auth.Service, "", auth.middleware)
 		auth.registerBaseRoutes(auth.Config, "", adminRoutes)
-
 	}
 
 	// Register Auth Base Routes

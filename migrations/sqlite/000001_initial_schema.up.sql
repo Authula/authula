@@ -1,6 +1,17 @@
 -- Go Better Auth Database Schema (SQLite)
 
 -- ---------------------------
+-- AUTH SETTINGS
+-- ---------------------------
+
+CREATE TABLE IF NOT EXISTS auth_settings (
+  key VARCHAR(255) PRIMARY KEY,
+  value TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ---------------------------
 -- USERS
 -- ---------------------------
 

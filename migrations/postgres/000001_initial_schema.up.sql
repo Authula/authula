@@ -3,6 +3,17 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ---------------------------
+-- AUTH SETTINGS
+-- ---------------------------
+
+CREATE TABLE IF NOT EXISTS auth_settings (
+  key VARCHAR(255) PRIMARY KEY,
+  value JSONB NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- ---------------------------
 -- USERS
 -- ---------------------------
 

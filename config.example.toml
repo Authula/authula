@@ -2,9 +2,6 @@
 # This file demonstrates all available configuration options for GoBetterAuth.
 # Copy this file to config.toml and modify the values as needed.
 
-# Mode: Runs as a standalone server - "file" or "database" mode
-mode = "file"
-
 # Application Name
 app_name = "GoBetterAuth"
 
@@ -62,10 +59,6 @@ disable_sign_up = false
 require_email_verification = true
 auto_sign_in = true
 reset_token_expiry = "24h"
-
-# Password Configuration (functions not configurable via TOML)
-[email_password.password]
-# Hash and Verify functions are set programmatically
 
 # Email Verification Configuration
 [email_verification]
@@ -147,7 +140,7 @@ headers = ["X-Forwarded-For", "X-Real-IP"]
 enabled = true
 prefix = "gobetterauth"
 max_concurrent_handlers = 10
-pubsub_type = "memory"  # or "custom", etc.
+pubsub_type = "memory"  # or "custom" (only supported in library mode), etc.
 
 # =======================
 # Webhooks Configuration

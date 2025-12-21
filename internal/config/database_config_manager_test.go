@@ -11,7 +11,7 @@ import (
 // are properly mapped to/from JSON when persisting to the database.
 func TestDatabaseConfigManager_KeyMapping(t *testing.T) {
 	testConfig := &models.Config{
-		Mode:     models.ModeDatabase,
+		Mode:     models.ModeStandalone,
 		AppName:  "Test App",
 		BaseURL:  "http://localhost:8080",
 		BasePath: "/auth",
