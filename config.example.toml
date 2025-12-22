@@ -5,7 +5,7 @@
 # Application Name
 app_name = "GoBetterAuth"
 
-# Base URL for the application (used for redirects, emails, etc.)
+# Base URL for the application (used as the base url of the API and for redirects, emails, etc.)
 base_url = "http://localhost:8080"
 
 # Base Path for API endpoints (e.g., "/auth")
@@ -13,7 +13,7 @@ base_path = "/auth"
 
 # SECURITY NOTE: It is recommended to set the 'secret' via the 
 # GO_BETTER_AUTH_SECRET environment variable rather than hardcoding it here.
-# However, if you want then generate using `openssl rand -base64 50 | tr -dc 'A-Za-z0-9' | cut -c -40`
+# However if you want, generate using `openssl rand -base64 50 | tr -dc 'A-Za-z0-9' | cut -c -40`
 secret = ""
 
 [logger]

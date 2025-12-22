@@ -15,7 +15,7 @@ type Mode string
 
 const (
 	ModeLibrary    Mode = "library"    // Library mode: embedded in another application
-	ModeStandalone Mode = "standalone" // Server mode: standalone server with database-backed configuration
+	ModeStandalone Mode = "standalone" // Standalone mode: standalone server with database-backed configuration
 )
 
 // =======================

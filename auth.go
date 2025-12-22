@@ -18,6 +18,7 @@ import (
 
 type Auth struct {
 	Config            *models.Config
+	logger            models.Logger
 	configManager     models.ConfigManager
 	mux               *http.ServeMux
 	Service           *auth.Service
@@ -32,8 +33,8 @@ type Auth struct {
 // New creates a new Auth instance using the provided config and options.
 func New(baseConfig *models.Config) *Auth {
 	activeConfig := baseConfig
-
 	InitDefaults(activeConfig)
+	logger := activeConfig.Logger.Logger
 
 	if _, err := InitDatabase(activeConfig); err != nil {
 		panic(fmt.Sprintf("failed to initialize database: %s", err.Error()))
@@ -44,12 +45,12 @@ func New(baseConfig *models.Config) *Auth {
 
 	configManager, err := InitConfigManager(activeConfig)
 	if err != nil {
-		activeConfig.Logger.Logger.Error("Failed to initialize config manager", "error", err)
+		logger.Error("Failed to initialize config manager", "error", err)
 		panic(err.Error())
 	}
 
 	if err := InitSecondaryStorage(activeConfig); err != nil {
-		activeConfig.Logger.Logger.Error("Failed to initialize secondary storage", "error", err)
+		logger.Error("Failed to initialize secondary storage", "error", err)
 		panic(err.Error())
 	} else {
 		if activeConfig.SecondaryStorage.Type == models.SecondaryStorageTypeDatabase {
@@ -61,7 +62,7 @@ func New(baseConfig *models.Config) *Auth {
 
 	eventBus, err := InitEventBus(activeConfig)
 	if err != nil {
-		activeConfig.Logger.Logger.Error("Failed to initialise event bus", "error", err)
+		logger.Error("Failed to initialise event bus", "error", err)
 		panic(err.Error())
 	}
 
@@ -69,6 +70,7 @@ func New(baseConfig *models.Config) *Auth {
 
 	auth := &Auth{
 		Config:        activeConfig,
+		logger:        logger,
 		configManager: configManager,
 		mux:           mux,
 		routes:        []models.CustomRoute{},
@@ -122,7 +124,7 @@ func (auth *Auth) watchForConfigChanges() {
 	ctx := context.Background()
 	configChan, err := auth.configManager.Watch(ctx)
 	if err != nil {
-		auth.Config.Logger.Logger.Error("Failed to start watching config changes", "error", err)
+		auth.logger.Error("Failed to start watching config changes", "error", err)
 		return
 	}
 
@@ -132,16 +134,16 @@ func (auth *Auth) watchForConfigChanges() {
 
 			util.PreserveNonSerializableFieldsOnConfig(auth.Config, updatedConfig)
 			*auth.Config = *updatedConfig
-			auth.Config.Logger.Logger.Debug("Configuration updated via watcher")
+			auth.logger.Debug("Configuration updated via watcher")
 
 			if restartRequired {
-				auth.Config.Logger.Logger.Info("Configuration change requires server restart")
+				auth.logger.Info("Configuration change requires server restart")
 				if auth.OnRestartRequired != nil {
 					if err := auth.OnRestartRequired(); err != nil {
-						auth.Config.Logger.Logger.Error("Failed to handle restart requirement", "error", err)
+						auth.logger.Error("Failed to handle restart requirement", "error", err)
 					}
 				} else {
-					auth.Config.Logger.Logger.Warn("Configuration change requires restart but no restart handler is set")
+					auth.logger.Warn("Configuration change requires restart but no restart handler is set")
 				}
 			}
 		}
@@ -175,7 +177,7 @@ func (auth *Auth) DropMigrations() {
 	}
 	for _, model := range models {
 		if err := auth.Config.DB.Migrator().DropTable(model); err != nil {
-			slog.Error("failed to drop table", slog.Any("model", model), slog.Any("error", err))
+			auth.logger.Error("failed to drop table", slog.Any("model", model), slog.Any("error", err))
 			panic(err)
 		}
 	}
@@ -188,7 +190,7 @@ func (auth *Auth) DropMigrations() {
 
 		for _, model := range migrations {
 			if err := auth.Config.DB.Migrator().DropTable(model); err != nil {
-				slog.Error("failed to drop table", slog.Any("model", model), slog.Any("error", err))
+				auth.logger.Error("failed to drop table", slog.Any("model", model), slog.Any("error", err))
 				panic(err)
 			}
 		}
@@ -289,7 +291,7 @@ func (auth *Auth) Handler() http.Handler {
 
 	// Add catch-all handler for unmatched routes
 	auth.mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth.Config.Logger.Logger.Info("Catch-all handler triggered", "method", r.Method, "path", r.URL.Path)
+		auth.logger.Info("Catch-all handler triggered", "method", r.Method, "path", r.URL.Path)
 		util.JSONResponse(w, http.StatusNotFound, map[string]any{"message": "Endpoint not found"})
 	}))
 

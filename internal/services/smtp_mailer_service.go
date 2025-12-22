@@ -27,7 +27,6 @@ func (s *SMTPMailerService) Send(ctx context.Context, to string, subject string,
 		return fmt.Errorf("invalid email configuration: missing required fields")
 	}
 
-	// Build the email message
 	headers := fmt.Sprintf(
 		"From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/html; charset=UTF-8\r\n",
 		s.config.Email.From,
@@ -36,7 +35,6 @@ func (s *SMTPMailerService) Send(ctx context.Context, to string, subject string,
 	)
 	message := headers + "\r\n" + body
 
-	// Connect to SMTP server
 	addr := fmt.Sprintf("%s:%d", s.config.Email.SMTPHost, s.config.Email.SMTPPort)
 	auth := smtp.PlainAuth("", s.config.Email.SMTPUser, s.config.Email.SMTPPass, s.config.Email.SMTPHost)
 
@@ -45,8 +43,6 @@ func (s *SMTPMailerService) Send(ctx context.Context, to string, subject string,
 		s.config.Logger.Logger.Error("failed to send email via SMTP", "to", to, "error", err)
 		return fmt.Errorf("failed to send email: %w", err)
 	}
-
-	s.config.Logger.Logger.Info("email sent successfully", "to", to, "subject", subject)
 
 	return nil
 }

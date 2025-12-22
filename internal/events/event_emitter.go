@@ -13,14 +13,14 @@ type EventEmitterImpl struct {
 	config          *models.Config
 	logger          models.Logger
 	eventBus        models.EventBus
-	webhookExecutor *WebhookExecutor
+	webhookExecutor models.WebhookExecutor
 }
 
 func NewEventEmitter(
 	config *models.Config,
 	logger models.Logger,
 	eventBus models.EventBus,
-	webhookExecutor *WebhookExecutor,
+	webhookExecutor models.WebhookExecutor,
 ) models.EventEmitter {
 	return &EventEmitterImpl{
 		config:          config,
