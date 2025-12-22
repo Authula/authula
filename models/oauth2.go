@@ -6,6 +6,7 @@ type OAuth2UserInfo struct {
 	Name     string
 	Picture  string
 	Verified bool
+	Raw      map[string]any
 }
 
 // OAuth2LoginResult contains the information needed for the OAuth2 login flow

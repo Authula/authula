@@ -3,26 +3,27 @@ package events
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 type EventEmitterImpl struct {
-	configManager   models.ConfigManager
+	config          *models.Config
 	logger          models.Logger
 	eventBus        models.EventBus
 	webhookExecutor *WebhookExecutor
 }
 
 func NewEventEmitter(
-	configManager models.ConfigManager,
+	config *models.Config,
 	logger models.Logger,
 	eventBus models.EventBus,
 	webhookExecutor *WebhookExecutor,
 ) models.EventEmitter {
 	return &EventEmitterImpl{
-		configManager:   configManager,
+		config:          config,
 		logger:          logger,
 		eventBus:        eventBus,
 		webhookExecutor: webhookExecutor,
@@ -31,10 +32,7 @@ func NewEventEmitter(
 
 // getConfig returns the current active config from the manager
 func (e *EventEmitterImpl) getConfig() *models.Config {
-	if e.configManager != nil {
-		return e.configManager.GetConfig()
-	}
-	return nil
+	return e.config
 }
 
 func (e *EventEmitterImpl) callEventHook(hook func(models.User) error, user *models.User) {
@@ -120,6 +118,8 @@ func (e *EventEmitterImpl) OnUserSignedUp(user models.User) {
 	if cfg == nil {
 		return
 	}
+	data, _ := json.Marshal(cfg.Webhooks)
+	fmt.Println(string(data))
 	e.callEventHook(cfg.EventHooks.OnUserSignedUp, &user)
 	e.callWebhook(cfg.Webhooks.OnUserSignedUp, models.EventUserSignedUp, &user)
 	e.emitEvent(models.EventUserSignedUp, user)

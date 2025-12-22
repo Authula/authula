@@ -17,6 +17,10 @@ type OAuth2LoginHandler struct {
 
 func (h *OAuth2LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	providerName := util.ExtractProviderName(r.URL.Path)
+	if providerName == "" {
+		util.JSONResponse(w, http.StatusBadRequest, map[string]any{"message": "oauth2 provider is required"})
+		return
+	}
 
 	// Use the usecase to prepare the OAuth2 login flow
 	// This generates the state, PKCE verifier if needed, and the authorization URL

@@ -22,10 +22,10 @@ type DiscordUser struct {
 }
 
 type DiscordProvider struct {
-	config *models.OAuth2Config
+	config *models.OAuth2ProviderConfig
 }
 
-func NewDiscordProvider(config *models.OAuth2Config) *DiscordProvider {
+func NewDiscordProvider(config *models.OAuth2ProviderConfig) *DiscordProvider {
 	if envClientID := os.Getenv("DISCORD_CLIENT_ID"); envClientID != "" {
 		config.ClientID = envClientID
 	}
@@ -98,6 +98,9 @@ func (p *DiscordProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) 
 		return nil, err
 	}
 
+	var raw map[string]any
+	_ = json.Unmarshal(body, &raw)
+
 	// Construct avatar URL
 	avatarURL := ""
 	if discordUser.Avatar != "" {
@@ -110,5 +113,6 @@ func (p *DiscordProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) 
 		Name:     discordUser.Username,
 		Picture:  avatarURL,
 		Verified: discordUser.Verified,
+		Raw:      raw,
 	}, nil
 }

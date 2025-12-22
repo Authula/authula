@@ -148,33 +148,20 @@ type CSRFConfig struct {
 // Social Providers Config
 // =======================
 
-type OAuth2Config struct {
+type OAuth2ProviderConfig struct {
+	Enabled      bool     `json:"enabled" toml:"enabled"`
 	ClientID     string   `json:"client_id" toml:"client_id"`
 	ClientSecret string   `json:"client_secret" toml:"client_secret"`
 	RedirectURL  string   `json:"redirect_url" toml:"redirect_url"`
 	Scopes       []string `json:"scopes" toml:"scopes"`
-}
-
-type DefaultOAuth2ProvidersConfig struct {
-	Google  *OAuth2Config `json:"google" toml:"google"`
-	GitHub  *OAuth2Config `json:"github" toml:"github"`
-	Discord *OAuth2Config `json:"discord" toml:"discord"`
-}
-
-type GenericOAuth2EndpointConfig struct {
+	// For generic providers or overriding defaults
 	AuthURL     string `json:"auth_url" toml:"auth_url"`
 	TokenURL    string `json:"token_url" toml:"token_url"`
 	UserInfoURL string `json:"user_info_url" toml:"user_info_url"`
 }
 
-type GenericOAuth2Config struct {
-	OAuth2Config
-	Endpoint GenericOAuth2EndpointConfig `json:"endpoint" toml:"endpoint"`
-}
-
 type SocialProvidersConfig struct {
-	Default DefaultOAuth2ProvidersConfig   `json:"default" toml:"default"`
-	Generic map[string]GenericOAuth2Config `json:"generic" toml:"generic"`
+	Providers map[string]OAuth2ProviderConfig `json:"providers" toml:"providers"`
 }
 
 // =======================

@@ -22,10 +22,10 @@ type GoogleUser struct {
 }
 
 type GoogleProvider struct {
-	config *models.OAuth2Config
+	config *models.OAuth2ProviderConfig
 }
 
-func NewGoogleProvider(config *models.OAuth2Config) *GoogleProvider {
+func NewGoogleProvider(config *models.OAuth2ProviderConfig) *GoogleProvider {
 	if envClientID := os.Getenv("GOOGLE_CLIENT_ID"); envClientID != "" {
 		config.ClientID = envClientID
 	}
@@ -97,11 +97,15 @@ func (p *GoogleProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 		return nil, err
 	}
 
+	var raw map[string]any
+	_ = json.Unmarshal(body, &raw)
+
 	return &models.OAuth2UserInfo{
 		ID:       googleUser.ID,
 		Email:    googleUser.Email,
 		Name:     googleUser.Name,
 		Picture:  googleUser.Picture,
 		Verified: googleUser.VerifiedEmail,
+		Raw:      raw,
 	}, nil
 }

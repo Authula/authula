@@ -88,36 +88,38 @@ expires_in = "1h"
 # Social Providers Configuration
 # SECURITY NOTE: It is recommended to set the 'client_secret' for each of these via their 
 # respective environment variables as shown in the .env.example file rather than hardcoding it here.
-[social_providers]
-[social_providers.default]
-[social_providers.default.discord]
+[social_providers.providers]
+[social_providers.providers.discord]
+enabled = true
 client_id = "your-discord-client-id"
 client_secret = "your-discord-client-secret"
 redirect_url = "http://localhost:8080/auth/oauth2/discord/callback"
-scopes = []
+scopes = ["email", "identify"]
 
-[social_providers.default.github]
+[social_providers.providers.github]
+enabled = true
 client_id = "your-github-client-id"
 client_secret = "your-github-client-secret"
 redirect_url = "http://localhost:8080/auth/oauth2/github/callback"
-scopes = []
+scopes = ["user:email"]
 
-[social_providers.default.google]
+[social_providers.providers.google]
+enabled = true
 client_id = "your-google-client-id"
 client_secret = "your-google-client-secret"
 redirect_url = "http://localhost:8080/auth/oauth2/google/callback"
-scopes = []
+scopes = ["openid", "email", "profile"]
 
-# Generic OAuth2 providers (example)
-[social_providers.generic.custom_provider]
-client_id = "custom-client-id"
-client_secret = "custom-client-secret"
+# Example of a generic OAuth2 provider
+[social_providers.providers.custom]
+enabled = false
+client_id = "your-custom-client-id"
+client_secret = "your-custom-client-secret"
 redirect_url = "http://localhost:8080/auth/oauth2/custom/callback"
-scopes = ["read"]
-[social_providers.generic.custom_provider.endpoint]
-auth_url = "https://custom-provider.com/oauth/authorize"
-token_url = "https://custom-provider.com/oauth/token"
-user_info_url = "https://custom-provider.com/api/user"
+scopes = ["email", "profile"]
+auth_url = "https://example.com/oauth/authorize"
+token_url = "https://example.com/oauth/token"
+user_info_url = "https://example.com/oauth/userinfo"
 
 # Trusted Origins Configuration
 [trusted_origins]

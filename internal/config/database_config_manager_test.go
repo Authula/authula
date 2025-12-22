@@ -90,25 +90,21 @@ func TestAuthSettings_TableName(t *testing.T) {
 func TestConfigJSON_NestedStructures(t *testing.T) {
 	testConfig := &models.Config{
 		SocialProviders: models.SocialProvidersConfig{
-			Default: models.DefaultOAuth2ProvidersConfig{
-				Google: &models.OAuth2Config{
+			Providers: map[string]models.OAuth2ProviderConfig{
+				"google": {
+					Enabled:      true,
 					ClientID:     "google-id",
 					ClientSecret: "google-secret",
 					RedirectURL:  "http://localhost:8080/auth/callback/google",
 					Scopes:       []string{"email", "profile"},
 				},
-			},
-			Generic: map[string]models.GenericOAuth2Config{
 				"custom": {
-					OAuth2Config: models.OAuth2Config{
-						ClientID:     "custom-id",
-						ClientSecret: "custom-secret",
-					},
-					Endpoint: models.GenericOAuth2EndpointConfig{
-						AuthURL:     "https://custom.com/oauth/authorize",
-						TokenURL:    "https://custom.com/oauth/token",
-						UserInfoURL: "https://custom.com/oauth/userinfo",
-					},
+					Enabled:      true,
+					ClientID:     "custom-id",
+					ClientSecret: "custom-secret",
+					AuthURL:      "https://custom.com/oauth/authorize",
+					TokenURL:     "https://custom.com/oauth/token",
+					UserInfoURL:  "https://custom.com/oauth/userinfo",
 				},
 			},
 		},
@@ -127,22 +123,23 @@ func TestConfigJSON_NestedStructures(t *testing.T) {
 	}
 
 	// Verify Google OAuth config
-	if unmarshaledConfig.SocialProviders.Default.Google == nil {
+	googleCfg, ok := unmarshaledConfig.SocialProviders.Providers["google"]
+	if !ok {
 		t.Fatal("Google OAuth config not preserved")
 	}
-	if unmarshaledConfig.SocialProviders.Default.Google.ClientID != "google-id" {
+	if googleCfg.ClientID != "google-id" {
 		t.Errorf("Google ClientID not preserved")
 	}
 
 	// Verify Generic OAuth config
-	if customCfg, ok := unmarshaledConfig.SocialProviders.Generic["custom"]; !ok {
+	if customCfg, ok := unmarshaledConfig.SocialProviders.Providers["custom"]; !ok {
 		t.Fatal("Custom OAuth config not preserved")
 	} else {
 		if customCfg.ClientID != "custom-id" {
 			t.Errorf("Custom ClientID not preserved")
 		}
-		if customCfg.Endpoint.AuthURL != "https://custom.com/oauth/authorize" {
-			t.Errorf("Custom Endpoint.AuthURL not preserved")
+		if customCfg.AuthURL != "https://custom.com/oauth/authorize" {
+			t.Errorf("Custom AuthURL not preserved")
 		}
 	}
 }

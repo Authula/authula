@@ -28,10 +28,10 @@ type GitHubEmailInfo struct {
 }
 
 type GitHubProvider struct {
-	config *models.OAuth2Config
+	config *models.OAuth2ProviderConfig
 }
 
-func NewGitHubProvider(config *models.OAuth2Config) *GitHubProvider {
+func NewGitHubProvider(config *models.OAuth2ProviderConfig) *GitHubProvider {
 	if envClientID := os.Getenv("GITHUB_CLIENT_ID"); envClientID != "" {
 		config.ClientID = envClientID
 	}
@@ -93,6 +93,9 @@ func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 		return nil, err
 	}
 
+	var raw map[string]any
+	_ = json.Unmarshal(body, &raw)
+
 	// GitHub email might be private, need to fetch it separately if empty
 	email := githubUser.Email
 	verified := false
@@ -128,5 +131,6 @@ func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 		Name:     name,
 		Picture:  githubUser.AvatarURL,
 		Verified: verified,
+		Raw:      raw,
 	}, nil
 }

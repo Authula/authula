@@ -269,18 +269,9 @@ func InitServices(config *models.Config, configManager models.ConfigManager, eve
 	rateLimitService := services.NewRateLimitServiceImpl(config, config.Logger.Logger, pluginRateLimits)
 	mailerService := services.NewMailerServiceImpl(config)
 	webhookExecutor := internalevents.NewWebhookExecutor(config.Logger.Logger)
-	eventEmitter := internalevents.NewEventEmitter(configManager, config.Logger.Logger, eventBus, webhookExecutor)
+	eventEmitter := internalevents.NewEventEmitter(config, config.Logger.Logger, eventBus, webhookExecutor)
 
 	oauth2ProviderRegistry := providers.NewOAuth2ProviderRegistry()
-	if config.SocialProviders.Default.Discord != nil {
-		oauth2ProviderRegistry.Register(providers.NewDiscordProvider(config.SocialProviders.Default.Discord))
-	}
-	if config.SocialProviders.Default.GitHub != nil {
-		oauth2ProviderRegistry.Register(providers.NewGitHubProvider(config.SocialProviders.Default.GitHub))
-	}
-	if config.SocialProviders.Default.Google != nil {
-		oauth2ProviderRegistry.Register(providers.NewGoogleProvider(config.SocialProviders.Default.Google))
-	}
 
 	authService := internalauth.NewService(
 		config,
@@ -297,6 +288,9 @@ func InitServices(config *models.Config, configManager models.ConfigManager, eve
 		mailerService,
 		oauth2ProviderRegistry,
 	)
+
+	// Initialize providers from config
+	authService.RefreshOAuth2Providers()
 
 	return authService
 }

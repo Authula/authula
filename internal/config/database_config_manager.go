@@ -97,7 +97,7 @@ func (cm *DatabaseConfigManager) Load() error {
 
 	util.PreserveNonSerializableFieldsOnConfig(&newCfg, current)
 
-	cm.activeConfig.Store(&newCfg)
+	*current = newCfg
 
 	return nil
 }
@@ -133,7 +133,7 @@ func (cm *DatabaseConfigManager) Update(key string, value any) error {
 		return fmt.Errorf("failed to update config in database: %w", err)
 	}
 
-	cm.activeConfig.Store(updatedConfig)
+	*current = *updatedConfig
 	slog.Info("Configuration updated", "key", key, "value", value)
 	return nil
 }
