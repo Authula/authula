@@ -1,7 +1,6 @@
 package events
 
 import (
-	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -29,7 +28,7 @@ func TestExecuteWebhook_NilWebhook(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	executor := NewWebhookExecutor(logger)
 
-	err := executor.ExecuteWebhook(context.Background(), nil, map[string]string{"test": "data"})
+	err := executor.ExecuteWebhook(nil, map[string]string{"test": "data"})
 	assert.NoError(t, err)
 }
 
@@ -38,7 +37,7 @@ func TestExecuteWebhook_EmptyURL(t *testing.T) {
 	executor := NewWebhookExecutor(logger)
 
 	webhook := &models.WebhookConfig{URL: ""}
-	err := executor.ExecuteWebhook(context.Background(), webhook, map[string]string{"test": "data"})
+	err := executor.ExecuteWebhook(webhook, map[string]string{"test": "data"})
 	assert.NoError(t, err)
 }
 
@@ -69,7 +68,7 @@ func TestExecuteWebhook_Success(t *testing.T) {
 		TimeoutSeconds: 5,
 	}
 
-	err := executor.ExecuteWebhook(context.Background(), webhook, map[string]string{"test": "data"})
+	err := executor.ExecuteWebhook(webhook, map[string]string{"test": "data"})
 	assert.NoError(t, err)
 }
 
@@ -83,7 +82,7 @@ func TestExecuteWebhook_NonSuccessStatus(t *testing.T) {
 	executor := NewWebhookExecutor(logger)
 
 	webhook := &models.WebhookConfig{URL: server.URL}
-	err := executor.ExecuteWebhook(context.Background(), webhook, map[string]string{"test": "data"})
+	err := executor.ExecuteWebhook(webhook, map[string]string{"test": "data"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "status code 400")
 }
@@ -103,6 +102,6 @@ func TestExecuteWebhook_Timeout(t *testing.T) {
 		TimeoutSeconds: 1,
 	}
 
-	err := executor.ExecuteWebhook(context.Background(), webhook, map[string]string{"test": "data"})
+	err := executor.ExecuteWebhook(webhook, map[string]string{"test": "data"})
 	assert.Error(t, err)
 }

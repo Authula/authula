@@ -71,5 +71,5 @@ type EventBus interface {
 
 // WebhookExecutor defines the interface for executing webhooks
 type WebhookExecutor interface {
-	ExecuteWebhook(ctx context.Context, webhook *WebhookConfig, payload any) error
+	ExecuteWebhook(webhook *WebhookConfig, payload any) error
 }

@@ -108,6 +108,8 @@ func New(baseConfig *models.Config) *Auth {
 	pluginRegistry := InitPluginRegistry(activeConfig, api, eventBus, apiMiddleware)
 	auth.pluginRegistry = pluginRegistry
 
+	RunPluginMigrations(pluginRegistry)
+
 	if configManager != nil {
 		go auth.watchForConfigChanges()
 	}
@@ -150,11 +152,16 @@ func (auth *Auth) watchForConfigChanges() {
 // MIGRATIONS
 // ---------------------------------
 
+// RunMigrations is a helper function to run all necessary database migrations for core and plugins manually.
+// This is already ran automatically during Auth initialization, so this function is only needed if you want to
+// run migrations manually for some reason.
 func (auth *Auth) RunMigrations() {
 	RunCoreMigrations(auth.Config.DB)
 	RunPluginMigrations(auth.pluginRegistry)
 }
 
+// DropMigrations is a helper function to drop all database tables related to core and plugins.
+// Use with caution as this will delete all data in those tables.
 func (auth *Auth) DropMigrations() {
 	models := []any{
 		// Auth

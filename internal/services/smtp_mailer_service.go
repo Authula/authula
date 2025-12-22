@@ -8,17 +8,17 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
-type MailerServiceImpl struct {
+type SMTPMailerService struct {
 	config *models.Config
 }
 
-func NewMailerServiceImpl(config *models.Config) *MailerServiceImpl {
-	return &MailerServiceImpl{
+func NewSMTPMailerService(config *models.Config) *SMTPMailerService {
+	return &SMTPMailerService{
 		config: config,
 	}
 }
 
-func (s *MailerServiceImpl) Send(ctx context.Context, to string, subject string, body string, htmlBody string) error {
+func (s *SMTPMailerService) Send(ctx context.Context, to string, subject string, body string, htmlBody string) error {
 	if s.config.Email.Provider != "smtp" {
 		return fmt.Errorf("unsupported email provider: %s", s.config.Email.Provider)
 	}

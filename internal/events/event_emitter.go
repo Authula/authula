@@ -35,7 +35,7 @@ func (e *EventEmitterImpl) getConfig() *models.Config {
 	return e.config
 }
 
-func (e *EventEmitterImpl) callEventHook(hook func(models.User) error, user *models.User) {
+func (e *EventEmitterImpl) callEventHook(hook func(models.User), user *models.User) {
 	if user == nil {
 		return
 	}
@@ -49,22 +49,15 @@ func (e *EventEmitterImpl) callWebhook(webhook *models.WebhookConfig, eventType 
 	// Execute webhook if configured
 	if webhook != nil && webhook.URL != "" {
 		go func() {
-			timeoutSeconds := 30
-			if webhook.TimeoutSeconds != 0 {
-				timeoutSeconds = webhook.TimeoutSeconds
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
-			defer cancel()
-
 			payload := map[string]any{
 				"eventType": eventType,
 				"user":      user,
 				"timestamp": time.Now().UTC(),
 			}
 
-			if err := e.webhookExecutor.ExecuteWebhook(ctx, webhook, payload); err != nil {
-				e.logger.Error("failed to execute event webhook",
+			if err := e.webhookExecutor.ExecuteWebhook(webhook, payload); err != nil {
+				e.logger.Error(
+					"failed to execute event webhook",
 					"event_type", eventType,
 					"error", err,
 				)

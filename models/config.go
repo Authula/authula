@@ -219,7 +219,7 @@ type EndpointHookContext struct {
 type EndpointHooksConfig struct {
 	Before   func(ctx *EndpointHookContext) error
 	Response func(ctx *EndpointHookContext) error
-	After    func(ctx *EndpointHookContext) error
+	After    func(ctx *EndpointHookContext)
 }
 
 // =======================
@@ -262,11 +262,11 @@ type DatabaseHooksConfig struct {
 // =======================
 
 type EventHooksConfig struct {
-	OnUserSignedUp    func(user User) error
-	OnUserLoggedIn    func(user User) error
-	OnEmailVerified   func(user User) error
-	OnPasswordChanged func(user User) error
-	OnEmailChanged    func(user User) error
+	OnUserSignedUp    func(user User)
+	OnUserLoggedIn    func(user User)
+	OnEmailVerified   func(user User)
+	OnPasswordChanged func(user User)
+	OnEmailChanged    func(user User)
 }
 
 // =======================
@@ -276,7 +276,7 @@ type EventHooksConfig struct {
 type WebhookConfig struct {
 	URL            string            `json:"url" toml:"url"`
 	Headers        map[string]string `json:"headers" toml:"headers"`
-	TimeoutSeconds int               `json:"timeout_seconds" toml:"timeout_seconds"`
+	TimeoutSeconds time.Duration     `json:"timeout_seconds" toml:"timeout_seconds"`
 }
 
 type WebhooksConfig struct {

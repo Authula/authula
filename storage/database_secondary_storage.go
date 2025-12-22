@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -54,7 +55,7 @@ func (storage *DatabaseSecondaryStorage) StartCleanup() {
 }
 
 // Get retrieves a value from the database by key.
-// Returns an error if the key does not exist or has expired.
+// Returns nil if the key does not exist or has expired.
 func (storage *DatabaseSecondaryStorage) Get(ctx context.Context, key string) (any, error) {
 	select {
 	case <-ctx.Done():
@@ -65,15 +66,15 @@ func (storage *DatabaseSecondaryStorage) Get(ctx context.Context, key string) (a
 	var entry models.KeyValueStore
 	result := storage.db.WithContext(ctx).Where("key = ?", key).First(&entry)
 
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
 	if result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
-			return nil, fmt.Errorf("key not found: %s", key)
-		}
 		return nil, fmt.Errorf("database error: %w", result.Error)
 	}
 
 	if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
-		return nil, fmt.Errorf("key expired: %s", key)
+		return nil, nil
 	}
 
 	return entry.Value, nil
@@ -113,7 +114,7 @@ func (storage *DatabaseSecondaryStorage) Set(ctx context.Context, key string, va
 }
 
 // Delete removes a key from the database.
-// Returns an error if the key does not exist.
+// It is idempotent: deleting a non-existent key does not return an error.
 func (storage *DatabaseSecondaryStorage) Delete(ctx context.Context, key string) error {
 	select {
 	case <-ctx.Done():
@@ -122,15 +123,11 @@ func (storage *DatabaseSecondaryStorage) Delete(ctx context.Context, key string)
 	}
 
 	result := storage.db.WithContext(ctx).Where("key = ?", key).Delete(&models.KeyValueStore{})
-
 	if result.Error != nil {
 		return fmt.Errorf("database error: %w", result.Error)
 	}
 
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("key not found: %s", key)
-	}
-
+	// Idempotent: do not return error if key does not exist
 	return nil
 }
 

@@ -200,9 +200,7 @@ func EndpointHooksMiddleware(config *models.Config, authService *auth.Service) f
 
 			// After hook
 			if config.EndpointHooks.After != nil {
-				if err := config.EndpointHooks.After(hookCtx); err != nil {
-					slog.Error("Error in After Hook", "path", hookCtx.Path, "error", err)
-				}
+				config.EndpointHooks.After(hookCtx)
 			}
 		})
 	}

@@ -1,4 +1,4 @@
-package providers
+package oauth2providers
 
 import (
 	"fmt"

@@ -29,15 +29,6 @@ max_open_conns = 25
 max_idle_conns = 25
 conn_max_lifetime = "1m"
 
-# Email Configuration
-[email]
-provider = "smtp"
-smtp_host = "localhost"
-smtp_port = 2525
-smtp_user = "user"
-smtp_pass = "pass"
-from = "noreply@example.com"
-
 # Secondary Storage Configuration
 [secondary_storage]
 type = "memory"  # or "database" or "custom"
@@ -49,6 +40,15 @@ cleanup_interval = "1m"
 # Database options (if type = "database")
 [secondary_storage.database_options]
 cleanup_interval = "1m"
+
+# Email Configuration
+[email]
+provider = "smtp"
+smtp_host = "localhost"
+smtp_port = 2525
+smtp_user = "user"
+smtp_pass = "pass"
+from = "noreply@example.com"
 
 # Email/Password Authentication Configuration
 [email_password]

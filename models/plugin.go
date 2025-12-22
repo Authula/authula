@@ -59,14 +59,17 @@ type Plugin interface {
 	RateLimit() *PluginRateLimit
 	SetRateLimit(rateLimit *PluginRateLimit)
 
+	EndpointHooks() any
+	SetEndpointHooks(hooks any)
+
 	DatabaseHooks() any
 	SetDatabaseHooks(hooks any)
 
 	EventHooks() any
 	SetEventHooks(hooks any)
 
-	EndpointHooks() any
-	SetEndpointHooks(hooks any)
+	Webhooks() any
+	SetWebhooks(hooks any)
 
 	Close() error
 	SetClose(fn func() error)
@@ -82,9 +85,10 @@ type BasePlugin struct {
 	migrations    []any // Database migration structs (GORM models)
 	routes        []PluginRoute
 	rateLimit     *PluginRateLimit
+	endpointHooks any
 	databaseHooks any
 	eventHooks    any
-	endpointHooks any
+	webhooks      any
 	close         func() error
 }
 
@@ -147,6 +151,14 @@ func (p *BasePlugin) SetRateLimit(rateLimit *PluginRateLimit) {
 	p.rateLimit = rateLimit
 }
 
+func (p *BasePlugin) EndpointHooks() any {
+	return p.endpointHooks
+}
+
+func (p *BasePlugin) SetEndpointHooks(hooks any) {
+	p.endpointHooks = hooks
+}
+
 func (p *BasePlugin) DatabaseHooks() any {
 	return p.databaseHooks
 }
@@ -163,12 +175,12 @@ func (p *BasePlugin) SetEventHooks(hooks any) {
 	p.eventHooks = hooks
 }
 
-func (p *BasePlugin) EndpointHooks() any {
-	return p.endpointHooks
+func (p *BasePlugin) Webhooks() any {
+	return p.webhooks
 }
 
-func (p *BasePlugin) SetEndpointHooks(hooks any) {
-	p.endpointHooks = hooks
+func (p *BasePlugin) SetWebhooks(hooks any) {
+	p.webhooks = hooks
 }
 
 func (p *BasePlugin) Close() error {

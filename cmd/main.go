@@ -100,7 +100,6 @@ func runServer(port string, restartChan chan struct{}, shutdownChan chan os.Sign
 	)
 
 	auth := gobetterauth.New(authConfig)
-	auth.RunMigrations()
 
 	// Set the restart handler - called when config changes require restart
 	var mu sync.Mutex

@@ -20,7 +20,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/internal/services"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/providers"
+	oauth2providers "github.com/GoBetterAuth/go-better-auth/oauth2-providers"
 	"github.com/GoBetterAuth/go-better-auth/storage"
 )
 
@@ -267,10 +267,10 @@ func InitServices(config *models.Config, configManager models.ConfigManager, eve
 	passwordService := services.NewArgon2PasswordService()
 	tokenService := services.NewTokenServiceImpl(config)
 	rateLimitService := services.NewRateLimitServiceImpl(config, config.Logger.Logger, pluginRateLimits)
-	mailerService := services.NewMailerServiceImpl(config)
+	mailerService := services.NewSMTPMailerService(config)
 	webhookExecutor := internalevents.NewWebhookExecutor(config.Logger.Logger)
 	eventEmitter := internalevents.NewEventEmitter(config, config.Logger.Logger, eventBus, webhookExecutor)
-	oauth2ProviderRegistry := providers.NewOAuth2ProviderRegistry(config)
+	oauth2ProviderRegistry := oauth2providers.NewOAuth2ProviderRegistry(config)
 
 	authService := internalauth.NewService(
 		config,

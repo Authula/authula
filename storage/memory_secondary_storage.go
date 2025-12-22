@@ -47,7 +47,7 @@ func NewMemorySecondaryStorage(config models.SecondaryStorageMemoryOptions) *Mem
 }
 
 // Get retrieves a value from memory by key.
-// Returns an error if the key does not exist or has expired.
+// Returns nil if the key does not exist or has expired.
 func (storage *MemorySecondaryStorage) Get(ctx context.Context, key string) (any, error) {
 	select {
 	case <-ctx.Done():
@@ -60,12 +60,11 @@ func (storage *MemorySecondaryStorage) Get(ctx context.Context, key string) (any
 
 	entry, exists := storage.store[key]
 	if !exists {
-		return nil, fmt.Errorf("key not found: %s", key)
+		return nil, nil
 	}
-	fmt.Printf("Key: %s\n", key)
 
 	if entry.expiresAt != nil && time.Now().After(*entry.expiresAt) {
-		return nil, fmt.Errorf("key expired: %s", key)
+		return nil, nil
 	}
 
 	return entry.value, nil
@@ -103,7 +102,7 @@ func (storage *MemorySecondaryStorage) Set(ctx context.Context, key string, valu
 }
 
 // Delete removes a key from storage.
-// Returns an error if the key does not exist.
+// This operation is idempotent: no error is returned if the key does not exist.
 func (storage *MemorySecondaryStorage) Delete(ctx context.Context, key string) error {
 	select {
 	case <-ctx.Done():
@@ -113,10 +112,6 @@ func (storage *MemorySecondaryStorage) Delete(ctx context.Context, key string) e
 
 	storage.mu.Lock()
 	defer storage.mu.Unlock()
-
-	if _, exists := storage.store[key]; !exists {
-		return fmt.Errorf("key not found: %s", key)
-	}
 
 	delete(storage.store, key)
 

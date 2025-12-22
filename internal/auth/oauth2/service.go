@@ -8,7 +8,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/internal/constants"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/providers"
+	oauth2providers "github.com/GoBetterAuth/go-better-auth/oauth2-providers"
 	"golang.org/x/oauth2"
 )
 
@@ -19,7 +19,7 @@ type service struct {
 	accountService         models.AccountService
 	sessionService         models.SessionService
 	tokenService           models.TokenService
-	oauth2ProviderRegistry *providers.OAuth2ProviderRegistry
+	oauth2ProviderRegistry *oauth2providers.OAuth2ProviderRegistry
 }
 
 func New(
@@ -29,7 +29,7 @@ func New(
 	accountService models.AccountService,
 	sessionService models.SessionService,
 	tokenService models.TokenService,
-	oauth2ProviderRegistry *providers.OAuth2ProviderRegistry,
+	oauth2ProviderRegistry *oauth2providers.OAuth2ProviderRegistry,
 ) *service {
 	return &service{
 		config:                 config,

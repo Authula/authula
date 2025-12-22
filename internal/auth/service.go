@@ -2,7 +2,7 @@ package auth
 
 import (
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/providers"
+	oauth2providers "github.com/GoBetterAuth/go-better-auth/oauth2-providers"
 )
 
 // Service encapsulates all services
@@ -19,7 +19,7 @@ type Service struct {
 	TokenService           models.TokenService
 	RateLimitService       models.RateLimitService
 	MailerService          models.MailerService
-	OAuth2ProviderRegistry *providers.OAuth2ProviderRegistry
+	OAuth2ProviderRegistry *oauth2providers.OAuth2ProviderRegistry
 }
 
 // NewService creates a new Auth service with all dependencies
@@ -36,7 +36,7 @@ func NewService(
 	tokenService models.TokenService,
 	rateLimitService models.RateLimitService,
 	mailerService models.MailerService,
-	oauth2ProviderRegistry *providers.OAuth2ProviderRegistry,
+	oauth2ProviderRegistry *oauth2providers.OAuth2ProviderRegistry,
 ) *Service {
 	return &Service{
 		config:                 config,
