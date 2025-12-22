@@ -270,8 +270,7 @@ func InitServices(config *models.Config, configManager models.ConfigManager, eve
 	mailerService := services.NewMailerServiceImpl(config)
 	webhookExecutor := internalevents.NewWebhookExecutor(config.Logger.Logger)
 	eventEmitter := internalevents.NewEventEmitter(config, config.Logger.Logger, eventBus, webhookExecutor)
-
-	oauth2ProviderRegistry := providers.NewOAuth2ProviderRegistry()
+	oauth2ProviderRegistry := providers.NewOAuth2ProviderRegistry(config)
 
 	authService := internalauth.NewService(
 		config,
@@ -289,8 +288,7 @@ func InitServices(config *models.Config, configManager models.ConfigManager, eve
 		oauth2ProviderRegistry,
 	)
 
-	// Initialize providers from config
-	authService.RefreshOAuth2Providers()
+	oauth2ProviderRegistry.RefreshOAuth2Providers()
 
 	return authService
 }

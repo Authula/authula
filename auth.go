@@ -2,7 +2,6 @@ package gobetterauth
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -132,11 +131,6 @@ func (auth *Auth) watchForConfigChanges() {
 			util.PreserveNonSerializableFieldsOnConfig(auth.Config, updatedConfig)
 			*auth.Config = *updatedConfig
 			auth.Config.Logger.Logger.Debug("Configuration updated via watcher")
-			data, _ := json.Marshal(auth.Config.Webhooks)
-			fmt.Println(string(data))
-
-			// Refresh OAuth2 providers in case they changed
-			auth.Service.RefreshOAuth2Providers()
 
 			if restartRequired {
 				auth.Config.Logger.Logger.Info("Configuration change requires server restart")

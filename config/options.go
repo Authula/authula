@@ -13,6 +13,7 @@ import (
 func NewConfig(options ...models.ConfigOption) *models.Config {
 	// Define sensible defaults first
 	config := &models.Config{
+		// Default to library mode
 		Mode:     models.ModeLibrary,
 		AppName:  "GoBetterAuth",
 		BasePath: "/auth",

@@ -310,7 +310,7 @@ type PluginsConfig struct {
 
 // Config holds all configurable options for the GoBetterAuth library.
 type Config struct {
-	Mode              Mode                    `json:"mode" toml:"mode"`
+	Mode              Mode                    `json:"-" toml:"-"`
 	AppName           string                  `json:"app_name" toml:"app_name"`
 	BaseURL           string                  `json:"base_url" toml:"base_url"`
 	BasePath          string                  `json:"base_path" toml:"base_path"`

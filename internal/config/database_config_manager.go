@@ -134,7 +134,7 @@ func (cm *DatabaseConfigManager) Update(key string, value any) error {
 	}
 
 	*current = *updatedConfig
-	slog.Info("Configuration updated", "key", key, "value", value)
+
 	return nil
 }
 

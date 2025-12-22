@@ -73,11 +73,6 @@ func runServer(port string, restartChan chan struct{}, shutdownChan chan os.Sign
 	// Apply environment variable overrides and defaults
 	applyConfigDefaults(&tomlConfig)
 
-	// Library mode is not supported in standalone executable
-	if tomlConfig.Mode == models.ModeLibrary {
-		panic("Library mode is not supported in standalone executable")
-	}
-
 	// Build config using functional options pattern to ensure all fields are set
 	authConfig := config.NewConfig(
 		config.WithMode(models.ModeStandalone),

@@ -7,8 +7,8 @@ import (
 )
 
 // NewConfigManager creates a config manager based on the runtime mode and settings.
-// - Library mode: no config manager needed (embedded in another app)
-// - Database mode: uses database-backed configuration
+// - Library mode: no config manager needed (embedded in API)
+// - Standalone mode: uses database-backed configuration
 func NewConfigManager(config *models.Config) models.ConfigManager {
 	// Library mode doesn't use a config manager
 	if config.Mode == models.ModeLibrary {

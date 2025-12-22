@@ -54,30 +54,3 @@ func NewService(
 		OAuth2ProviderRegistry: oauth2ProviderRegistry,
 	}
 }
-
-func (s *Service) RefreshOAuth2Providers() {
-	s.OAuth2ProviderRegistry.Clear()
-	for name, providerConfig := range s.config.SocialProviders.Providers {
-		if !providerConfig.Enabled {
-			continue
-		}
-
-		var provider providers.OAuth2Provider
-		switch name {
-		case "google":
-			provider = providers.NewGoogleProvider(&providerConfig)
-		case "github":
-			provider = providers.NewGitHubProvider(&providerConfig)
-		case "discord":
-			provider = providers.NewDiscordProvider(&providerConfig)
-		default:
-			if providerConfig.AuthURL != "" && providerConfig.TokenURL != "" {
-				provider = providers.NewGenericProvider(name, &providerConfig)
-			}
-		}
-
-		if provider != nil {
-			s.OAuth2ProviderRegistry.Register(provider)
-		}
-	}
-}
