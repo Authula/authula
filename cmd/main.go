@@ -7,12 +7,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 
 	gobetterauth "github.com/GoBetterAuth/go-better-auth"
 	gobetterauthconfig "github.com/GoBetterAuth/go-better-auth/config"
@@ -20,20 +21,48 @@ import (
 )
 
 func getEnv(key, fallback string) string {
+	// First check viper (includes .env file values)
+	if value := viper.GetString(key); value != "" {
+		return value
+	}
+	// Fall back to direct OS env lookup
 	if value, ok := os.LookupEnv(key); ok {
 		return value
 	}
 	return fallback
 }
 
+// initViper initializes viper for configuration management
+func initViper() error {
+	// Set up viper for .env file loading
+	viper.SetConfigName(".env")
+	viper.SetConfigType("env")
+	viper.AddConfigPath(".")
+
+	// Enable automatic environment variable binding
+	// This allows GO_BETTER_AUTH_SECRET to be read as go_better_auth_secret
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// Try to read .env file, but don't fail if it doesn't exist in production
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			// .env file not found - this is okay in production
+			return nil
+		}
+		// Config file was found but another error occurred
+		return err
+	}
+	return nil
+}
+
 // Run GoBetterAuth in standalone mode
 func main() {
-	err := godotenv.Load()
+	err := initViper()
 	if err != nil {
 		env := os.Getenv("GO_ENV")
 		if env != "production" {
-			// Production-specific logic
-			log.Fatal("No .env file found", "error", err)
+			log.Fatal("Failed to initialize configuration", "error", err)
 			return
 		}
 	}
@@ -192,11 +221,11 @@ func loadConfigFromFile() gobetterauthmodels.Config {
 
 // applyConfigDefaults applies environment variable overrides and sensible defaults
 func applyConfigDefaults(config *gobetterauthmodels.Config) {
-	// Override other critical settings from environment variables
-	if baseURL := os.Getenv("GO_BETTER_AUTH_BASE_URL"); baseURL != "" {
+	// Override other critical settings from environment variables (via viper)
+	if baseURL := viper.GetString("GO_BETTER_AUTH_BASE_URL"); baseURL != "" {
 		config.BaseURL = baseURL
 	}
-	if secret := os.Getenv("GO_BETTER_AUTH_SECRET"); secret != "" {
+	if secret := viper.GetString("GO_BETTER_AUTH_SECRET"); secret != "" {
 		config.Secret = secret
 	}
 }
