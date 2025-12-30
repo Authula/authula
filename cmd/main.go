@@ -39,10 +39,11 @@ func initViper() error {
 	viper.SetConfigType("env")
 	viper.AddConfigPath(".")
 
-	// Enable automatic environment variable binding
-	// This allows GO_BETTER_AUTH_SECRET to be read as go_better_auth_secret
+	// Enable automatic environment variable binding with GBA_ prefix
+	// ENV vars use format: GBA_DATABASE__PROVIDER, GBA_SOCIAL_PROVIDERS__PROVIDERS__GITHUB__CLIENT_SECRET
+	viper.SetEnvPrefix("GBA")
 	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "__"))
 
 	// Try to read .env file, but don't fail if it doesn't exist in production
 	if err := viper.ReadInConfig(); err != nil {
@@ -221,11 +222,12 @@ func loadConfigFromFile() gobetterauthmodels.Config {
 
 // applyConfigDefaults applies environment variable overrides and sensible defaults
 func applyConfigDefaults(config *gobetterauthmodels.Config) {
-	// Override other critical settings from environment variables (via viper)
-	if baseURL := viper.GetString("GO_BETTER_AUTH_BASE_URL"); baseURL != "" {
+	// Override critical settings from environment variables (via viper with GBA_ prefix)
+	// e.g., GBA_BASE_URL, GBA_SECRET
+	if baseURL := viper.GetString("base_url"); baseURL != "" {
 		config.BaseURL = baseURL
 	}
-	if secret := viper.GetString("GO_BETTER_AUTH_SECRET"); secret != "" {
+	if secret := viper.GetString("secret"); secret != "" {
 		config.Secret = secret
 	}
 }
