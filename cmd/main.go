@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,11 +10,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/BurntSushi/toml"
+	mapstructure "github.com/go-viper/mapstructure/v2"
 	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 
 	gobetterauth "github.com/GoBetterAuth/go-better-auth"
 	gobetterauthconfig "github.com/GoBetterAuth/go-better-auth/config"
+	gobetterauthenv "github.com/GoBetterAuth/go-better-auth/env"
 	gobetterauthmodels "github.com/GoBetterAuth/go-better-auth/models"
 )
 
@@ -28,25 +29,10 @@ func getEnv(key, fallback string) string {
 
 // Run GoBetterAuth in standalone mode
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		env := os.Getenv("GO_ENV")
-		if env != "production" {
-			// Production-specific logic
-			log.Fatal("No .env file found", "error", err)
-			return
-		}
-	}
-
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
 	slog.SetDefault(logger)
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
 
 	// Channel to signal restart
 	restartChan := make(chan struct{})
@@ -56,50 +42,75 @@ func main() {
 
 	// Server loop with restart capability
 	for {
-		if err := runServer(port, restartChan, shutdownChan); err != nil {
+		if err := runServer(logger, restartChan, shutdownChan); err != nil {
 			slog.Error("Server error", "error", err)
 			os.Exit(1)
 		}
 	}
 }
 
-// runServer starts the HTTP server and handles restarts
-func runServer(port string, restartChan chan struct{}, shutdownChan chan os.Signal) error {
-	logger := slog.Default()
+// loadConfig loads configuration with proper precedence:
+func loadConfig() (*gobetterauthmodels.Config, error) {
+	_ = godotenv.Load(".env")
 
-	// Load configuration from TOML file if available
-	tomlConfig := loadConfigFromFile()
+	v := viper.New()
+	configPath := getEnv(gobetterauthenv.ConfigPath, "config.toml")
+	v.SetConfigFile(configPath)
+	v.SetConfigType("toml")
+	if err := v.ReadInConfig(); err != nil {
+		slog.Debug("No config.toml found, continuing", "path", configPath)
+	}
 
-	// Apply environment variable overrides and defaults
-	applyConfigDefaults(&tomlConfig)
+	var loadedConfig gobetterauthmodels.Config
+	if err := v.Unmarshal(&loadedConfig, func(c *mapstructure.DecoderConfig) {
+		c.TagName = "toml"
+		c.DecodeHook = mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToTimeDurationHookFunc(),
+			mapstructure.StringToSliceHookFunc(","),
+		)
+	}); err != nil {
+		return &loadedConfig, err
+	}
 
-	// Build config using functional options pattern to ensure all fields are set
 	authConfig := gobetterauthconfig.NewConfig(
 		gobetterauthconfig.WithMode(gobetterauthmodels.ModeStandalone),
-		gobetterauthconfig.WithAppName(tomlConfig.AppName),
-		gobetterauthconfig.WithBaseURL(tomlConfig.BaseURL),
-		gobetterauthconfig.WithBasePath(tomlConfig.BasePath),
-		gobetterauthconfig.WithSecret(tomlConfig.Secret),
-		gobetterauthconfig.WithLogger(tomlConfig.Logger),
-		gobetterauthconfig.WithDatabase(tomlConfig.Database),
-		gobetterauthconfig.WithEmailConfig(tomlConfig.Email),
-		gobetterauthconfig.WithSecondaryStorage(tomlConfig.SecondaryStorage),
-		gobetterauthconfig.WithEmailPassword(tomlConfig.EmailPassword),
-		gobetterauthconfig.WithEmailVerification(tomlConfig.EmailVerification),
-		gobetterauthconfig.WithUser(tomlConfig.User),
-		gobetterauthconfig.WithSession(tomlConfig.Session),
-		gobetterauthconfig.WithCSRF(tomlConfig.CSRF),
-		gobetterauthconfig.WithSocialProviders(tomlConfig.SocialProviders),
-		gobetterauthconfig.WithTrustedOrigins(tomlConfig.TrustedOrigins),
-		gobetterauthconfig.WithRateLimit(tomlConfig.RateLimit),
-		gobetterauthconfig.WithEventBus(tomlConfig.EventBus),
-		gobetterauthconfig.WithEndpointHooks(tomlConfig.EndpointHooks),
-		gobetterauthconfig.WithDatabaseHooks(tomlConfig.DatabaseHooks),
-		gobetterauthconfig.WithEventHooks(tomlConfig.EventHooks),
-		gobetterauthconfig.WithWebhooks(tomlConfig.Webhooks),
+		gobetterauthconfig.WithAppName(loadedConfig.AppName),
+		gobetterauthconfig.WithBaseURL(loadedConfig.BaseURL),
+		gobetterauthconfig.WithBasePath(loadedConfig.BasePath),
+		gobetterauthconfig.WithSecret(loadedConfig.Secret),
+		gobetterauthconfig.WithLogger(loadedConfig.Logger),
+		gobetterauthconfig.WithDatabase(loadedConfig.Database),
+		gobetterauthconfig.WithEmailConfig(loadedConfig.Email),
+		gobetterauthconfig.WithSecondaryStorage(loadedConfig.SecondaryStorage),
+		gobetterauthconfig.WithEmailPassword(loadedConfig.EmailPassword),
+		gobetterauthconfig.WithEmailVerification(loadedConfig.EmailVerification),
+		gobetterauthconfig.WithUser(loadedConfig.User),
+		gobetterauthconfig.WithSession(loadedConfig.Session),
+		gobetterauthconfig.WithCSRF(loadedConfig.CSRF),
+		gobetterauthconfig.WithSocialProviders(loadedConfig.SocialProviders),
+		gobetterauthconfig.WithTrustedOrigins(loadedConfig.TrustedOrigins),
+		gobetterauthconfig.WithRateLimit(loadedConfig.RateLimit),
+		gobetterauthconfig.WithEventBus(loadedConfig.EventBus),
+		gobetterauthconfig.WithEndpointHooks(loadedConfig.EndpointHooks),
+		gobetterauthconfig.WithDatabaseHooks(loadedConfig.DatabaseHooks),
+		gobetterauthconfig.WithEventHooks(loadedConfig.EventHooks),
+		gobetterauthconfig.WithWebhooks(loadedConfig.Webhooks),
 	)
 
-	auth := gobetterauth.New(authConfig)
+	return authConfig, nil
+}
+
+// runServer starts the HTTP server and handles restarts
+func runServer(logger gobetterauthmodels.Logger, restartChan chan struct{}, shutdownChan chan os.Signal) error {
+	port := getEnv("PORT", "8080")
+
+	config, err := loadConfig()
+	if err != nil {
+		logger.Error("Failed to load configuration", "error", err)
+		return err
+	}
+
+	auth := gobetterauth.New(config)
 
 	// Set the restart handler - called when config changes require restart
 	var mu sync.Mutex
@@ -171,32 +182,4 @@ func runServer(port string, restartChan chan struct{}, shutdownChan chan os.Sign
 	}
 
 	return nil
-}
-
-// loadConfigFromFile attempts to load configuration from TOML file if it exists
-func loadConfigFromFile() gobetterauthmodels.Config {
-	configPath := getEnv("GO_BETTER_AUTH_CONFIG_PATH", "config.toml")
-	var config gobetterauthmodels.Config
-
-	if _, err := os.Stat(configPath); err != nil {
-		// File doesn't exist, return empty config - will use env vars and defaults
-		return config
-	}
-
-	if _, err := toml.DecodeFile(configPath, &config); err != nil {
-		slog.Warn("Failed to parse TOML config file, will use environment variables and defaults", "path", configPath, "error", err)
-	}
-
-	return config
-}
-
-// applyConfigDefaults applies environment variable overrides and sensible defaults
-func applyConfigDefaults(config *gobetterauthmodels.Config) {
-	// Override other critical settings from environment variables
-	if baseURL := os.Getenv("GO_BETTER_AUTH_BASE_URL"); baseURL != "" {
-		config.BaseURL = baseURL
-	}
-	if secret := os.Getenv("GO_BETTER_AUTH_SECRET"); secret != "" {
-		config.Secret = secret
-	}
 }

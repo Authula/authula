@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"sync"
 	"time"
 
 	"gorm.io/gorm"
@@ -24,10 +25,12 @@ type DatabaseSecondaryStorage struct {
 	done chan struct{}
 	// cleanupStarted tracks whether the cleanup goroutine has been started.
 	cleanupStarted bool
+	// closeOnce ensures Close() is idempotent.
+	closeOnce sync.Once
 }
 
 func NewDatabaseSecondaryStorage(db *gorm.DB, config models.SecondaryStorageDatabaseOptions) *DatabaseSecondaryStorage {
-	cleanupInterval := 1 * time.Minute
+	cleanupInterval := time.Minute
 	if config.CleanupInterval != 0 {
 		cleanupInterval = config.CleanupInterval
 	}
@@ -56,10 +59,11 @@ func (storage *DatabaseSecondaryStorage) StartCleanup() {
 
 // Get retrieves a value from the database by key.
 // Returns nil if the key does not exist or has expired.
+// Expired entries are deleted immediately to prevent database bloat.
 func (storage *DatabaseSecondaryStorage) Get(ctx context.Context, key string) (any, error) {
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("context cancelled: %w", ctx.Err())
+		return nil, fmt.Errorf("context canceled: %w", ctx.Err())
 	default:
 	}
 
@@ -73,7 +77,12 @@ func (storage *DatabaseSecondaryStorage) Get(ctx context.Context, key string) (a
 		return nil, fmt.Errorf("database error: %w", result.Error)
 	}
 
+	// Check if entry has expired
 	if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
+		// Delete the expired entry
+		if err := storage.db.WithContext(ctx).Delete(&models.KeyValueStore{}, "key = ?", key).Error; err != nil {
+			slog.Error("error deleting expired entry", slog.String("key", key), slog.Any("error", err))
+		}
 		return nil, nil
 	}
 
@@ -85,7 +94,7 @@ func (storage *DatabaseSecondaryStorage) Get(ctx context.Context, key string) (a
 func (storage *DatabaseSecondaryStorage) Set(ctx context.Context, key string, value any, ttl *time.Duration) error {
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("context cancelled: %w", ctx.Err())
+		return fmt.Errorf("context canceled: %w", ctx.Err())
 	default:
 	}
 
@@ -118,7 +127,7 @@ func (storage *DatabaseSecondaryStorage) Set(ctx context.Context, key string, va
 func (storage *DatabaseSecondaryStorage) Delete(ctx context.Context, key string) error {
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("context cancelled: %w", ctx.Err())
+		return fmt.Errorf("context canceled: %w", ctx.Err())
 	default:
 	}
 
@@ -134,10 +143,11 @@ func (storage *DatabaseSecondaryStorage) Delete(ctx context.Context, key string)
 // Incr increments the integer value stored at key by 1.
 // If the key does not exist, it is initialized to 0 and then incremented to 1.
 // If ttl is provided, it will be set or updated on the key.
+// Expired entries are deleted immediately before incrementing.
 func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, ttl *time.Duration) (int, error) {
 	select {
 	case <-ctx.Done():
-		return 0, fmt.Errorf("context cancelled: %w", ctx.Err())
+		return 0, fmt.Errorf("context canceled: %w", ctx.Err())
 	default:
 	}
 
@@ -151,9 +161,14 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 	}
 
 	if result.Error == nil {
+		// Entry exists, check if it's expired
 		if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
-			count = 0
+			// Delete the expired entry
+			if err := storage.db.WithContext(ctx).Delete(&models.KeyValueStore{}, "key = ?", key).Error; err != nil {
+				slog.Error("error deleting expired entry during incr", slog.String("key", key), slog.Any("error", err))
+			}
 		} else {
+			// Entry exists and is not expired
 			if num, err := strconv.Atoi(entry.Value); err == nil {
 				count = num
 			} else {
@@ -212,12 +227,13 @@ func (storage *DatabaseSecondaryStorage) removeExpiredEntries() {
 }
 
 // Close gracefully shuts down the storage by stopping the cleanup goroutine.
-// This should be called when the application is shutting down.
+// This method is idempotent and safe to call multiple times.
 func (storage *DatabaseSecondaryStorage) Close() error {
-	if !storage.cleanupStarted {
-		return nil
-	}
-	close(storage.stopCleanup)
-	<-storage.done
+	storage.closeOnce.Do(func() {
+		if storage.cleanupStarted {
+			close(storage.stopCleanup)
+			<-storage.done
+		}
+	})
 	return nil
 }

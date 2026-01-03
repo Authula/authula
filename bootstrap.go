@@ -12,6 +12,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 
+	"github.com/GoBetterAuth/go-better-auth/env"
 	"github.com/GoBetterAuth/go-better-auth/events"
 	internalauth "github.com/GoBetterAuth/go-better-auth/internal/auth"
 	internalconfig "github.com/GoBetterAuth/go-better-auth/internal/config"
@@ -83,15 +84,15 @@ func InitDatabase(config *models.Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("database provider must be specified")
 	}
 
-	databaseUrl := os.Getenv("DATABASE_URL")
+	databaseUrl := os.Getenv(env.DatabaseURL)
 	if databaseUrl == "" {
-		if config.Database.ConnectionString == "" {
-			return nil, fmt.Errorf("database connection string must be specified via DATABASE_URL environment variable or config")
+		if config.Database.URL == "" {
+			return nil, fmt.Errorf("database connection string must be specified via %s environment variable or config", env.DatabaseURL)
 		} else {
-			databaseUrl = config.Database.ConnectionString
+			databaseUrl = config.Database.URL
 		}
 	} else {
-		config.Database.ConnectionString = databaseUrl
+		config.Database.URL = databaseUrl
 	}
 
 	// Initialize database connection
@@ -181,9 +182,6 @@ func InitConfigManager(config *models.Config) (models.ConfigManager, error) {
 			if err := manager.Init(); err != nil {
 				return nil, fmt.Errorf("failed to initialize config manager: %w", err)
 			}
-			// Get config and override
-			loadedConfig := manager.GetConfig()
-			*config = *loadedConfig
 		}
 	default:
 		{

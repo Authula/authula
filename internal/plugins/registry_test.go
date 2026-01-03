@@ -25,8 +25,8 @@ func getMockConfig() *models.Config {
 	return config.NewConfig(
 		config.WithDatabase(
 			models.DatabaseConfig{
-				Provider:         "sqlite",
-				ConnectionString: "file::memory:?cache=shared",
+				Provider: "sqlite",
+				URL:      "file::memory:?cache=shared",
 			},
 		),
 		config.WithDB(db),

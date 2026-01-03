@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/GoBetterAuth/go-better-auth/env"
 	"github.com/GoBetterAuth/go-better-auth/internal/admin"
 	"github.com/GoBetterAuth/go-better-auth/internal/auth"
 	"github.com/GoBetterAuth/go-better-auth/internal/handlers"
@@ -77,7 +78,7 @@ func New(baseConfig *models.Config) *Auth {
 		EventBus:      eventBus,
 	}
 
-	apiKey := os.Getenv("GO_BETTER_AUTH_ADMIN_API_KEY")
+	apiKey := os.Getenv(env.AdminApiKey)
 	adminAuth := func() func(http.Handler) http.Handler {
 		return middleware.AdminAuth(apiKey)
 	}

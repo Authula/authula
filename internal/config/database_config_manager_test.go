@@ -17,10 +17,10 @@ func TestDatabaseConfigManager_KeyMapping(t *testing.T) {
 		BasePath: "/auth",
 		Secret:   "test-secret",
 		Database: models.DatabaseConfig{
-			Provider:         "postgres",
-			ConnectionString: "postgresql://user:pass@localhost/db",
-			MaxOpenConns:     10,
-			MaxIdleConns:     5,
+			Provider:     "postgres",
+			URL:          "postgresql://user:pass@localhost/db",
+			MaxOpenConns: 10,
+			MaxIdleConns: 5,
 		},
 		Email: models.EmailConfig{
 			Provider: "smtp",
@@ -89,23 +89,21 @@ func TestAuthSettings_TableName(t *testing.T) {
 // are properly serialized with correct JSON tags
 func TestConfigJSON_NestedStructures(t *testing.T) {
 	testConfig := &models.Config{
-		SocialProviders: models.SocialProvidersConfig{
-			Providers: map[string]models.OAuth2ProviderConfig{
-				"google": {
-					Enabled:      true,
-					ClientID:     "google-id",
-					ClientSecret: "google-secret",
-					RedirectURL:  "http://localhost:8080/auth/callback/google",
-					Scopes:       []string{"email", "profile"},
-				},
-				"custom": {
-					Enabled:      true,
-					ClientID:     "custom-id",
-					ClientSecret: "custom-secret",
-					AuthURL:      "https://custom.com/oauth/authorize",
-					TokenURL:     "https://custom.com/oauth/token",
-					UserInfoURL:  "https://custom.com/oauth/userinfo",
-				},
+		SocialProviders: map[string]models.OAuth2ProviderConfig{
+			"google": {
+				Enabled:      true,
+				ClientID:     "google-id",
+				ClientSecret: "google-secret",
+				RedirectURL:  "http://localhost:8080/auth/callback/google",
+				Scopes:       []string{"email", "profile"},
+			},
+			"custom": {
+				Enabled:      true,
+				ClientID:     "custom-id",
+				ClientSecret: "custom-secret",
+				AuthURL:      "https://custom.com/oauth/authorize",
+				TokenURL:     "https://custom.com/oauth/token",
+				UserInfoURL:  "https://custom.com/oauth/userinfo",
 			},
 		},
 	}
@@ -123,7 +121,7 @@ func TestConfigJSON_NestedStructures(t *testing.T) {
 	}
 
 	// Verify Google OAuth config
-	googleCfg, ok := unmarshaledConfig.SocialProviders.Providers["google"]
+	googleCfg, ok := unmarshaledConfig.SocialProviders["google"]
 	if !ok {
 		t.Fatal("Google OAuth config not preserved")
 	}
@@ -132,7 +130,7 @@ func TestConfigJSON_NestedStructures(t *testing.T) {
 	}
 
 	// Verify Generic OAuth config
-	if customCfg, ok := unmarshaledConfig.SocialProviders.Providers["custom"]; !ok {
+	if customCfg, ok := unmarshaledConfig.SocialProviders["custom"]; !ok {
 		t.Fatal("Custom OAuth config not preserved")
 	} else {
 		if customCfg.ClientID != "custom-id" {

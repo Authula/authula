@@ -65,7 +65,7 @@ func TestExecuteWebhook_Success(t *testing.T) {
 		Headers: map[string]string{
 			"X-Test-Header": "test-value",
 		},
-		TimeoutSeconds: 5,
+		TimeoutSeconds: 5 * time.Second,
 	}
 
 	err := executor.ExecuteWebhook(webhook, map[string]string{"test": "data"})
@@ -99,7 +99,7 @@ func TestExecuteWebhook_Timeout(t *testing.T) {
 
 	webhook := &models.WebhookConfig{
 		URL:            server.URL,
-		TimeoutSeconds: 1,
+		TimeoutSeconds: 1 * time.Second,
 	}
 
 	err := executor.ExecuteWebhook(webhook, map[string]string{"test": "data"})

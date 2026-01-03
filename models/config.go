@@ -32,11 +32,11 @@ type LoggerConfig struct {
 // =======================
 
 type DatabaseConfig struct {
-	Provider         string        `json:"provider" toml:"provider"`
-	ConnectionString string        `json:"connection_string" toml:"connection_string"`
-	MaxOpenConns     int           `json:"max_open_conns" toml:"max_open_conns"`
-	MaxIdleConns     int           `json:"max_idle_conns" toml:"max_idle_conns"`
-	ConnMaxLifetime  time.Duration `json:"conn_max_lifetime" toml:"conn_max_lifetime"`
+	Provider        string        `json:"provider" toml:"provider"`
+	URL             string        `json:"url" toml:"url"`
+	MaxOpenConns    int           `json:"max_open_conns" toml:"max_open_conns"`
+	MaxIdleConns    int           `json:"max_idle_conns" toml:"max_idle_conns"`
+	ConnMaxLifetime time.Duration `json:"conn_max_lifetime" toml:"conn_max_lifetime"`
 }
 
 // =======================
@@ -160,9 +160,7 @@ type OAuth2ProviderConfig struct {
 	UserInfoURL string `json:"user_info_url" toml:"user_info_url"`
 }
 
-type SocialProvidersConfig struct {
-	Providers map[string]OAuth2ProviderConfig `json:"providers" toml:"providers"`
-}
+type SocialProvidersConfig map[string]OAuth2ProviderConfig
 
 // =======================
 // Trusted Origins Config

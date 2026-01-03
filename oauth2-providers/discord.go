@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/oauth2"
 
+	"github.com/GoBetterAuth/go-better-auth/env"
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
@@ -26,10 +27,10 @@ type DiscordProvider struct {
 }
 
 func NewDiscordProvider(config *models.OAuth2ProviderConfig) *DiscordProvider {
-	if envClientID := os.Getenv("DISCORD_CLIENT_ID"); envClientID != "" {
+	if envClientID := os.Getenv(env.DiscordClientID); envClientID != "" {
 		config.ClientID = envClientID
 	}
-	if envClientSecret := os.Getenv("DISCORD_CLIENT_SECRET"); envClientSecret != "" {
+	if envClientSecret := os.Getenv(env.DiscordClientSecret); envClientSecret != "" {
 		config.ClientSecret = envClientSecret
 	}
 	return &DiscordProvider{

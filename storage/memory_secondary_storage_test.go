@@ -122,9 +122,13 @@ func TestGet_KeyNotFound(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := storage.Get(ctx, "nonexistent_key")
-	if err == nil {
-		t.Fatal("expected key not found error, got nil")
+	value, err := storage.Get(ctx, "nonexistent_key")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if value != nil {
+		t.Fatalf("expected nil value for non-existent key, got %v", value)
 	}
 }
 
@@ -161,18 +165,24 @@ func TestGet_ExpiredEntry(t *testing.T) {
 		}
 
 		// Verify entry exists
-		_, err = storage.Get(ctx, key)
+		retrieved, err := storage.Get(ctx, key)
 		if err != nil {
 			t.Fatalf("expected entry to exist, got error: %v", err)
+		}
+		if retrieved != value {
+			t.Fatalf("expected value %s, got %v", value, retrieved)
 		}
 
 		// Wait for the entry to expire - the fake clock will automatically advance
 		// when this goroutine is durably blocked on time.Sleep
 		time.Sleep(11 * time.Millisecond)
 
-		_, err = storage.Get(ctx, key)
-		if err == nil {
-			t.Fatal("expected key expired error, got nil")
+		retrieved, err = storage.Get(ctx, key)
+		if err != nil {
+			t.Fatalf("expected no error for expired key, got %v", err)
+		}
+		if retrieved != nil {
+			t.Fatalf("expected nil value for expired key, got %v", retrieved)
 		}
 	})
 }
@@ -192,9 +202,12 @@ func TestDelete_Success(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	_, err = storage.Get(ctx, key)
-	if err == nil {
-		t.Fatal("expected key not found error after deletion, got nil")
+	retrieved, err := storage.Get(ctx, key)
+	if err != nil {
+		t.Fatalf("expected no error for deleted key, got %v", err)
+	}
+	if retrieved != nil {
+		t.Fatalf("expected nil value after deletion, got %v", retrieved)
 	}
 }
 
@@ -205,8 +218,8 @@ func TestDelete_KeyNotFound(t *testing.T) {
 	ctx := context.Background()
 
 	err := storage.Delete(ctx, "nonexistent_key")
-	if err == nil {
-		t.Fatal("expected key not found error, got nil")
+	if err != nil {
+		t.Fatalf("expected no error for idempotent delete, got %v", err)
 	}
 }
 
@@ -281,10 +294,13 @@ func TestSet_WithTTL(t *testing.T) {
 		time.Sleep(2 * time.Millisecond)
 		synctest.Wait()
 
-		// Should now be expired
-		_, err = storage.Get(ctx, key)
-		if err == nil {
-			t.Fatal("expected key expired error, got nil")
+		// Should now be expired and return nil
+		retrieved, err = storage.Get(ctx, key)
+		if err != nil {
+			t.Fatalf("expected no error for expired key, got %v", err)
+		}
+		if retrieved != nil {
+			t.Fatalf("expected nil for expired key, got %v", retrieved)
 		}
 	})
 }
@@ -393,9 +409,12 @@ func TestConcurrentDeletes(t *testing.T) {
 	// Verify all keys are deleted
 	for i := range numKeys {
 		key := "delete_key_" + string(rune(i))
-		_, err := storage.Get(ctx, key)
-		if err == nil {
-			t.Fatalf("expected key not found error for key %s, got nil", key)
+		retrieved, err := storage.Get(ctx, key)
+		if err != nil {
+			t.Fatalf("expected no error for deleted key %s, got %v", key, err)
+		}
+		if retrieved != nil {
+			t.Fatalf("expected nil for deleted key %s, got %v", key, retrieved)
 		}
 	}
 }

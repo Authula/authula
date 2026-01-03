@@ -140,9 +140,13 @@ func TestDatabaseStorage_GetKeyNotFound(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := storage.Get(ctx, "nonexistent_key")
-	if err == nil {
-		t.Fatal("expected key not found error, got nil")
+	value, err := storage.Get(ctx, "nonexistent_key")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if value != nil {
+		t.Fatalf("expected nil value for non-existent key, got %v", value)
 	}
 }
 
@@ -180,17 +184,23 @@ func TestDatabaseStorage_GetExpiredEntry(t *testing.T) {
 	}
 
 	// Verify entry exists
-	_, err = storage.Get(ctx, key)
+	retrieved, err := storage.Get(ctx, key)
 	if err != nil {
 		t.Fatalf("expected entry to exist, got error: %v", err)
+	}
+	if retrieved != value {
+		t.Fatalf("expected value %s, got %v", value, retrieved)
 	}
 
 	// Wait for the entry to expire
 	time.Sleep(101 * time.Millisecond)
 
-	_, err = storage.Get(ctx, key)
-	if err == nil {
-		t.Fatal("expected key expired error, got nil")
+	retrieved, err = storage.Get(ctx, key)
+	if err != nil {
+		t.Fatalf("expected no error for expired key, got %v", err)
+	}
+	if retrieved != nil {
+		t.Fatalf("expected nil value for expired key, got %v", retrieved)
 	}
 }
 
@@ -210,9 +220,12 @@ func TestDatabaseStorage_DeleteSuccess(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	_, err = storage.Get(ctx, key)
-	if err == nil {
-		t.Fatal("expected key not found error after deletion, got nil")
+	retrieved, err := storage.Get(ctx, key)
+	if err != nil {
+		t.Fatalf("expected no error for deleted key, got %v", err)
+	}
+	if retrieved != nil {
+		t.Fatalf("expected nil value after deletion, got %v", retrieved)
 	}
 }
 
@@ -224,8 +237,8 @@ func TestDatabaseStorage_DeleteKeyNotFound(t *testing.T) {
 	ctx := context.Background()
 
 	err := storage.Delete(ctx, "nonexistent_key")
-	if err == nil {
-		t.Fatal("expected key not found error, got nil")
+	if err != nil {
+		t.Fatalf("expected no error for idempotent delete, got %v", err)
 	}
 }
 
@@ -288,9 +301,12 @@ func TestDatabaseStorage_SetWithTTL(t *testing.T) {
 	// Wait for the entry to expire
 	time.Sleep(101 * time.Millisecond)
 
-	_, err = storage.Get(ctx, "ttl_key")
-	if err == nil {
-		t.Fatal("expected key expired error, got nil")
+	retrieved, err = storage.Get(ctx, "ttl_key")
+	if err != nil {
+		t.Fatalf("expected no error for expired key, got %v", err)
+	}
+	if retrieved != nil {
+		t.Fatalf("expected nil for expired key, got %v", retrieved)
 	}
 }
 
@@ -475,12 +491,15 @@ func TestDatabaseStorage_CleanupExpiredEntries(t *testing.T) {
 	// Wait for expiration and cleanup
 	time.Sleep(200 * time.Millisecond)
 
-	// Verify entries are cleaned up
+	// Verify entries are cleaned up and return nil
 	for i := range 10 {
 		key := "cleanup_key_" + string(rune(i))
-		_, err := storage.Get(ctx, key)
-		if err == nil {
-			t.Fatalf("expected key to be expired and cleaned up: %s", key)
+		retrieved, err := storage.Get(ctx, key)
+		if err != nil {
+			t.Fatalf("expected no error for expired/cleaned key %s, got %v", key, err)
+		}
+		if retrieved != nil {
+			t.Fatalf("expected nil for expired/cleaned key %s, got %v", key, retrieved)
 		}
 	}
 }

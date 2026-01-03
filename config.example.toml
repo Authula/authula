@@ -23,8 +23,8 @@ level = "debug"  # Options: "debug", "info", "warn", "error"
 [database]
 provider = "sqlite"
 # SECURITY NOTE: It is recommended to set the 'connection_string' via the 
-# DATABASE_URL environment variable rather than hardcoding it here.
-connection_string = "auth.db"
+# GO_BETTER_AUTH_DATABASE_URL environment variable rather than hardcoding it here.
+url = "auth.db"
 max_open_conns = 25
 max_idle_conns = 25
 conn_max_lifetime = "1m"
@@ -88,22 +88,22 @@ expires_in = "1h"
 # Social Providers Configuration
 # SECURITY NOTE: It is recommended to set the 'client_secret' for each of these via their 
 # respective environment variables as shown in the .env.example file rather than hardcoding it here.
-[social_providers.providers]
-[social_providers.providers.discord]
+[social_providers]
+[social_providers.discord]
 enabled = true
 client_id = "your-discord-client-id"
 client_secret = "your-discord-client-secret"
 redirect_url = "http://localhost:8080/auth/oauth2/discord/callback"
 scopes = ["email", "identify"]
 
-[social_providers.providers.github]
+[social_providers.github]
 enabled = true
 client_id = "your-github-client-id"
 client_secret = "your-github-client-secret"
 redirect_url = "http://localhost:8080/auth/oauth2/github/callback"
 scopes = ["user:email"]
 
-[social_providers.providers.google]
+[social_providers.google]
 enabled = true
 client_id = "your-google-client-id"
 client_secret = "your-google-client-secret"
@@ -111,7 +111,7 @@ redirect_url = "http://localhost:8080/auth/oauth2/google/callback"
 scopes = ["openid", "email", "profile"]
 
 # Example of a generic OAuth2 provider
-[social_providers.providers.custom]
+[social_providers.custom]
 enabled = false
 client_id = "your-custom-client-id"
 client_secret = "your-custom-client-secret"
@@ -154,24 +154,24 @@ pubsub_type = "memory"  # or "custom" (only supported in library mode), etc.
 # [webhooks.on_user_signed_up]
 # url = "https://myapp.com/webhooks/user-signed-up"
 # headers = { "Authorization" = "Bearer your-secret-token", "X-Custom-Header" = "value" }
-# timeout_seconds = 5
+# timeout_seconds = "5s"
 
 # [webhooks.on_user_logged_in]
 # url = "https://myapp.com/webhooks/user-logged-in"
 # headers = { "Authorization" = "Bearer your-secret-token" }
-# timeout_seconds = 5
+# timeout_seconds = "5s"
 
 # [webhooks.on_email_verified]
 # url = "https://myapp.com/webhooks/email-verified"
 # headers = { "Authorization" = "Bearer your-secret-token" }
-# timeout_seconds = 5
+# timeout_seconds = "5s"
 
 # [webhooks.on_password_changed]
 # url = "https://myapp.com/webhooks/password-changed"
 # headers = { "Authorization" = "Bearer your-secret-token" }
-# timeout_seconds = 5
+# timeout_seconds = "5s"
 
 # [webhooks.on_email_changed]
 # url = "https://myapp.com/webhooks/email-changed"
 # headers = { "Authorization" = "Bearer your-secret-token" }
-# timeout_seconds = 5
+# timeout_seconds = "5s"

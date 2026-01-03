@@ -26,10 +26,12 @@ type MemorySecondaryStorage struct {
 	stopCleanup chan struct{}
 	// done signals that the cleanup goroutine has stopped.
 	done chan struct{}
+	// closeOnce ensures Close() is idempotent.
+	closeOnce sync.Once
 }
 
 func NewMemorySecondaryStorage(config models.SecondaryStorageMemoryOptions) *MemorySecondaryStorage {
-	cleanupInterval := 1 * time.Minute
+	cleanupInterval := time.Minute
 	if config.CleanupInterval != 0 {
 		cleanupInterval = config.CleanupInterval
 	}
@@ -48,26 +50,35 @@ func NewMemorySecondaryStorage(config models.SecondaryStorageMemoryOptions) *Mem
 
 // Get retrieves a value from memory by key.
 // Returns nil if the key does not exist or has expired.
+// Expired entries are deleted immediately to prevent memory bloat.
 func (storage *MemorySecondaryStorage) Get(ctx context.Context, key string) (any, error) {
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("context cancelled: %w", ctx.Err())
+		return nil, fmt.Errorf("context canceled: %w", ctx.Err())
 	default:
 	}
 
 	storage.mu.RLock()
-	defer storage.mu.RUnlock()
-
 	entry, exists := storage.store[key]
 	if !exists {
+		storage.mu.RUnlock()
 		return nil, nil
 	}
 
+	// Check if entry has expired
 	if entry.expiresAt != nil && time.Now().After(*entry.expiresAt) {
+		storage.mu.RUnlock()
+		// Delete the expired entry
+		storage.mu.Lock()
+		delete(storage.store, key)
+		storage.mu.Unlock()
 		return nil, nil
 	}
 
-	return entry.value, nil
+	value := entry.value
+	storage.mu.RUnlock()
+
+	return value, nil
 }
 
 // Set stores a value in memory with an optional TTL.
@@ -75,7 +86,7 @@ func (storage *MemorySecondaryStorage) Get(ctx context.Context, key string) (any
 func (storage *MemorySecondaryStorage) Set(ctx context.Context, key string, value any, ttl *time.Duration) error {
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("context cancelled: %w", ctx.Err())
+		return fmt.Errorf("context canceled: %w", ctx.Err())
 	default:
 	}
 
@@ -106,7 +117,7 @@ func (storage *MemorySecondaryStorage) Set(ctx context.Context, key string, valu
 func (storage *MemorySecondaryStorage) Delete(ctx context.Context, key string) error {
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("context cancelled: %w", ctx.Err())
+		return fmt.Errorf("context canceled: %w", ctx.Err())
 	default:
 	}
 
@@ -121,10 +132,11 @@ func (storage *MemorySecondaryStorage) Delete(ctx context.Context, key string) e
 // Incr increments the integer value stored at key by 1.
 // If the key does not exist, it is initialized to 0 and then incremented to 1.
 // If ttl is provided, it will be set or updated on the key.
+// Expired entries are deleted immediately before incrementing.
 func (storage *MemorySecondaryStorage) Incr(ctx context.Context, key string, ttl *time.Duration) (int, error) {
 	select {
 	case <-ctx.Done():
-		return 0, fmt.Errorf("context cancelled: %w", ctx.Err())
+		return 0, fmt.Errorf("context canceled: %w", ctx.Err())
 	default:
 	}
 
@@ -134,9 +146,11 @@ func (storage *MemorySecondaryStorage) Incr(ctx context.Context, key string, ttl
 	var count int
 
 	if entry, exists := storage.store[key]; exists {
+		// Delete if expired
 		if entry.expiresAt != nil && time.Now().After(*entry.expiresAt) {
-			count = 0
+			delete(storage.store, key)
 		} else {
+			// Entry exists and is not expired
 			if num, err := strconv.Atoi(entry.value); err == nil {
 				count = num
 			} else {
@@ -192,8 +206,11 @@ func (storage *MemorySecondaryStorage) removeExpiredEntries() {
 }
 
 // Close gracefully shuts down the storage by stopping the cleanup goroutine.
+// This method is idempotent and safe to call multiple times.
 func (storage *MemorySecondaryStorage) Close() error {
-	close(storage.stopCleanup)
-	<-storage.done
+	storage.closeOnce.Do(func() {
+		close(storage.stopCleanup)
+		<-storage.done
+	})
 	return nil
 }

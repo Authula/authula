@@ -52,7 +52,7 @@ func (r *OAuth2ProviderRegistry) RefreshOAuth2Providers() {
 
 	r.providers = make(map[string]OAuth2Provider)
 
-	for name, providerConfig := range r.config.SocialProviders.Providers {
+	for name, providerConfig := range r.config.SocialProviders {
 		if !providerConfig.Enabled {
 			continue
 		}

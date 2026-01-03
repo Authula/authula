@@ -1,15 +1,20 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"time"
 
 	"gorm.io/gorm"
 
+	"github.com/GoBetterAuth/go-better-auth/env"
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
+const defaultSecret = "go-better-auth-secret-0123456789"
+
 // NewConfig builds a Config using functional options with sensible defaults.
+// Works for both library and standalone modes. Options only override zero/empty values.
 func NewConfig(options ...models.ConfigOption) *models.Config {
 	// Define sensible defaults first
 	config := &models.Config{
@@ -17,7 +22,8 @@ func NewConfig(options ...models.ConfigOption) *models.Config {
 		Mode:     models.ModeLibrary,
 		AppName:  "GoBetterAuth",
 		BasePath: "/auth",
-		Secret:   "",
+		BaseURL:  "http://localhost:8080",
+		Secret:   defaultSecret,
 		DB:       nil,
 		Database: models.DatabaseConfig{
 			MaxOpenConns:    25,
@@ -52,10 +58,10 @@ func NewConfig(options ...models.ConfigOption) *models.Config {
 			HeaderName: "X-GOBETTERAUTH-CSRF-TOKEN",
 			ExpiresIn:  7 * 24 * time.Hour,
 		},
-		SocialProviders: models.SocialProvidersConfig{
-			Providers: map[string]models.OAuth2ProviderConfig{},
+		SocialProviders: map[string]models.OAuth2ProviderConfig{},
+		TrustedOrigins: models.TrustedOriginsConfig{
+			Origins: []string{},
 		},
-		TrustedOrigins: models.TrustedOriginsConfig{},
 		SecondaryStorage: models.SecondaryStorageConfig{
 			Type: models.SecondaryStorageTypeMemory,
 		},
@@ -82,33 +88,18 @@ func NewConfig(options ...models.ConfigOption) *models.Config {
 		Plugins: models.PluginsConfig{},
 	}
 
-	// Apply the options
+	// Apply the options - they override defaults only if non-zero/non-empty
 	for _, option := range options {
 		option(config)
 	}
 
-	// Environment variable overrides
-
-	// Set BaseURL
-	if baseURL := os.Getenv("GO_BETTER_AUTH_BASE_URL"); baseURL != "" {
-		config.BaseURL = baseURL
-	} else if config.BaseURL == "" {
-		config.BaseURL = "http://localhost:8080"
-	}
-
-	// Set Secret
-	if secret := os.Getenv("GO_BETTER_AUTH_SECRET"); secret != "" {
-		config.Secret = secret
-	} else if config.Secret == "" {
-		if os.Getenv("GO_ENV") == "production" {
-			panic("GO_BETTER_AUTH_SECRET environment variable must be set in production")
-		}
-		config.Secret = "go-better-auth-secret-0123456789"
+	// Validate production configuration
+	if os.Getenv(env.GoEnvironment) == "production" && config.Secret == defaultSecret {
+		panic(fmt.Sprintf("A custom secret must be set in production mode. Please set a custom secret via configuration or the %s environment variable.", env.Secret))
 	}
 
 	return config
 }
-
 func WithMode(mode models.Mode) models.ConfigOption {
 	return func(c *models.Config) {
 		c.Mode = mode
@@ -117,25 +108,37 @@ func WithMode(mode models.Mode) models.ConfigOption {
 
 func WithAppName(name string) models.ConfigOption {
 	return func(c *models.Config) {
-		c.AppName = name
+		if name != "" {
+			c.AppName = name
+		}
 	}
 }
 
 func WithBaseURL(url string) models.ConfigOption {
 	return func(c *models.Config) {
-		c.BaseURL = url
+		if envValue := os.Getenv(env.BaseURL); envValue != "" {
+			c.BaseURL = envValue
+		} else if url != "" {
+			c.BaseURL = url
+		}
 	}
 }
 
 func WithBasePath(path string) models.ConfigOption {
 	return func(c *models.Config) {
-		c.BasePath = path
+		if path != "" {
+			c.BasePath = path
+		}
 	}
 }
 
 func WithSecret(secret string) models.ConfigOption {
 	return func(c *models.Config) {
-		c.Secret = secret
+		if envValue := os.Getenv(env.Secret); envValue != "" {
+			c.Secret = envValue
+		} else if secret != "" {
+			c.Secret = secret
+		}
 	}
 }
 
@@ -167,8 +170,8 @@ func WithDatabase(config models.DatabaseConfig) models.ConfigOption {
 		if config.Provider != "" {
 			defaults.Provider = config.Provider
 		}
-		if config.ConnectionString != "" {
-			defaults.ConnectionString = config.ConnectionString
+		if config.URL != "" {
+			defaults.URL = config.URL
 		}
 		if config.MaxOpenConns != 0 {
 			defaults.MaxOpenConns = config.MaxOpenConns

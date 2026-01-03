@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/oauth2"
 
+	"github.com/GoBetterAuth/go-better-auth/env"
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
@@ -32,10 +33,10 @@ type GitHubProvider struct {
 }
 
 func NewGitHubProvider(config *models.OAuth2ProviderConfig) *GitHubProvider {
-	if envClientID := os.Getenv("GITHUB_CLIENT_ID"); envClientID != "" {
+	if envClientID := os.Getenv(env.GithubClientID); envClientID != "" {
 		config.ClientID = envClientID
 	}
-	if envClientSecret := os.Getenv("GITHUB_CLIENT_SECRET"); envClientSecret != "" {
+	if envClientSecret := os.Getenv(env.GithubClientSecret); envClientSecret != "" {
 		config.ClientSecret = envClientSecret
 	}
 	return &GitHubProvider{config: config}

@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/oauth2"
 
+	"github.com/GoBetterAuth/go-better-auth/env"
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
@@ -26,10 +27,10 @@ type GoogleProvider struct {
 }
 
 func NewGoogleProvider(config *models.OAuth2ProviderConfig) *GoogleProvider {
-	if envClientID := os.Getenv("GOOGLE_CLIENT_ID"); envClientID != "" {
+	if envClientID := os.Getenv(env.GoogleClientID); envClientID != "" {
 		config.ClientID = envClientID
 	}
-	if envClientSecret := os.Getenv("GOOGLE_CLIENT_SECRET"); envClientSecret != "" {
+	if envClientSecret := os.Getenv(env.GoogleClientSecret); envClientSecret != "" {
 		config.ClientSecret = envClientSecret
 	}
 	return &GoogleProvider{config: config}
