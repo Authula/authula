@@ -1,0 +1,82 @@
+package handlers
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/plugins/oauth2/constants"
+	"github.com/GoBetterAuth/go-better-auth/plugins/oauth2/types"
+	"github.com/GoBetterAuth/go-better-auth/plugins/oauth2/usecases"
+)
+
+type AuthorizeHandler struct {
+	UseCase *usecases.AuthorizeUseCase
+}
+
+func NewAuthorizeHandler(useCase *usecases.AuthorizeUseCase) *AuthorizeHandler {
+	return &AuthorizeHandler{UseCase: useCase}
+}
+
+func (h *AuthorizeHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
+
+		providerID := r.PathValue("provider")
+		if providerID == "" {
+			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]string{
+				"message": "provider is required",
+			})
+			reqCtx.Handled = true
+			return
+		}
+
+		req := &types.AuthorizeRequest{
+			ProviderID: providerID,
+			RedirectTo: r.URL.Query().Get("redirect_to"),
+		}
+
+		resp, err := h.UseCase.Authorize(ctx, req)
+		if err != nil {
+			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]string{
+				"message": err.Error(),
+			})
+			reqCtx.Handled = true
+			return
+		}
+
+		// Set cookies
+		http.SetCookie(w, &http.Cookie{
+			Name:     constants.CookieState,
+			Value:    resp.StateCookie,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   int(time.Minute.Seconds()) * 5,
+		})
+		http.SetCookie(w, &http.Cookie{
+			Name:     constants.CookieRedirectTo,
+			Value:    resp.RedirectCookie,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   int(time.Minute.Seconds()) * 5,
+		})
+		if resp.VerifierCookie != nil {
+			http.SetCookie(w, &http.Cookie{
+				Name:     constants.CookieVerifier,
+				Value:    *resp.VerifierCookie,
+				Path:     "/",
+				HttpOnly: true,
+				Secure:   true,
+				SameSite: http.SameSiteLaxMode,
+				MaxAge:   int(time.Minute.Seconds()) * 5,
+			})
+		}
+
+		http.Redirect(w, r, resp.AuthorizationURL, http.StatusTemporaryRedirect)
+	}
+}

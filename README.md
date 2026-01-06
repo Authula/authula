@@ -17,24 +17,168 @@
 
 ✨ Overview
 
-**GoBetterAuth** is an open-source authentication solution that scales with you. Embed it as a library in your Go app, or run it as a standalone auth server for any language or framework. It provides secure email/password authentication, session management, email verification, password reset, and more, all built with clean architecture. **GoBetterAuth** is flexible enough to integrate with any technology stack. It streamlines the implementation of essential security features through a clean, modular architecture, allowing developers to concentrate on building their applications without the overhead of managing authentication complexities.
+**GoBetterAuth** is an open-source authentication solution that scales with you. Embed it as a library in your Go app, or run it as a standalone auth server for any language or framework. All functionality is delivered through a powerful plugin system, allowing you to compose exactly the authentication stack you need — no more, no less, all built with clean architecture. **GoBetterAuth** is flexible enough to integrate with any technology stack. It streamlines the implementation of essential security features through a clean, modular architecture, allowing developers to concentrate on building their applications without the overhead of managing authentication complexities.
 
 ---
 
-### Features
+### 🎯 Who is it for?
 
-- 🔑 **Email & Password** – Secure, production-ready authentication with argon2 password hashing. Includes Email Verification, Password Reset and Change Email flows.
-- 🌐 **Social OAuth Providers** – Google, GitHub, Discord and more coming soon.
-- 💾 **Multiple Database Support** – SQLite, PostgreSQL, MySQL adapters and more coming soon, with migration scripts included.
-- 🗄️ **Secondary Storage** – Supports in-memory/database storage and a custom interface to implement Redis and other key-value stores. Use secondary storage to manage session data, rate limiting counters, and other high-frequency records. This enables offloading intensive data to high-performance storage solutions or RAM for optimal scalability and speed.
-- 📦 **Minimal Dependencies** – Standard library first, production-ready, and framework-agnostic.
-- 🧩 **Comprehensive Configuration** – Flexible, type-safe config with sensible defaults and environment variable support.
-- ⚙️ **Flexible Configuration** – Whether you're embedding as a library or running as a server, GoBetterAuth gives you full control over your authentication logic.
-- 🛡️ **Enhanced Security** – CSRF protection.
-- ⚡ **Rate Limiting** – Configurable rate limiting with secondary storage.
-- 🪝 **Hooks System** – Powerful hooks for deep customization: **Endpoint Hooks** allow you to modify requests and responses in the lifecycle. **Database Hooks** let you tap into DB events like BeforeCreate and AfterCreate on entities, with support for custom hooks in plugins. **Event Hooks** run after key actions, enabling event-driven workflows. **Webhooks** are also supported, so you can trigger external services when authentication events occur.
-- 📨 **Event Bus** – Built-in event bus enables event-driven architecture, allowing you to publish and subscribe to authentication and authorization events for seamless integration with external systems and custom workflows.
-- 🔌 **Plugin System** – Extensible plugin architecture for custom business logic and routes. Including flexible plugin interface to implement all kinds of plugins.
+GoBetterAuth is ideal for:
+
+- Startups that want full control over their authentication stack
+- Teams building microservices or multi-backend systems
+- Companies with self-hosting or compliance requirements
+- Go developers who want first-class embedded auth
+- Anyone who wants modern auth without SaaS lock-in
+
+---
+
+🧩 Plugins & Capabilities
+
+GoBetterAuth is architected around a powerful plugin and capability system.
+
+**Plugins** are modular packages that encapsulate related authentication features.  
+**Capabilities** represent individual, fine-grained functionalities exposed by these plugins.
+
+Each plugin can offer multiple capabilities, and every route in your application explicitly declares which capabilities it leverages. This approach ensures that authentication logic is:
+
+- **Explicit** – No hidden behaviors; every capability is clearly declared.
+- **Composable** – Mix and match only the features you need.
+- **Auditable** – Easily track which routes use which authentication features.
+- **Understandable** – The authentication flow is transparent and easy to reason about.
+
+This design empowers you to build secure, maintainable, and highly customizable authentication flows tailored to your application's needs.
+
+---
+
+### Features via Plugins
+
+- 🔑 Email & Password authentication (argon2)
+- 📧 Email verification & password reset
+- 🌐 OAuth providers
+- 💾 Multiple database backends
+- 🗄️ Secondary storage (Redis, memory, DB)
+- ⚡ Rate limiting
+- 🛡️ CSRF protection
+- 🪝 Hooks system
+- 📨 Event bus
+- 🧩 Custom routes and logic
+
+---
+
+### 🪝 Hooks System
+
+GoBetterAuth includes a powerful, lifecycle-based hooks system that lets you intercept and customize request handling at every stage of the HTTP pipeline.
+
+Hooks allow you to implement:
+
+- custom authentication logic
+- request validation
+- logging & tracing
+- metrics
+- access control
+- A/B testing
+- feature flags
+- audit trails
+- custom headers
+- dynamic routing
+
+All without modifying core code.
+
+Build your own plugins for:
+
+- business logic
+- custom routes
+- custom auth flows
+- external integrations
+- internal tooling
+
+---
+
+### ⚙️ Deployment Modes
+
+### Embedded Mode (Go Library)
+
+Embed GoBetterAuth directly into your Go application:
+
+```go
+config := gobetterauthconfig.NewConfig(
+  gobetterauthconfig.WithAppName("GoBetterAuthPlayground"),
+  gobetterauthconfig.WithBasePath("/api/auth"),
+  gobetterauthconfig.WithDatabase(gobetterauthmodels.DatabaseConfig{
+    Provider: "postgres",
+    URL:      os.Getenv(gobetterauthenv.EnvDatabaseURL),
+  }),
+  // other config options...
+)
+
+auth := gobetterauth.New(gobetterauth.AuthConfig{
+  Config:  config,
+  Plugins: []gobetterauthmodels.Plugin{
+    emailpasswordplugin.New(...),
+    // other plugins...
+  },
+})
+```
+
+You get:
+
+- zero network overhead
+- full type safety
+- native integration
+- maximum performance
+
+---
+
+### Server Mode (Standalone Auth Server)
+
+Run GoBetterAuth as a standalone authentication server via Docker:
+
+```bash
+docker run -itd -p 8080:8080 \
+  -v $(pwd)/config.toml:/home/appuser/config.toml \
+  -e GO_BETTER_AUTH_ADMIN_API_KEY=my-admin-api-key \
+  -e GO_BETTER_AUTH_BASE_URL=http://localhost:8080 \
+  -e GO_BETTER_AUTH_SECRET=my-app-secret \
+  -e GO_BETTER_AUTH_DATABASE_URL=<your_connection_string> \
+  # other env vars depending on plugins used...
+  ghcr.io/gobetterauth/go-better-auth:latest
+```
+
+Use it from any language or framework over HTTP.
+
+Perfect for:
+
+- microservices
+- polyglot stacks
+- frontend-heavy apps
+- mobile apps
+
+---
+
+### 🧠 Design Principles
+
+- Plugin-first architecture
+- Clean architecture
+- Minimal dependencies
+- Standard library first
+- Secure by default
+- Framework agnostic
+- Self-hosted
+- Extensible
+
+---
+
+### 🚀 Roadmap
+
+- Many more plugins including Admin, Organizations, RBAC, MFA...
+- And more to be announced!
+
+---
+
+### 📜 License
+
+Apache 2.0 License
 
 ---
 
@@ -55,6 +199,8 @@ Your contributions are welcome! Here's how you can get involved:
 ---
 
 ### Support & Community
+
+Join our growing community for support, discussions, and updates:
 
 - [Discord Server](https://discord.gg/nThBksdr2Z)
 

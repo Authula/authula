@@ -1,0 +1,33 @@
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id BINARY(16) PRIMARY KEY,
+  session_id BINARY(16) NOT NULL,
+  token_hash VARCHAR(64) NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+  is_revoked BOOLEAN DEFAULT FALSE,
+  revoked_at TIMESTAMP NULL,
+  last_reuse_attempt TIMESTAMP NULL DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  
+  CONSTRAINT fk_refresh_tokens_session
+    FOREIGN KEY (session_id) REFERENCES sessions(id)
+    ON DELETE CASCADE
+);
+
+CREATE INDEX idx_refresh_tokens_session_id ON refresh_tokens(session_id);
+CREATE UNIQUE INDEX idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
+CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
+CREATE INDEX idx_refresh_tokens_is_revoked ON refresh_tokens(is_revoked);
+CREATE INDEX idx_refresh_tokens_last_reuse_attempt ON refresh_tokens(last_reuse_attempt);
+
+-- Cleanup query for expired tokens
+-- MySQL procedure to cleanup expired tokens
+DROP PROCEDURE IF EXISTS cleanup_expired_refresh_tokens;
+
+DELIMITER $$
+
+CREATE PROCEDURE cleanup_expired_refresh_tokens()
+BEGIN
+  DELETE FROM refresh_tokens WHERE expires_at < NOW();
+END$$
+
+DELIMITER ;

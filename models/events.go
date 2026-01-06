@@ -6,15 +6,6 @@ import (
 	"time"
 )
 
-// Built-in event types for the authentication system
-const (
-	EventUserSignedUp    = "user.signed_up"
-	EventUserLoggedIn    = "user.logged_in"
-	EventEmailVerified   = "user.email_verified"
-	EventPasswordChanged = "user.password_changed"
-	EventEmailChanged    = "user.email_changed"
-)
-
 // Event represents data to be published or received via the EventBus
 type Event struct {
 	ID        string            `json:"id"`
@@ -67,9 +58,4 @@ type PubSub interface {
 type EventBus interface {
 	EventPublisher
 	EventSubscriber
-}
-
-// WebhookExecutor defines the interface for executing webhooks
-type WebhookExecutor interface {
-	ExecuteWebhook(webhook *WebhookConfig, payload any) error
 }

@@ -1,196 +1,175 @@
 package models
 
+import (
+	"context"
+	"embed"
+	"net/http"
+
+	"github.com/uptrace/bun"
+)
+
+type PluginID string
+
+const (
+	PluginCore             PluginID = "core"
+	PluginConfigManager    PluginID = "config_manager"
+	PluginSecondaryStorage PluginID = "secondary_storage"
+	PluginEmail            PluginID = "email"
+	PluginCORS             PluginID = "cors"
+	PluginCSRF             PluginID = "csrf"
+	PluginEmailPassword    PluginID = "email_password"
+	PluginOAuth2           PluginID = "oauth2"
+	PluginSession          PluginID = "session"
+	PluginJWT              PluginID = "jwt"
+	PluginBearer           PluginID = "bearer"
+	PluginRateLimit        PluginID = "ratelimit"
+)
+
+func (id PluginID) String() string {
+	return string(id)
+}
+
+// PluginMetadata contains metadata about a plugin
 type PluginMetadata struct {
-	Name        string
+	ID          string
 	Version     string
 	Description string
 }
 
-// PluginConfig holds per-plugin configuration.
-type PluginConfig struct {
-	Enabled bool
-	Options any
-}
-
+// PluginContext is the context passed to plugins during initialization.
 type PluginContext struct {
-	Config          *Config
-	Api             AuthApi
+	DB              bun.IDB
+	Logger          Logger
 	EventBus        EventBus
-	Middleware      *ApiMiddleware
-	WebhookExecutor WebhookExecutor
-	Plugin          Plugin // Reference to the plugin being initialized
+	ServiceRegistry ServiceRegistry
+	GetConfig       func() *Config
 }
 
-type PluginRoute struct {
-	Method     string
-	Path       string // Relative path, /auth is auto-prefixed
-	Middleware []RouteMiddleware
-	Handler    RouteHandler
-}
-
-type PluginRateLimit = RateLimitConfig
-
+// Plugin is the base interface all plugins must implement
 type Plugin interface {
 	Metadata() PluginMetadata
-	SetMetadata(meta PluginMetadata)
-
-	Config() PluginConfig
-	SetConfig(cfg PluginConfig)
-
-	Ctx() *PluginContext
-	SetCtx(ctx *PluginContext)
-
+	Config() any
 	Init(ctx *PluginContext) error
-	SetInit(fn func(ctx *PluginContext) error)
-
-	Migrations() []any
-	SetMigrations(migrations []any)
-
-	Routes() []PluginRoute
-	SetRoutes(routes []PluginRoute)
-
-	RateLimit() *PluginRateLimit
-	SetRateLimit(rateLimit *PluginRateLimit)
-
-	EndpointHooks() any
-	SetEndpointHooks(hooks any)
-
-	DatabaseHooks() any
-	SetDatabaseHooks(hooks any)
-
-	EventHooks() any
-	SetEventHooks(hooks any)
-
-	Webhooks() any
-	SetWebhooks(hooks any)
-
 	Close() error
-	SetClose(fn func() error)
+}
+
+// PluginWithMigrations is an optional interface for plugins that have database migrations
+type PluginWithMigrations interface {
+	// Migrations returns the embedded SQL migrations filesystem for the given database provider.
+	// The dbProvider parameter should be one of: "postgres", "mysql", "sqlite".
+	// The returned embed.FS should contain migration files organized as:
+	//   - 20250115000001_migration_name.up.sql
+	//   - 20250115000001_migration_name.down.sql
+	Migrations(ctx context.Context, dbProvider string) (*embed.FS, error)
+}
+
+// PluginWithRoutes is an optional interface for plugins that provide HTTP routes
+type PluginWithRoutes interface {
+	Routes() []Route
+}
+
+// PluginWithMiddleware is an optional interface for plugins that provide global middleware
+type PluginWithMiddleware interface {
+	Middleware() []func(http.Handler) http.Handler
+}
+
+// AuthMethodProvider is an interface for plugins that provide authentication mechanisms
+type AuthMethodProvider interface {
+	AuthMiddleware() func(http.Handler) http.Handler
+	OptionalAuthMiddleware() func(http.Handler) http.Handler
+}
+
+// MiddlewareProvider is an interface for plugins that provide global middleware
+type MiddlewareProvider interface {
+	Middleware() func(http.Handler) http.Handler
+}
+
+// PluginWithConfigWatcher is an optional interface that plugins can implement
+// to receive real-time config updates. When the config is updated in the database,
+// the ConfigManager will call OnConfigUpdate with the new config. Plugins should
+// use this callback to update their own config structs using ParsePluginConfig,
+// which ensures their internal config stays synchronized without changing pointer references.
+type PluginWithConfigWatcher interface {
+	OnConfigUpdate(config *Config) error
+}
+
+// HookStage defines when a hook should be executed in the request lifecycle
+type HookStage int
+
+const (
+	// HookOnRequest is executed for every request at the very start
+	HookOnRequest HookStage = iota
+	// HookBefore is executed before route matching and handling
+	HookBefore
+	// HookAfter is executed after route handling but before response is sent
+	HookAfter
+	// HookOnResponse is executed after the response has been written
+	HookOnResponse
+)
+
+// HookMatcher is a function that determines whether a hook should execute
+// for a given request context. It allows hooks to be conditionally applied
+// based on path, method, headers, or other request properties.
+type HookMatcher func(ctx *RequestContext) bool
+
+// HookHandler is the function that executes a hook. It receives the request
+// context and can modify request state, set UserID, populate Values, or set
+// the Handled flag to short-circuit further processing.
+type HookHandler func(ctx *RequestContext) error
+
+// Hook defines a request lifecycle hook that can be registered by plugins.
+// Hooks provide a clean mechanism for plugins to intercept and modify the
+// request lifecycle without tight coupling to the router.
+//
+// Execution Semantics:
+//   - Hooks execute in three phases: HookOnRequest → HookBefore (route handling) → HookAfter (before response)
+//   - Within each stage, hooks are sorted by PluginID first (grouping), then by Order within each plugin
+//   - Order values are plugin-local: comparing order only makes sense between hooks with the same PluginID
+//   - If a hook's Handler returns an error, it is logged but does not stop further hook execution
+//   - If a hook sets ctx.Handled=true, execution of subsequent hooks at that stage stops
+//   - Hooks without a PluginID execute for all routes; hooks with PluginID only execute if listed in route metadata
+//   - If a hook's Matcher returns false, the hook is skipped for that request
+//   - Errors returned by HookHandler should not panic; they are handled gracefully
+//   - Async hooks execute in background goroutines and do not block the response (side-effects only)
+type Hook struct {
+	// Stage determines when this hook is executed
+	Stage HookStage
+	// PluginID identifies a plugin capability (e.g., "session.auth", "bearer.auth", "csrf.protect").
+	// If set, hook only executes if PluginID is in ctx.Route.Metadata["plugins"].
+	// If empty, hook executes based on Matcher logic.
+	PluginID string
+	// Matcher optionally filters when this hook should run (optional).
+	// Checked after PluginID filtering, if present.
+	Matcher HookMatcher
+	// Handler is the function that executes the hook
+	Handler HookHandler
+	// Order determines execution order when multiple hooks are at the same stage
+	// Lower order values execute first (0 is before 1, which is before 2, etc.).
+	// Order is local to the plugin (only compared against other hooks with same PluginID).
+	Order int
+	// Async determines if this hook runs in a background goroutine without blocking the response.
+	// Async hooks are for side-effects only (logging, analytics, events, webhooks, secondary storage).
+	// Must be false for all auth validation, CSRF, rate-limiting, and critical security hooks.
+	// Async hooks execute with a timeout to prevent leaks and have no access to response writer.
+	Async bool
+}
+
+// PluginWithHooks is an optional interface that plugins can implement
+// to provide request lifecycle hooks.
+type PluginWithHooks interface {
+	Hooks() []Hook
 }
 
 type PluginOption func(p Plugin)
 
-type BasePlugin struct {
-	metadata      PluginMetadata
-	config        PluginConfig
-	ctx           *PluginContext
-	init          func(ctx *PluginContext) error
-	migrations    []any // Database migration structs (GORM models)
-	routes        []PluginRoute
-	rateLimit     *PluginRateLimit
-	endpointHooks any
-	databaseHooks any
-	eventHooks    any
-	webhooks      any
-	close         func() error
-}
-
-func (p *BasePlugin) Metadata() PluginMetadata {
-	return p.metadata
-}
-
-func (p *BasePlugin) SetMetadata(meta PluginMetadata) {
-	p.metadata = meta
-}
-
-func (p *BasePlugin) Config() PluginConfig {
-	return p.config
-}
-
-func (p *BasePlugin) SetConfig(config PluginConfig) {
-	p.config = config
-}
-
-func (p *BasePlugin) Ctx() *PluginContext {
-	return p.ctx
-}
-
-func (p *BasePlugin) SetCtx(ctx *PluginContext) {
-	p.ctx = ctx
-}
-
-func (p *BasePlugin) Init(ctx *PluginContext) error {
-	if p.init != nil {
-		return p.init(ctx)
-	}
-	return nil
-}
-
-func (p *BasePlugin) SetInit(fn func(ctx *PluginContext) error) {
-	p.init = fn
-}
-
-func (p *BasePlugin) Migrations() []any {
-	return p.migrations
-}
-
-func (p *BasePlugin) SetMigrations(migrations []any) {
-	p.migrations = migrations
-}
-
-func (p *BasePlugin) Routes() []PluginRoute {
-	return p.routes
-}
-
-func (p *BasePlugin) SetRoutes(routes []PluginRoute) {
-	p.routes = routes
-}
-
-func (p *BasePlugin) RateLimit() *PluginRateLimit {
-	return p.rateLimit
-}
-
-func (p *BasePlugin) SetRateLimit(rateLimit *PluginRateLimit) {
-	p.rateLimit = rateLimit
-}
-
-func (p *BasePlugin) EndpointHooks() any {
-	return p.endpointHooks
-}
-
-func (p *BasePlugin) SetEndpointHooks(hooks any) {
-	p.endpointHooks = hooks
-}
-
-func (p *BasePlugin) DatabaseHooks() any {
-	return p.databaseHooks
-}
-
-func (p *BasePlugin) SetDatabaseHooks(hooks any) {
-	p.databaseHooks = hooks
-}
-
-func (p *BasePlugin) EventHooks() any {
-	return p.eventHooks
-}
-
-func (p *BasePlugin) SetEventHooks(hooks any) {
-	p.eventHooks = hooks
-}
-
-func (p *BasePlugin) Webhooks() any {
-	return p.webhooks
-}
-
-func (p *BasePlugin) SetWebhooks(hooks any) {
-	p.webhooks = hooks
-}
-
-func (p *BasePlugin) Close() error {
-	if p.close != nil {
-		return p.close()
-	}
-	return nil
-}
-
-func (p *BasePlugin) SetClose(fn func() error) {
-	p.close = fn
-}
-
+// PluginRegistry manages plugin registration and lifecycle
 type PluginRegistry interface {
-	Register(p Plugin)
+	Register(p Plugin) error
 	InitAll() error
-	RunMigrations() error
+	RunMigrations(ctx context.Context) error
+	DropMigrations(ctx context.Context) error
 	Plugins() []Plugin
+	GetConfig() *Config
 	CloseAll()
+	GetPlugin(pluginID string) Plugin
 }

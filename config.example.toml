@@ -16,162 +16,297 @@ base_path = "/auth"
 # However if you want, generate using `openssl rand -base64 50 | tr -dc 'A-Za-z0-9' | cut -c -40`
 secret = ""
 
+# -----------------------------------
+# - Logger Configuration
+# -----------------------------------
+
 [logger]
 level = "debug"  # Options: "debug", "info", "warn", "error"
 
-# Database Configuration
+# -----------------------------------
+# - Database Configuration
+# -----------------------------------
+
 [database]
 provider = "sqlite"
 # SECURITY NOTE: It is recommended to set the 'connection_string' via the 
 # GO_BETTER_AUTH_DATABASE_URL environment variable rather than hardcoding it here.
 url = "auth.db"
 max_open_conns = 25
-max_idle_conns = 25
-conn_max_lifetime = "1m"
+max_idle_conns = 5
+conn_max_lifetime = "10m"
 
-# Secondary Storage Configuration
-[secondary_storage]
-type = "memory"  # or "database" or "custom"
+# -----------------------------------
+# - Security Configuration
+# -----------------------------------
 
-# Memory options (if type = "memory")
-[secondary_storage.memory_options]
+[security]
+trusted_origins = []
+
+# -----------------------------------
+# - Plugins Configuration
+# -----------------------------------
+
+[plugins]
+
+# Core plugin is required for basic functionality
+[plugins.core]
+enabled = true
+
+# Enable the Config Manager plugin to allow runtime configuration changes via the Admin API
+[plugins.config_manager]
+enabled = true
+
+# Enable the Secondary Storage plugin to provide secondary storage backends for other plugins
+[plugins.secondary_storage]
+enabled = true
+provider = "memory" # Options: "memory", "database", "redis"
+
+[plugins.secondary_storage.memory]
 cleanup_interval = "1m"
 
-# Database options (if type = "database")
-[secondary_storage.database_options]
-cleanup_interval = "1m"
+# [plugins.secondary_storage.database]
+# cleanup_interval = "1m"
 
-# Email Configuration
-[email]
-provider = "smtp"
-smtp_host = "localhost"
-smtp_port = 2525
-smtp_user = "user"
-smtp_pass = "pass"
-from = "noreply@example.com"
+# [plugins.secondary_storage.redis]
+# SECURITY NOTE: It is recommended to set the 'url' via the
+# REDIS_URL environment variable rather than hardcoding it here.
+# url = ""
+# max_retries = 3
+# pool_size = 10
+# pool_timeout = "30s"
 
-# Email/Password Authentication Configuration
-[email_password]
+# Email Plugin Configuration (handles email sending via SMTP or Resend)
+[plugins.email]
+enabled = true
+provider = "smtp"  # Options: "smtp", "resend"
+from_address = "noreply@example.com"
+
+# Optional: Fallback provider if primary fails
+# fallback_provider = "resend"
+
+# Resend API Configuration (when provider = "resend")
+# NOTE: The Resend API key MUST be set via the RESEND_API_KEY environment variable.
+
+# CORS Plugin Configuration (to handle Cross-Origin Resource Sharing)
+[plugins.cors]
+enabled = true
+allowed_origins = ["*"] # If using session plugin, specify exact origins instead of "*"
+allowed_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+allowed_headers = ["Authorization", "Content-Type", "Cookie", "Set-Cookie"]
+exposed_headers = []
+allow_credentials = true
+max_age = "24h"
+# IMPORTANT CORS NOTE: If using the session plugin, the CORS plugin must specify exact allowed_origins.
+# Setting allowed_origins = ["*"] with allow_credentials = true is NOT allowed by browsers and will fail.
+# Example CORS configuration when using sessions:
+# allowed_origins = ["https://yourdomain.com", "https://api.yourdomain.com"]
+# allow_credentials = true
+
+# CSRF Plugin Configuration (for protecting against CSRF attacks)
+[plugins.csrf]
+enabled = true
+cookie_name = "gobetterauth_csrf"
+header_name = "X-GOBETTERAUTH-CSRF-TOKEN"
+max_age = "24h"
+same_site = "lax"  # Options: "lax", "strict", "none" (Note: HttpOnly=false and Secure=true are hardcoded for Double-Submit Cookie pattern)
+# Go 1.25+ Header-based CSRF Protection (Recommended)
+# When enabled, validates cross-origin requests using Sec-Fetch-Site and Origin/Host headers.
+# This provides defense-in-depth alongside token validation.
+# Disabled by default for specific clients (mobile apps, CLI tools, webhooks).
+enable_header_protection = false
+
+# Email/Password Plugin Configuration
+[plugins.email_password]
 enabled = true
 min_password_length = 8
 max_password_length = 128
 disable_sign_up = false
 require_email_verification = true
 auto_sign_in = true
-reset_token_expiry = "24h"
-
-# Email Verification Configuration
-[email_verification]
-auto_sign_in = true
-send_on_sign_up = true
-send_on_sign_in = false
+send_email_on_sign_up = true
+send_email_on_sign_in = false
 expires_in = "24h"
 
-# User Configuration
-[user]
-[user.change_email]
+# OAuth2 Plugin Configuration (for social logins)
+[plugins.oauth2]
 enabled = true
+cookie_ttl = "5m"
+session_ttl = "24h"
 
-# Session Configuration
-[session]
-cookie_name = "gobetterauth.session_token"
-expires_in = "168h"  # in hours (7 days)
-update_age = "24h"
-
-# CSRF Configuration
-[csrf]
-enabled = true
-cookie_name = "gobetterauth_csrf"
-header_name = "X-GOBETTERAUTH-CSRF-TOKEN"
-expires_in = "1h"
-
-# Social Providers Configuration
 # SECURITY NOTE: It is recommended to set the 'client_secret' for each of these via their 
 # respective environment variables as shown in the .env.example file rather than hardcoding it here.
-[social_providers]
-[social_providers.discord]
+[plugins.oauth2.providers.discord]
 enabled = true
-client_id = "your-discord-client-id"
-client_secret = "your-discord-client-secret"
-redirect_url = "http://localhost:8080/auth/oauth2/discord/callback"
+client_id = "your-client-id"
+client_secret = "your-client-secret"
+redirect_url = "http://localhost:8080/auth/oauth2/callback/discord"
 scopes = ["email", "identify"]
 
-[social_providers.github]
+[plugins.oauth2.providers.github]
 enabled = true
-client_id = "your-github-client-id"
-client_secret = "your-github-client-secret"
-redirect_url = "http://localhost:8080/auth/oauth2/github/callback"
+client_id = "your-client-id"
+client_secret = "your-client-secret"
+redirect_url = "http://localhost:8080/auth/oauth2/callback/github"
 scopes = ["user:email"]
 
-[social_providers.google]
+[plugins.oauth2.providers.google]
 enabled = true
-client_id = "your-google-client-id"
-client_secret = "your-google-client-secret"
-redirect_url = "http://localhost:8080/auth/oauth2/google/callback"
+client_id = "your-client-id"
+client_secret = "your-client-secret"
+redirect_url = "http://localhost:8080/auth/oauth2/callback/google"
 scopes = ["openid", "email", "profile"]
 
-# Example of a generic OAuth2 provider
-[social_providers.custom]
-enabled = false
-client_id = "your-custom-client-id"
-client_secret = "your-custom-client-secret"
-redirect_url = "http://localhost:8080/auth/oauth2/custom/callback"
-scopes = ["email", "profile"]
-auth_url = "https://example.com/oauth/authorize"
-token_url = "https://example.com/oauth/token"
-user_info_url = "https://example.com/oauth/userinfo"
+# Example: Additional fields for a custom OAuth2 provider
+# auth_url = "https://provider.com/oauth2/authorize"
+# token_url = "https://provider.com/oauth2/token"
+# user_info_url = "https://provider.com/oauth2/userinfo"
+# user_id_field = "sub"
+# email_field = "email"
+# name_field = "name"
+# picture_field = "picture"
 
-# Trusted Origins Configuration
-[trusted_origins]
-origins = ["http://localhost:3000", "https://yourdomain.com"]
+# Example: Generic OAuth2 Provider Configuration
+# You can add any custom OAuth2 provider by specifying a new section under [plugins.oauth2.providers.<provider_name>]
+# Replace <provider_name> with your desired provider key (e.g., "mycustom")
+# The following is a template for a generic OAuth2 provider:
+#
+# [plugins.oauth2.providers.mycustom]
+# enabled = true
+# client_id = "your-client-id"
+# client_secret = "your-client-secret"
+# redirect_url = "http://localhost:8080/auth/oauth2/callback/mycustom"
+# auth_url = "https://provider.com/oauth2/authorize"
+# token_url = "https://provider.com/oauth2/token"
+# user_info_url = "https://provider.com/oauth2/userinfo"
+# scopes = ["profile", "email"]
+# # Optional: Custom field mappings if your provider returns non-standard fields
+# user_id_field = "sub"
+# email_field = "email_address"
+# name_field = "full_name"
+# picture_field = "avatar_url"
 
-# Rate Limit Configuration
-[rate_limit]
+# Session Plugin Configuration (use for SSR apps)
+# Cookie-based session authentication that stores session tokens as HTTP-only cookies
+# Note: Client IP address and User-Agent are automatically captured from the request and
+# stored in the session record for security audit trails and session management features.
+[plugins.session]
 enabled = true
-window = "1m"
-max = 100
-algorithm = "fixed_window"
-prefix = "rate_limit:"
-[rate_limit.ip]
-headers = ["X-Forwarded-For", "X-Real-IP"]
-# [rate_limit.custom_rules]
-# "path/to/your/endpoint" = { disabled = false, window = "1m", max = 5 }
+cookie_name = "gobetterauth.session_token"
+cookie_path = "/"  # Path scope for the cookie (default: "/"). Set to a specific path if needed
+max_age = "24h"  # Session duration (default: 24h). Controls both cookie expiry and database expiry
+secure = false  # Set to true in production with HTTPS
+http_only = true  # Prevents JavaScript access to the cookie (recommended: true for security)
+same_site = "lax"  # Options: "lax", "strict", "none" (recommended: "lax" for balance of security and functionality)
 
-# Event Bus Configuration
+# JWT Plugin Configuration (use for SPAs and mobile apps)
+# [plugins.jwt]
+# enabled = true
+# expires_in = "15m"
+# refresh_expires_in = "7d"
+# header_name = "Authorization"
+
+# Bearer Plugin Configuration (use for SPAs and mobile apps)
+# [plugins.bearer]
+# enabled = true
+# header_name = "Authorization"
+
+# Rate Limit Plugin Configuration (to prevent abuse and brute-force attacks)
+# [plugins.ratelimit]
+# enabled = true
+# window = "1m"
+# max = 100
+# prefix = "ratelimit:"
+# provider = "memory" # Options: "memory", "redis", "database"
+# [plugins.ratelimit.custom_rules]
+# "/path/to/your/endpoint" = { disabled = false, window = "1m", max = 5, prefix = "" }
+#
+# Optional: Configure cleanup intervals for storage providers
+# [plugins.ratelimit.memory]
+# cleanup_interval = "1m"  # How often to remove expired entries (default: 1m)
+# 
+# [plugins.ratelimit.database]
+# cleanup_interval = "1m"  # How often to remove expired entries from database (default: 1m)
+
+# -----------------------------------
+# - Event Bus Configuration
+# -----------------------------------
+# The event bus handles internal authentication events and allows plugins to communicate
+# Supports multiple providers via Watermill.
+# Provider options: "gochannel", "sqlite", "postgres", "redis", "kafka", "nats", "rabbitmq"
+
 [event_bus]
-enabled = true
-prefix = "gobetterauth"
-max_concurrent_handlers = 10
-pubsub_type = "memory"  # or "custom" (only supported in library mode), etc.
+# Optional prefix for all event topics (default: "")
+prefix = ""
+# Maximum concurrent handlers for event processing (default: 100)
+max_concurrent_handlers = 100
 
-# =======================
-# Webhooks Configuration
-# =======================
-# Configure HTTP webhooks for authentication events
-# Webhooks are called asynchronously when events occur
-# Use these to integrate with external services (CRM, analytics, notifications, etc.)
+# GoChannel Configuration (Default - In-Memory)
+# Best for development and testing - events lost on restart
+# Other providers enable distributed event handling across multiple instances
+provider = "gochannel"
+[event_bus.go_channel]
+buffer_size = 100
 
-# [webhooks.on_user_signed_up]
-# url = "https://myapp.com/webhooks/user-signed-up"
-# headers = { "Authorization" = "Bearer your-secret-token", "X-Custom-Header" = "value" }
-# timeout_seconds = "5s"
+# SQLite Configuration
+# Event storage in SQLite file (good for single-instance deployments with persistence)
+# provider = "sqlite"
+# [event_bus.sqlite]
+# db_path = "events.db"  # File path for the SQLite database (relative to current working directory)
 
-# [webhooks.on_user_logged_in]
-# url = "https://myapp.com/webhooks/user-logged-in"
-# headers = { "Authorization" = "Bearer your-secret-token" }
-# timeout_seconds = "5s"
+# Redis Configuration
+# Enables distributed event handling across multiple instances
+# provider = "redis"
+# [event_bus.redis]
+# Prefer to use EVENT_BUS_REDIS_URL environment variable to set the URL
+# url = "redis://localhost:6379/0"
+# consumer_group = "gobetterauth_consumer_group"
 
-# [webhooks.on_email_verified]
-# url = "https://myapp.com/webhooks/email-verified"
-# headers = { "Authorization" = "Bearer your-secret-token" }
-# timeout_seconds = "5s"
+# Kafka Configuration
+# For high-throughput, distributed event streaming
+# provider = "kafka"
+# [event_bus.kafka]
+# brokers = "localhost:9092"
+# consumer_group = "gobetterauth_consumer_group"
 
-# [webhooks.on_password_changed]
-# url = "https://myapp.com/webhooks/password-changed"
-# headers = { "Authorization" = "Bearer your-secret-token" }
-# timeout_seconds = "5s"
+# NATS Configuration
+# Lightweight, cloud-native messaging
+# provider = "nats"
+# [event_bus.nats]
+# url = "nats://localhost:4222"
 
-# [webhooks.on_email_changed]
-# url = "https://myapp.com/webhooks/email-changed"
-# headers = { "Authorization" = "Bearer your-secret-token" }
-# timeout_seconds = "5s"
+# AMQP Configuration (RabbitMQ)
+# Traditional message broker with advanced routing
+# provider = "rabbitmq"
+# [event_bus.rabbitmq]
+# Prefer to use EVENT_BUS_RABBITMQ_URL environment variable to set the URL
+# url = "amqp://guest:guest@localhost:5672/"
+
+# -----------------------------------
+# - Route-to-Plugin Mappings (Standalone Mode)
+# -----------------------------------
+# Declaratively map routes to plugins for hook execution.
+# In standalone mode, all plugin-to-route associations are defined here via [[route_mappings]] tables.
+# This enables full plugin routing control without code changes.
+# Plugin IDs follow the format "{plugin_name}.{operation}" (e.g., "session.auth", "csrf.protect")
+
+# Example routes:
+# [[route_mappings]]
+# path = "/me"
+# method = "GET"
+# plugins = ["session.auth"] (SSR) or ["bearer.auth"] (SPA/mobile)
+
+# [[route_mappings]]
+# path = "/sign-in"
+# method = "POST"
+# plugins = ["session.issuance"]
+
+# [[route_mappings]]
+# path = "/sign-up"
+# method = "POST"
+# plugins = ["session.issuance"]
+
+# [[route_mappings]]
+# path = "/change-password"
+# method = "POST"
+# plugins = ["session.auth", "csrf.protect"]

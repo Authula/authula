@@ -50,3 +50,4 @@ temp/
 
 # Custom
 config.toml
+events.db*

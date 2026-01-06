@@ -13,26 +13,18 @@ const (
 	SecondaryStorageTypeCustom   SecondaryStorageType = "custom"
 )
 
-// KeyValueStore represents the persistent key-value store table in the database.
-// This is a domain model used for secondary storage operations.
-type KeyValueStore struct {
-	Key       string     `gorm:"primaryKey;type:varchar(255)" json:"key" `
-	Value     string     `json:"value"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-}
-
-// TableName overrides the table name for GORM
-func (KeyValueStore) TableName() string {
-	return "key_value_store"
-}
-
 // SecondaryStorage defines an interface for secondary storage operations.
 type SecondaryStorage interface {
+	// Get retrieves the value associated with the given key.
 	Get(ctx context.Context, key string) (any, error)
+	// Set stores a value with an optional time-to-live (TTL).
 	Set(ctx context.Context, key string, value any, ttl *time.Duration) error
+	// Delete removes the value associated with the given key.
 	Delete(ctx context.Context, key string) error
+	// Incr increments an integer value associated with the given key.
 	Incr(ctx context.Context, key string, ttl *time.Duration) (int, error)
+	// TTL retrieves the time-to-live (TTL) for the given key.
+	TTL(ctx context.Context, key string) (*time.Duration, error)
+	// Close closes the storage and releases any resources.
 	Close() error
 }

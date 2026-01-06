@@ -1,27 +1,42 @@
 package util
 
 import (
+	"fmt"
 	"net/url"
+	"strings"
 )
 
+// BuildVerificationURL constructs the verification endpoint URL with optional callback.
 func BuildVerificationURL(baseURL string, basePath string, token string, callbackURL *string) string {
-	urlToConstruct := baseURL + basePath + "/verify-email"
+	return BuildActionURL(baseURL, basePath, "/verify-email", token, callbackURL)
+}
 
-	// We can safely ignore the error here because we are constructing the URL ourselves which is always valid.
-	url, _ := url.Parse(urlToConstruct)
-	q := url.Query()
+// BuildActionURL centralizes URL building logic for token-based flows while preserving callback semantics.
+func BuildActionURL(baseURL, basePath, actionPath, token string, callbackURL *string) string {
+	urlToConstruct := buildAbsoluteActionURL(baseURL, basePath, actionPath)
+	urlObj, _ := url.Parse(urlToConstruct)
+	q := urlObj.Query()
 	q.Set("token", token)
 
 	if callbackURL != nil && *callbackURL != "" {
-		// Parse the callback URL and add token as query parameter
-		callbackUrlObj, _ := url.Parse(*callbackURL)
-		callbackQuery := callbackUrlObj.Query()
-		callbackQuery.Set("token", token)
-		callbackUrlObj.RawQuery = callbackQuery.Encode()
-		q.Set("callback_url", callbackUrlObj.String())
+		q.Set("callback_url", *callbackURL)
 	}
 
-	url.RawQuery = q.Encode()
+	urlObj.RawQuery = q.Encode()
+	return urlObj.String()
+}
 
-	return url.String()
+func buildAbsoluteActionURL(baseURL, basePath, actionPath string) string {
+	base := strings.TrimRight(baseURL, "/")
+	pathSegment := strings.Trim(basePath, "/")
+	actionSegment := strings.TrimLeft(actionPath, "/")
+
+	switch {
+	case pathSegment == "" && actionSegment == "":
+		return base
+	case pathSegment == "":
+		return fmt.Sprintf("%s/%s", base, actionSegment)
+	default:
+		return fmt.Sprintf("%s/%s/%s", base, pathSegment, actionSegment)
+	}
 }

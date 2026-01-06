@@ -1,28 +1,26 @@
 # Variables
 APP_NAME=go-better-auth
 BINARY_PATH=./tmp/$(APP_NAME)
-SQLITE_DB?=auth.db
-POSTGRES_URL?=host=host.docker.internal user=postgres dbname=gobetterauth sslmode=disable
 
 .PHONY: help build build-exe run test clean install setup
-.PHONY: test test-coverage
+.PHONY: test-coverage
 .PHONY: lint fmt vet deps-update all check quick-check ci
 
 # Help command
 help: ## Display this help screen
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-# Build commands
+# Build commands`
 build: ## Build the package (library)
 	@echo "Building $(APP_NAME) package..."
-	@go build ./...
+	@GOEXPERIMENT=greenteagc go build ./...
 	@echo "Build complete!"
 
 build-exe: ## Build the binary executable
 	@echo "Building $(APP_NAME) binary..."
 	@mkdir -p ./tmp
 	@rm -rf ./tmp/$(APP_NAME)
-	@go build -o $(BINARY_PATH) ./cmd/main.go
+	@GOEXPERIMENT=greenteagc go build -o $(BINARY_PATH) ./cmd/main.go
 	@echo "Binary built: $(BINARY_PATH)"
 
 run: ## Run the application with live reloading using air
@@ -52,6 +50,16 @@ deps-update: ## Update dependencies
 	@go get -u ./...
 	@go mod tidy
 
+# Library mode development
+library-test: test ## Run library mode tests
+
+# Development setup
+setup: install ## Setup development environment
+	@echo "Setting up development environment..."
+	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@go install github.com/cosmtrek/air@latest
+	@echo "Development environment setup complete!"
+
 # Clean commands
 clean: ## Clean build artifacts
 	@echo "Cleaning..."
@@ -72,13 +80,6 @@ vet: ## Run go vet
 	@echo "Running go vet..."
 	@go vet ./...
 
-# Development setup
-setup: install ## Setup development environment
-	@echo "Setting up development environment..."
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	@go install github.com/cosmtrek/air@latest
-	@echo "Development environment setup complete!"
-
 # All-in-one commands
 all: clean install build check ## Clean, install deps, build, and run all checks
 
@@ -87,6 +88,9 @@ check: fmt vet lint test ## Run all checks (format, vet, lint, test)
 quick-check: fmt vet test ## Run quick checks (format, vet, fast tests)
 
 ci: clean install check ## CI pipeline (clean, install, check)
+
+# Integration testing
+integration-test: docker-down docker-up docker-test ## Run integration tests with Docker
 
 # Default target
 .DEFAULT_GOAL := help

@@ -46,7 +46,7 @@ func TestBuildVerificationURL_BasePathTrailingSlash(t *testing.T) {
 	baseURL := "https://example.com"
 	basePath := "/auth/"
 	token := "token"
-	expected := "https://example.com/auth//verify-email?token=token"
+	expected := "https://example.com/auth/verify-email?token=token"
 
 	result := BuildVerificationURL(baseURL, basePath, token, nil)
 	if result != expected {

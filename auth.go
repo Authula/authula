@@ -3,360 +3,270 @@ package gobetterauth
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
-	"os"
+	"sync"
 
-	"github.com/GoBetterAuth/go-better-auth/env"
-	"github.com/GoBetterAuth/go-better-auth/internal/admin"
-	"github.com/GoBetterAuth/go-better-auth/internal/auth"
-	"github.com/GoBetterAuth/go-better-auth/internal/handlers"
-	"github.com/GoBetterAuth/go-better-auth/internal/middleware"
+	"github.com/GoBetterAuth/go-better-auth/internal/plugins"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/storage"
 )
 
-type Auth struct {
-	Config            *models.Config
-	logger            models.Logger
-	configManager     models.ConfigManager
-	mux               *http.ServeMux
-	Service           *auth.Service
-	Api               models.AuthApi
-	routes            []models.CustomRoute
-	middleware        *models.ApiMiddleware
-	EventBus          models.EventBus
-	pluginRegistry    models.PluginRegistry
-	OnRestartRequired func() error
+type AuthConfig struct {
+	Config  *models.Config
+	Plugins []models.Plugin
 }
 
-// New creates a new Auth instance using the provided config and options.
-func New(baseConfig *models.Config) *Auth {
-	activeConfig := baseConfig
-	InitDefaults(activeConfig)
-	logger := activeConfig.Logger.Logger
+// Auth is a composition root and entry point for the authentication framework.
+type Auth struct {
+	config          *models.Config
+	logger          models.Logger
+	router          *Router
+	ServiceRegistry models.ServiceRegistry
+	PluginRegistry  models.PluginRegistry
+	handlerOnce     sync.Once
+}
 
-	if _, err := InitDatabase(activeConfig); err != nil {
-		panic(fmt.Sprintf("failed to initialize database: %s", err.Error()))
-	}
-	// Auto-migrate core models. This is crucial to run here to ensure that the core tables
-	// exist before following the next steps as some of these functions rely on core tables to exist.
-	RunCoreMigrations(activeConfig.DB)
+// New creates a new Auth instance using the provided config and plugins.
+// Handles plugin registration, migrations, and initialization in unified way.
+// Works identically whether plugins are manually instantiated or built from config.
+func New(authConfig *AuthConfig) *Auth {
+	util.InitValidator()
 
-	configManager, err := InitConfigManager(activeConfig)
+	logger := InitLogger(authConfig.Config)
+
+	db, err := InitDatabase(authConfig.Config, logger, authConfig.Config.Logger.Level)
 	if err != nil {
-		logger.Error("Failed to initialize config manager", "error", err)
-		panic(err.Error())
+		panic(fmt.Errorf("failed to initialize database: %w", err))
 	}
 
-	if err := InitSecondaryStorage(activeConfig); err != nil {
-		logger.Error("Failed to initialize secondary storage", "error", err)
-		panic(err.Error())
-	} else {
-		if activeConfig.SecondaryStorage.Type == models.SecondaryStorageTypeDatabase {
-			if dbStorage, ok := activeConfig.SecondaryStorage.Storage.(*storage.DatabaseSecondaryStorage); ok {
-				dbStorage.StartCleanup()
+	router := NewRouter(logger, authConfig.Config.BasePath, nil)
+
+	eventBus, err := InitEventBus(authConfig.Config)
+	if err != nil {
+		panic(fmt.Errorf("failed to initialize event bus: %w", err))
+	}
+
+	serviceRegistry := plugins.NewServiceRegistry()
+
+	pluginRegistry := plugins.NewPluginRegistry(
+		authConfig.Config,
+		logger,
+		db,
+		serviceRegistry,
+		eventBus,
+	)
+
+	// Initialize PreParsedConfigs if not already done
+	if authConfig.Config.PreParsedConfigs == nil {
+		authConfig.Config.PreParsedConfigs = make(map[string]any)
+	}
+
+	// Initialize Plugins map if not already done
+	if authConfig.Config.Plugins == nil {
+		authConfig.Config.Plugins = make(models.PluginsConfig)
+	}
+
+	// Cache type-safe configs for all plugins and auto-enable those not explicitly disabled
+	for _, plugin := range authConfig.Plugins {
+		pluginID := plugin.Metadata().ID
+
+		// Check if plugin is explicitly disabled in config
+		isDisabled := false
+		if pluginConfig, ok := authConfig.Config.Plugins[pluginID]; ok {
+			if configMap, ok := pluginConfig.(map[string]any); ok {
+				if enabled, found := configMap["enabled"]; found {
+					if b, ok := enabled.(bool); ok && !b {
+						isDisabled = true
+					}
+				}
 			}
 		}
+
+		// If not explicitly disabled, enable the plugin
+		if !isDisabled {
+			if authConfig.Config.Plugins[pluginID] == nil {
+				authConfig.Config.Plugins[pluginID] = make(map[string]any)
+			}
+			if configMap, ok := authConfig.Config.Plugins[pluginID].(map[string]any); ok {
+				configMap["enabled"] = true
+			}
+		}
+
+		// Cache the type-safe config
+		authConfig.Config.PreParsedConfigs[pluginID] = plugin.Config()
 	}
 
-	eventBus, err := InitEventBus(activeConfig)
-	if err != nil {
-		logger.Error("Failed to initialise event bus", "error", err)
-		panic(err.Error())
-	}
-
-	mux := http.NewServeMux()
-
-	auth := &Auth{
-		Config:        activeConfig,
-		logger:        logger,
-		configManager: configManager,
-		mux:           mux,
-		routes:        []models.CustomRoute{},
-		EventBus:      eventBus,
-	}
-
-	apiKey := os.Getenv(env.EnvAdminApiKey)
-	adminAuth := func() func(http.Handler) http.Handler {
-		return middleware.AdminAuth(apiKey)
-	}
-	apiMiddleware := &models.ApiMiddleware{
-		// Admin
-		AdminAuth: adminAuth,
-		// Auth
-		Auth:          auth.AuthMiddleware,
-		OptionalAuth:  auth.OptionalAuthMiddleware,
-		CorsAuth:      auth.CorsAuthMiddleware,
-		CSRF:          auth.CSRFMiddleware,
-		RateLimit:     auth.RateLimitMiddleware,
-		EndpointHooks: auth.EndpointHooksMiddleware,
-	}
-	auth.middleware = apiMiddleware
-
-	pluginRateLimits := []models.PluginRateLimit{}
-	for _, p := range activeConfig.Plugins.Plugins {
-		if rateLimit := p.RateLimit(); rateLimit != nil && rateLimit.Enabled {
-			pluginRateLimits = append(pluginRateLimits, *rateLimit)
+	for _, plugin := range authConfig.Plugins {
+		if err := pluginRegistry.Register(plugin); err != nil {
+			panic(fmt.Errorf("failed to register plugin: %w", err))
 		}
 	}
 
-	authService := InitServices(activeConfig, configManager, eventBus, pluginRateLimits)
-	auth.Service = authService
-
-	api := InitApi(activeConfig, authService)
-	auth.Api = api
-
-	webhookExecutor := InitWebhookExecutor(activeConfig)
-	pluginRegistry := InitPluginRegistry(activeConfig, api, eventBus, apiMiddleware, webhookExecutor)
-	auth.pluginRegistry = pluginRegistry
-
-	RunPluginMigrations(pluginRegistry)
-
-	if configManager != nil {
-		go auth.watchForConfigChanges()
+	// Run plugin migrations
+	if err := pluginRegistry.RunMigrations(context.Background()); err != nil {
+		logger.Error("failed to run plugin migrations", "error", err)
+		panic(fmt.Errorf("failed to run plugin migrations: %w", err))
 	}
+
+	// Initialize all plugins in order
+	// Plugin ordering is managed by the plugin registry to ensure dependencies are satisfied
+	// (e.g., Core initializes before ConfigManager, ConfigManager before others)
+	if err := pluginRegistry.InitAll(); err != nil {
+		logger.Error("failed to initialize plugins", "error", err)
+		panic(fmt.Errorf("failed to initialize plugins: %w", err))
+	}
+
+	auth := &Auth{
+		config:          authConfig.Config,
+		logger:          logger,
+		router:          router,
+		ServiceRegistry: serviceRegistry,
+		PluginRegistry:  pluginRegistry,
+	}
+
+	// Register middleware NOW (before any routes are registered)
+	// This ensures Chi's requirement that all middleware is defined before routes
+	auth.registerMiddleware()
 
 	return auth
 }
 
-// watchForConfigChanges watches for configuration changes and updates the active config.
-func (auth *Auth) watchForConfigChanges() {
-	ctx := context.Background()
-	configChan, err := auth.configManager.Watch(ctx)
-	if err != nil {
-		auth.logger.Error("Failed to start watching config changes", "error", err)
-		return
+// registerMiddleware registers all middleware from hooks and plugins
+func (auth *Auth) registerMiddleware() {
+	currentConfig := auth.PluginRegistry.GetConfig()
+	// Register Plugin Global Middleware
+	for _, plugin := range auth.PluginRegistry.Plugins() {
+		if !util.IsPluginEnabled(currentConfig, plugin.Metadata().ID, false) {
+			continue
+		}
+		if middlewareProvider, ok := plugin.(models.PluginWithMiddleware); ok {
+			middleware := middlewareProvider.Middleware()
+			if len(middleware) == 0 {
+				continue
+			}
+			auth.router.RegisterMiddleware(middleware...)
+		}
 	}
+}
 
-	for updatedConfig := range configChan {
-		if updatedConfig != nil {
-			restartRequired := util.RequiresRestart(auth.Config, updatedConfig)
+// RegisterMiddleware registers middleware to the chi router.
+// Middleware should be registered before calling Handler().
+func (auth *Auth) RegisterMiddleware(middleware ...func(http.Handler) http.Handler) {
+	auth.router.RegisterMiddleware(middleware...)
+}
 
-			util.PreserveNonSerializableFieldsOnConfig(auth.Config, updatedConfig)
-			*auth.Config = *updatedConfig
-			auth.logger.Debug("Configuration updated via watcher")
+// RegisterRoute registers a single route with the basePath prefix
+func (auth *Auth) RegisterRoute(route models.Route) {
+	auth.router.RegisterRoute(route)
+}
 
-			if restartRequired {
-				auth.logger.Info("Configuration change requires server restart")
-				if auth.OnRestartRequired != nil {
-					if err := auth.OnRestartRequired(); err != nil {
-						auth.logger.Error("Failed to handle restart requirement", "error", err)
-					}
-				} else {
-					auth.logger.Warn("Configuration change requires restart but no restart handler is set")
+// RegisterRoutes registers multiple routes with the basePath prefix
+func (auth *Auth) RegisterRoutes(routes []models.Route) {
+	auth.router.RegisterRoutes(routes)
+}
+
+// RegisterCustomRoute registers a single custom route without the basePath prefix
+// This is useful for application routes that should not be under the auth basePath
+func (auth *Auth) RegisterCustomRoute(route models.Route) {
+	auth.router.RegisterCustomRoute(route)
+}
+
+// RegisterCustomRoutes registers multiple custom routes without the basePath prefix
+// This is useful for application routes that should not be under the auth basePath
+func (auth *Auth) RegisterCustomRoutes(routes []models.Route) {
+	auth.router.RegisterCustomRoutes(routes)
+}
+
+// RegisterHook registers a single hook to the router.
+// Hooks allow developers to intercept and modify requests/responses at various stages
+// of the request lifecycle (OnRequest, Before, After, OnResponse).
+func (auth *Auth) RegisterHook(hook models.Hook) {
+	auth.router.RegisterHook(hook)
+}
+
+// RegisterHooks registers multiple hooks to the router.
+// Hooks allow developers to intercept and modify requests/responses at various stages
+// of the request lifecycle (OnRequest, Before, After, OnResponse).
+func (auth *Auth) RegisterHooks(hooks []models.Hook) {
+	auth.router.RegisterHooks(hooks)
+}
+
+// GetUserIDFromContext retrieves the user ID from a context.
+// Returns the user ID and a boolean indicating whether it was found.
+// This is a convenience wrapper around models.GetUserIDFromContext to avoid
+// requiring application code to import the models package.
+func (auth *Auth) GetUserIDFromContext(ctx context.Context) (string, bool) {
+	return models.GetUserIDFromContext(ctx)
+}
+
+// GetUserIDFromRequest retrieves the user ID from an HTTP request's context.
+// Returns the user ID and a boolean indicating whether it was found.
+// This is a convenience wrapper around models.GetUserIDFromRequest to avoid
+// requiring application code to import the models package.
+func (auth *Auth) GetUserIDFromRequest(req *http.Request) (string, bool) {
+	return models.GetUserIDFromRequest(req)
+}
+
+// Handler returns the HTTP handler that serves all authentication routes and hooks.
+// It registers routes and hooks from all plugins with the router.
+// This is the entry point for HTTP traffic.
+func (auth *Auth) Handler() http.Handler {
+	auth.handlerOnce.Do(func() {
+		currentConfig := auth.PluginRegistry.GetConfig()
+
+		// Convert route mappings to metadata format for plugin routing
+		// This works identically whether RouteMappings come from config file or library mode
+		if len(currentConfig.RouteMappings) > 0 {
+			routeMetadata, err := util.ConvertRouteMetadata(currentConfig.RouteMappings)
+			if err != nil {
+				auth.logger.Error("failed to convert route metadata", "error", err)
+			} else {
+				adjustedMetadata := make(map[string]map[string]any)
+				for key, metadata := range routeMetadata {
+					adjustedKey := util.ApplyBasePathToMetadataKey(key, auth.router.basePath)
+					adjustedMetadata[adjustedKey] = metadata
+				}
+				auth.router.SetRouteMetadataFromConfig(adjustedMetadata)
+			}
+		}
+
+		// Register Plugin Routes
+		for _, plugin := range auth.PluginRegistry.Plugins() {
+			if !util.IsPluginEnabled(currentConfig, plugin.Metadata().ID, false) {
+				continue
+			}
+			if routeProvider, ok := plugin.(models.PluginWithRoutes); ok {
+				pluginRoutes := routeProvider.Routes()
+				if len(pluginRoutes) == 0 {
+					continue
+				}
+				auth.router.RegisterRoutes(pluginRoutes)
+			}
+		}
+
+		// Register Plugin Hooks
+		for _, plugin := range auth.PluginRegistry.Plugins() {
+			if !util.IsPluginEnabled(currentConfig, plugin.Metadata().ID, false) {
+				continue
+			}
+			if hookProvider, ok := plugin.(models.PluginWithHooks); ok {
+				hooks := hookProvider.Hooks()
+				if len(hooks) > 0 {
+					auth.router.RegisterHooks(hooks)
 				}
 			}
 		}
-	}
-}
+	})
 
-// ---------------------------------
-// MIGRATIONS
-// ---------------------------------
-
-// RunMigrations is a helper function to run all necessary database migrations for core and plugins manually.
-// This is already ran automatically during Auth initialization, so this function is only needed if you want to
-// run migrations manually for some reason.
-func (auth *Auth) RunMigrations() {
-	RunCoreMigrations(auth.Config.DB)
-	RunPluginMigrations(auth.pluginRegistry)
-}
-
-// DropMigrations is a helper function to drop all database tables related to core and plugins.
-// Use with caution as this will delete all data in those tables.
-func (auth *Auth) DropMigrations() {
-	models := []any{
-		// Auth
-		&models.KeyValueStore{},
-		&models.Verification{},
-		&models.Session{},
-		&models.Account{},
-		&models.User{},
-		// Admin
-		&models.AuthSettings{},
-	}
-	for _, model := range models {
-		if err := auth.Config.DB.Migrator().DropTable(model); err != nil {
-			auth.logger.Error("failed to drop table", slog.Any("model", model), slog.Any("error", err))
-			panic(err)
-		}
-	}
-
-	for _, plugin := range auth.pluginRegistry.Plugins() {
-		migrations := plugin.Migrations()
-		if len(migrations) == 0 {
-			continue
-		}
-
-		for _, model := range migrations {
-			if err := auth.Config.DB.Migrator().DropTable(model); err != nil {
-				auth.logger.Error("failed to drop table", slog.Any("model", model), slog.Any("error", err))
-				panic(err)
-			}
-		}
-	}
-}
-
-// ---------------------------------
-// MIDDLEWARES & HANDLERS
-// ---------------------------------
-
-func (auth *Auth) AuthMiddleware() func(http.Handler) http.Handler {
-	return middleware.AuthMiddleware(
-		auth.Service,
-		auth.Config.Session.CookieName,
-	)
-}
-
-func (auth *Auth) OptionalAuthMiddleware() func(http.Handler) http.Handler {
-	return middleware.OptionalAuthMiddleware(
-		auth.Service,
-		auth.Config.Session.CookieName,
-	)
-}
-
-func (auth *Auth) CorsAuthMiddleware() func(http.Handler) http.Handler {
-	return middleware.CorsMiddleware(
-		auth.Config.TrustedOrigins.Origins,
-	)
-}
-
-func (auth *Auth) CSRFMiddleware() func(http.Handler) http.Handler {
-	return middleware.CSRFMiddleware(auth.Config.CSRF)
-}
-
-func (auth *Auth) RateLimitMiddleware() func(http.Handler) http.Handler {
-	return middleware.RateLimitMiddleware(auth.Service.RateLimitService)
-}
-
-func (auth *Auth) EndpointHooksMiddleware() func(http.Handler) http.Handler {
-	return middleware.EndpointHooksMiddleware(auth.Config, auth.Service)
-}
-
-func (auth *Auth) RedirectAuthMiddleware(redirectURL string, status int) func(http.Handler) http.Handler {
-	return middleware.RedirectAuthMiddleware(auth.Service, auth.Config.Session.CookieName, redirectURL, status)
-}
-
-func (auth *Auth) GetUserIDFromContext(ctx context.Context) (string, bool) {
-	value := ctx.Value(middleware.ContextUserID)
-	if value == nil {
-		return "", false
-	}
-	id, ok := value.(string)
-
-	return id, ok
-}
-
-func (auth *Auth) GetUserIDFromRequest(req *http.Request) (string, bool) {
-	return auth.GetUserIDFromContext(req.Context())
-}
-
-func (auth *Auth) RegisterRoute(route models.CustomRoute) {
-	originalHandler := route.Handler
-	route.Handler = func() http.Handler {
-		handler := originalHandler()
-		finalHandler := handler
-		for i := len(route.Middleware) - 1; i >= 0; i-- {
-			finalHandler = route.Middleware[i](finalHandler)
-		}
-		return finalHandler
-	}
-	auth.routes = append(auth.routes, route)
-}
-
-// Handler sets up all routes and returns the final http.Handler
-func (auth *Auth) Handler() http.Handler {
-	basePath := auth.Config.BasePath
-
-	// Ensure basePath starts with "/" and does not end with "/"
-	if basePath[0] != '/' {
-		basePath = "/" + basePath
-	}
-	if len(basePath) > 1 && basePath[len(basePath)-1] == '/' {
-		basePath = basePath[:len(basePath)-1]
-	}
-
-	// Register Admin Routes if configManager is set. Otherwise we're running in Library mode
-	if auth.configManager != nil {
-		// We purposely set basePath to "" here so that admin routes are always available at /admin/*
-		adminRoutes := admin.GetRoutes(auth.Config, auth.configManager, auth.Service, "", auth.middleware)
-		auth.registerBaseRoutes("", adminRoutes)
-	}
-
-	// Register Auth Base Routes
-	authBaseRoutes := handlers.GetRoutes(auth.Config, auth.Service, basePath, auth.middleware)
-	auth.registerBaseRoutes(basePath, authBaseRoutes)
-
-	auth.registerPluginRoutes(basePath)
-
-	// Add catch-all handler for unmatched routes
-	auth.mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth.logger.Info("Catch-all handler triggered", "method", r.Method, "path", r.URL.Path)
-		util.JSONResponse(w, http.StatusNotFound, map[string]any{"message": "Endpoint not found"})
-	}))
-
-	var finalHandler http.Handler = auth.mux
-	finalHandler = middleware.EndpointHooksMiddleware(auth.Config, auth.Service)(finalHandler)
-	if auth.Config.RateLimit.Enabled {
-		finalHandler = auth.RateLimitMiddleware()(finalHandler)
-	}
-
-	return finalHandler
-}
-
-// registerBaseRoutes registers base routes
-func (auth *Auth) registerBaseRoutes(basePath string, routes []models.CustomRoute) {
-	for _, route := range routes {
-		path := fmt.Sprintf("%s%s", basePath, route.Path)
-		handler := route.Handler()
-
-		for i := len(route.Middleware) - 1; i >= 0; i-- {
-			handler = route.Middleware[i](handler)
-		}
-
-		auth.mux.Handle(fmt.Sprintf("%s %s", route.Method, path), handler)
-	}
-}
-
-// registerPluginRoutes registers routes from plugins
-func (auth *Auth) registerPluginRoutes(basePath string) {
-	if auth.pluginRegistry == nil {
-		return
-	}
-
-	plugins := auth.pluginRegistry.Plugins()
-	if len(plugins) == 0 {
-		return
-	}
-
-	for _, plugin := range plugins {
-		pluginRoutes := plugin.Routes()
-		if len(pluginRoutes) == 0 {
-			continue
-		}
-
-		for _, route := range pluginRoutes {
-			path := fmt.Sprintf("%s%s", basePath, route.Path)
-			handler := route.Handler()
-
-			for i := len(route.Middleware) - 1; i >= 0; i-- {
-				handler = route.Middleware[i](handler)
-			}
-
-			auth.mux.Handle(fmt.Sprintf("%s %s", route.Method, path), handler)
-		}
-	}
+	return auth.router.Handler()
 }
 
 // ClosePlugins calls Close for all registered plugins
 func (auth *Auth) ClosePlugins() error {
-	if auth.pluginRegistry == nil {
+	if auth.PluginRegistry == nil {
 		return nil
 	}
 
-	auth.pluginRegistry.CloseAll()
-
+	auth.PluginRegistry.CloseAll()
 	return nil
 }

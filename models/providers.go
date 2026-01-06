@@ -1,10 +1,14 @@
 package models
 
-type ProviderType string
+type AuthProviderID string
 
 const (
-	ProviderEmail   ProviderType = "email"
-	ProviderDiscord ProviderType = "discord"
-	ProviderGitHub  ProviderType = "github"
-	ProviderGoogle  ProviderType = "google"
+	AuthProviderEmail   AuthProviderID = "email"
+	AuthProviderDiscord AuthProviderID = "discord"
+	AuthProviderGitHub  AuthProviderID = "github"
+	AuthProviderGoogle  AuthProviderID = "google"
 )
+
+func (id AuthProviderID) String() string {
+	return string(id)
+}

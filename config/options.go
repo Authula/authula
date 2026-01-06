@@ -5,87 +5,32 @@ import (
 	"os"
 	"time"
 
-	"gorm.io/gorm"
-
 	"github.com/GoBetterAuth/go-better-auth/env"
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 const defaultSecret = "go-better-auth-secret-0123456789"
 
+type ConfigOption func(*models.Config)
+
 // NewConfig builds a Config using functional options with sensible defaults.
-// Works for both library and standalone modes. Options only override zero/empty values.
-func NewConfig(options ...models.ConfigOption) *models.Config {
+// Panics if event bus configuration is invalid or if required secrets are missing in production.
+func NewConfig(options ...ConfigOption) *models.Config {
 	// Define sensible defaults first
 	config := &models.Config{
-		// Default to library mode
-		Mode:     models.ModeLibrary,
 		AppName:  "GoBetterAuth",
 		BasePath: "/auth",
 		BaseURL:  "http://localhost:8080",
 		Secret:   defaultSecret,
-		DB:       nil,
 		Database: models.DatabaseConfig{
 			MaxOpenConns:    25,
 			MaxIdleConns:    5,
 			ConnMaxLifetime: time.Hour,
 		},
-		Email: models.EmailConfig{},
-		EmailPassword: models.EmailPasswordConfig{
-			Enabled:                  false,
-			RequireEmailVerification: false,
-			MinPasswordLength:        8,
-			MaxPasswordLength:        32,
-			ResetTokenExpiry:         1 * time.Hour,
-		},
-		EmailVerification: models.EmailVerificationConfig{
-			AutoSignIn:   false,
-			SendOnSignUp: true,
-			SendOnSignIn: false,
-			ExpiresIn:    1 * time.Hour,
-		},
-		User: models.UserConfig{
-			ChangeEmail: models.ChangeEmailConfig{},
-		},
-		Session: models.SessionConfig{
-			CookieName: "gobetterauth.session_token",
-			ExpiresIn:  7 * 24 * time.Hour,
-			UpdateAge:  24 * time.Hour,
-		},
-		CSRF: models.CSRFConfig{
-			Enabled:    false,
-			CookieName: "gobetterauth_csrf",
-			HeaderName: "X-GOBETTERAUTH-CSRF-TOKEN",
-			ExpiresIn:  7 * 24 * time.Hour,
-		},
-		SocialProviders: map[string]models.OAuth2ProviderConfig{},
-		TrustedOrigins: models.TrustedOriginsConfig{
-			Origins: []string{},
-		},
-		SecondaryStorage: models.SecondaryStorageConfig{
-			Type: models.SecondaryStorageTypeMemory,
-		},
-		RateLimit: models.RateLimitConfig{
-			Enabled:   false,
-			Window:    1 * time.Minute,
-			Max:       100,
-			Algorithm: models.RateLimitAlgorithmFixedWindow,
-			Prefix:    "rate_limit:",
-			IP: models.IPConfig{
-				Headers: []string{
-					"x-forwarded-for",
-				},
-			},
-		},
-		EndpointHooks: models.EndpointHooksConfig{},
-		DatabaseHooks: models.DatabaseHooksConfig{},
-		EventHooks:    models.EventHooksConfig{},
-		Webhooks:      models.WebhooksConfig{},
-		EventBus: models.EventBusConfig{
-			Enabled:               false,
-			MaxConcurrentHandlers: 10,
-		},
-		Plugins: models.PluginsConfig{},
+		Logger:   models.LoggerConfig{},
+		EventBus: models.EventBusConfig{},
+		Security: models.SecurityConfig{},
+		Plugins:  models.PluginsConfig{},
 	}
 
 	// Apply the options - they override defaults only if non-zero/non-empty
@@ -93,20 +38,25 @@ func NewConfig(options ...models.ConfigOption) *models.Config {
 		option(config)
 	}
 
+	// Validate BasePath format
+	if config.BasePath != "" && config.BasePath[0] != '/' {
+		panic(fmt.Errorf("BasePath must start with '/', got: %q", config.BasePath))
+	}
+
+	// Validate event bus configuration
+	if err := validateEventBusConfig(&config.EventBus); err != nil {
+		panic(fmt.Errorf("invalid event bus configuration: %w", err))
+	}
+
 	// Validate production configuration
 	if os.Getenv(env.EnvGoEnvironment) == "production" && config.Secret == defaultSecret {
-		panic(fmt.Sprintf("A custom secret must be set in production mode. Please set a custom secret via configuration or the %s environment variable.", env.EnvSecret))
+		panic(fmt.Errorf("a custom secret must be set in production mode. Please set a custom secret via configuration or the %s environment variable", env.EnvSecret))
 	}
 
 	return config
 }
-func WithMode(mode models.Mode) models.ConfigOption {
-	return func(c *models.Config) {
-		c.Mode = mode
-	}
-}
 
-func WithAppName(name string) models.ConfigOption {
+func WithAppName(name string) ConfigOption {
 	return func(c *models.Config) {
 		if name != "" {
 			c.AppName = name
@@ -114,7 +64,7 @@ func WithAppName(name string) models.ConfigOption {
 	}
 }
 
-func WithBaseURL(url string) models.ConfigOption {
+func WithBaseURL(url string) ConfigOption {
 	return func(c *models.Config) {
 		if envValue := os.Getenv(env.EnvBaseURL); envValue != "" {
 			c.BaseURL = envValue
@@ -124,7 +74,7 @@ func WithBaseURL(url string) models.ConfigOption {
 	}
 }
 
-func WithBasePath(path string) models.ConfigOption {
+func WithBasePath(path string) ConfigOption {
 	return func(c *models.Config) {
 		if path != "" {
 			c.BasePath = path
@@ -132,7 +82,7 @@ func WithBasePath(path string) models.ConfigOption {
 	}
 }
 
-func WithSecret(secret string) models.ConfigOption {
+func WithSecret(secret string) ConfigOption {
 	return func(c *models.Config) {
 		if envValue := os.Getenv(env.EnvSecret); envValue != "" {
 			c.Secret = envValue
@@ -142,255 +92,147 @@ func WithSecret(secret string) models.ConfigOption {
 	}
 }
 
-func WithLogger(config models.LoggerConfig) models.ConfigOption {
+func WithDatabase(config models.DatabaseConfig) ConfigOption {
 	return func(c *models.Config) {
-		defaults := c.Logger
-
-		if config.Level != "" {
-			defaults.Level = config.Level
-		}
-		if config.Logger != nil {
-			defaults.Logger = config.Logger
-		}
-
-		c.Logger = defaults
-	}
-}
-
-func WithDB(db *gorm.DB) models.ConfigOption {
-	return func(c *models.Config) {
-		c.DB = db
-	}
-}
-
-func WithDatabase(config models.DatabaseConfig) models.ConfigOption {
-	return func(c *models.Config) {
-		defaults := c.Database
-
 		if config.Provider != "" {
-			defaults.Provider = config.Provider
+			c.Database.Provider = config.Provider
 		}
-		if config.URL != "" {
-			defaults.URL = config.URL
+		if envValue := os.Getenv(env.EnvDatabaseURL); envValue != "" {
+			c.Database.URL = envValue
+		} else if config.URL != "" {
+			c.Database.URL = config.URL
 		}
 		if config.MaxOpenConns != 0 {
-			defaults.MaxOpenConns = config.MaxOpenConns
+			c.Database.MaxOpenConns = config.MaxOpenConns
 		}
 		if config.MaxIdleConns != 0 {
-			defaults.MaxIdleConns = config.MaxIdleConns
+			c.Database.MaxIdleConns = config.MaxIdleConns
 		}
 		if config.ConnMaxLifetime != 0 {
-			defaults.ConnMaxLifetime = config.ConnMaxLifetime
+			c.Database.ConnMaxLifetime = config.ConnMaxLifetime
 		}
-
-		c.Database = defaults
 	}
 }
 
-func WithSecondaryStorage(storage models.SecondaryStorageConfig) models.ConfigOption {
+func WithLogger(config models.LoggerConfig) ConfigOption {
 	return func(c *models.Config) {
-		c.SecondaryStorage = storage
+		if config.Level != "" {
+			c.Logger.Level = config.Level
+		}
 	}
 }
 
-func WithEmailPassword(config models.EmailPasswordConfig) models.ConfigOption {
+func WithEventBus(config models.EventBusConfig) ConfigOption {
 	return func(c *models.Config) {
-		defaults := c.EmailPassword
-
-		if config.Enabled {
-			defaults.Enabled = config.Enabled
+		if config.MaxConcurrentHandlers > 0 {
+			c.EventBus.MaxConcurrentHandlers = config.MaxConcurrentHandlers
 		}
-		if config.MinPasswordLength != 0 {
-			defaults.MinPasswordLength = config.MinPasswordLength
+		if config.Provider != "" {
+			c.EventBus.Provider = config.Provider
 		}
-		if config.MaxPasswordLength != 0 {
-			defaults.MaxPasswordLength = config.MaxPasswordLength
+		if config.GoChannel != nil {
+			c.EventBus.GoChannel = config.GoChannel
 		}
-		if config.DisableSignUp {
-			defaults.DisableSignUp = config.DisableSignUp
+		if config.SQLite != nil {
+			c.EventBus.SQLite = config.SQLite
 		}
-		if config.RequireEmailVerification {
-			defaults.RequireEmailVerification = config.RequireEmailVerification
+		if config.PostgreSQL != nil {
+			c.EventBus.PostgreSQL = config.PostgreSQL
 		}
-		if config.AutoSignIn {
-			defaults.AutoSignIn = config.AutoSignIn
+		if config.Redis != nil {
+			c.EventBus.Redis = config.Redis
 		}
-		if config.SendResetPasswordEmail != nil {
-			defaults.SendResetPasswordEmail = config.SendResetPasswordEmail
+		if config.Kafka != nil {
+			c.EventBus.Kafka = config.Kafka
 		}
-		if config.ResetTokenExpiry != 0 {
-			defaults.ResetTokenExpiry = config.ResetTokenExpiry
+		if config.NATS != nil {
+			c.EventBus.NATS = config.NATS
 		}
-		if config.Password.Hash != nil {
-			defaults.Password.Hash = config.Password.Hash
+		if config.RabbitMQ != nil {
+			c.EventBus.RabbitMQ = config.RabbitMQ
 		}
-		if config.Password.Verify != nil {
-			defaults.Password.Verify = config.Password.Verify
-		}
-
-		c.EmailPassword = defaults
 	}
 }
 
-func WithEmailVerification(config models.EmailVerificationConfig) models.ConfigOption {
+func WithTrustedOrigins(origins []string) ConfigOption {
 	return func(c *models.Config) {
-		defaults := c.EmailVerification
-
-		if config.SendVerificationEmail != nil {
-			defaults.SendVerificationEmail = config.SendVerificationEmail
+		if len(origins) > 0 {
+			c.Security.TrustedOrigins = origins
 		}
-		if config.AutoSignIn {
-			defaults.AutoSignIn = config.AutoSignIn
-		}
-		if config.SendOnSignUp {
-			defaults.SendOnSignUp = config.SendOnSignUp
-		}
-		if config.SendOnSignIn {
-			defaults.SendOnSignIn = config.SendOnSignIn
-		}
-		if config.ExpiresIn != 0 {
-			defaults.ExpiresIn = config.ExpiresIn
-		}
-
-		c.EmailVerification = defaults
 	}
 }
 
-func WithUser(userConfig models.UserConfig) models.ConfigOption {
-	return func(c *models.Config) {
-		c.User = userConfig
-	}
-}
-
-func WithSession(sessionConfig models.SessionConfig) models.ConfigOption {
-	return func(c *models.Config) {
-		if sessionConfig.CookieName == "" {
-			sessionConfig.CookieName = c.Session.CookieName
-		}
-		if sessionConfig.ExpiresIn == 0 {
-			sessionConfig.ExpiresIn = c.Session.ExpiresIn
-		}
-		if sessionConfig.UpdateAge == 0 {
-			sessionConfig.UpdateAge = c.Session.UpdateAge
-		}
-		c.Session = sessionConfig
-	}
-}
-
-func WithCSRF(csrfConfig models.CSRFConfig) models.ConfigOption {
-	return func(c *models.Config) {
-		if csrfConfig.CookieName == "" {
-			csrfConfig.CookieName = c.CSRF.CookieName
-		}
-		if csrfConfig.HeaderName == "" {
-			csrfConfig.HeaderName = c.CSRF.HeaderName
-		}
-		if csrfConfig.ExpiresIn == 0 {
-			csrfConfig.ExpiresIn = c.CSRF.ExpiresIn
-		}
-		c.CSRF = csrfConfig
-	}
-}
-
-func WithSocialProviders(socialProvidersConfig models.SocialProvidersConfig) models.ConfigOption {
-	return func(c *models.Config) {
-		c.SocialProviders = socialProvidersConfig
-	}
-}
-
-func WithTrustedOrigins(trustedOriginsConfig models.TrustedOriginsConfig) models.ConfigOption {
-	return func(c *models.Config) {
-		c.TrustedOrigins = trustedOriginsConfig
-	}
-}
-
-func WithRateLimit(rateLimitConfig models.RateLimitConfig) models.ConfigOption {
-	return func(c *models.Config) {
-		defaults := c.RateLimit
-
-		if rateLimitConfig.Enabled {
-			defaults.Enabled = rateLimitConfig.Enabled
-		}
-		if rateLimitConfig.Window != 0 {
-			defaults.Window = rateLimitConfig.Window
-		}
-		if rateLimitConfig.Max != 0 {
-			defaults.Max = rateLimitConfig.Max
-		}
-		if rateLimitConfig.Algorithm != "" {
-			defaults.Algorithm = rateLimitConfig.Algorithm
-		}
-		if rateLimitConfig.Prefix != "" {
-			defaults.Prefix = rateLimitConfig.Prefix
-		}
-		if rateLimitConfig.CustomRules != nil {
-			defaults.CustomRules = rateLimitConfig.CustomRules
-		}
-		if len(rateLimitConfig.IP.Headers) != 0 {
-			defaults.IP.Headers = rateLimitConfig.IP.Headers
-		}
-
-		c.RateLimit = defaults
-	}
-}
-
-func WithEndpointHooks(endpointHooksConfig models.EndpointHooksConfig) models.ConfigOption {
-	return func(c *models.Config) {
-		c.EndpointHooks = endpointHooksConfig
-	}
-}
-
-func WithDatabaseHooks(databaseHooksConfig models.DatabaseHooksConfig) models.ConfigOption {
-	return func(c *models.Config) {
-		c.DatabaseHooks = databaseHooksConfig
-	}
-}
-
-func WithEventHooks(eventHooksConfig models.EventHooksConfig) models.ConfigOption {
-	return func(c *models.Config) {
-		c.EventHooks = eventHooksConfig
-	}
-}
-
-func WithEventBus(eventBusConfig models.EventBusConfig) models.ConfigOption {
-	return func(c *models.Config) {
-		defaults := c.EventBus
-
-		if eventBusConfig.Enabled {
-			defaults.Enabled = eventBusConfig.Enabled
-		}
-		if eventBusConfig.Prefix != "" {
-			defaults.Prefix = eventBusConfig.Prefix
-		}
-		if eventBusConfig.MaxConcurrentHandlers != 0 {
-			defaults.MaxConcurrentHandlers = eventBusConfig.MaxConcurrentHandlers
-		}
-		if eventBusConfig.PubSubType != "" {
-			defaults.PubSubType = eventBusConfig.PubSubType
-		}
-		if eventBusConfig.PubSub != nil {
-			defaults.PubSub = eventBusConfig.PubSub
-		}
-
-		c.EventBus = defaults
-	}
-}
-
-func WithPlugins(config models.PluginsConfig) models.ConfigOption {
+func WithPlugins(config models.PluginsConfig) ConfigOption {
 	return func(c *models.Config) {
 		c.Plugins = config
 	}
 }
 
-func WithWebhooks(config models.WebhooksConfig) models.ConfigOption {
+func WithRouteMappings(config []models.RouteMapping) ConfigOption {
 	return func(c *models.Config) {
-		c.Webhooks = config
+		c.RouteMappings = config
 	}
 }
 
-// WithEmailConfig sets the email configuration for sending emails in standalone mode
-func WithEmailConfig(emailConfig models.EmailConfig) models.ConfigOption {
-	return func(c *models.Config) {
-		c.Email = emailConfig
+// validateEventBusConfig validates that the event bus provider has the correct configuration
+func validateEventBusConfig(config *models.EventBusConfig) error {
+	provider := config.Provider
+	if provider == "" {
+		provider = "gochannel"
 	}
+
+	// Validate that the selected provider has the correct config
+	switch provider {
+	case "gochannel":
+		if config.GoChannel == nil {
+			return fmt.Errorf("gochannel provider selected but gochannel config is missing")
+		}
+
+	case "sqlite":
+		if config.SQLite == nil {
+			return fmt.Errorf("sqlite provider selected but sqlite config is missing")
+		}
+
+	case "postgres":
+		if config.PostgreSQL == nil {
+			return fmt.Errorf("postgres provider selected but postgres config is missing")
+		}
+		if os.Getenv(env.EnvPostgresURL) == "" && config.PostgreSQL.URL == "" {
+			return fmt.Errorf("postgres provider selected but postgres.url is empty and POSTGRES_URL env var is not set")
+		}
+
+	case "redis":
+		if config.Redis == nil {
+			return fmt.Errorf("redis provider selected but redis config is missing")
+		}
+		if os.Getenv(env.EnvRedisURL) == "" && config.Redis.URL == "" {
+			return fmt.Errorf("redis provider selected but redis.url is empty and REDIS_URL env var is not set")
+		}
+
+	case "kafka":
+		if config.Kafka == nil {
+			return fmt.Errorf("kafka provider selected but kafka config is missing")
+		}
+		if config.Kafka.Brokers == "" {
+			return fmt.Errorf("kafka provider selected but kafka.brokers is empty")
+		}
+
+	case "nats":
+		if config.NATS == nil {
+			return fmt.Errorf("nats provider selected but nats config is missing")
+		}
+		if os.Getenv(env.EnvNatsURL) == "" && config.NATS.URL == "" {
+			return fmt.Errorf("nats provider selected but nats.url is empty and NATS_URL env var is not set")
+		}
+
+	case "rabbitmq":
+		if config.RabbitMQ == nil {
+			return fmt.Errorf("rabbitmq provider selected but rabbitmq config is missing")
+		}
+		if os.Getenv(env.EnvRabbitMQURL) == "" && config.RabbitMQ.URL == "" {
+			return fmt.Errorf("rabbitmq provider selected but rabbitmq.url is empty and RABBITMQ_URL env var is not set")
+		}
+	}
+
+	return nil
 }

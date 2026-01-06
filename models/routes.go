@@ -4,27 +4,12 @@ import (
 	"net/http"
 )
 
-type RouteHandler func() http.Handler
-
-type RouteMiddleware func(http.Handler) http.Handler
-
-type CustomRoute struct {
+type Route struct {
 	Method     string
 	Path       string
-	Middleware []RouteMiddleware
-	Handler    RouteHandler
-}
-
-// Handler is the interface for creating HTTP handlers for routes.
-type Handler interface {
-	Handle(w http.ResponseWriter, r *http.Request)
-}
-
-// WrapHandler converts a Handler to a RouteHandler.
-func WrapHandler(h Handler) RouteHandler {
-	return func() http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			h.Handle(w, req)
-		})
-	}
+	Handler    http.Handler
+	Middleware []func(http.Handler) http.Handler
+	// Metadata holds route-specific metadata, including plugin IDs ("plugins"),
+	// custom tags, and plugin-specific attributes for conditional hook execution.
+	Metadata map[string]any
 }

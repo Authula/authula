@@ -3,7 +3,6 @@ package util
 import (
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
@@ -63,18 +62,10 @@ func NewMockPlugin() *mockPlugin {
 
 func (m *mockPlugin) Metadata() models.PluginMetadata {
 	return models.PluginMetadata{
-		Name:        "Mock Plugin",
+		ID:          "Mock Plugin",
 		Version:     "0.0.1",
 		Description: "A mock plugin.",
 	}
-}
-
-func (m *mockPlugin) Config() models.PluginConfig {
-	return models.PluginConfig{Enabled: true}
-}
-
-func (m *mockPlugin) Ctx() *models.PluginContext {
-	return &models.PluginContext{Config: nil, EventBus: nil, Middleware: nil}
 }
 
 func (m *mockPlugin) Init(ctx *models.PluginContext) error {
@@ -85,28 +76,8 @@ func (m *mockPlugin) Migrations() []any {
 	return []any{}
 }
 
-func (m *mockPlugin) Routes() []models.PluginRoute {
-	return []models.PluginRoute{}
-}
-
-func (m *mockPlugin) RateLimit() *models.PluginRateLimit {
-	return &models.PluginRateLimit{
-		Enabled: true,
-		CustomRules: map[string]models.RateLimitCustomRule{
-			"/plugin": {
-				Window: 1 * time.Minute,
-				Max:    1,
-			},
-		},
-	}
-}
-
-func (m *mockPlugin) DatabaseHooks() any {
-	return nil
-}
-
-func (m *mockPlugin) EventHooks() any {
-	return nil
+func (m *mockPlugin) Routes() []models.Route {
+	return []models.Route{}
 }
 
 func (m *mockPlugin) Close() error {
