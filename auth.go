@@ -289,6 +289,10 @@ func (auth *Auth) Handler() http.Handler {
 	authBaseRoutes := handlers.GetRoutes(auth.Config, auth.Service, basePath, auth.middleware)
 	auth.registerBaseRoutes(basePath, authBaseRoutes)
 
+	//Register custom registered routes
+	auth.registerBaseRoutes(basePath, auth.routes)
+
+	// Register Plugin Routes
 	auth.registerPluginRoutes(basePath)
 
 	// Add catch-all handler for unmatched routes
