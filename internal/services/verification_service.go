@@ -5,21 +5,24 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/GoBetterAuth/go-better-auth/internal/repositories"
+	"github.com/GoBetterAuth/go-better-auth/internal/security"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/repositories"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/security"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/types"
 	"github.com/GoBetterAuth/go-better-auth/services"
 )
 
 type verificationService struct {
 	repo   repositories.VerificationRepository
 	signer security.TokenSigner
-	hooks  *types.CoreDatabaseHooks
+	hooks  *models.CoreDatabaseHooks
 }
 
-func NewVerificationService(repo repositories.VerificationRepository, signer security.TokenSigner, hooks *types.CoreDatabaseHooks) services.VerificationService {
+func NewVerificationService(
+	repo repositories.VerificationRepository,
+	signer security.TokenSigner,
+	hooks *models.CoreDatabaseHooks,
+) services.VerificationService {
 	return &verificationService{
 		repo:   repo,
 		signer: signer,

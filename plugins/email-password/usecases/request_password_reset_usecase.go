@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
@@ -11,6 +12,7 @@ import (
 )
 
 type RequestPasswordResetUseCase struct {
+	Logger              models.Logger
 	GlobalConfig        *models.Config
 	PluginConfig        types.EmailPasswordPluginConfig
 	UserService         rootservices.UserService
@@ -24,6 +26,8 @@ func (uc *RequestPasswordResetUseCase) RequestReset(
 	email string,
 	callbackURL *string,
 ) error {
+	reqCtx, _ := models.GetRequestContext(ctx)
+
 	user, err := uc.UserService.GetByEmail(ctx, email)
 	if err != nil || user == nil {
 		return nil
@@ -36,39 +40,70 @@ func (uc *RequestPasswordResetUseCase) RequestReset(
 
 	hashedToken := uc.TokenService.Hash(token)
 
-	if _, err = uc.VerificationService.Create(ctx, user.ID, hashedToken, models.TypePasswordResetRequest, user.Email, uc.PluginConfig.ExpiresIn); err != nil {
+	if _, err = uc.VerificationService.Create(
+		ctx,
+		user.ID,
+		hashedToken,
+		models.TypePasswordResetRequest,
+		user.Email,
+		uc.PluginConfig.PasswordResetExpiresIn,
+	); err != nil {
 		// swallow error to avoid enumeration
 		return nil
 	}
 
-	resetURL := util.BuildVerificationURL(
+	verificationLink := util.BuildVerificationURL(
 		uc.GlobalConfig.BaseURL,
 		uc.GlobalConfig.BasePath,
 		token,
 		callbackURL,
 	)
 
-	subject := "Reset Your Password"
-	textBody := fmt.Sprintf("Please reset your password by clicking the following link: %s.", resetURL)
-	htmlBody := `<html>
-<body>
-	<h2>Password Reset Request</h2>
-	<p>Hello, ` + user.Email + `</p>
-	<p>We received a request to reset your password. If you made this request, please click the link below to reset your password:</p>
-	<p><a href="` + resetURL + `">Reset Password</a></p>
-	<p>If you did not request a password reset, please ignore this email. Your password will remain unchanged.</p>
-	<p>This link will expire in ` + fmt.Sprintf("%d", int(uc.PluginConfig.ExpiresIn.Hours())) + ` hours.</p>
-	<p>If you're having trouble clicking the link, copy and paste this URL into your browser: ` + resetURL + `</p>
-	<p>&copy; 2023 GoBetterAuth. All rights reserved.</p>
-</body>
-</html>`
-	go uc.MailerService.SendEmail(
-		context.Background(),
-		user.Email,
-		subject,
-		textBody,
-		htmlBody,
-	)
+	if uc.PluginConfig.SendEmailResetEmail != nil {
+		err := uc.PluginConfig.SendEmailResetEmail(
+			types.SendEmailResetEmailParams{
+				User:  *user,
+				URL:   verificationLink,
+				Token: token,
+			},
+			reqCtx,
+		)
+		if err != nil {
+			uc.Logger.Error(err.Error())
+			return err
+		}
+		return nil
+	}
+
+	go func() {
+		detachedCtx := context.WithoutCancel(ctx)
+		taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
+		defer cancel()
+
+		if err := sendRequestPasswordResetEmail(taskCtx, user, verificationLink, uc.PluginConfig.PasswordResetExpiresIn, uc.MailerService); err != nil {
+			uc.Logger.Error(err.Error())
+		}
+	}()
 
 	return nil
+}
+
+func sendRequestPasswordResetEmail(ctx context.Context, user *models.User, verificationLink string, expiresIn time.Duration, mailerService rootservices.MailerService) error {
+	subject := "Reset Your Password"
+	textBody := fmt.Sprintf("Please reset your password by clicking the following link: %s.", verificationLink)
+	htmlBody := fmt.Sprintf(
+		`<html>
+			<body>
+				<p>Hello, %s</p>
+				<p>We received a request to reset your password. If you made this request, please click the link below to reset your password:</p>
+				<p><a href="%s">Reset Password</a></p>
+				<p>This link will expire in %s hours.</p>
+				<p>If you did not request a password reset, please ignore this email. Your password will remain unchanged.</p>
+		</body>
+	</html>`,
+		user.Email,
+		verificationLink,
+		fmt.Sprintf("%d", int(expiresIn.Hours())),
+	)
+	return mailerService.SendEmail(ctx, user.Email, subject, textBody, htmlBody)
 }

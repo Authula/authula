@@ -6,12 +6,18 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
+type BearerHookID string
+
 // Constants for bearer plugin hook IDs and metadata
 const (
 	// HookIDBearerAuth identifies the bearer token authentication hook
 	// Validates Authorization: Bearer <token> header and sets ctx.UserID
-	HookIDBearerAuth = "bearer.auth"
+	HookIDBearerAuth BearerHookID = "bearer.auth"
 )
+
+func (id BearerHookID) String() string {
+	return string(id)
+}
 
 // validateBearerToken hook validates a bearer token from the Authorization header
 // This hook runs at HookBefore stage if "bearer.auth" is in route.Metadata["plugins"]
@@ -60,7 +66,7 @@ func (p *BearerPlugin) buildHooks() []models.Hook {
 		// Executes if "bearer.auth" is in route.Metadata["plugins"]
 		{
 			Stage:    models.HookBefore,
-			PluginID: HookIDBearerAuth,
+			PluginID: HookIDBearerAuth.String(),
 			Handler:  p.validateBearerToken,
 			Order:    5, // Higher priority than session (which is 10)
 		},

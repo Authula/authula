@@ -4,10 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/GoBetterAuth/go-better-auth/internal/repositories"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/repositories"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/types"
 	"github.com/GoBetterAuth/go-better-auth/services"
 )
 
@@ -15,13 +14,17 @@ type accountService struct {
 	config      *models.Config
 	accountRepo repositories.AccountRepository
 	tokenRepo   repositories.TokenRepository
-	hooks       *types.CoreDatabaseHooks
+	hooks       *models.CoreDatabaseHooks
 }
 
-func NewAccountService(config *models.Config, accountRepo repositories.AccountRepository, tokenRepo repositories.TokenRepository, hooks *types.CoreDatabaseHooks) services.AccountService {
+func NewAccountService(
+	config *models.Config,
+	accountRepo repositories.AccountRepository,
+	tokenRepo repositories.TokenRepository,
+	hooks *models.CoreDatabaseHooks,
+) services.AccountService {
 	return &accountService{config: config, accountRepo: accountRepo, tokenRepo: tokenRepo, hooks: hooks}
 }
-
 func (s *accountService) Create(ctx context.Context, userID string, accountID string, providerID string, password *string) (*models.Account, error) {
 	account := &models.Account{
 		ID:         util.GenerateUUID(),

@@ -5,21 +5,24 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/GoBetterAuth/go-better-auth/internal/repositories"
+	"github.com/GoBetterAuth/go-better-auth/internal/security"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/repositories"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/security"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/types"
 	"github.com/GoBetterAuth/go-better-auth/services"
 )
 
 type sessionService struct {
 	repo   repositories.SessionRepository
 	signer security.TokenSigner
-	hooks  *types.CoreDatabaseHooks
+	hooks  *models.CoreDatabaseHooks
 }
 
-func NewSessionService(repo repositories.SessionRepository, signer security.TokenSigner, hooks *types.CoreDatabaseHooks) services.SessionService {
+func NewSessionService(
+	repo repositories.SessionRepository,
+	signer security.TokenSigner,
+	hooks *models.CoreDatabaseHooks,
+) services.SessionService {
 	return &sessionService{
 		repo:   repo,
 		signer: signer,
@@ -78,6 +81,27 @@ func (s *sessionService) GetByUserID(ctx context.Context, userID string) (*model
 
 func (s *sessionService) GetByToken(ctx context.Context, hashedToken string) (*models.Session, error) {
 	return s.repo.GetByToken(ctx, hashedToken)
+}
+
+func (s *sessionService) Update(ctx context.Context, session *models.Session) (*models.Session, error) {
+	if s.hooks != nil && s.hooks.Sessions != nil && s.hooks.Sessions.BeforeUpdate != nil {
+		if err := s.hooks.Sessions.BeforeUpdate(session); err != nil {
+			return nil, err
+		}
+	}
+
+	updated, err := s.repo.Update(ctx, session)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.hooks != nil && s.hooks.Sessions != nil && s.hooks.Sessions.AfterUpdate != nil {
+		if err := s.hooks.Sessions.AfterUpdate(*updated); err != nil {
+			return nil, err
+		}
+	}
+
+	return updated, nil
 }
 
 func (s *sessionService) Delete(ctx context.Context, id string) error {

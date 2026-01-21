@@ -6,16 +6,22 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
+type CSRFHookID string
+
 // Constants for CSRF plugin hook IDs and metadata
 const (
-	// HookIDCSRFGenerate identifies the CSRF token generation hook
+	// HookIDCSRFGenerate identifies the CSRF token generation hook.
 	// Generates CSRF tokens for safe requests
-	HookIDCSRFGenerate = "csrf.generate"
+	HookIDCSRFGenerate CSRFHookID = "csrf.generate"
 
-	// HookIDCSRFProtect identifies the CSRF protection hook
+	// HookIDCSRFProtect identifies the CSRF protection hook.
 	// Validates CSRF tokens on state-changing requests
-	HookIDCSRFProtect = "csrf.protect"
+	HookIDCSRFProtect CSRFHookID = "csrf.protect"
 )
+
+func (id CSRFHookID) String() string {
+	return string(id)
+}
 
 // generateCSRFTokenHook generates and sets CSRF tokens for safe methods
 // This hook runs on all GET/HEAD/OPTIONS requests for authenticated users
@@ -133,10 +139,10 @@ func (p *CSRFPlugin) buildHooks() []models.Hook {
 		// Handler: generates token for safe methods, validates for unsafe methods
 		{
 			Stage:    models.HookBefore,
+			PluginID: HookIDCSRFGenerate.String(),
 			Matcher:  p.safeMethodMatcher,
 			Handler:  p.combinedCSRFHook,
 			Order:    15, // Execute after auth but before main handler
-			PluginID: HookIDCSRFGenerate,
 		},
 
 		// CSRF protection hook: validates tokens on state-changing requests
@@ -144,10 +150,10 @@ func (p *CSRFPlugin) buildHooks() []models.Hook {
 		// Matcher: unsafe methods (POST, PUT, PATCH, DELETE)
 		{
 			Stage:    models.HookBefore,
+			PluginID: HookIDCSRFProtect.String(),
 			Matcher:  p.unsafeMethodMatcher,
 			Handler:  p.validateCSRFTokenHook,
 			Order:    15,
-			PluginID: HookIDCSRFProtect,
 		},
 	}
 }

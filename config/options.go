@@ -19,18 +19,29 @@ func NewConfig(options ...ConfigOption) *models.Config {
 	// Define sensible defaults first
 	config := &models.Config{
 		AppName:  "GoBetterAuth",
-		BasePath: "/auth",
 		BaseURL:  "http://localhost:8080",
+		BasePath: "/auth",
 		Secret:   defaultSecret,
+		Session: models.SessionConfig{
+			CookieName: "gobetterauth.session_token",
+			ExpiresIn:  time.Hour * 24 * 7, // 7 days by default
+			UpdateAge:  time.Hour * 24,     // 24 hours update interval
+			Secure:     false,
+			HttpOnly:   true,
+			SameSite:   "lax",
+		},
+		Security: models.SecurityConfig{},
 		Database: models.DatabaseConfig{
 			MaxOpenConns:    25,
 			MaxIdleConns:    5,
-			ConnMaxLifetime: time.Hour,
+			ConnMaxLifetime: time.Minute * 10,
 		},
-		Logger:   models.LoggerConfig{},
-		EventBus: models.EventBusConfig{},
-		Security: models.SecurityConfig{},
-		Plugins:  models.PluginsConfig{},
+		Logger:           models.LoggerConfig{},
+		EventBus:         models.EventBusConfig{},
+		Plugins:          models.PluginsConfig{},
+		RouteMappings:    []models.RouteMapping{},
+		PreParsedConfigs: make(map[string]any),
+		DatabaseHooks:    nil,
 	}
 
 	// Apply the options - they override defaults only if non-zero/non-empty
@@ -154,10 +165,21 @@ func WithEventBus(config models.EventBusConfig) ConfigOption {
 	}
 }
 
-func WithTrustedOrigins(origins []string) ConfigOption {
+func WithSession(config models.SessionConfig) ConfigOption {
 	return func(c *models.Config) {
-		if len(origins) > 0 {
-			c.Security.TrustedOrigins = origins
+		if config.CookieName != "" {
+			c.Session.CookieName = config.CookieName
+		}
+		if config.ExpiresIn != 0 {
+			c.Session.ExpiresIn = config.ExpiresIn
+		}
+	}
+}
+
+func WithSecurity(config models.SecurityConfig) ConfigOption {
+	return func(c *models.Config) {
+		if len(config.TrustedOrigins) > 0 {
+			c.Security.TrustedOrigins = config.TrustedOrigins
 		}
 	}
 }
@@ -171,6 +193,12 @@ func WithPlugins(config models.PluginsConfig) ConfigOption {
 func WithRouteMappings(config []models.RouteMapping) ConfigOption {
 	return func(c *models.Config) {
 		c.RouteMappings = config
+	}
+}
+
+func WithDatabaseHooks(config *models.CoreDatabaseHooks) ConfigOption {
+	return func(c *models.Config) {
+		c.DatabaseHooks = config
 	}
 }
 

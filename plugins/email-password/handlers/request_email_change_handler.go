@@ -8,40 +8,46 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/usecases"
 )
 
-type SendVerificationEmailRequestPayload struct {
-	Email       string `json:"email"`
+type RequestEmailChangePayload struct {
+	NewEmail    string `json:"new_email"`
 	CallbackURL string `json:"callback_url,omitempty"`
 }
 
-type SendVerificationEmailHandler struct {
-	UseCase *usecases.SendVerificationEmailUseCase
+type RequestEmailChangeHandler struct {
+	UseCase *usecases.RequestEmailChangeUseCase
 }
 
-func (h *SendVerificationEmailHandler) Handler() http.HandlerFunc {
+func (h *RequestEmailChangeHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		var payload SendVerificationEmailRequestPayload
+		if reqCtx.UserID == nil {
+			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "unauthorized"})
+			reqCtx.Handled = true
+			return
+		}
+
+		var payload RequestEmailChangePayload
 		if err := util.ParseJSON(r, &payload); err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
-				"message": "invalid request",
+				"message": err.Error(),
 			})
 			reqCtx.Handled = true
 			return
 		}
 
-		err := h.UseCase.Send(ctx, payload.Email, &payload.CallbackURL)
+		err := h.UseCase.RequestChange(ctx, *reqCtx.UserID, payload.NewEmail, &payload.CallbackURL)
 		if err != nil {
-			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
-				"message": "internal server error",
+			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
+				"message": err.Error(),
 			})
 			reqCtx.Handled = true
 			return
 		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{
-			"message": "verification email sent",
+			"message": "verification sent to new email",
 		})
 	}
 }

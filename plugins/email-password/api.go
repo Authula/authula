@@ -21,8 +21,10 @@ func (a *API) SignUp(
 	password string,
 	image *string,
 	callbackURL *string,
+	ipAddress *string,
+	userAgent *string,
 ) (*types.SignUpResult, error) {
-	return a.useCases.SignUpUseCase.SignUp(ctx, name, email, password, image, callbackURL)
+	return a.useCases.SignUpUseCase.SignUp(ctx, name, email, password, image, callbackURL, ipAddress, userAgent)
 }
 
 func (a *API) SignIn(
@@ -30,24 +32,34 @@ func (a *API) SignIn(
 	email string,
 	password string,
 	callbackURL *string,
+	ipAddress *string,
+	userAgent *string,
 ) (*types.SignInResult, error) {
-	return a.useCases.SignInUseCase.SignIn(ctx, email, password, callbackURL)
+	return a.useCases.SignInUseCase.SignIn(ctx, email, password, callbackURL, ipAddress, userAgent)
 }
 
 func (a *API) VerifyEmail(ctx context.Context, tokenStr string) error {
 	return a.useCases.VerifyEmailUseCase.VerifyEmail(ctx, tokenStr)
 }
 
-func (a *API) SendVerificationEmail(ctx context.Context, email string, callbackURL *string) error {
-	return a.useCases.SendVerificationEmailUseCase.Send(ctx, email, callbackURL)
+func (a *API) SendEmailVerification(ctx context.Context, email string, callbackURL *string) error {
+	return a.useCases.SendEmailVerificationUseCase.Send(ctx, email, callbackURL)
 }
 
 func (a *API) RequestPasswordReset(ctx context.Context, email string, callbackURL *string) error {
 	return a.useCases.RequestPasswordResetUseCase.RequestReset(ctx, email, callbackURL)
 }
 
-func (a *API) ChangePassword(ctx context.Context, tokenStr string, newPassword string) error {
-	return a.useCases.ChangePasswordUseCase.ChangePassword(ctx, tokenStr, newPassword)
+func (a *API) ChangePassword(ctx context.Context, userID string, tokenStr string, newPassword string) error {
+	return a.useCases.ChangePasswordUseCase.ChangePassword(ctx, userID, tokenStr, newPassword)
+}
+
+func (a *API) RequestEmailChange(ctx context.Context, userID string, newEmail string, callbackURL *string) error {
+	return a.useCases.RequestEmailChangeUseCase.RequestChange(ctx, userID, newEmail, callbackURL)
+}
+
+func (a *API) ChangeEmail(ctx context.Context, userID string, tokenStr string, newEmail string) error {
+	return a.useCases.ChangeEmailUseCase.ChangeEmail(ctx, userID, tokenStr, newEmail)
 }
 
 func BuildAPI(plugin *EmailPasswordPlugin) *API {
@@ -60,19 +72,25 @@ func Routes(plugin *EmailPasswordPlugin) []models.Route {
 	useCases := BuildUseCases(plugin)
 
 	signUpHandler := &handlers.SignUpHandler{
-		UseCase: useCases.SignUpUseCase,
+		Logger:                       plugin.logger,
+		PluginConfig:                 plugin.pluginConfig,
+		SignUpUseCase:                useCases.SignUpUseCase,
+		SendEmailVerificationUseCase: useCases.SendEmailVerificationUseCase,
 	}
 
 	signInHandler := &handlers.SignInHandler{
-		UseCase: useCases.SignInUseCase,
+		Logger:                       plugin.logger,
+		PluginConfig:                 plugin.pluginConfig,
+		SignInUseCase:                useCases.SignInUseCase,
+		SendEmailVerificationUseCase: useCases.SendEmailVerificationUseCase,
 	}
 
 	verifyEmailHandler := &handlers.VerifyEmailHandler{
 		UseCase: useCases.VerifyEmailUseCase,
 	}
 
-	sendVerificationEmailHandler := &handlers.SendVerificationEmailHandler{
-		UseCase: useCases.SendVerificationEmailUseCase,
+	sendEmailVerificationHandler := &handlers.SendEmailVerificationHandler{
+		UseCase: useCases.SendEmailVerificationUseCase,
 	}
 
 	requestPasswordResetHandler := &handlers.RequestPasswordResetHandler{
@@ -81,6 +99,14 @@ func Routes(plugin *EmailPasswordPlugin) []models.Route {
 
 	changePasswordHandler := &handlers.ChangePasswordHandler{
 		UseCase: useCases.ChangePasswordUseCase,
+	}
+
+	requestEmailChangeHandler := &handlers.RequestEmailChangeHandler{
+		UseCase: useCases.RequestEmailChangeUseCase,
+	}
+
+	changeEmailHandler := &handlers.ChangeEmailHandler{
+		UseCase: useCases.ChangeEmailUseCase,
 	}
 
 	return []models.Route{
@@ -101,8 +127,8 @@ func Routes(plugin *EmailPasswordPlugin) []models.Route {
 		},
 		{
 			Method:  http.MethodPost,
-			Path:    "/send-verification-email",
-			Handler: sendVerificationEmailHandler.Handler(),
+			Path:    "/send-email-verification",
+			Handler: sendEmailVerificationHandler.Handler(),
 		},
 		{
 			Method:  http.MethodPost,
@@ -114,71 +140,113 @@ func Routes(plugin *EmailPasswordPlugin) []models.Route {
 			Path:    "/change-password",
 			Handler: changePasswordHandler.Handler(),
 		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/request-email-change",
+			Handler: requestEmailChangeHandler.Handler(),
+		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/change-email",
+			Handler: changeEmailHandler.Handler(),
+		},
 	}
 }
 
-func BuildUseCases(plugin *EmailPasswordPlugin) *usecases.UseCases {
-	sendVerificationEmailUseCase := &usecases.SendVerificationEmailUseCase{
-		GlobalConfig:        plugin.globalConfig,
-		PluginConfig:        plugin.pluginConfig,
-		Logger:              plugin.logger,
-		UserService:         plugin.userService,
-		VerificationService: plugin.verificationService,
-		TokenService:        plugin.tokenService,
-		MailerService:       plugin.mailerService,
-	}
-
+func BuildUseCases(p *EmailPasswordPlugin) *usecases.UseCases {
 	signUpUseCase := &usecases.SignUpUseCase{
-		GlobalConfig:                 plugin.globalConfig,
-		PluginConfig:                 plugin.pluginConfig,
-		Logger:                       plugin.logger,
-		UserService:                  plugin.userService,
-		AccountService:               plugin.accountService,
-		PasswordService:              plugin.passwordService,
-		EventBus:                     plugin.ctx.EventBus,
-		SendVerificationEmailUseCase: sendVerificationEmailUseCase,
+		GlobalConfig:    p.globalConfig,
+		PluginConfig:    p.pluginConfig,
+		Logger:          p.logger,
+		UserService:     p.userService,
+		AccountService:  p.accountService,
+		SessionService:  p.sessionService,
+		TokenService:    p.tokenService,
+		PasswordService: p.passwordService,
+		EventBus:        p.ctx.EventBus,
 	}
 
 	signInUseCase := &usecases.SignInUseCase{
-		GlobalConfig:                 plugin.globalConfig,
-		PluginConfig:                 plugin.pluginConfig,
-		Logger:                       plugin.logger,
-		UserService:                  plugin.userService,
-		AccountService:               plugin.accountService,
-		PasswordService:              plugin.passwordService,
-		EventBus:                     plugin.ctx.EventBus,
-		SendVerificationEmailUseCase: sendVerificationEmailUseCase,
+		GlobalConfig:    p.globalConfig,
+		PluginConfig:    p.pluginConfig,
+		Logger:          p.logger,
+		UserService:     p.userService,
+		AccountService:  p.accountService,
+		SessionService:  p.sessionService,
+		TokenService:    p.tokenService,
+		PasswordService: p.passwordService,
+		EventBus:        p.ctx.EventBus,
 	}
 
 	verifyEmailUseCase := &usecases.VerifyEmailUseCase{
-		Logger:              plugin.logger,
-		EventBus:            plugin.ctx.EventBus,
-		UserService:         plugin.userService,
-		VerificationService: plugin.verificationService,
-		TokenService:        plugin.tokenService,
+		Logger:              p.logger,
+		EventBus:            p.ctx.EventBus,
+		UserService:         p.userService,
+		VerificationService: p.verificationService,
+		TokenService:        p.tokenService,
+	}
+
+	sendEmailVerificationUseCase := &usecases.SendEmailVerificationUseCase{
+		GlobalConfig:        p.globalConfig,
+		PluginConfig:        p.pluginConfig,
+		Logger:              p.logger,
+		UserService:         p.userService,
+		VerificationService: p.verificationService,
+		TokenService:        p.tokenService,
+		MailerService:       p.mailerService,
 	}
 
 	requestPasswordResetUseCase := &usecases.RequestPasswordResetUseCase{
-		GlobalConfig:        plugin.globalConfig,
-		PluginConfig:        plugin.pluginConfig,
-		UserService:         plugin.userService,
-		VerificationService: plugin.verificationService,
-		MailerService:       plugin.mailerService,
+		Logger:              p.logger,
+		GlobalConfig:        p.globalConfig,
+		PluginConfig:        p.pluginConfig,
+		UserService:         p.userService,
+		VerificationService: p.verificationService,
+		TokenService:        p.tokenService,
+		MailerService:       p.mailerService,
 	}
 
 	changePasswordUseCase := &usecases.ChangePasswordUseCase{
-		PluginConfig:        plugin.pluginConfig,
-		AccountService:      plugin.accountService,
-		VerificationService: plugin.verificationService,
-		PasswordService:     plugin.passwordService,
+		Logger:              p.logger,
+		PluginConfig:        p.pluginConfig,
+		UserService:         p.userService,
+		AccountService:      p.accountService,
+		VerificationService: p.verificationService,
+		PasswordService:     p.passwordService,
+		TokenService:        p.tokenService,
+		MailerService:       p.mailerService,
+		EventBus:            p.ctx.EventBus,
+	}
+
+	requestEmailChangeUseCase := &usecases.RequestEmailChangeUseCase{
+		Logger:              p.logger,
+		GlobalConfig:        p.globalConfig,
+		PluginConfig:        p.pluginConfig,
+		UserService:         p.userService,
+		VerificationService: p.verificationService,
+		TokenService:        p.tokenService,
+		MailerService:       p.mailerService,
+	}
+
+	changeEmailUseCase := &usecases.ChangeEmailUseCase{
+		Logger:              p.logger,
+		PluginConfig:        p.pluginConfig,
+		UserService:         p.userService,
+		AccountService:      p.accountService,
+		VerificationService: p.verificationService,
+		TokenService:        p.tokenService,
+		MailerService:       p.mailerService,
+		EventBus:            p.ctx.EventBus,
 	}
 
 	return &usecases.UseCases{
 		SignUpUseCase:                signUpUseCase,
 		SignInUseCase:                signInUseCase,
 		VerifyEmailUseCase:           verifyEmailUseCase,
-		SendVerificationEmailUseCase: sendVerificationEmailUseCase,
+		SendEmailVerificationUseCase: sendEmailVerificationUseCase,
 		RequestPasswordResetUseCase:  requestPasswordResetUseCase,
 		ChangePasswordUseCase:        changePasswordUseCase,
+		RequestEmailChangeUseCase:    requestEmailChangeUseCase,
+		ChangeEmailUseCase:           changeEmailUseCase,
 	}
 }

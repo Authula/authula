@@ -13,7 +13,8 @@ import (
 )
 
 type SessionPlugin struct {
-	config         SessionPluginConfig
+	globalConfig   *models.Config
+	pluginConfig   SessionPluginConfig
 	ctx            *models.PluginContext
 	logger         models.Logger
 	userService    services.UserService
@@ -24,7 +25,7 @@ type SessionPlugin struct {
 
 func New(config SessionPluginConfig) *SessionPlugin {
 	config.ApplyDefaults()
-	return &SessionPlugin{config: config}
+	return &SessionPlugin{pluginConfig: config}
 }
 
 func (p *SessionPlugin) Metadata() models.PluginMetadata {
@@ -36,18 +37,20 @@ func (p *SessionPlugin) Metadata() models.PluginMetadata {
 }
 
 func (p *SessionPlugin) Config() any {
-	return p.config
+	return p.pluginConfig
 }
 
 func (p *SessionPlugin) Init(ctx *models.PluginContext) error {
 	p.ctx = ctx
 	p.logger = ctx.Logger
+	globalConfig := ctx.GetConfig()
+	p.globalConfig = globalConfig
 
-	if err := util.LoadPluginConfig(ctx.GetConfig(), p.Metadata().ID, &p.config); err != nil {
+	if err := util.LoadPluginConfig(ctx.GetConfig(), p.Metadata().ID, &p.pluginConfig); err != nil {
 		return err
 	}
 
-	p.config.ApplyDefaults()
+	p.pluginConfig.ApplyDefaults()
 
 	userService, ok := ctx.ServiceRegistry.Get(models.ServiceUser.String()).(services.UserService)
 	if !ok {
@@ -80,12 +83,12 @@ func (p *SessionPlugin) Hooks() []models.Hook {
 }
 
 func (p *SessionPlugin) OnConfigUpdate(config *models.Config) error {
-	if err := util.LoadPluginConfig(config, p.Metadata().ID, &p.config); err != nil {
+	if err := util.LoadPluginConfig(config, p.Metadata().ID, &p.pluginConfig); err != nil {
 		p.logger.Error("failed to parse session plugin config on update", "error", err)
 		return err
 	}
 
-	p.config.ApplyDefaults()
+	p.pluginConfig.ApplyDefaults()
 
 	return nil
 }
@@ -138,7 +141,7 @@ func (p *SessionPlugin) OptionalAuthMiddleware() func(http.Handler) http.Handler
 }
 
 func (p *SessionPlugin) validateSessionCookie(r *http.Request) (*models.Session, error) {
-	cookie, err := r.Cookie(p.config.CookieName)
+	cookie, err := r.Cookie(p.globalConfig.Session.CookieName)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +152,7 @@ func (p *SessionPlugin) validateSessionCookie(r *http.Request) (*models.Session,
 	}
 
 	if time.Now().UTC().After(session.ExpiresAt) {
-		_ = p.sessionService.Delete(r.Context(), session.ID)
+		p.sessionService.Delete(r.Context(), session.ID)
 		return nil, fmt.Errorf("session_expired")
 	}
 
@@ -163,7 +166,7 @@ func (p *SessionPlugin) writeErrorResponse(w http.ResponseWriter, statusCode int
 }
 
 func (p *SessionPlugin) getSameSiteMode() http.SameSite {
-	switch p.config.SameSite {
+	switch p.globalConfig.Session.SameSite {
 	case "strict":
 		return http.SameSiteStrictMode
 	case "none":
@@ -179,53 +182,51 @@ func (p *SessionPlugin) SetSessionCookie(w http.ResponseWriter, sessionToken str
 	sameSite := p.getSameSiteMode()
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     p.config.CookieName,
+		Name:     p.globalConfig.Session.CookieName,
 		Value:    sessionToken,
-		Path:     p.config.CookiePath,
-		HttpOnly: p.config.HttpOnly,
-		Secure:   p.config.Secure,
+		Path:     "/",
+		HttpOnly: p.globalConfig.Session.HttpOnly,
+		Secure:   p.globalConfig.Session.Secure,
 		SameSite: sameSite,
-		MaxAge:   int(p.config.MaxAge.Seconds()),
+		MaxAge:   int(p.globalConfig.Session.CookieMaxAge.Seconds()),
 	})
 }
 
 func (p *SessionPlugin) ClearSessionCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     p.config.CookieName,
+		Name:     p.globalConfig.Session.CookieName,
 		Value:    "",
-		Path:     p.config.CookiePath,
-		HttpOnly: p.config.HttpOnly,
-		Secure:   p.config.Secure,
+		Path:     "/",
+		HttpOnly: p.globalConfig.Session.HttpOnly,
+		Secure:   p.globalConfig.Session.Secure,
 		MaxAge:   -1,
 	})
 }
 
 // shouldRenewSession checks if the session is past 50% of its max age and should be renewed
 func (p *SessionPlugin) shouldRenewSession(session *models.Session) bool {
-	if session == nil {
-		return false
-	}
 	now := time.Now().UTC()
-	timeSinceCreation := now.Sub(session.CreatedAt)
-	totalLifetime := session.ExpiresAt.Sub(session.CreatedAt)
 
-	// Renew if more than 50% of the session lifetime has passed
-	return timeSinceCreation > totalLifetime/2
+	// Renew if within UpdateAge of expiry (Better Auth pattern)
+	timeToExpiry := session.ExpiresAt.Sub(now)
+	return timeToExpiry <= p.globalConfig.Session.UpdateAge
 }
 
 // renewSession extends the session expiration in the database and updates the cookie
 func (p *SessionPlugin) renewSession(w http.ResponseWriter, r *http.Request, session *models.Session) {
-	newExpiresAt := time.Now().UTC().Add(p.config.MaxAge)
-	if _, err := p.ctx.DB.NewUpdate().Model(session).Set("expires_at = ?", newExpiresAt).Where("id = ?", session.ID).Exec(r.Context()); err != nil {
-		p.logger.Error("failed to renew session", "error", err, "session_id", session.ID)
+	cookie, _ := r.Cookie(p.globalConfig.Session.CookieName)
+	if cookie == nil {
 		return
 	}
 
-	cookie, err := r.Cookie(p.config.CookieName)
-	if err == nil && cookie != nil {
-		p.SetSessionCookie(w, cookie.Value)
-		p.logger.Debug("session renewed", "session_id", session.ID)
+	session.ExpiresAt = time.Now().UTC().Add(p.globalConfig.Session.ExpiresIn)
+	if _, err := p.sessionService.Update(r.Context(), session); err != nil {
+		p.logger.Error("session renewal failed", "error", err)
+		return
 	}
+
+	p.SetSessionCookie(w, cookie.Value)
+	p.logger.Debug("session renewed", "session_id", session.ID)
 }
 
 func (p *SessionPlugin) Close() error {

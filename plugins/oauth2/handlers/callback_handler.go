@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/GoBetterAuth/go-better-auth/plugins/oauth2/constants"
 	"github.com/GoBetterAuth/go-better-auth/plugins/oauth2/services"
@@ -67,7 +68,14 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		result, err := h.UseCase.Callback(ctx, req)
+		ipAddress := util.ExtractClientIP(
+			r.Header.Get("X-Forwarded-For"),
+			r.Header.Get("X-Real-IP"),
+			r.RemoteAddr,
+		)
+		userAgent := r.UserAgent()
+
+		result, err := h.UseCase.Callback(ctx, req, &ipAddress, &userAgent)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]string{
 				"message": err.Error(),
@@ -106,7 +114,7 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 		})
 
 		reqCtx.SetUserIDInContext(result.User.ID)
-		reqCtx.Values["auth_success"] = true
+		reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken
 
 		var redirectTo string
 		if cookie, err := r.Cookie(constants.CookieRedirectTo); err == nil {
@@ -121,7 +129,8 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, &types.CallbackResponse{
-			User: result.User,
+			User:    result.User,
+			Session: result.Session,
 		})
 	}
 }

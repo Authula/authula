@@ -18,7 +18,7 @@ func assertPanic(t *testing.T, f func()) {
 func TestBuildPluginsFromConfig_ValidPlugins(t *testing.T) {
 	cfg := &models.Config{
 		Plugins: map[string]any{
-			models.PluginCore.String(): map[string]any{
+			models.PluginCORS.String(): map[string]any{
 				"enabled": true,
 			},
 		},
@@ -33,7 +33,7 @@ func TestBuildPluginsFromConfig_ValidPlugins(t *testing.T) {
 	// Verify core plugin is present
 	hasCorePlugin := false
 	for _, p := range plugins {
-		if p.Metadata().ID == models.PluginCore.String() {
+		if p.Metadata().ID == models.PluginCORS.String() {
 			hasCorePlugin = true
 			break
 		}
@@ -46,7 +46,7 @@ func TestBuildPluginsFromConfig_ValidPlugins(t *testing.T) {
 func TestBuildPluginsFromConfig_UnknownPlugin(t *testing.T) {
 	cfg := &models.Config{
 		Plugins: map[string]any{
-			models.PluginCore.String(): map[string]any{
+			models.PluginCORS.String(): map[string]any{
 				"enabled": true,
 			},
 			"unknown_plugin": map[string]any{
@@ -61,10 +61,10 @@ func TestBuildPluginsFromConfig_UnknownPlugin(t *testing.T) {
 func TestBuildPluginsFromConfig_DisabledPlugins(t *testing.T) {
 	cfg := &models.Config{
 		Plugins: map[string]any{
-			models.PluginCore.String(): map[string]any{
+			models.PluginCORS.String(): map[string]any{
 				"enabled": true,
 			},
-			models.PluginCORS.String(): map[string]any{
+			models.PluginCSRF.String(): map[string]any{
 				"enabled": false,
 			},
 		},
@@ -72,10 +72,9 @@ func TestBuildPluginsFromConfig_DisabledPlugins(t *testing.T) {
 
 	plugins := BuildPluginsFromConfig(cfg)
 
-	// Verify cors plugin is not present (disabled)
 	for _, p := range plugins {
-		if p.Metadata().ID == models.PluginCORS.String() {
-			t.Errorf("cors plugin should not be in plugins list when disabled")
+		if p.Metadata().ID == models.PluginCSRF.String() {
+			t.Errorf("csrf plugin should not be in plugins list when disabled")
 		}
 	}
 }
@@ -83,9 +82,6 @@ func TestBuildPluginsFromConfig_DisabledPlugins(t *testing.T) {
 func TestBuildPluginsFromConfig_PluginOrder(t *testing.T) {
 	cfg := &models.Config{
 		Plugins: map[string]any{
-			models.PluginCore.String(): map[string]any{
-				"enabled": true,
-			},
 			models.PluginConfigManager.String(): map[string]any{
 				"enabled": true,
 			},
@@ -97,22 +93,31 @@ func TestBuildPluginsFromConfig_PluginOrder(t *testing.T) {
 
 	plugins := BuildPluginsFromConfig(cfg)
 
-	// Verify core is first
-	if len(plugins) > 0 && plugins[0].Metadata().ID != models.PluginCore.String() {
-		t.Errorf("expected core plugin to be first, got %s", plugins[0].Metadata().ID)
+	if len(plugins) == 0 {
+		t.Fatalf("expected plugins to be present, got %d", len(plugins))
+	}
+
+	if plugins[0].Metadata().ID != models.PluginConfigManager.String() {
+		t.Errorf("expected %s to be first, got %s", models.PluginConfigManager.String(), plugins[0].Metadata().ID)
 	}
 }
 
 func TestBuildPluginsFromConfig_CoreDisabled(t *testing.T) {
 	cfg := &models.Config{
 		Plugins: map[string]any{
-			models.PluginCore.String(): map[string]any{
+			models.PluginCORS.String(): map[string]any{
 				"enabled": false,
 			},
 		},
 	}
 
-	assertPanic(t, func() { BuildPluginsFromConfig(cfg) })
+	plugins := BuildPluginsFromConfig(cfg)
+
+	for _, p := range plugins {
+		if p.Metadata().ID == models.PluginCORS.String() {
+			t.Errorf("cors plugin should not be in plugins list when disabled")
+		}
+	}
 }
 
 func TestBuildPluginsFromConfig_EmptyConfig(t *testing.T) {
@@ -122,11 +127,7 @@ func TestBuildPluginsFromConfig_EmptyConfig(t *testing.T) {
 
 	plugins := BuildPluginsFromConfig(cfg)
 
-	if len(plugins) != 1 {
-		t.Errorf("expected 1 plugin for empty config, got %d", len(plugins))
-	}
-
-	if len(plugins) > 0 && plugins[0].Metadata().ID != models.PluginCore.String() {
-		t.Errorf("expected core plugin, got %s", plugins[0].Metadata().ID)
+	if len(plugins) != 0 {
+		t.Errorf("expected 0 plugins for empty config, got %d", len(plugins))
 	}
 }

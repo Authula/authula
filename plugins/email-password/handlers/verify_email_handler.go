@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/constants"
 	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/usecases"
 )
 
@@ -28,21 +27,9 @@ func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
 
 		err := h.UseCase.VerifyEmail(ctx, tokenStr)
 		if err != nil {
-			switch err {
-			case constants.ErrInvalidOrExpiredToken:
-				reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
-					"message": "invalid or expired token",
-				})
-			case constants.ErrUserNotFound:
-				reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
-					"message": "user not found",
-				})
-			default:
-				reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
-					"message": "internal server error",
-				})
-			}
-
+			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
+				"message": err.Error(),
+			})
 			reqCtx.Handled = true
 			return
 		}

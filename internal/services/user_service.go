@@ -4,19 +4,18 @@ import (
 	"context"
 	"errors"
 
+	"github.com/GoBetterAuth/go-better-auth/internal/repositories"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/repositories"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/types"
 	"github.com/GoBetterAuth/go-better-auth/services"
 )
 
 type userService struct {
 	repo  repositories.UserRepository
-	hooks *types.CoreDatabaseHooks
+	hooks *models.CoreDatabaseHooks
 }
 
-func NewUserService(repo repositories.UserRepository, hooks *types.CoreDatabaseHooks) services.UserService {
+func NewUserService(repo repositories.UserRepository, hooks *models.CoreDatabaseHooks) services.UserService {
 	return &userService{repo: repo, hooks: hooks}
 }
 

@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/constants"
+	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/types"
 	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/usecases"
 )
 
@@ -16,7 +18,10 @@ type SignInRequestPayload struct {
 }
 
 type SignInHandler struct {
-	UseCase *usecases.SignInUseCase
+	Logger                       models.Logger
+	PluginConfig                 types.EmailPasswordPluginConfig
+	SignInUseCase                *usecases.SignInUseCase
+	SendEmailVerificationUseCase *usecases.SendEmailVerificationUseCase
 }
 
 func (h *SignInHandler) Handler() http.HandlerFunc {
@@ -33,38 +38,47 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		result, err := h.UseCase.SignIn(
+		ipAddress := util.ExtractClientIP(
+			r.Header.Get("X-Forwarded-For"),
+			r.Header.Get("X-Real-IP"),
+			r.RemoteAddr,
+		)
+		userAgent := r.UserAgent()
+
+		result, err := h.SignInUseCase.SignIn(
 			ctx,
 			payload.Email,
 			payload.Password,
 			&payload.CallbackURL,
+			&ipAddress,
+			&userAgent,
 		)
-
 		if err != nil {
-			switch err {
-			case constants.ErrInvalidCredentials:
-				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
-					"message": "invalid credentials",
-				})
-			case constants.ErrEmailNotVerified:
-				reqCtx.SetJSONResponse(http.StatusForbidden, map[string]any{
-					"message": "email not verified",
-				})
-			default:
-				reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
-					"message": "internal server error",
-				})
-			}
-
+			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
+				"message": err.Error(),
+			})
 			reqCtx.Handled = true
 			return
 		}
 
-		reqCtx.SetUserIDInContext(result.User.ID)
-		reqCtx.Values["auth_success"] = true
+		if h.PluginConfig.RequireEmailVerification && !result.User.EmailVerified && h.PluginConfig.SendEmailOnSignIn {
+			go func() {
+				detachedCtx := context.WithoutCancel(ctx)
+				taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
+				defer cancel()
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{
-			"user": result.User,
+				if err := h.SendEmailVerificationUseCase.Send(taskCtx, result.User.Email, &payload.CallbackURL); err != nil {
+					h.Logger.Error("failed to send email", "err", err)
+				}
+			}()
+		}
+
+		reqCtx.SetUserIDInContext(result.User.ID)
+		reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken
+
+		reqCtx.SetJSONResponse(http.StatusOK, types.SignInResponse{
+			User:    result.User,
+			Session: result.Session,
 		})
 	}
 }

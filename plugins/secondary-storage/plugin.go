@@ -86,10 +86,8 @@ func (p *SecondaryStoragePlugin) Init(ctx *models.PluginContext) error {
 		p.storage = p.initMemoryProvider()
 	}
 
-	// Register the secondary storage service in the service registry
-	service := NewSecondaryStorageService(string(p.config.Provider), p.storage)
+	service := NewSecondaryStorageService(p.config.Provider.String(), p.storage)
 	ctx.ServiceRegistry.Register(models.ServiceSecondaryStorage.String(), service)
-	p.logger.Debug("secondary storage service registered", "provider", p.config.Provider)
 
 	return nil
 }

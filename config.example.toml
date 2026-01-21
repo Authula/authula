@@ -17,6 +17,26 @@ base_path = "/auth"
 secret = ""
 
 # -----------------------------------
+# - Session Configuration
+# -----------------------------------
+
+[session]
+cookie_name = "gobetterauth.session_token"
+expires_in = "30m"
+update_age = "5m"
+cookie_max_age = "24h"
+secure = false
+http_only = true
+same_site = "lax"  # Options: "lax", "strict", "none"
+
+# -----------------------------------
+# - Security Configuration
+# -----------------------------------
+
+[security]
+trusted_origins = []
+
+# -----------------------------------
 # - Logger Configuration
 # -----------------------------------
 
@@ -37,27 +57,18 @@ max_idle_conns = 5
 conn_max_lifetime = "10m"
 
 # -----------------------------------
-# - Security Configuration
-# -----------------------------------
-
-[security]
-trusted_origins = []
-
-# -----------------------------------
 # - Plugins Configuration
 # -----------------------------------
 
 [plugins]
 
-# Core plugin is required for basic functionality
-[plugins.core]
-enabled = true
+# --- Config Manager Plugin (allows runtime configuration changes via the Admin API) ---
 
-# Enable the Config Manager plugin to allow runtime configuration changes via the Admin API
 [plugins.config_manager]
 enabled = true
 
-# Enable the Secondary Storage plugin to provide secondary storage backends for other plugins
+# --- Secondary Storage Plugin (provides secondary storage backends for other plugins) ---
+
 [plugins.secondary_storage]
 enabled = true
 provider = "memory" # Options: "memory", "database", "redis"
@@ -76,11 +87,13 @@ cleanup_interval = "1m"
 # pool_size = 10
 # pool_timeout = "30s"
 
-# Email Plugin Configuration (handles email sending via SMTP or Resend)
+# --- Email Plugin (handles email sending via SMTP or Resend) ---
+
 [plugins.email]
 enabled = true
 provider = "smtp"  # Options: "smtp", "resend"
-from_address = "noreply@example.com"
+# Can also be set via FROM_ADDRESS environment variable
+from_address = ""
 
 # Optional: Fallback provider if primary fails
 # fallback_provider = "resend"
@@ -88,7 +101,8 @@ from_address = "noreply@example.com"
 # Resend API Configuration (when provider = "resend")
 # NOTE: The Resend API key MUST be set via the RESEND_API_KEY environment variable.
 
-# CORS Plugin Configuration (to handle Cross-Origin Resource Sharing)
+# --- CORS Plugin (to handle Cross-Origin Resource Sharing) ---
+
 [plugins.cors]
 enabled = true
 allowed_origins = ["*"] # If using session plugin, specify exact origins instead of "*"
@@ -103,7 +117,8 @@ max_age = "24h"
 # allowed_origins = ["https://yourdomain.com", "https://api.yourdomain.com"]
 # allow_credentials = true
 
-# CSRF Plugin Configuration (for protecting against CSRF attacks)
+# --- CSRF Plugin (for protecting against CSRF attacks) ---
+
 [plugins.csrf]
 enabled = true
 cookie_name = "gobetterauth_csrf"
@@ -116,7 +131,8 @@ same_site = "lax"  # Options: "lax", "strict", "none" (Note: HttpOnly=false and 
 # Disabled by default for specific clients (mobile apps, CLI tools, webhooks).
 enable_header_protection = false
 
-# Email/Password Plugin Configuration
+# --- Email/Password Plugin ---
+
 [plugins.email_password]
 enabled = true
 min_password_length = 8
@@ -126,36 +142,39 @@ require_email_verification = true
 auto_sign_in = true
 send_email_on_sign_up = true
 send_email_on_sign_in = false
-expires_in = "24h"
+email_verification_expires_in = "24h"
+password_reset_expires_in = "1h"
+email_reset_expires_in = "1h"
 
-# OAuth2 Plugin Configuration (for social logins)
-[plugins.oauth2]
-enabled = true
-cookie_ttl = "5m"
-session_ttl = "24h"
+# --- OAuth2 Plugin (for social logins) ---
+
+# [plugins.oauth2]
+# enabled = true
+# cookie_ttl = "5m"
+# session_ttl = "24h"
 
 # SECURITY NOTE: It is recommended to set the 'client_secret' for each of these via their 
 # respective environment variables as shown in the .env.example file rather than hardcoding it here.
-[plugins.oauth2.providers.discord]
-enabled = true
-client_id = "your-client-id"
-client_secret = "your-client-secret"
-redirect_url = "http://localhost:8080/auth/oauth2/callback/discord"
-scopes = ["email", "identify"]
+# [plugins.oauth2.providers.discord]
+# enabled = true
+# client_id = "your-client-id"
+# client_secret = "your-client-secret"
+# redirect_url = "http://localhost:8080/auth/oauth2/callback/discord"
+# scopes = ["email", "identify"]
 
-[plugins.oauth2.providers.github]
-enabled = true
-client_id = "your-client-id"
-client_secret = "your-client-secret"
-redirect_url = "http://localhost:8080/auth/oauth2/callback/github"
-scopes = ["user:email"]
+# [plugins.oauth2.providers.github]
+# enabled = true
+# client_id = "your-client-id"
+# client_secret = "your-client-secret"
+# redirect_url = "http://localhost:8080/auth/oauth2/callback/github"
+# scopes = ["user:email"]
 
-[plugins.oauth2.providers.google]
-enabled = true
-client_id = "your-client-id"
-client_secret = "your-client-secret"
-redirect_url = "http://localhost:8080/auth/oauth2/callback/google"
-scopes = ["openid", "email", "profile"]
+# [plugins.oauth2.providers.google]
+# enabled = true
+# client_id = "your-client-id"
+# client_secret = "your-client-secret"
+# redirect_url = "http://localhost:8080/auth/oauth2/callback/google"
+# scopes = ["openid", "email", "profile"]
 
 # Example: Additional fields for a custom OAuth2 provider
 # auth_url = "https://provider.com/oauth2/authorize"
@@ -186,32 +205,30 @@ scopes = ["openid", "email", "profile"]
 # name_field = "full_name"
 # picture_field = "avatar_url"
 
-# Session Plugin Configuration (use for SSR apps)
+# --- Session Plugin (use for SSR apps) ---
+
 # Cookie-based session authentication that stores session tokens as HTTP-only cookies
 # Note: Client IP address and User-Agent are automatically captured from the request and
 # stored in the session record for security audit trails and session management features.
 [plugins.session]
 enabled = true
-cookie_name = "gobetterauth.session_token"
-cookie_path = "/"  # Path scope for the cookie (default: "/"). Set to a specific path if needed
-max_age = "24h"  # Session duration (default: 24h). Controls both cookie expiry and database expiry
-secure = false  # Set to true in production with HTTPS
-http_only = true  # Prevents JavaScript access to the cookie (recommended: true for security)
-same_site = "lax"  # Options: "lax", "strict", "none" (recommended: "lax" for balance of security and functionality)
 
-# JWT Plugin Configuration (use for SPAs and mobile apps)
+# --- JWT Plugin (use for SPAs and mobile apps) ---
+
 # [plugins.jwt]
 # enabled = true
 # expires_in = "15m"
-# refresh_expires_in = "7d"
+# refresh_expires_in = "168h"
 # header_name = "Authorization"
 
-# Bearer Plugin Configuration (use for SPAs and mobile apps)
+# --- Bearer Plugin (use for SPAs and mobile apps) ---
+
 # [plugins.bearer]
 # enabled = true
 # header_name = "Authorization"
 
-# Rate Limit Plugin Configuration (to prevent abuse and brute-force attacks)
+# --- Rate Limit Plugin (to prevent abuse and brute-force attacks) ---
+
 # [plugins.ratelimit]
 # enabled = true
 # window = "1m"
@@ -299,12 +316,10 @@ buffer_size = 100
 # [[route_mappings]]
 # path = "/sign-in"
 # method = "POST"
-# plugins = ["session.issuance"]
 
 # [[route_mappings]]
 # path = "/sign-up"
 # method = "POST"
-# plugins = ["session.issuance"]
 
 # [[route_mappings]]
 # path = "/change-password"

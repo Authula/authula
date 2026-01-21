@@ -6,16 +6,22 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
+type JWTHookID string
+
 // Constants for JWT plugin hook IDs and metadata
 const (
-	// HookIDJWTAuth identifies the JWT authentication hook
+	// HookIDJWTAuth identifies the JWT authentication hook.
 	// Validates JWT tokens in Authorization header and sets ctx.UserID
-	HookIDJWTAuth = "jwt.auth"
+	HookIDJWTAuth JWTHookID = "jwt.auth"
 
-	// HookIDJWTIssuance identifies the JWT issuance hook
+	// HookIDJWTIssuance identifies the JWT issuance hook.
 	// Issues access and refresh tokens on successful authentication
-	HookIDJWTIssuance = "jwt.issuance"
+	HookIDJWTIssuance JWTHookID = "jwt.issuance"
 )
+
+func (id JWTHookID) String() string {
+	return string(id)
+}
 
 // issueTokensHook generates and stores JWT tokens for authenticated users
 // This hook runs at HookAfter stage if "jwt.issuance" is in route.Metadata["plugins"]
@@ -61,7 +67,7 @@ func (p *JWTPlugin) buildHooks() []models.Hook {
 		// Executes if "jwt.issuance" is in route.Metadata["plugins"]
 		{
 			Stage:    models.HookAfter,
-			PluginID: HookIDJWTIssuance,
+			PluginID: HookIDJWTIssuance.String(),
 			Handler:  p.issueTokensHook,
 			Order:    10, // Normal priority
 		},

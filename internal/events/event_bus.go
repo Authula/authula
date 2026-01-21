@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -120,15 +121,9 @@ func (bus *eventBus) Subscribe(
 
 	state, exists := bus.topics[topic]
 
-	// First subscriber → start consumer
+	// First subscriber  start resilient consumer loop that re-subscribes on transport disconnects
 	if !exists {
 		ctx, cancel := context.WithCancel(bus.rootCtx)
-
-		msgs, err := bus.pubsub.Subscribe(ctx, topic)
-		if err != nil {
-			cancel()
-			return 0, err
-		}
 
 		state = &topicState{
 			cancel: cancel,
@@ -136,7 +131,7 @@ func (bus *eventBus) Subscribe(
 		bus.topics[topic] = state
 
 		bus.wg.Add(1)
-		go bus.consumeAndMultiplex(ctx, topic, msgs)
+		go bus.startConsumerLoop(ctx, topic)
 	}
 
 	state.handlers = append(state.handlers, handlerEntry{
@@ -178,8 +173,6 @@ func (bus *eventBus) consumeAndMultiplex(
 	topic string,
 	msgs <-chan *models.Message,
 ) {
-	defer bus.wg.Done()
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -214,6 +207,73 @@ func (bus *eventBus) consumeAndMultiplex(
 
 				go bus.callHandler(ctx, entry.handler, event)
 			}
+		}
+	}
+}
+
+func (bus *eventBus) startConsumerLoop(ctx context.Context, topic string) {
+	defer bus.wg.Done()
+
+	// Exponential backoff settings
+	const (
+		baseBackoff = 500 * time.Millisecond
+		maxBackoff  = 30 * time.Second
+	)
+	backoff := baseBackoff
+
+	for {
+		msgs, err := bus.pubsub.Subscribe(ctx, topic)
+		if err != nil {
+			// Add jitter to avoid thundering herd when many consumers retry
+			jitter := time.Duration(rand.Int63n(int64(250 * time.Millisecond)))
+			wait := backoff + jitter
+
+			bus.logger.Error(
+				"failed to subscribe to topic, will retry",
+				err,
+				watermill.LogFields{"topic": topic, "retry_in_ms": wait.Milliseconds()},
+			)
+
+			select {
+			case <-time.After(wait):
+				// increase backoff exponentially up to cap
+				backoff *= 2
+				if backoff > maxBackoff {
+					backoff = maxBackoff
+				}
+				continue
+			case <-ctx.Done():
+				return
+			}
+		}
+
+		// reset backoff on successful subscribe
+		backoff = baseBackoff
+
+		bus.logger.Debug(
+			"Starting consuming",
+			watermill.LogFields{"topic": topic},
+		)
+
+		bus.consumeAndMultiplex(ctx, topic, msgs)
+
+		bus.logger.Debug(
+			"Consuming done",
+			watermill.LogFields{"topic": topic},
+		)
+
+		// If context is cancelled, stop retrying
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		// Small delay to avoid tight restart loops
+		select {
+		case <-time.After(500 * time.Millisecond):
+		case <-ctx.Done():
+			return
 		}
 	}
 }

@@ -53,8 +53,7 @@ This design empowers you to build secure, maintainable, and highly customizable 
 
 ### Features via Plugins
 
-- 🔑 Email & Password authentication (argon2)
-- 📧 Email verification & password reset
+- 📧 Email & Password: Authentication, Email Verification & Password Reset
 - 🌐 OAuth providers
 - 💾 Multiple database backends
 - 🗄️ Secondary storage (Redis, memory, DB)
@@ -102,6 +101,12 @@ Build your own plugins for:
 Embed GoBetterAuth directly into your Go application:
 
 ```go
+import (
+  gobetterauth "github.com/GoBetterAuth/go-better-auth"
+  gobetterauthconfig "github.com/GoBetterAuth/go-better-auth/config"
+  gobetterauthmodels "github.com/GoBetterAuth/go-better-auth/models"
+)
+
 config := gobetterauthconfig.NewConfig(
   gobetterauthconfig.WithAppName("GoBetterAuthPlayground"),
   gobetterauthconfig.WithBasePath("/api/auth"),
@@ -119,6 +124,8 @@ auth := gobetterauth.New(gobetterauth.AuthConfig{
     // other plugins...
   },
 })
+
+http.ListenAndServe(":8080", auth.Handler())
 ```
 
 You get:
@@ -151,8 +158,6 @@ Perfect for:
 
 - microservices
 - polyglot stacks
-- frontend-heavy apps
-- mobile apps
 
 ---
 

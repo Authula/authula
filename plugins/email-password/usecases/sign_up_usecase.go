@@ -13,14 +13,15 @@ import (
 )
 
 type SignUpUseCase struct {
-	GlobalConfig                 *models.Config
-	PluginConfig                 types.EmailPasswordPluginConfig
-	Logger                       models.Logger
-	UserService                  rootservices.UserService
-	AccountService               rootservices.AccountService
-	PasswordService              rootservices.PasswordService
-	SendVerificationEmailUseCase *SendVerificationEmailUseCase
-	EventBus                     models.EventBus
+	GlobalConfig    *models.Config
+	PluginConfig    types.EmailPasswordPluginConfig
+	Logger          models.Logger
+	UserService     rootservices.UserService
+	AccountService  rootservices.AccountService
+	SessionService  rootservices.SessionService
+	TokenService    rootservices.TokenService
+	PasswordService rootservices.PasswordService
+	EventBus        models.EventBus
 }
 
 func (uc *SignUpUseCase) SignUp(
@@ -30,6 +31,8 @@ func (uc *SignUpUseCase) SignUp(
 	password string,
 	image *string,
 	callbackURL *string,
+	ipAddress *string,
+	userAgent *string,
 ) (*types.SignUpResult, error) {
 	if uc.PluginConfig.DisableSignUp {
 		return nil, constants.ErrSignUpDisabled
@@ -58,33 +61,43 @@ func (uc *SignUpUseCase) SignUp(
 		return nil, err
 	}
 
-	if uc.PluginConfig.RequireEmailVerification {
-		// Capture the current value of the pointer to avoid race conditions
-		var cbURL string
-		if callbackURL != nil {
-			cbURL = *callbackURL
+	var session *models.Session
+	var sessionToken *string
+
+	if uc.PluginConfig.AutoSignIn {
+		token, err := uc.TokenService.Generate()
+		if err != nil {
+			uc.Logger.Error("failed to generate session token", "error", err)
+			return nil, err
 		}
+		sessionToken = &token
 
-		go func() {
-			detachedCtx := context.WithoutCancel(ctx)
-			taskCtx, cancel := context.WithTimeout(detachedCtx, 30*time.Second)
-			defer cancel()
+		hashedToken := uc.TokenService.Hash(token)
 
-			err := uc.SendVerificationEmailUseCase.Send(taskCtx, email, &cbURL)
-			if err != nil {
-				uc.Logger.Error("failed to send email", "err", err)
-			}
-		}()
+		session, err = uc.SessionService.Create(
+			ctx,
+			user.ID,
+			hashedToken,
+			ipAddress,
+			userAgent,
+			uc.GlobalConfig.Session.ExpiresIn,
+		)
+		if err != nil {
+			uc.Logger.Error("failed to create session", "error", err)
+			return nil, err
+		}
 	}
 
-	uc.publishSignUpEvent(user)
+	uc.publishSignedUpEvent(user)
 
 	return &types.SignUpResult{
-		User: user,
+		User:         user,
+		Session:      session,
+		SessionToken: sessionToken,
 	}, nil
 }
 
-func (uc *SignUpUseCase) publishSignUpEvent(user *models.User) {
+func (uc *SignUpUseCase) publishSignedUpEvent(user *models.User) {
 	userJson, err := json.Marshal(user)
 	if err != nil {
 		uc.Logger.Error(err.Error())

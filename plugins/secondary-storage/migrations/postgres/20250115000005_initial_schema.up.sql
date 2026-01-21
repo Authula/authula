@@ -1,5 +1,5 @@
 -- Create a function to automatically update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+CREATE OR REPLACE FUNCTION key_value_store_update_updated_at_func()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS key_value_store (
 
 CREATE INDEX IF NOT EXISTS idx_key_value_store_expires_at ON key_value_store(expires_at);
 
-DROP TRIGGER IF EXISTS update_key_value_store_updated_at ON key_value_store;
-CREATE TRIGGER update_key_value_store_updated_at
+DROP TRIGGER IF EXISTS key_value_store_update_updated_at_trigger ON key_value_store;
+CREATE TRIGGER key_value_store_update_updated_at_trigger
   BEFORE UPDATE ON key_value_store
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION key_value_store_update_updated_at_func();

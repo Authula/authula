@@ -14,14 +14,10 @@ type HMACSigner struct {
 	secret []byte
 }
 
-func NewHMACSigner(secret string) (*HMACSigner, error) {
-	if len(secret) < 32 {
-		return nil, errors.New("auth secret must be at least 32 characters")
-	}
-
+func NewHMACSigner(secret string) *HMACSigner {
 	return &HMACSigner{
 		secret: []byte(secret),
-	}, nil
+	}
 }
 
 // Generate creates a cryptographically signed token.

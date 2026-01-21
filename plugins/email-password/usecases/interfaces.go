@@ -4,7 +4,9 @@ type UseCases struct {
 	SignUpUseCase                *SignUpUseCase
 	SignInUseCase                *SignInUseCase
 	VerifyEmailUseCase           *VerifyEmailUseCase
-	SendVerificationEmailUseCase *SendVerificationEmailUseCase
+	SendEmailVerificationUseCase *SendEmailVerificationUseCase
 	RequestPasswordResetUseCase  *RequestPasswordResetUseCase
 	ChangePasswordUseCase        *ChangePasswordUseCase
+	RequestEmailChangeUseCase    *RequestEmailChangeUseCase
+	ChangeEmailUseCase           *ChangeEmailUseCase
 }

@@ -12,7 +12,12 @@ type VerificationType string
 const (
 	TypeEmailVerification    VerificationType = "email_verification"
 	TypePasswordResetRequest VerificationType = "password_reset_request"
+	TypeEmailResetRequest    VerificationType = "email_reset_request"
 )
+
+func (vt VerificationType) String() string {
+	return string(vt)
+}
 
 type Verification struct {
 	bun.BaseModel `bun:"table:verifications,alias:v"`

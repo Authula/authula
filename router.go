@@ -88,7 +88,7 @@ func NewRouter(logger models.Logger, basePath string, opts *RouterOptions) *Rout
 
 	// Set default NotFound handler
 	r.NotFound(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		http.Error(w, "Not Found", http.StatusNotFound)
+		util.JSONResponse(w, http.StatusNotFound, map[string]any{"message": "Not Found"})
 	}))
 
 	// Set default MethodNotAllowed handler
@@ -262,12 +262,6 @@ func (r *Router) sortHooks() {
 }
 
 func (r *Router) runHooks(stage models.HookStage, ctx *models.RequestContext) {
-	r.logger.Debug("runHooks start",
-		"stage", stage,
-		"path", ctx.Path,
-		"method", ctx.Method,
-		"total_hooks", len(r.hooks))
-
 	for _, hook := range r.hooks {
 		if hook.Stage != stage {
 			continue
@@ -288,22 +282,6 @@ func (r *Router) runHooks(stage models.HookStage, ctx *models.RequestContext) {
 		if hook.Matcher != nil && !hook.Matcher(ctx) {
 			continue
 		}
-
-		matchedPattern := "<unknown>"
-		if ctx.Route != nil && ctx.Route.Metadata != nil {
-			if val, ok := ctx.Route.Metadata["_pattern"]; ok {
-				if s, ok2 := val.(string); ok2 {
-					matchedPattern = s
-				}
-			}
-		}
-
-		r.logger.Debug("Executing hook",
-			"stage", stage,
-			"plugin_id", hook.PluginID,
-			"async", hook.Async,
-			"path", ctx.Path,
-			"matched_pattern", matchedPattern)
 
 		// Async execution
 		if hook.Async {
@@ -339,11 +317,6 @@ func (r *Router) runHooks(stage models.HookStage, ctx *models.RequestContext) {
 					ctx.Handled = true
 				}
 			}
-			r.logger.Debug("Executed hook",
-				"stage", stage,
-				"plugin_id", hook.PluginID,
-				"path", ctx.Path,
-				"matched_pattern", matchedPattern)
 		}()
 
 		if ctx.Handled {
@@ -420,8 +393,6 @@ func matchRoutePath(requestPath, pattern string) bool {
 // getRouteMetadata looks up route metadata for a given request method and path.
 // Returns the metadata, the matched pattern (for dynamic paths), and whether a match was found.
 func (r *Router) getRouteMetadata(method, path string) (map[string]any, string, bool) {
-	r.logger.Debug("getRouteMetadata", "method", method, "path", path)
-
 	// Try exact match first
 	exactKey := method + ":" + path
 	if metadata, exists := r.routeMetadata[exactKey]; exists {
@@ -501,12 +472,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			Path:     req.URL.Path,
 			Metadata: metadata,
 		}
-		r.logger.Debug("Route metadata matched",
-			"path", req.URL.Path,
-			"pattern", pattern,
-			"plugins", metadata["plugins"])
 	} else {
-		r.logger.Debug("No route metadata matched", "path", req.URL.Path)
 		ctx.Route = &models.Route{
 			Method:   req.Method,
 			Path:     req.URL.Path,

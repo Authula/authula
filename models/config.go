@@ -7,18 +7,17 @@ import (
 // Config holds the core configuration for GoBetterAuth.
 type Config struct {
 	// Core identity
-	AppName  string `json:"app_name" toml:"app_name"`
-	BaseURL  string `json:"base_url" toml:"base_url"`
-	BasePath string `json:"base_path" toml:"base_path"`
-	Secret   string `json:"secret" toml:"secret"`
+	AppName  string         `json:"app_name" toml:"app_name"`
+	BaseURL  string         `json:"base_url" toml:"base_url"`
+	BasePath string         `json:"base_path" toml:"base_path"`
+	Secret   string         `json:"secret" toml:"secret"`
+	Session  SessionConfig  `json:"session" toml:"session"`
+	Security SecurityConfig `json:"security" toml:"security"`
 
 	// Core infrastructure configuration
 	Database DatabaseConfig `json:"database" toml:"database"`
 	Logger   LoggerConfig   `json:"logger" toml:"logger"`
 	EventBus EventBusConfig `json:"event_bus" toml:"event_bus"`
-
-	// Global trusted origins for CORS, CSRF protection and more
-	Security SecurityConfig `json:"security" toml:"security"`
 
 	// Plugin configurations
 	Plugins PluginsConfig `json:"plugins" toml:"plugins"`
@@ -32,6 +31,23 @@ type Config struct {
 	// This allows skipping mapstructure unmarshalling and preserving type safety.
 	// Key: plugin ID, Value: typed config struct passed to Auth.New()
 	PreParsedConfigs map[string]any `json:"-" toml:"-"`
+
+	// DatabaseHooks allows you to hook into database operations for users, accounts, sessions, and verifications.
+	DatabaseHooks *CoreDatabaseHooks `json:"-" toml:"-"`
+}
+
+type SessionConfig struct {
+	CookieName   string        `json:"cookie_name" toml:"cookie_name"`
+	ExpiresIn    time.Duration `json:"expires_in" toml:"expires_in"`         // Sliding window per activity
+	UpdateAge    time.Duration `json:"update_age" toml:"update_age"`         // How often to check/update
+	CookieMaxAge time.Duration `json:"cookie_max_age" toml:"cookie_max_age"` // Absolute max age of the cookie
+	Secure       bool          `json:"secure" toml:"secure"`
+	HttpOnly     bool          `json:"http_only" toml:"http_only"`
+	SameSite     string        `json:"same_site" toml:"same_site"`
+}
+
+type SecurityConfig struct {
+	TrustedOrigins []string `json:"trusted_origins" toml:"trusted_origins"`
 }
 
 type LoggerConfig struct {
@@ -57,10 +73,6 @@ type EventBusConfig struct {
 	Kafka                 *KafkaConfig      `json:"kafka" toml:"kafka"`
 	NATS                  *NatsConfig       `json:"nats" toml:"nats"`
 	RabbitMQ              *RabbitMQConfig   `json:"rabbitmq" toml:"rabbitmq"`
-}
-
-type SecurityConfig struct {
-	TrustedOrigins []string `json:"trusted_origins" toml:"trusted_origins"`
 }
 
 type GoChannelConfig struct {
@@ -122,4 +134,37 @@ type RouteMapping struct {
 	// Plugins is the list of plugin IDs that should execute for this route.
 	// Plugin IDs follow the format "{plugin_name}.{operation}" (e.g., "session.auth", "csrf.protect")
 	Plugins []string `json:"plugins" toml:"plugins"`
+}
+
+type CoreDatabaseHooks struct {
+	Users         *UserDatabaseHooksConfig
+	Accounts      *AccountDatabaseHooksConfig
+	Sessions      *SessionDatabaseHooksConfig
+	Verifications *VerificationDatabaseHooksConfig
+}
+
+type UserDatabaseHooksConfig struct {
+	BeforeCreate func(user *User) error
+	AfterCreate  func(user User) error
+	BeforeUpdate func(user *User) error
+	AfterUpdate  func(user User) error
+}
+
+type AccountDatabaseHooksConfig struct {
+	BeforeCreate func(account *Account) error
+	AfterCreate  func(account Account) error
+	BeforeUpdate func(account *Account) error
+	AfterUpdate  func(account Account) error
+}
+
+type SessionDatabaseHooksConfig struct {
+	BeforeCreate func(session *Session) error
+	AfterCreate  func(session Session) error
+	BeforeUpdate func(session *Session) error
+	AfterUpdate  func(session Session) error
+}
+
+type VerificationDatabaseHooksConfig struct {
+	BeforeCreate func(verification *Verification) error
+	AfterCreate  func(verification Verification) error
 }

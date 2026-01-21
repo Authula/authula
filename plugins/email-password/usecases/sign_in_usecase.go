@@ -13,14 +13,15 @@ import (
 )
 
 type SignInUseCase struct {
-	GlobalConfig                 *models.Config
-	PluginConfig                 types.EmailPasswordPluginConfig
-	Logger                       models.Logger
-	UserService                  rootservices.UserService
-	AccountService               rootservices.AccountService
-	PasswordService              rootservices.PasswordService
-	EventBus                     models.EventBus
-	SendVerificationEmailUseCase *SendVerificationEmailUseCase
+	GlobalConfig    *models.Config
+	PluginConfig    types.EmailPasswordPluginConfig
+	Logger          models.Logger
+	UserService     rootservices.UserService
+	AccountService  rootservices.AccountService
+	SessionService  rootservices.SessionService
+	TokenService    rootservices.TokenService
+	PasswordService rootservices.PasswordService
+	EventBus        models.EventBus
 }
 
 func (uc *SignInUseCase) SignIn(
@@ -28,6 +29,8 @@ func (uc *SignInUseCase) SignIn(
 	email string,
 	password string,
 	callbackURL *string,
+	ipAddress *string,
+	userAgent *string,
 ) (*types.SignInResult, error) {
 	user, err := uc.UserService.GetByEmail(ctx, email)
 	if err != nil {
@@ -45,37 +48,37 @@ func (uc *SignInUseCase) SignIn(
 		return nil, constants.ErrInvalidCredentials
 	}
 
-	if uc.PluginConfig.RequireEmailVerification && !user.EmailVerified {
-		if uc.PluginConfig.SendEmailOnSignIn {
-			// Capture the current value of the pointer to avoid race conditions
-			var cbURL string
-			if callbackURL != nil {
-				cbURL = *callbackURL
-			}
-
-			go func() {
-				detachedCtx := context.WithoutCancel(ctx)
-				taskCtx, cancel := context.WithTimeout(detachedCtx, 30*time.Second)
-				defer cancel()
-
-				err := uc.SendVerificationEmailUseCase.Send(taskCtx, user.Email, &cbURL)
-				if err != nil {
-					uc.Logger.Error("failed to send email", "err", err)
-				}
-			}()
-		}
-
-		return nil, constants.ErrEmailNotVerified
+	token, err := uc.TokenService.Generate()
+	if err != nil {
+		uc.Logger.Error("failed to generate session token", "error", err)
+		return nil, err
 	}
 
-	uc.publishSignInEvent(user)
+	hashedToken := uc.TokenService.Hash(token)
+
+	newSession, err := uc.SessionService.Create(
+		ctx,
+		user.ID,
+		hashedToken,
+		ipAddress,
+		userAgent,
+		uc.GlobalConfig.Session.ExpiresIn,
+	)
+	if err != nil {
+		uc.Logger.Error("failed to create session", "error", err)
+		return nil, err
+	}
+
+	uc.publishSignedInEvent(user)
 
 	return &types.SignInResult{
-		User: user,
+		User:         user,
+		Session:      newSession,
+		SessionToken: token,
 	}, nil
 }
 
-func (uc *SignInUseCase) publishSignInEvent(user *models.User) {
+func (uc *SignInUseCase) publishSignedInEvent(user *models.User) {
 	userJson, err := json.Marshal(user)
 	if err != nil {
 		uc.Logger.Error(err.Error())

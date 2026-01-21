@@ -30,6 +30,7 @@ type SessionService interface {
 	Create(ctx context.Context, userID string, hashedToken string, ipAddress *string, userAgent *string, maxAge time.Duration) (*models.Session, error)
 	GetByUserID(ctx context.Context, userID string) (*models.Session, error)
 	GetByToken(ctx context.Context, hashedToken string) (*models.Session, error)
+	Update(ctx context.Context, session *models.Session) (*models.Session, error)
 	Delete(ctx context.Context, ID string) error
 	DeleteAllByUserID(ctx context.Context, userID string) error
 }
@@ -47,4 +48,12 @@ type TokenService interface {
 	Hash(token string) string
 	Encrypt(token string) (string, error)
 	Decrypt(encrypted string) (string, error)
+}
+
+type CoreServices struct {
+	UserService         UserService
+	AccountService      AccountService
+	SessionService      SessionService
+	VerificationService VerificationService
+	TokenService        TokenService
 }

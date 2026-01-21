@@ -8,21 +8,27 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/usecases"
 )
 
-type ChangePasswordPayload struct {
-	Token    string `json:"token"`
-	Password string `json:"password"`
+type ChangeEmailPayload struct {
+	Token string `json:"token"`
+	Email string `json:"email"`
 }
 
-type ChangePasswordHandler struct {
-	UseCase *usecases.ChangePasswordUseCase
+type ChangeEmailHandler struct {
+	UseCase *usecases.ChangeEmailUseCase
 }
 
-func (h *ChangePasswordHandler) Handler() http.HandlerFunc {
+func (h *ChangeEmailHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		var payload ChangePasswordPayload
+		if reqCtx.UserID == nil {
+			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "unauthorized"})
+			reqCtx.Handled = true
+			return
+		}
+
+		var payload ChangeEmailPayload
 		if err := util.ParseJSON(r, &payload); err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),
@@ -31,7 +37,7 @@ func (h *ChangePasswordHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		err := h.UseCase.ChangePassword(ctx, *reqCtx.UserID, payload.Token, payload.Password)
+		err := h.UseCase.ChangeEmail(ctx, *reqCtx.UserID, payload.Token, payload.Email)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),
@@ -41,8 +47,7 @@ func (h *ChangePasswordHandler) Handler() http.HandlerFunc {
 		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{
-			"message": "password updated",
+			"message": "email updated",
 		})
 	}
-
 }

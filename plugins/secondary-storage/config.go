@@ -12,6 +12,10 @@ const (
 	SecondaryStorageProviderRedis    SecondaryStorageProvider = "redis"
 )
 
+func (p SecondaryStorageProvider) String() string {
+	return string(p)
+}
+
 // SecondaryStoragePluginConfig is the main configuration for the secondary storage plugin
 // Defaults to in-memory storage if no provider is configured
 type SecondaryStoragePluginConfig struct {

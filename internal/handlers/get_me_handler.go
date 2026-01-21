@@ -3,9 +3,9 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/GoBetterAuth/go-better-auth/internal/types"
+	"github.com/GoBetterAuth/go-better-auth/internal/usecases"
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/types"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/usecases"
 )
 
 type GetMeHandler struct {
@@ -36,7 +36,8 @@ func (h *GetMeHandler) Handler() http.HandlerFunc {
 		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, &types.GetMeResponse{
-			User: result.User,
+			User:    result.User,
+			Session: result.Session,
 		})
 	}
 }

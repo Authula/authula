@@ -3,8 +3,8 @@ package usecases
 import (
 	"context"
 
+	"github.com/GoBetterAuth/go-better-auth/internal/types"
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/types"
 	"github.com/GoBetterAuth/go-better-auth/services"
 )
 

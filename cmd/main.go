@@ -31,26 +31,12 @@ func getEnv(key, fallback string) string {
 // This demonstrates the unified architecture where both library and standalone modes
 // use identical runtime behavior - they only differ in how plugins are instantiated
 func main() {
+	_ = godotenv.Load(".env")
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
 	slog.SetDefault(logger)
-
-	// Channel to signal restart
-	restartChan := make(chan struct{})
-	// Channel to signal shutdown
-	shutdownChan := make(chan os.Signal, 1)
-	signal.Notify(shutdownChan, syscall.SIGINT, syscall.SIGTERM)
-
-	// Server loop with restart capability
-	for {
-		runServer(logger, restartChan, shutdownChan)
-	}
-}
-
-// runServer starts the HTTP server and handles restarts
-func runServer(logger gobetterauthmodels.Logger, restartChan chan struct{}, shutdownChan chan os.Signal) {
-	port := getEnv(gobetterauthenv.EnvPort, "8080")
 
 	config := loadConfig()
 
@@ -61,7 +47,26 @@ func runServer(logger gobetterauthmodels.Logger, restartChan chan struct{}, shut
 		Plugins: pluginsList,
 	})
 
-	// auth.PluginRegistry.DropMigrations(context.Background())
+	ctx := context.Background()
+	auth.DropCoreMigrations(ctx)
+	auth.PluginRegistry.DropMigrations(ctx)
+	return
+
+	// Channel to signal restart
+	restartChan := make(chan struct{})
+	// Channel to signal shutdown
+	shutdownChan := make(chan os.Signal, 1)
+	signal.Notify(shutdownChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Server loop with restart capability
+	for {
+		runServer(logger, auth, restartChan, shutdownChan)
+	}
+}
+
+// runServer starts the HTTP server and handles restarts
+func runServer(logger gobetterauthmodels.Logger, auth *gobetterauth.Auth, restartChan chan struct{}, shutdownChan chan os.Signal) {
+	port := getEnv(gobetterauthenv.EnvPort, "8080")
 
 	// Create HTTP server with graceful shutdown support
 	server := &http.Server{
@@ -112,8 +117,6 @@ func runServer(logger gobetterauthmodels.Logger, restartChan chan struct{}, shut
 
 // loadConfig loads configuration with proper precedence:
 func loadConfig() *gobetterauthmodels.Config {
-	_ = godotenv.Load(".env")
-
 	configPath := getEnv(gobetterauthenv.EnvConfigPath, "config.toml")
 
 	data, err := os.ReadFile(configPath)
@@ -132,6 +135,8 @@ func loadConfig() *gobetterauthmodels.Config {
 		gobetterauthconfig.WithBaseURL(loadedConfig.BaseURL),
 		gobetterauthconfig.WithBasePath(loadedConfig.BasePath),
 		gobetterauthconfig.WithSecret(loadedConfig.Secret),
+		gobetterauthconfig.WithSession(loadedConfig.Session),
+		gobetterauthconfig.WithSecurity(loadedConfig.Security),
 		gobetterauthconfig.WithDatabase(loadedConfig.Database),
 		gobetterauthconfig.WithLogger(loadedConfig.Logger),
 		gobetterauthconfig.WithEventBus(loadedConfig.EventBus),

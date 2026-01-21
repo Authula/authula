@@ -84,14 +84,17 @@ type CallbackRequest struct {
 	Error      string
 }
 
-// CallbackResponse represents an OAuth2 callback response
-type CallbackResponse struct {
-	User *models.User `json:"user"`
-}
-
 // CallbackResult represents the result of OAuth2 callback
 type CallbackResult struct {
-	User *models.User
+	User         *models.User
+	Session      *models.Session
+	SessionToken string
+}
+
+// CallbackResponse represents an OAuth2 callback response
+type CallbackResponse struct {
+	User    *models.User    `json:"user"`
+	Session *models.Session `json:"session"`
 }
 
 // RefreshRequest represents a token refresh request

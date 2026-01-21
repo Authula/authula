@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/IBM/sarama"
@@ -236,18 +237,37 @@ func initRedis(logger watermill.LoggerAdapter, config *models.RedisConfig) (mode
 
 // initKafka initializes a Kafka provider
 func initKafka(logger watermill.LoggerAdapter, config *models.KafkaConfig) (models.PubSub, error) {
-	if config == nil || os.Getenv(env.EnvKafkaBrokers) == "" || config.Brokers == "" {
+	brokersStr := os.Getenv(env.EnvKafkaBrokers)
+	if brokersStr == "" && config != nil {
+		brokersStr = config.Brokers
+	}
+	if brokersStr == "" {
+		return nil, fmt.Errorf("kafka config with brokers is required")
+	}
+
+	brokerList := []string{}
+	for b := range strings.SplitSeq(brokersStr, ",") {
+		b = strings.TrimSpace(b)
+		if b != "" {
+			brokerList = append(brokerList, b)
+		}
+	}
+	if len(brokerList) == 0 {
 		return nil, fmt.Errorf("kafka config with brokers is required")
 	}
 
 	consumerGroup := os.Getenv(env.EnvEventBusConsumerGroup)
 	if consumerGroup == "" {
-		if config.ConsumerGroup != "" {
+		if config != nil && config.ConsumerGroup != "" {
 			consumerGroup = config.ConsumerGroup
 		} else {
 			consumerGroup = "gobetterauth_consumer_group"
 		}
 	}
+
+	logger.Debug("kafka init",
+		watermill.LogFields{"brokers": strings.Join(brokerList, ","), "consumer_group": consumerGroup},
+	)
 
 	saramaSubscriberConfig := kafka.DefaultSaramaSubscriberConfig()
 	saramaSubscriberConfig.Consumer.Offsets.Initial = sarama.OffsetNewest
@@ -264,11 +284,11 @@ func initKafka(logger watermill.LoggerAdapter, config *models.KafkaConfig) (mode
 	saramaProducerConfig.Producer.Flush.Frequency = 100 * time.Millisecond // Batch messages every 100ms
 	saramaProducerConfig.Producer.Flush.Messages = 100                     // Or batch 100 messages
 	saramaProducerConfig.Producer.Flush.MaxMessages = 1000                 // Max batch size
-	saramaProducerConfig.Version = sarama.V2_6_0_0                         // Use Kafka 2.6.0+ compatibility
+	saramaProducerConfig.Version = sarama.V4_1_0_0                         // Use Kafka 4.1.0+ compatibility
 
 	subscriber, err := kafka.NewSubscriber(
 		kafka.SubscriberConfig{
-			Brokers:               []string{config.Brokers},
+			Brokers:               brokerList,
 			Unmarshaler:           kafka.DefaultMarshaler{},
 			ConsumerGroup:         consumerGroup,
 			OverwriteSaramaConfig: saramaSubscriberConfig,
@@ -281,7 +301,7 @@ func initKafka(logger watermill.LoggerAdapter, config *models.KafkaConfig) (mode
 
 	publisher, err := kafka.NewPublisher(
 		kafka.PublisherConfig{
-			Brokers:               []string{config.Brokers},
+			Brokers:               brokerList,
 			Marshaler:             kafka.DefaultMarshaler{},
 			OverwriteSaramaConfig: saramaProducerConfig,
 		},

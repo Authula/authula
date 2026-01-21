@@ -3,9 +3,9 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/GoBetterAuth/go-better-auth/internal/usecases"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/usecases"
 )
 
 type SignOutRequestPayload struct {

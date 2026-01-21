@@ -18,6 +18,8 @@ type CallbackUseCase struct {
 	HMACKey          []byte
 	UserService      rootservices.UserService
 	AccountService   rootservices.AccountService
+	SessionService   rootservices.SessionService
+	TokenService     rootservices.TokenService
 }
 
 func NewCallbackUseCase(
@@ -27,6 +29,8 @@ func NewCallbackUseCase(
 	hmacKey []byte,
 	userService rootservices.UserService,
 	accountService rootservices.AccountService,
+	sessionService rootservices.SessionService,
+	tokenService rootservices.TokenService,
 ) *CallbackUseCase {
 	return &CallbackUseCase{
 		GlobalConfig:     globalConfig,
@@ -35,10 +39,12 @@ func NewCallbackUseCase(
 		HMACKey:          hmacKey,
 		UserService:      userService,
 		AccountService:   accountService,
+		SessionService:   sessionService,
+		TokenService:     tokenService,
 	}
 }
 
-func (uc *CallbackUseCase) Callback(ctx context.Context, req *types.CallbackRequest) (*types.CallbackResult, error) {
+func (uc *CallbackUseCase) Callback(ctx context.Context, req *types.CallbackRequest, ipAddress *string, userAgent *string) (*types.CallbackResult, error) {
 	if req.Error != "" {
 		return nil, fmt.Errorf("oauth provider error: %s", req.Error)
 	}
@@ -106,7 +112,29 @@ func (uc *CallbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 		return nil, fmt.Errorf("failed to handle account linking: %w", err)
 	}
 
+	sessionToken, err := uc.TokenService.Generate()
+	if err != nil {
+		uc.Logger.Error("failed to generate session token", "error", err)
+		return nil, err
+	}
+
+	hashedSessionToken := uc.TokenService.Hash(sessionToken)
+
+	newSession, err := uc.SessionService.Create(
+		ctx,
+		user.ID,
+		hashedSessionToken,
+		ipAddress,
+		userAgent,
+		uc.GlobalConfig.Session.ExpiresIn,
+	)
+	if err != nil {
+		uc.Logger.Error("failed to create session", "error", err)
+		return nil, err
+	}
+
 	return &types.CallbackResult{
-		User: user,
+		User:    user,
+		Session: newSession,
 	}, nil
 }

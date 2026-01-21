@@ -1,5 +1,5 @@
 -- Create a function to automatically update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+CREATE OR REPLACE FUNCTION config_manager_update_updated_at_column_func()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS auth_settings (
 -- Create index for efficient polling by config_version
 CREATE INDEX IF NOT EXISTS idx_auth_settings_config_version ON auth_settings(config_version);
 
-DROP TRIGGER IF EXISTS update_auth_settings_updated_at ON auth_settings;
-CREATE TRIGGER update_auth_settings_updated_at
+DROP TRIGGER IF EXISTS update_auth_settings_updated_at_trigger ON auth_settings;
+CREATE TRIGGER update_auth_settings_updated_at_trigger
   BEFORE UPDATE ON auth_settings
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION config_manager_update_updated_at_column_func();

@@ -74,21 +74,24 @@ func (s *SMTPProvider) SendEmail(ctx context.Context, to string, subject string,
 		mail.WithPort(s.port),
 	}
 
-	isLocal := s.host == "localhost" || s.host == "127.0.0.1" || s.host == "0.0.0.0" || s.host == "host.docker.internal"
+	// isLocal := s.host == "localhost" || s.host == "127.0.0.1" || s.host == "0.0.0.0" || s.host == "host.docker.internal"
 
-	if isLocal {
-		opts = append(opts,
-			mail.WithTLSPolicy(mail.NoTLS), // Local servers like MailDev/Nodemailer usually don't have SSL
-		)
-	} else {
-		opts = append(opts,
-			mail.WithUsername(s.user),
-			mail.WithPassword(s.pass),
-			mail.WithTLSPolicy(mail.TLSMandatory), // Ensure encrypted connection for production
-			mail.WithSMTPAuth(mail.SMTPAuthLogin), // Standard for most cloud providers
-		)
-	}
+	// if isLocal {
+	// 	opts = append(opts,
+	// 		mail.WithTLSPolicy(mail.NoTLS), // Local servers like MailDev/Nodemailer usually don't have SSL
+	// 	)
+	// } else {
+	// 	opts = append(opts,
+	// 		mail.WithUsername(s.user),
+	// 		mail.WithPassword(s.pass),
+	// 		mail.WithTLSPolicy(mail.TLSMandatory), // Ensure encrypted connection for production
+	// 		mail.WithSMTPAuth(mail.SMTPAuthLogin), // Standard for most cloud providers
+	// 	)
+	// }
 
+	opts = append(opts,
+		mail.WithTLSPolicy(mail.NoTLS), // Local servers like MailDev/Nodemailer usually don't have SSL
+	)
 	client, err := mail.NewClient(s.host, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to create SMTP client: %w", err)

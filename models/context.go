@@ -11,8 +11,13 @@ type ContextKey string
 const (
 	ContextUserID         ContextKey = "user_id"
 	ContextSessionID      ContextKey = "session_id"
+	ContextSessionToken   ContextKey = "session_token"
 	ContextRequestContext ContextKey = "request_context"
 )
+
+func (k ContextKey) String() string {
+	return string(k)
+}
 
 // RequestContext provides a structured abstraction for passing context
 // through request lifecycle hooks. It encapsulates all request-related

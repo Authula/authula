@@ -11,7 +11,6 @@ import (
 type PluginID string
 
 const (
-	PluginCore             PluginID = "core"
 	PluginConfigManager    PluginID = "config_manager"
 	PluginSecondaryStorage PluginID = "secondary_storage"
 	PluginEmail            PluginID = "email"

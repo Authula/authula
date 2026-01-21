@@ -2,8 +2,11 @@ package usecases
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
+	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/constants"
 	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/types"
@@ -11,14 +14,20 @@ import (
 )
 
 type ChangePasswordUseCase struct {
+	Logger              models.Logger
 	PluginConfig        types.EmailPasswordPluginConfig
+	UserService         rootservices.UserService
 	AccountService      rootservices.AccountService
 	VerificationService rootservices.VerificationService
+	TokenService        rootservices.TokenService
 	PasswordService     rootservices.PasswordService
+	MailerService       rootservices.MailerService
+	EventBus            models.EventBus
 }
 
 func (uc *ChangePasswordUseCase) ChangePassword(
 	ctx context.Context,
+	userID string,
 	tokenValue string,
 	newPassword string,
 ) error {
@@ -27,18 +36,30 @@ func (uc *ChangePasswordUseCase) ChangePassword(
 		return constants.ErrInvalidPasswordLength
 	}
 
-	token, err := uc.VerificationService.GetByToken(ctx, tokenValue)
+	hashedToken := uc.TokenService.Hash(tokenValue)
+	verification, err := uc.VerificationService.GetByToken(ctx, hashedToken)
 	if err != nil {
 		return err
 	}
 
-	if token == nil ||
-		token.Type != models.TypePasswordResetRequest ||
-		token.ExpiresAt.Before(time.Now()) {
+	if verification == nil ||
+		verification.Type != models.TypePasswordResetRequest ||
+		verification.ExpiresAt.Before(time.Now()) {
 		return constants.ErrInvalidOrExpiredToken
 	}
 
-	account, err := uc.AccountService.GetByUserIDAndProvider(ctx, *token.UserID, "email_password")
+	user, err := uc.UserService.GetByID(ctx, *verification.UserID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return constants.ErrUserNotFound
+	}
+	if user.ID != userID {
+		return constants.ErrUserNotAuthorized
+	}
+
+	account, err := uc.AccountService.GetByUserIDAndProvider(ctx, *verification.UserID, models.AuthProviderEmail.String())
 	if err != nil {
 		return err
 	}
@@ -57,9 +78,54 @@ func (uc *ChangePasswordUseCase) ChangePassword(
 		return err
 	}
 
-	if err := uc.VerificationService.Delete(ctx, token.ID); err != nil {
+	if err := uc.VerificationService.Delete(ctx, verification.ID); err != nil {
 		return err
 	}
 
+	go func() {
+		detachedCtx := context.WithoutCancel(ctx)
+		taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
+		defer cancel()
+
+		if err := uc.sendChangedPasswordEmail(taskCtx, user); err != nil {
+			uc.Logger.Error("failed to send changed password email", "err", err)
+		}
+	}()
+
+	uc.publishChangedPasswordEvent(user)
+
 	return nil
+}
+
+func (uc *ChangePasswordUseCase) sendChangedPasswordEmail(ctx context.Context, user *models.User) error {
+	subject := "Your password has been changed"
+	textBody := "Your password has been successfully changed. If you did not perform this action, please reset your password immediately by requesting a password reset."
+	htmlBody := fmt.Sprintf(
+		`<div>
+			<p>Hello %s,</p>
+			<p>Your password has been successfully changed. If you did not perform this action, please reset your password immediately by requesting a password reset.</p>
+		</div>`,
+		user.Email,
+	)
+	return uc.MailerService.SendEmail(ctx, user.Email, subject, textBody, htmlBody)
+}
+
+func (uc *ChangePasswordUseCase) publishChangedPasswordEvent(user *models.User) {
+	userJson, err := json.Marshal(user)
+	if err != nil {
+		uc.Logger.Error(err.Error())
+		return
+	}
+
+	util.PublishEventAsync(
+		uc.EventBus,
+		uc.Logger,
+		models.Event{
+			ID:        util.GenerateUUID(),
+			Type:      constants.EventUserChangedPassword,
+			Payload:   userJson,
+			Metadata:  nil,
+			Timestamp: time.Now().UTC(),
+		},
+	)
 }

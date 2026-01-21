@@ -1,53 +1,45 @@
 package session
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
+
+type SessionHookID string
 
 // Constants for session plugin hook IDs and metadata
 const (
 	// HookIDSessionAuth identifies the session authentication hook.
 	// Validates session cookie and sets ctx.UserID if valid
-	HookIDSessionAuth = "session.auth"
-
-	// HookIDSessionIssuance identifies the session issuance hook.
-	// Sets session cookie on successful authentication
-	HookIDSessionIssuance = "session.issuance"
-
-	// HookIDSessionContext overrides and returns a custom response with the session data.
-	HookIDSessionContext = "session.context"
+	HookIDSessionAuth SessionHookID = "session.auth"
 
 	// HookIDSessionClear identifies the session clear hook.
 	// Clears session cookie on sign-out
-	HookIDSessionClear = "session.clear"
+	HookIDSessionClear SessionHookID = "session.clear"
 )
+
+func (id SessionHookID) String() string {
+	return string(id)
+}
 
 // validateSessionHook validates a session cookie from the request and sets UserID
 // This hook runs at HookBefore stage if "session.auth" is in route.Metadata["plugins"]
 func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error {
-	p.logger.Debug("session auth hook running", "path", reqCtx.Path, "method", reqCtx.Method)
-
 	// Cooperative auth: if UserID already set by another auth plugin, skip
 	if reqCtx.UserID != nil {
-		p.logger.Debug("user already authenticated, skipping session validation")
 		return nil
 	}
 
-	cookie, err := reqCtx.Request.Cookie(p.config.CookieName)
+	cookie, err := reqCtx.Request.Cookie(p.globalConfig.Session.CookieName)
 	if err != nil {
-		p.logger.Debug("no session cookie found", "cookie_name", p.config.CookieName)
 		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]string{"message": "Unauthorized"})
 		reqCtx.Handled = true
 		return nil
 	}
 
 	sessionToken := cookie.Value
-	p.logger.Debug("validating session token", "token", sessionToken)
 
 	hashedToken := p.tokenService.Hash(sessionToken)
 	session, err := p.sessionService.GetByToken(reqCtx.Request.Context(), hashedToken)
@@ -78,64 +70,16 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 // JWT tokens (access_token, refresh_token) are client-side only and sent in the response body,
 // not as cookies. Only the session token is stored as a cookie for stateful session validation.
 func (p *SessionPlugin) issueSessionCookieHook(reqCtx *models.RequestContext) error {
-	if reqCtx.UserID == nil {
+	p.logger.Debug("session issuance hook running")
+	p.logger.Debug(*reqCtx.UserID)
+
+	sessionToken, ok := reqCtx.Values[models.ContextSessionToken.String()].(string)
+	if !ok || sessionToken == "" {
+		p.logger.Warn("No session_token found in request context; skipping session issuance")
 		return nil
 	}
 
-	authSuccess, ok := reqCtx.Values["auth_success"].(bool)
-	if !ok || !authSuccess {
-		return nil
-	}
-
-	if authSuccess {
-		sessionToken, err := p.tokenService.Generate()
-		if err != nil {
-			return nil
-		}
-
-		hashedToken := p.tokenService.Hash(sessionToken)
-
-		r := reqCtx.Request
-		ctx := r.Context()
-
-		ipAddress := util.ExtractClientIP(
-			r.Header.Get("X-Forwarded-For"),
-			r.Header.Get("X-Real-IP"),
-			r.RemoteAddr,
-		)
-		userAgent := r.UserAgent()
-		_, err = p.sessionService.Create(ctx, *reqCtx.UserID, hashedToken, &ipAddress, &userAgent, p.config.MaxAge)
-		if err != nil {
-			return nil
-		}
-
-		p.SetSessionCookie(reqCtx.ResponseWriter, sessionToken)
-		return nil
-	}
-
-	return nil
-}
-
-func (p *SessionPlugin) sessionContextHook(ctx *models.RequestContext) error {
-	if ctx.UserID == nil {
-		return nil
-	}
-
-	session, err := p.sessionService.GetByUserID(ctx.Request.Context(), *ctx.UserID)
-	if err != nil {
-		p.logger.Error("failed to get session by user ID: %v", err)
-		return nil
-	}
-
-	if ctx.ResponseBody != nil && ctx.ResponseReady {
-		var payload map[string]any
-		if err := json.Unmarshal(ctx.ResponseBody, &payload); err == nil {
-			payload["session"] = session
-			if updatedData, err := json.Marshal(payload); err == nil {
-				ctx.ResponseBody = updatedData
-			}
-		}
-	}
+	p.SetSessionCookie(reqCtx.ResponseWriter, sessionToken)
 
 	return nil
 }
@@ -156,31 +100,29 @@ func (p *SessionPlugin) buildHooks() []models.Hook {
 		// Session authentication hook: validates cookie, sets UserID
 		{
 			Stage:    models.HookBefore,
-			PluginID: HookIDSessionAuth,
+			PluginID: HookIDSessionAuth.String(),
 			Handler:  p.validateSessionHook,
 			Order:    5,
 		},
 
 		// Session issuance hook: sets cookie after successful auth
 		{
-			Stage:    models.HookAfter,
-			PluginID: HookIDSessionIssuance,
-			Handler:  p.issueSessionCookieHook,
-			Order:    5,
-		},
-
-		// Session context hook: returns session data in response
-		{
-			Stage:    models.HookAfter,
-			PluginID: HookIDSessionContext,
-			Handler:  p.sessionContextHook,
-			Order:    10,
+			Stage: models.HookAfter,
+			Matcher: func(ctx *models.RequestContext) bool {
+				sessionToken, ok := ctx.Values[models.ContextSessionToken.String()].(string)
+				if !ok || sessionToken == "" || ctx.UserID == nil {
+					return false
+				}
+				return true
+			},
+			Handler: p.issueSessionCookieHook,
+			Order:   5,
 		},
 
 		// Session clear hook: clears cookie on sign-out
 		{
 			Stage:    models.HookAfter,
-			PluginID: HookIDSessionClear,
+			PluginID: HookIDSessionClear.String(),
 			Handler:  p.clearSessionCookie,
 			Order:    10,
 		},

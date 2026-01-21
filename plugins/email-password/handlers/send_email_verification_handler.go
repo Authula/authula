@@ -8,21 +8,21 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/usecases"
 )
 
-type RequestPasswordResetPayload struct {
+type SendEmailVerificationRequestPayload struct {
 	Email       string `json:"email"`
 	CallbackURL string `json:"callback_url,omitempty"`
 }
 
-type RequestPasswordResetHandler struct {
-	UseCase *usecases.RequestPasswordResetUseCase
+type SendEmailVerificationHandler struct {
+	UseCase *usecases.SendEmailVerificationUseCase
 }
 
-func (h *RequestPasswordResetHandler) Handler() http.HandlerFunc {
+func (h *SendEmailVerificationHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		var payload RequestPasswordResetPayload
+		var payload SendEmailVerificationRequestPayload
 		if err := util.ParseJSON(r, &payload); err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),
@@ -31,11 +31,17 @@ func (h *RequestPasswordResetHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		// Always return 200 to prevent account enumeration
-		_ = h.UseCase.RequestReset(ctx, payload.Email, &payload.CallbackURL)
+		err := h.UseCase.Send(ctx, payload.Email, &payload.CallbackURL)
+		if err != nil {
+			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
+				"message": err.Error(),
+			})
+			reqCtx.Handled = true
+			return
+		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{
-			"message": "if account exists, password reset link sent to email",
+			"message": "If an account exists with this email, a verification link has been sent.",
 		})
 	}
 }

@@ -8,8 +8,6 @@ import (
 	bearerplugin "github.com/GoBetterAuth/go-better-auth/plugins/bearer"
 	configmanagerplugin "github.com/GoBetterAuth/go-better-auth/plugins/config-manager"
 	configmanagerplugintypes "github.com/GoBetterAuth/go-better-auth/plugins/config-manager/types"
-	coreplugin "github.com/GoBetterAuth/go-better-auth/plugins/core"
-	coreplugintypes "github.com/GoBetterAuth/go-better-auth/plugins/core/types"
 	corsplugin "github.com/GoBetterAuth/go-better-auth/plugins/cors"
 	csrfplugin "github.com/GoBetterAuth/go-better-auth/plugins/csrf"
 	emailplugin "github.com/GoBetterAuth/go-better-auth/plugins/email"
@@ -36,19 +34,6 @@ type PluginFactory struct {
 // pluginFactories is an ordered list of registered plugin factories.
 // The order matters: core must be initialized first, then others.
 var pluginFactories = []PluginFactory{
-	{
-		ID:                models.PluginCore.String(),
-		RequiredByDefault: true,
-		ConfigParser: func(rawConfig any) (any, error) {
-			// Core plugin has no config, always enabled
-			return coreplugintypes.CorePluginConfig{
-				Enabled: true,
-			}, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return coreplugin.New(typedConfig.(coreplugintypes.CorePluginConfig))
-		},
-	},
 	{
 		ID:                models.PluginConfigManager.String(),
 		RequiredByDefault: false,

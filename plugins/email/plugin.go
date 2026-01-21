@@ -28,7 +28,7 @@ func New(config emailtypes.EmailPluginConfig) *EmailPlugin {
 
 func (p *EmailPlugin) Metadata() models.PluginMetadata {
 	return models.PluginMetadata{
-		ID:          "email",
+		ID:          models.PluginEmail.String(),
 		Version:     "1.0.0",
 		Description: "Email plugin with providers, template rendering, and tiered error handling.",
 	}
@@ -41,17 +41,12 @@ func (p *EmailPlugin) Config() any {
 func (p *EmailPlugin) Init(ctx *models.PluginContext) error {
 	p.Logger = ctx.Logger
 	p.ctx = ctx
-
 	globalConfig := ctx.GetConfig()
+
 	if err := util.LoadPluginConfig(globalConfig, p.Metadata().ID, p.PluginConfig); err != nil {
-		p.Logger.Warn("failed to load email plugin config, using defaults", map[string]interface{}{
+		p.Logger.Warn("failed to load email plugin config, using defaults", map[string]any{
 			"error": err.Error(),
 		})
-	}
-
-	if !p.PluginConfig.Enabled {
-		p.Logger.Debug("email plugin is disabled")
-		return nil
 	}
 
 	if emailFrom := os.Getenv(env.EnvEmailFrom); emailFrom != "" {
@@ -90,7 +85,7 @@ func (p *EmailPlugin) OnConfigUpdate(config *models.Config) error {
 
 	// Reload configuration
 	if err := util.LoadPluginConfig(config, p.Metadata().ID, p.PluginConfig); err != nil {
-		p.Logger.Warn("failed to reload email plugin config", map[string]interface{}{
+		p.Logger.Warn("failed to reload email plugin config", map[string]any{
 			"error": err.Error(),
 		})
 		return nil // Non-fatal error

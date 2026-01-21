@@ -6,9 +6,12 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/GoBetterAuth/go-better-auth/internal"
 	"github.com/GoBetterAuth/go-better-auth/internal/plugins"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
+	coreservices "github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/uptrace/bun"
 )
 
 type AuthConfig struct {
@@ -20,10 +23,13 @@ type AuthConfig struct {
 type Auth struct {
 	config          *models.Config
 	logger          models.Logger
+	db              bun.IDB
 	router          *Router
 	ServiceRegistry models.ServiceRegistry
 	PluginRegistry  models.PluginRegistry
 	handlerOnce     sync.Once
+	coreServices    *coreservices.CoreServices
+	Api             internal.CoreAPI
 }
 
 // New creates a new Auth instance using the provided config and plugins.
@@ -39,6 +45,8 @@ func New(authConfig *AuthConfig) *Auth {
 		panic(fmt.Errorf("failed to initialize database: %w", err))
 	}
 
+	RunCoreMigrations(context.Background(), logger, authConfig.Config.Database.Provider, db)
+
 	router := NewRouter(logger, authConfig.Config.BasePath, nil)
 
 	eventBus, err := InitEventBus(authConfig.Config)
@@ -47,6 +55,8 @@ func New(authConfig *AuthConfig) *Auth {
 	}
 
 	serviceRegistry := plugins.NewServiceRegistry()
+
+	coreServices := InitCoreServices(authConfig.Config, db, serviceRegistry)
 
 	pluginRegistry := plugins.NewPluginRegistry(
 		authConfig.Config,
@@ -116,12 +126,17 @@ func New(authConfig *AuthConfig) *Auth {
 		panic(fmt.Errorf("failed to initialize plugins: %w", err))
 	}
 
+	api := internal.NewCoreAPI(logger, coreServices.UserService, coreServices.SessionService)
+
 	auth := &Auth{
 		config:          authConfig.Config,
 		logger:          logger,
+		db:              db,
 		router:          router,
 		ServiceRegistry: serviceRegistry,
 		PluginRegistry:  pluginRegistry,
+		coreServices:    coreServices,
+		Api:             api,
 	}
 
 	// Register middleware NOW (before any routes are registered)
@@ -129,6 +144,14 @@ func New(authConfig *AuthConfig) *Auth {
 	auth.registerMiddleware()
 
 	return auth
+}
+
+func (auth *Auth) RunCoreMigrations(ctx context.Context) error {
+	return RunCoreMigrations(ctx, auth.logger, auth.config.Database.Provider, auth.db)
+}
+
+func (auth *Auth) DropCoreMigrations(ctx context.Context) error {
+	return DropCoreMigrations(ctx, auth.logger, auth.config.Database.Provider, auth.db)
 }
 
 // registerMiddleware registers all middleware from hooks and plugins
@@ -212,6 +235,14 @@ func (auth *Auth) GetUserIDFromRequest(req *http.Request) (string, bool) {
 // This is the entry point for HTTP traffic.
 func (auth *Auth) Handler() http.Handler {
 	auth.handlerOnce.Do(func() {
+		auth.router.RegisterRoutes(
+			internal.CoreRoutes(
+				auth.logger,
+				auth.coreServices.UserService,
+				auth.coreServices.SessionService,
+			),
+		)
+
 		currentConfig := auth.PluginRegistry.GetConfig()
 
 		// Convert route mappings to metadata format for plugin routing

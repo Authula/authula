@@ -20,7 +20,7 @@ const (
 	EnvSMTPPort  = "SMTP_PORT"
 	EnvSMTPUser  = "SMTP_USER"
 	EnvSMTPPass  = "SMTP_PASS"
-	EnvEmailFrom = "EMAIL_FROM"
+	EnvEmailFrom = "FROM_ADDRESS"
 
 	// POSTGRES
 

@@ -3,6 +3,8 @@ package usecases
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
@@ -10,7 +12,7 @@ import (
 	rootservices "github.com/GoBetterAuth/go-better-auth/services"
 )
 
-type SendVerificationEmailUseCase struct {
+type SendEmailVerificationUseCase struct {
 	GlobalConfig        *models.Config
 	PluginConfig        types.EmailPasswordPluginConfig
 	Logger              models.Logger
@@ -20,7 +22,7 @@ type SendVerificationEmailUseCase struct {
 	MailerService       rootservices.MailerService
 }
 
-func (uc *SendVerificationEmailUseCase) Send(ctx context.Context, email string, callbackURL *string) error {
+func (uc *SendEmailVerificationUseCase) Send(ctx context.Context, email string, callbackURL *string) error {
 	reqCtx, _ := models.GetRequestContext(ctx)
 
 	if !uc.PluginConfig.RequireEmailVerification {
@@ -38,7 +40,6 @@ func (uc *SendVerificationEmailUseCase) Send(ctx context.Context, email string, 
 		// Don't expose internal errors to prevent enumeration attacks
 		return nil
 	}
-
 	if user == nil {
 		uc.Logger.Debug("user not found", map[string]any{"email": email})
 		// For security, we don't return an error indicating the user doesn't exist
@@ -52,19 +53,26 @@ func (uc *SendVerificationEmailUseCase) Send(ctx context.Context, email string, 
 
 	token, err := uc.TokenService.Generate()
 	if err != nil {
-		uc.Logger.Error("failed to generate verification token", map[string]any{"error": err.Error(), "user_id": user.ID})
+		uc.Logger.Error(err.Error())
 		return fmt.Errorf("failed to generate verification token: %w", err)
 	}
 
 	hashedToken := uc.TokenService.Hash(token)
 
 	if err := uc.VerificationService.DeleteByUserIDAndType(ctx, user.ID, models.TypeEmailVerification); err != nil {
-		uc.Logger.Error("failed to delete existing verification tokens", map[string]any{"error": err.Error(), "user_id": user.ID})
+		uc.Logger.Error(err.Error())
 		// Continue anyway - the new token will still be created
 	}
 
-	if _, err := uc.VerificationService.Create(ctx, user.ID, hashedToken, models.TypeEmailVerification, user.Email, uc.PluginConfig.ExpiresIn); err != nil {
-		uc.Logger.Error("failed to create verification token", map[string]any{"error": err.Error(), "user_id": user.ID})
+	if _, err := uc.VerificationService.Create(
+		ctx,
+		user.ID,
+		hashedToken,
+		models.TypeEmailVerification,
+		user.Email,
+		uc.PluginConfig.EmailVerificationExpiresIn,
+	); err != nil {
+		uc.Logger.Error(err.Error())
 		return fmt.Errorf("failed to create verification token: %w", err)
 	}
 
@@ -85,24 +93,41 @@ func (uc *SendVerificationEmailUseCase) Send(ctx context.Context, email string, 
 			reqCtx,
 		)
 		if err != nil {
-			uc.Logger.Error("custom email verification sender failed", map[string]any{"error": err.Error(), "user_id": user.ID})
+			uc.Logger.Error(err.Error())
 			return err
 		}
 		return nil
 	}
 
+	go func() {
+		detachedCtx := context.WithoutCancel(ctx)
+		taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
+		defer cancel()
+
+		if err := uc.sendEmailVerification(taskCtx, user, verificationLink, uc.PluginConfig.EmailVerificationExpiresIn); err != nil {
+			uc.Logger.Error(err.Error())
+		}
+	}()
+
+	return nil
+}
+
+func (uc *SendEmailVerificationUseCase) sendEmailVerification(ctx context.Context, user *models.User, verificationLink string, expiresIn time.Duration) error {
 	subject := "Verify your email"
 	textBody := fmt.Sprintf("Verify your email by clicking the following link: %s.", verificationLink)
 	htmlBody := fmt.Sprintf(
-		"<p>Hello %s,</p><p>Please verify your email address by clicking the following link:</p><p><a href=\"%s\">%s</a></p><p>If you did not request this, please ignore this email.</p>",
+		strings.TrimSpace(
+			`<div>
+				<p>Hello %s,</p>
+				<p>Please verify your email address by clicking the following link: <a href=\"%s\">%s</a></p>
+				<p>This link will expire in %s hours.</p>
+				<p>If you did not request this, please ignore this email.</p>
+			</div>`,
+		),
 		user.Email,
 		verificationLink,
 		verificationLink,
+		fmt.Sprintf("%d", int(expiresIn.Hours())),
 	)
-	if err := uc.MailerService.SendEmail(ctx, user.Email, subject, textBody, htmlBody); err != nil {
-		uc.Logger.Error("failed to send verification email", map[string]any{"error": err.Error(), "user_id": user.ID})
-		return fmt.Errorf("failed to send verification email: %w", err)
-	}
-
-	return nil
+	return uc.MailerService.SendEmail(ctx, user.Email, subject, textBody, htmlBody)
 }

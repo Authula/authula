@@ -105,7 +105,6 @@ func (r *PluginRegistry) InitAll() error {
 func (r *PluginRegistry) registerConfigWatchers() {
 	configManagerService, ok := r.serviceRegistry.Get(models.ServiceConfigManager.String()).(services.ConfigManagerService)
 	if !ok {
-		r.logger.Debug("config manager service not found, skipping config watchers registration")
 		return
 	}
 
@@ -121,8 +120,6 @@ func (r *PluginRegistry) registerConfigWatchers() {
 			r.logger.Error("failed to register config watcher", "plugin", pluginID, "error", err)
 			continue
 		}
-
-		r.logger.Debug("config watcher registered", "plugin", pluginID)
 	}
 }
 

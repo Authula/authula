@@ -35,6 +35,8 @@ func BuildUseCases(p *OAuth2Plugin) *usecases.UseCases {
 			p.hmacKey,
 			p.userService,
 			p.accountService,
+			p.sessionService,
+			p.tokenService,
 		),
 		RefreshUseCase: usecases.NewRefreshUseCase(
 			p.providerRegistry,
@@ -55,8 +57,8 @@ func (a *API) Authorize(ctx context.Context, req *types.AuthorizeRequest) (*usec
 }
 
 // Callback handles the OAuth2 callback
-func (a *API) Callback(ctx context.Context, req *types.CallbackRequest) (*types.CallbackResult, error) {
-	return a.UseCases.CallbackUseCase.Callback(ctx, req)
+func (a *API) Callback(ctx context.Context, req *types.CallbackRequest, ipAddress *string, userAgent *string) (*types.CallbackResult, error) {
+	return a.UseCases.CallbackUseCase.Callback(ctx, req, ipAddress, userAgent)
 }
 
 // Refresh refreshes an OAuth2 token for an authenticated user

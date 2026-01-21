@@ -1,7 +1,7 @@
 package services
 
 import (
-	"github.com/GoBetterAuth/go-better-auth/plugins/core/repositories"
+	"github.com/GoBetterAuth/go-better-auth/internal/repositories"
 	"github.com/GoBetterAuth/go-better-auth/services"
 )
 
