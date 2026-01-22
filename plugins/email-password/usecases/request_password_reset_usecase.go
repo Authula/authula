@@ -59,9 +59,9 @@ func (uc *RequestPasswordResetUseCase) RequestReset(
 		callbackURL,
 	)
 
-	if uc.PluginConfig.SendEmailResetEmail != nil {
-		err := uc.PluginConfig.SendEmailResetEmail(
-			types.SendEmailResetEmailParams{
+	if uc.PluginConfig.SendPasswordResetEmail != nil {
+		err := uc.PluginConfig.SendPasswordResetEmail(
+			types.SendPasswordResetEmailParams{
 				User:  *user,
 				URL:   verificationLink,
 				Token: token,
@@ -89,6 +89,11 @@ func (uc *RequestPasswordResetUseCase) RequestReset(
 }
 
 func sendRequestPasswordResetEmail(ctx context.Context, user *models.User, verificationLink string, expiresIn time.Duration, mailerService rootservices.MailerService) error {
+	hours := int(expiresIn.Hours())
+	hoursText := "hours"
+	if hours == 1 {
+		hoursText = "hour"
+	}
 	subject := "Reset Your Password"
 	textBody := fmt.Sprintf("Please reset your password by clicking the following link: %s.", verificationLink)
 	htmlBody := fmt.Sprintf(
@@ -97,13 +102,14 @@ func sendRequestPasswordResetEmail(ctx context.Context, user *models.User, verif
 				<p>Hello, %s</p>
 				<p>We received a request to reset your password. If you made this request, please click the link below to reset your password:</p>
 				<p><a href="%s">Reset Password</a></p>
-				<p>This link will expire in %s hours.</p>
+				<p>This link will expire in %d %s.</p>
 				<p>If you did not request a password reset, please ignore this email. Your password will remain unchanged.</p>
 		</body>
 	</html>`,
 		user.Email,
 		verificationLink,
-		fmt.Sprintf("%d", int(expiresIn.Hours())),
+		hours,
+		hoursText,
 	)
 	return mailerService.SendEmail(ctx, user.Email, subject, textBody, htmlBody)
 }

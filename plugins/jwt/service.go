@@ -36,6 +36,11 @@ func (p *JWTPlugin) GenerateTokens(secret string, userID string, sessionID strin
 		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
 
+	// Set the Key ID (kid) on the key so it's included in the JWT header
+	if err := privKey.Set(jwk.KeyIDKey, jwksKey.ID); err != nil {
+		return nil, fmt.Errorf("failed to set key ID: %w", err)
+	}
+
 	keyAlgorithm := p.detectAlgorithmFromKey(privKey)
 
 	now := time.Now()
@@ -255,7 +260,7 @@ func (p *JWTPlugin) detectAlgorithmFromKey(k jwk.Key) jwa.SignatureAlgorithm {
 	}
 
 	// Validate that detected algorithm is compatible with configured algorithm
-	configAlg := strings.ToLower(p.pluginConfig.Algorithm)
+	configAlg := strings.ToLower(p.pluginConfig.Algorithm.String())
 	detectedStr := strings.ToLower(detectedAlg.String())
 	if !strings.Contains(configAlg, detectedStr) && !strings.Contains(detectedStr, configAlg) {
 		p.Logger.Warn("detected algorithm differs from config",

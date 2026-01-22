@@ -1,5 +1,15 @@
 -- SQLite JWT Plugin Schema
 
+CREATE TABLE IF NOT EXISTS jwks (
+  id TEXT PRIMARY KEY,
+  public_key TEXT NOT NULL,
+  private_key TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_jwks_expires_at ON jwks(expires_at);
+
 CREATE TABLE IF NOT EXISTS refresh_tokens (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,

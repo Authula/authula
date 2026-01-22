@@ -16,7 +16,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/events"
 	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/repositories"
 	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/types"
-	services "github.com/GoBetterAuth/go-better-auth/services"
+	coreservices "github.com/GoBetterAuth/go-better-auth/services"
 )
 
 // RefreshTokenServiceConfig contains configuration for the refresh token service
@@ -32,7 +32,7 @@ type refreshTokenService struct {
 	gracePeriod      time.Duration
 	disableIPLogging bool
 	jwtAPI           JWTAPI
-	sessionService   services.SessionService
+	sessionService   coreservices.SessionService
 	storage          RefreshTokenStorage
 }
 
@@ -41,7 +41,7 @@ func NewRefreshTokenService(
 	config *models.Config,
 	logger models.Logger,
 	eventBus models.EventBus,
-	sessionService services.SessionService,
+	sessionService coreservices.SessionService,
 	storage RefreshTokenStorage,
 	svcConfig RefreshTokenServiceConfig,
 ) RefreshTokenService {

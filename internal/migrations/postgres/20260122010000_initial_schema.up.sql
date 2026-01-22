@@ -1,3 +1,6 @@
+-- Enable pgcrypto extension for UUID generation
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Create a function to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION core_update_updated_at_column_func()
 RETURNS TRIGGER AS $$

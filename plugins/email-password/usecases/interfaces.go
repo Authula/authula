@@ -8,5 +8,4 @@ type UseCases struct {
 	RequestPasswordResetUseCase  *RequestPasswordResetUseCase
 	ChangePasswordUseCase        *ChangePasswordUseCase
 	RequestEmailChangeUseCase    *RequestEmailChangeUseCase
-	ChangeEmailUseCase           *ChangeEmailUseCase
 }

@@ -39,7 +39,7 @@ func (uc *SignUpUseCase) SignUp(
 	}
 
 	if len(password) < uc.PluginConfig.MinPasswordLength || len(password) > uc.PluginConfig.MaxPasswordLength {
-		return nil, constants.ErrPasswordLengthInvalid
+		return nil, constants.ErrInvalidPasswordLength
 	}
 
 	if existing, _ := uc.UserService.GetByEmail(ctx, email); existing != nil {
@@ -62,7 +62,7 @@ func (uc *SignUpUseCase) SignUp(
 	}
 
 	var session *models.Session
-	var sessionToken *string
+	sessionToken := ""
 
 	if uc.PluginConfig.AutoSignIn {
 		token, err := uc.TokenService.Generate()
@@ -70,7 +70,7 @@ func (uc *SignUpUseCase) SignUp(
 			uc.Logger.Error("failed to generate session token", "error", err)
 			return nil, err
 		}
-		sessionToken = &token
+		sessionToken = token
 
 		hashedToken := uc.TokenService.Hash(token)
 

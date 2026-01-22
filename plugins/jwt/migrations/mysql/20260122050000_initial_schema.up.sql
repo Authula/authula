@@ -1,5 +1,15 @@
+CREATE TABLE IF NOT EXISTS jwks (
+  id BINARY(16) NOT NULL PRIMARY KEY,
+  public_key TEXT NOT NULL,
+  private_key TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP NULL
+);
+
+CREATE INDEX idx_jwks_expires_at ON jwks(expires_at);
+
 CREATE TABLE IF NOT EXISTS refresh_tokens (
-  id BINARY(16) PRIMARY KEY,
+  id BINARY(16) NOT NULL PRIMARY KEY,
   session_id BINARY(16) NOT NULL,
   token_hash VARCHAR(64) NOT NULL UNIQUE,
   expires_at TIMESTAMP NOT NULL,

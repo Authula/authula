@@ -8,7 +8,7 @@ import (
 )
 
 type VerifyEmailHandler struct {
-	UseCase *usecases.VerifyEmailUseCase
+	VerifyEmailUseCase *usecases.VerifyEmailUseCase
 }
 
 func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
@@ -25,7 +25,7 @@ func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		err := h.UseCase.VerifyEmail(ctx, tokenStr)
+		err := h.VerifyEmailUseCase.VerifyEmail(ctx, tokenStr)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),

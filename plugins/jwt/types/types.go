@@ -2,15 +2,66 @@ package types
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
 )
 
+// Algorithm represents supported JWT/JWKS algorithms
+type Algorithm string
+
+const (
+	AlgEdDSA  Algorithm = "EdDSA"
+	AlgRS256  Algorithm = "RS256"
+	AlgPS256  Algorithm = "PS256"
+	AlgES256  Algorithm = "ES256"
+	AlgES512  Algorithm = "ES512"
+	AlgECDHES Algorithm = "ECDH-ES"
+)
+
+func (a Algorithm) String() string {
+	return string(a)
+}
+
+// ParseAlgorithm parses a string into an Algorithm, accepting only canonical names (case-insensitive input)
+func ParseAlgorithm(s string) (Algorithm, error) {
+	s = strings.TrimSpace(strings.ToLower(s))
+	switch s {
+	case "eddsa":
+		return AlgEdDSA, nil
+	case "rs256":
+		return AlgRS256, nil
+	case "ps256":
+		return AlgPS256, nil
+	case "es256":
+		return AlgES256, nil
+	case "es512":
+		return AlgES512, nil
+	case "ecdh-es":
+		return AlgECDHES, nil
+	default:
+		return "", errors.New("unsupported jwt algorithm")
+	}
+}
+
+// ValidateAlgorithm enforces that the algorithm can be used for JWT signing
+func ValidateAlgorithm(alg Algorithm) error {
+	switch alg {
+	case AlgEdDSA, AlgRS256, AlgPS256, AlgES256, AlgES512:
+		return nil
+	case AlgECDHES:
+		return errors.New("ECDH-ES cannot be used for JWT signing")
+	default:
+		return errors.New("unsupported JWT algorithm")
+	}
+}
+
 // JWTPluginConfig configures the JWKS-based JWT plugin
 type JWTPluginConfig struct {
 	Enabled             bool          `json:"enabled" toml:"enabled"`
-	Algorithm           string        `json:"algorithm" toml:"algorithm"`                         // ed25519 (default), rs256, rs2048, rs4096, es256, es384, es512
+	Algorithm           Algorithm     `json:"algorithm" toml:"algorithm"`                         // EdDSA (default), RS256, PS256, ES256, ES512
 	KeyRotationInterval time.Duration `json:"key_rotation_interval" toml:"key_rotation_interval"` // Default: 90 days
 	ExpiresIn           time.Duration `json:"expires_in" toml:"expires_in"`                       // Access token TTL
 	RefreshExpiresIn    time.Duration `json:"refresh_expires_in" toml:"refresh_expires_in"`       // Refresh token TTL
@@ -22,7 +73,7 @@ type JWTPluginConfig struct {
 // ApplyDefaults returns sensible defaults for the JWT plugin
 func (c *JWTPluginConfig) ApplyDefaults() {
 	if c.Algorithm == "" {
-		c.Algorithm = "ed25519"
+		c.Algorithm = AlgEdDSA
 	}
 	if c.KeyRotationInterval == 0 {
 		c.KeyRotationInterval = 90 * 24 * time.Hour
@@ -39,6 +90,24 @@ func (c *JWTPluginConfig) ApplyDefaults() {
 	if c.RefreshGracePeriod == 0 {
 		c.RefreshGracePeriod = 10 * time.Second
 	}
+}
+
+// NormalizeAlgorithm normalizes and validates the algorithm string. Use when
+// parsing config or on update to catch legacy or unsupported values.
+func (c *JWTPluginConfig) NormalizeAlgorithm() error {
+	if c.Algorithm == "" {
+		c.Algorithm = AlgEdDSA
+		return nil
+	}
+	parsed, err := ParseAlgorithm(string(c.Algorithm))
+	if err != nil {
+		return err
+	}
+	if err := ValidateAlgorithm(parsed); err != nil {
+		return err
+	}
+	c.Algorithm = parsed
+	return nil
 }
 
 // JWKS represents a cryptographic key pair for signing and verification

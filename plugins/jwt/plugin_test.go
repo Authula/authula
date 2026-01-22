@@ -18,8 +18,8 @@ func TestJWTPluginConfig_DefaultConfig(t *testing.T) {
 			name:   "sets default algorithm",
 			config: types.JWTPluginConfig{},
 			check: func(t *testing.T, c types.JWTPluginConfig) {
-				if c.Algorithm != "ed25519" {
-					t.Errorf("Algorithm = %v, want ed25519", c.Algorithm)
+				if c.Algorithm != types.AlgEdDSA {
+					t.Errorf("Algorithm = %v, want %v", c.Algorithm, types.AlgEdDSA)
 				}
 			},
 		},

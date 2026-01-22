@@ -90,7 +90,6 @@ func (p *BearerPlugin) AuthMiddleware() func(http.Handler) http.Handler {
 				return
 			}
 
-			r.Header.Set("X-User-ID", userID)
 			ctx := context.WithValue(r.Context(), models.ContextUserID, userID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -103,7 +102,6 @@ func (p *BearerPlugin) OptionalAuthMiddleware() func(http.Handler) http.Handler 
 			token, err := p.extractToken(r)
 			if err == nil && token != "" {
 				if userID, validateErr := p.jwtService.ValidateToken(token); validateErr == nil {
-					r.Header.Set("X-User-ID", userID)
 					ctx := context.WithValue(r.Context(), models.ContextUserID, userID)
 					r = r.WithContext(ctx)
 				}

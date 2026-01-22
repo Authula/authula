@@ -234,16 +234,16 @@ func (p *CSRFPlugin) Middleware() func(http.Handler) http.Handler {
 // Also sets the token in a response header so the client can read and use it.
 func (p *CSRFPlugin) setCSRFCookie(w http.ResponseWriter, r *http.Request, token string) {
 	// Determine SameSite mode from config
-	var sf http.SameSite
+	var samesite http.SameSite
 	switch p.pluginConfig.SameSite {
 	case "strict":
-		sf = http.SameSiteStrictMode
+		samesite = http.SameSiteStrictMode
 	case "none":
-		sf = http.SameSiteNoneMode
+		samesite = http.SameSiteNoneMode
 	case "lax":
-		sf = http.SameSiteLaxMode
+		samesite = http.SameSiteLaxMode
 	default:
-		sf = http.SameSiteLaxMode
+		samesite = http.SameSiteLaxMode
 	}
 
 	// Set Secure flag only for HTTPS requests (production),
@@ -256,7 +256,7 @@ func (p *CSRFPlugin) setCSRFCookie(w http.ResponseWriter, r *http.Request, token
 		Path:     "/",
 		HttpOnly: false,  // Hardcoded: Required for Double-Submit Cookie pattern
 		Secure:   secure, // Conditional: true for HTTPS (production), false for HTTP (development)
-		SameSite: sf,
+		SameSite: samesite,
 		MaxAge:   int(p.pluginConfig.MaxAge.Seconds()),
 	})
 

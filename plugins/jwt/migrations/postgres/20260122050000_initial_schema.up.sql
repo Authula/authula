@@ -1,3 +1,13 @@
+CREATE TABLE IF NOT EXISTS jwks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  public_key TEXT NOT NULL,
+  private_key TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP WITH TIME ZONE NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_jwks_expires_at ON jwks(expires_at);
+
 CREATE TABLE IF NOT EXISTS refresh_tokens (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id UUID NOT NULL,
@@ -7,7 +17,7 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   revoked_at TIMESTAMP WITH TIME ZONE NULL,
   last_reuse_attempt TIMESTAMP NULL DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
+  CONSTRAINT uq_refresh_tokens_token_hash UNIQUE (token_hash),
   CONSTRAINT fk_refresh_tokens_session FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
 );
 

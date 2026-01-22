@@ -109,12 +109,12 @@ const (
 // HookMatcher is a function that determines whether a hook should execute
 // for a given request context. It allows hooks to be conditionally applied
 // based on path, method, headers, or other request properties.
-type HookMatcher func(ctx *RequestContext) bool
+type HookMatcher func(reqCtx *RequestContext) bool
 
 // HookHandler is the function that executes a hook. It receives the request
 // context and can modify request state, set UserID, populate Values, or set
 // the Handled flag to short-circuit further processing.
-type HookHandler func(ctx *RequestContext) error
+type HookHandler func(reqCtx *RequestContext) error
 
 // Hook defines a request lifecycle hook that can be registered by plugins.
 // Hooks provide a clean mechanism for plugins to intercept and modify the

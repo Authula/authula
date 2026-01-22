@@ -2,24 +2,19 @@ package services
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
+	coreservices "github.com/GoBetterAuth/go-better-auth/services"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/pbkdf2"
 
 	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/repositories"
@@ -27,19 +22,21 @@ import (
 )
 
 type keyService struct {
-	repo      repositories.JWKSRepository
-	logger    models.Logger
-	secret    string
-	algorithm string
+	repo         repositories.JWKSRepository
+	logger       models.Logger
+	secret       string
+	algorithm    types.Algorithm
+	tokenService coreservices.TokenService
 }
 
 // NewKeyService creates a new key service
-func NewKeyService(repo repositories.JWKSRepository, logger models.Logger, secret, algorithm string) KeyService {
+func NewKeyService(repo repositories.JWKSRepository, logger models.Logger, tokenService coreservices.TokenService, secret string, algorithm types.Algorithm) KeyService {
 	return &keyService{
-		repo:      repo,
-		logger:    logger,
-		secret:    secret,
-		algorithm: strings.ToLower(algorithm),
+		repo:         repo,
+		logger:       logger,
+		secret:       secret,
+		algorithm:    algorithm,
+		tokenService: tokenService,
 	}
 }
 
@@ -55,7 +52,7 @@ func (s *keyService) GenerateKeysIfMissing(ctx context.Context) error {
 		return nil
 	}
 
-	s.logger.Info("generating initial key pair", "algorithm", s.algorithm)
+	s.logger.Debug("generating initial key pair", "algorithm", s.algorithm)
 	return s.generateAndStoreKey(ctx)
 }
 
@@ -98,7 +95,7 @@ func (s *keyService) RotateKeysIfNeeded(ctx context.Context, rotationInterval ti
 		return false, nil
 	}
 
-	s.logger.Info("rotating keys due to age", "algorithm", s.algorithm)
+	s.logger.Debug("rotating keys due to age", "algorithm", s.algorithm)
 
 	// Mark old keys as expired
 	keys, err := s.repo.GetJWKSKeys(ctx)
@@ -127,46 +124,61 @@ func (s *keyService) RotateKeysIfNeeded(ctx context.Context, rotationInterval ti
 	return true, nil
 }
 
-// generateAndStoreKey generates a key pair and stores it in the database
-func (s *keyService) generateAndStoreKey(ctx context.Context) error {
-	var pubKey, privKey any
-	var err error
+// generateKey returns a newly generated private/public key pair for the given algorithm
+func generateKey(alg types.Algorithm) (priv any, pub any, err error) {
+	switch alg {
+	case types.AlgRS256, types.AlgPS256:
+		priv, err = rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			return nil, nil, err
+		}
+		pub = &priv.(*rsa.PrivateKey).PublicKey
+		return
 
-	switch s.algorithm {
-	case "rsa2048", "rs2048":
-		privKey, err = rsa.GenerateKey(rand.Reader, 2048)
-	case "rsa4096", "rs4096":
-		privKey, err = rsa.GenerateKey(rand.Reader, 4096)
-	case "rsa256", "rs256":
-		privKey, err = rsa.GenerateKey(rand.Reader, 2048) // RS256 uses 2048 minimum
-	case "es256":
-		privKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	case "es384":
-		privKey, err = ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-	case "es512":
-		privKey, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
-	default:
-		// Default to Ed25519
+	case types.AlgES256:
+		priv, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			return nil, nil, err
+		}
+		pub = &priv.(*ecdsa.PrivateKey).PublicKey
+		return
+
+	case types.AlgES512:
+		priv, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+		if err != nil {
+			return nil, nil, err
+		}
+		pub = &priv.(*ecdsa.PrivateKey).PublicKey
+		return
+
+	case types.AlgEdDSA:
 		var seed [32]byte
 		if _, err := rand.Read(seed[:]); err != nil {
-			return fmt.Errorf("failed to read random seed: %w", err)
+			return nil, nil, fmt.Errorf("failed to read random seed: %w", err)
 		}
-		privKey = ed25519.NewKeyFromSeed(seed[:])
-	}
+		priv = ed25519.NewKeyFromSeed(seed[:])
+		pub = priv.(ed25519.PrivateKey).Public()
+		return
 
+	case types.AlgECDHES:
+		// ECDH-ES uses EC P-256 keys for key agreement (future JWE)
+		priv, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			return nil, nil, err
+		}
+		pub = &priv.(*ecdsa.PrivateKey).PublicKey
+		return
+
+	default:
+		return nil, nil, fmt.Errorf("unsupported algorithm: %s", alg)
+	}
+}
+
+// generateAndStoreKey generates a key pair and stores it in the database
+func (s *keyService) generateAndStoreKey(ctx context.Context) error {
+	privKey, pubKey, err := generateKey(s.algorithm)
 	if err != nil {
 		return fmt.Errorf("failed to generate key pair: %w", err)
-	}
-
-	switch pk := privKey.(type) {
-	case *rsa.PrivateKey:
-		pubKey = &pk.PublicKey
-	case *ecdsa.PrivateKey:
-		pubKey = &pk.PublicKey
-	case ed25519.PrivateKey:
-		pubKey = pk.Public()
-	default:
-		return errors.New("unsupported key type")
 	}
 
 	privKeyPEM, err := privateKeyToPEM(privKey)
@@ -179,7 +191,7 @@ func (s *keyService) generateAndStoreKey(ctx context.Context) error {
 		return fmt.Errorf("failed to convert public key to PEM: %w", err)
 	}
 
-	encryptedPrivKey, err := s.encryptPrivateKey(privKeyPEM)
+	encryptedPrivKey, err := s.tokenService.Encrypt(string(privKeyPEM))
 	if err != nil {
 		return fmt.Errorf("failed to encrypt private key: %w", err)
 	}
@@ -196,7 +208,7 @@ func (s *keyService) generateAndStoreKey(ctx context.Context) error {
 		return fmt.Errorf("failed to store key: %w", err)
 	}
 
-	s.logger.Info("generated and stored key", "id", jwksKey.ID, "algorithm", s.algorithm)
+	s.logger.Info("generated and stored key", "id", jwksKey.ID, "algorithm", s.algorithm.String())
 	return nil
 }
 
@@ -225,45 +237,6 @@ func privateKeyToPEM(privKey any) ([]byte, error) {
 	}
 
 	return pem.EncodeToMemory(block), nil
-}
-
-// encryptPrivateKey encrypts a private key using PBKDF2 + AES-256-GCM
-// Returns base64-encoded [salt_16][nonce_12][ciphertext][tag_16]
-func (s *keyService) encryptPrivateKey(keyData []byte) (string, error) {
-	// Generate random salt
-	salt := make([]byte, 16)
-	if _, err := rand.Read(salt); err != nil {
-		return "", fmt.Errorf("failed to generate salt: %w", err)
-	}
-
-	// Derive key using PBKDF2
-	key := pbkdf2.Key([]byte(s.secret), salt, 100000, 32, sha256.New)
-
-	// Create cipher
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", fmt.Errorf("failed to create cipher: %w", err)
-	}
-
-	// Generate random nonce
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", fmt.Errorf("failed to create GCM: %w", err)
-	}
-
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err := rand.Read(nonce); err != nil {
-		return "", fmt.Errorf("failed to generate nonce: %w", err)
-	}
-
-	// Encrypt
-	ciphertext := gcm.Seal(nil, nonce, keyData, nil)
-
-	// Combine: [salt][nonce][ciphertext]
-	result := append(salt, nonce...)
-	result = append(result, ciphertext...)
-
-	return base64.StdEncoding.EncodeToString(result), nil
 }
 
 // publicKeyToPEM converts a public key to PEM format

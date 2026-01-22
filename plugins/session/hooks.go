@@ -65,17 +65,13 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 	return nil
 }
 
-// issueSessionCookieHook hook handles generating sessions and setting the session cookie on successful authentication
-// This hook runs at HookAfter stage if "session.issuance" is in route.Metadata["plugins"]
+// issueSessionCookieHook hook handles generating sessions and setting the session cookie on successful authentication.
+// This hook always runs by default at HookAfter stage.
 // JWT tokens (access_token, refresh_token) are client-side only and sent in the response body,
 // not as cookies. Only the session token is stored as a cookie for stateful session validation.
 func (p *SessionPlugin) issueSessionCookieHook(reqCtx *models.RequestContext) error {
-	p.logger.Debug("session issuance hook running")
-	p.logger.Debug(*reqCtx.UserID)
-
 	sessionToken, ok := reqCtx.Values[models.ContextSessionToken.String()].(string)
 	if !ok || sessionToken == "" {
-		p.logger.Warn("No session_token found in request context; skipping session issuance")
 		return nil
 	}
 
@@ -88,7 +84,6 @@ func (p *SessionPlugin) issueSessionCookieHook(reqCtx *models.RequestContext) er
 // This hook runs at HookAfter stage if "session.clear" is in route.Metadata["plugins"]
 // The application/router should only invoke this hook on sign-out routes via metadata
 func (p *SessionPlugin) clearSessionCookie(ctx *models.RequestContext) error {
-	p.logger.Debug("session clear hook running")
 	p.ClearSessionCookie(ctx.ResponseWriter)
 	return nil
 }
@@ -108,12 +103,9 @@ func (p *SessionPlugin) buildHooks() []models.Hook {
 		// Session issuance hook: sets cookie after successful auth
 		{
 			Stage: models.HookAfter,
-			Matcher: func(ctx *models.RequestContext) bool {
-				sessionToken, ok := ctx.Values[models.ContextSessionToken.String()].(string)
-				if !ok || sessionToken == "" || ctx.UserID == nil {
-					return false
-				}
-				return true
+			Matcher: func(reqCtx *models.RequestContext) bool {
+				sessionToken, ok := reqCtx.Values[models.ContextSessionToken.String()].(string)
+				return ok && sessionToken != "" && reqCtx.UserID != nil
 			},
 			Handler: p.issueSessionCookieHook,
 			Order:   5,

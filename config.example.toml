@@ -144,14 +144,12 @@ send_email_on_sign_up = true
 send_email_on_sign_in = false
 email_verification_expires_in = "24h"
 password_reset_expires_in = "1h"
-email_reset_expires_in = "1h"
+request_email_change_expires_in = "1h"
 
 # --- OAuth2 Plugin (for social logins) ---
 
 # [plugins.oauth2]
 # enabled = true
-# cookie_ttl = "5m"
-# session_ttl = "24h"
 
 # SECURITY NOTE: It is recommended to set the 'client_secret' for each of these via their 
 # respective environment variables as shown in the .env.example file rather than hardcoding it here.
@@ -217,9 +215,13 @@ enabled = true
 
 # [plugins.jwt]
 # enabled = true
+# algorithm = "ed25519"
+# key_rotation_interval = "24h"
 # expires_in = "15m"
 # refresh_expires_in = "168h"
-# header_name = "Authorization"
+# jwks_cache_ttl = "5m"
+# refresh_grace_period = "1m"
+# disable_ip_logging = false
 
 # --- Bearer Plugin (use for SPAs and mobile apps) ---
 

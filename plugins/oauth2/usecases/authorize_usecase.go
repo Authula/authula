@@ -14,7 +14,6 @@ type AuthorizeUseCase struct {
 	ProviderRegistry *services.ProviderRegistry
 	Logger           models.Logger
 	TrustedOrigins   []string
-	CookieTTL        int
 	HMACKey          []byte
 }
 
@@ -23,14 +22,12 @@ func NewAuthorizeUseCase(
 	registry *services.ProviderRegistry,
 	logger models.Logger,
 	trustedOrigins []string,
-	cookieTTL int,
 	hmacKey []byte,
 ) *AuthorizeUseCase {
 	return &AuthorizeUseCase{
 		ProviderRegistry: registry,
 		Logger:           logger,
 		TrustedOrigins:   trustedOrigins,
-		CookieTTL:        cookieTTL,
 		HMACKey:          hmacKey,
 	}
 }

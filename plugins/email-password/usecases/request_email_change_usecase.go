@@ -59,7 +59,7 @@ func (uc *RequestEmailChangeUseCase) RequestChange(
 		hashedToken,
 		models.TypeEmailResetRequest,
 		newEmail,
-		uc.PluginConfig.EmailResetExpiresIn,
+		uc.PluginConfig.RequestEmailChangeExpiresIn,
 	); err != nil {
 		return err
 	}
@@ -71,9 +71,9 @@ func (uc *RequestEmailChangeUseCase) RequestChange(
 		callbackURL,
 	)
 
-	if uc.PluginConfig.SendEmailChangeEmail != nil {
-		if err := uc.PluginConfig.SendEmailChangeEmail(
-			types.SendEmailChangeEmailParams{
+	if uc.PluginConfig.SendRequestEmailChangeEmail != nil {
+		if err := uc.PluginConfig.SendRequestEmailChangeEmail(
+			types.SendRequestEmailChangeEmailParams{
 				User:     *user,
 				URL:      verificationLink,
 				Token:    token,
@@ -102,6 +102,11 @@ func (uc *RequestEmailChangeUseCase) RequestChange(
 }
 
 func (uc *RequestEmailChangeUseCase) sendRequestEmailChangeEmail(ctx context.Context, user *models.User, newEmail string, verificationLink string) error {
+	expiryInHours := int(uc.PluginConfig.RequestEmailChangeExpiresIn.Hours())
+	hoursText := "hours"
+	if expiryInHours < 2 {
+		hoursText = "hour"
+	}
 	subject := "Confirm Your Email Change"
 	textBody := fmt.Sprintf("Please confirm your email change to %s by clicking the following link: %s.", newEmail, verificationLink)
 	htmlBody := fmt.Sprintf(
@@ -110,14 +115,15 @@ func (uc *RequestEmailChangeUseCase) sendRequestEmailChangeEmail(ctx context.Con
 				<p>Hello, %s</p>
 				<p>We received a request to change your account email to %s. If you made this request, please click the link below to confirm the change:</p>
 				<p><a href="%s">Confirm Email Change</a></p>
-				<p>This link will expire in %s hours.</p>
+				<p>This link will expire in %d %s.</p>
 				<p>If you did not request an email change, please ignore this email.</p>
 		</body>
 	</html>`,
 		user.Email,
 		newEmail,
 		verificationLink,
-		fmt.Sprintf("%d", int(uc.PluginConfig.EmailResetExpiresIn.Hours())),
+		expiryInHours,
+		hoursText,
 	)
 	return uc.MailerService.SendEmail(ctx, newEmail, subject, textBody, htmlBody)
 }

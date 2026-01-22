@@ -72,7 +72,24 @@ func (s *cacheService) FetchJWKSFromDatabase(ctx context.Context) (jwk.Set, erro
 			continue
 		}
 
+		// Set the Key ID so JWT validation can match the token's kid to the correct key
 		_ = pubKey.Set(jwk.KeyIDKey, wk.ID)
+
+		// Ensure algorithm is properly set based on key type
+		// This helps the JWT library know which algorithm to use for verification
+		keyType := pubKey.KeyType().String()
+		var alg string
+		switch keyType {
+		case "OKP":
+			alg = "EdDSA"
+		case "RSA":
+			alg = "RS256"
+		case "EC":
+			alg = "ES256"
+		}
+		if alg != "" {
+			_ = pubKey.Set(jwk.AlgorithmKey, alg)
+		}
 
 		_ = set.AddKey(pubKey)
 	}

@@ -58,10 +58,6 @@ func (a *API) RequestEmailChange(ctx context.Context, userID string, newEmail st
 	return a.useCases.RequestEmailChangeUseCase.RequestChange(ctx, userID, newEmail, callbackURL)
 }
 
-func (a *API) ChangeEmail(ctx context.Context, userID string, tokenStr string, newEmail string) error {
-	return a.useCases.ChangeEmailUseCase.ChangeEmail(ctx, userID, tokenStr, newEmail)
-}
-
 func BuildAPI(plugin *EmailPasswordPlugin) *API {
 	useCases := BuildUseCases(plugin)
 	return &API{useCases: useCases}
@@ -86,7 +82,7 @@ func Routes(plugin *EmailPasswordPlugin) []models.Route {
 	}
 
 	verifyEmailHandler := &handlers.VerifyEmailHandler{
-		UseCase: useCases.VerifyEmailUseCase,
+		VerifyEmailUseCase: useCases.VerifyEmailUseCase,
 	}
 
 	sendEmailVerificationHandler := &handlers.SendEmailVerificationHandler{
@@ -103,10 +99,6 @@ func Routes(plugin *EmailPasswordPlugin) []models.Route {
 
 	requestEmailChangeHandler := &handlers.RequestEmailChangeHandler{
 		UseCase: useCases.RequestEmailChangeUseCase,
-	}
-
-	changeEmailHandler := &handlers.ChangeEmailHandler{
-		UseCase: useCases.ChangeEmailUseCase,
 	}
 
 	return []models.Route{
@@ -145,11 +137,6 @@ func Routes(plugin *EmailPasswordPlugin) []models.Route {
 			Path:    "/request-email-change",
 			Handler: requestEmailChangeHandler.Handler(),
 		},
-		{
-			Method:  http.MethodPost,
-			Path:    "/change-email",
-			Handler: changeEmailHandler.Handler(),
-		},
 	}
 }
 
@@ -180,10 +167,13 @@ func BuildUseCases(p *EmailPasswordPlugin) *usecases.UseCases {
 
 	verifyEmailUseCase := &usecases.VerifyEmailUseCase{
 		Logger:              p.logger,
-		EventBus:            p.ctx.EventBus,
+		PluginConfig:        p.pluginConfig,
 		UserService:         p.userService,
+		AccountService:      p.accountService,
 		VerificationService: p.verificationService,
 		TokenService:        p.tokenService,
+		MailerService:       p.mailerService,
+		EventBus:            p.ctx.EventBus,
 	}
 
 	sendEmailVerificationUseCase := &usecases.SendEmailVerificationUseCase{
@@ -228,17 +218,6 @@ func BuildUseCases(p *EmailPasswordPlugin) *usecases.UseCases {
 		MailerService:       p.mailerService,
 	}
 
-	changeEmailUseCase := &usecases.ChangeEmailUseCase{
-		Logger:              p.logger,
-		PluginConfig:        p.pluginConfig,
-		UserService:         p.userService,
-		AccountService:      p.accountService,
-		VerificationService: p.verificationService,
-		TokenService:        p.tokenService,
-		MailerService:       p.mailerService,
-		EventBus:            p.ctx.EventBus,
-	}
-
 	return &usecases.UseCases{
 		SignUpUseCase:                signUpUseCase,
 		SignInUseCase:                signInUseCase,
@@ -247,6 +226,5 @@ func BuildUseCases(p *EmailPasswordPlugin) *usecases.UseCases {
 		RequestPasswordResetUseCase:  requestPasswordResetUseCase,
 		ChangePasswordUseCase:        changePasswordUseCase,
 		RequestEmailChangeUseCase:    requestEmailChangeUseCase,
-		ChangeEmailUseCase:           changeEmailUseCase,
 	}
 }

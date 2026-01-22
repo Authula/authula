@@ -427,9 +427,6 @@ func (r *Router) Handler() http.Handler {
 
 // ServeHTTP implements http.Handler for testing and direct use
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// Start timing the request
-	requestStart := time.Now()
-
 	// Check if this is a streaming response that should skip buffering
 	skipBuffer := r.isStreamingResponse(w.Header())
 
@@ -442,7 +439,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Create request context
-	ctx := &models.RequestContext{
+	reqCtx := &models.RequestContext{
 		Request:         req,
 		ResponseWriter:  wrappedWriter,
 		Path:            req.URL.Path,
@@ -453,27 +450,29 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		Handled:         false,
 	}
 
-	wrappedWriter.SetRequestContext(ctx)
+	// Associate request context with wrapped writer
+	wrappedWriter.SetRequestContext(reqCtx)
 
 	// Allow manual override of buffer skipping via context
-	if skipVal, ok := ctx.Values["skipBuffer"]; ok {
+	if skipVal, ok := reqCtx.Values["skipBuffer"]; ok {
 		if skipBool, ok := skipVal.(bool); ok && skipBool {
 			wrappedWriter.SkipBuffer = true
 		}
 	}
 
+	// Lookup route metadata
 	metadata, pattern, exists := r.getRouteMetadata(req.Method, req.URL.Path)
 	if exists {
 		if metadata["_pattern"] == nil {
 			metadata["_pattern"] = pattern
 		}
-		ctx.Route = &models.Route{
+		reqCtx.Route = &models.Route{
 			Method:   req.Method,
 			Path:     req.URL.Path,
 			Metadata: metadata,
 		}
 	} else {
-		ctx.Route = &models.Route{
+		reqCtx.Route = &models.Route{
 			Method:   req.Method,
 			Path:     req.URL.Path,
 			Metadata: make(map[string]any),
@@ -481,84 +480,40 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Store context in request
-	reqWithCtx := req.WithContext(models.NewContextWithRequestContext(req.Context(), ctx))
+	reqWithCtx := req.WithContext(models.NewContextWithRequestContext(req.Context(), reqCtx))
 
 	// Stage 1: OnRequest hooks
-	onRequestStart := time.Now()
-	r.runHooks(models.HookOnRequest, ctx)
-	onRequestDuration := time.Since(onRequestStart).Milliseconds()
+	r.runHooks(models.HookOnRequest, reqCtx)
 
-	if ctx.Handled {
-		r.finalizeResponse(ctx, wrappedWriter)
-		totalDuration := time.Since(requestStart).Milliseconds()
-		r.logger.Debug("request completed (early exit)",
-			"method", req.Method, "path", req.URL.Path,
-			"status", ctx.ResponseStatus,
-			"total_ms", totalDuration,
-			"on_request_ms", onRequestDuration)
+	if reqCtx.Handled {
+		r.finalizeResponse(reqCtx, wrappedWriter)
 		return
 	}
 
 	// Stage 2: Before hooks
-	beforeStart := time.Now()
-	r.runHooks(models.HookBefore, ctx)
-	beforeDuration := time.Since(beforeStart).Milliseconds()
+	r.runHooks(models.HookBefore, reqCtx)
 
-	if ctx.Handled {
-		r.finalizeResponse(ctx, wrappedWriter)
-		totalDuration := time.Since(requestStart).Milliseconds()
-		r.logger.Debug("request completed (before hook handled)",
-			"method", req.Method, "path", req.URL.Path,
-			"status", ctx.ResponseStatus,
-			"total_ms", totalDuration,
-			"on_request_ms", onRequestDuration,
-			"before_ms", beforeDuration)
+	if reqCtx.Handled {
+		r.finalizeResponse(reqCtx, wrappedWriter)
 		return
 	}
 
 	// Stage 3: Route handler (via Chi)
-	handlerStart := time.Now()
 	r.router.ServeHTTP(wrappedWriter, reqWithCtx)
-	handlerDuration := time.Since(handlerStart).Milliseconds()
 
 	// Stage 4: After hooks
-	afterStart := time.Now()
-	r.runHooks(models.HookAfter, ctx)
-	afterDuration := time.Since(afterStart).Milliseconds()
+	r.runHooks(models.HookAfter, reqCtx)
 
-	if ctx.Handled {
-		r.finalizeResponse(ctx, wrappedWriter)
-		totalDuration := time.Since(requestStart).Milliseconds()
-		r.logger.Debug("request completed (after hook handled)",
-			"method", req.Method, "path", req.URL.Path,
-			"status", ctx.ResponseStatus,
-			"total_ms", totalDuration,
-			"on_request_ms", onRequestDuration,
-			"before_ms", beforeDuration,
-			"handler_ms", handlerDuration,
-			"after_ms", afterDuration)
+	if reqCtx.Handled {
+		r.finalizeResponse(reqCtx, wrappedWriter)
 		return
 	}
 
 	// Stage 5: OnResponse hooks
-	onResponseStart := time.Now()
-	r.runHooks(models.HookOnResponse, ctx)
-	onResponseDuration := time.Since(onResponseStart).Milliseconds()
+	r.runHooks(models.HookOnResponse, reqCtx)
 
 	// Flush deferred writes or captured response
-	r.finalizeResponse(ctx, wrappedWriter)
-
-	// Log complete request timing (sync hooks only - async hooks run in background)
-	totalDuration := time.Since(requestStart).Milliseconds()
-	r.logger.Debug("request completed",
-		"method", req.Method, "path", req.URL.Path,
-		"status", ctx.ResponseStatus,
-		"total_ms", totalDuration,
-		"on_request_ms", onRequestDuration,
-		"before_ms", beforeDuration,
-		"handler_ms", handlerDuration,
-		"after_ms", afterDuration,
-		"on_response_ms", onResponseDuration)
+	r.finalizeResponse(reqCtx, wrappedWriter)
 }
 
 // isStreamingResponse checks if the response appears to be streaming based on headers

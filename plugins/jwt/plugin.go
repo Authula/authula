@@ -30,6 +30,7 @@ type JWTPlugin struct {
 }
 
 func New(config types.JWTPluginConfig) *JWTPlugin {
+	config.ApplyDefaults()
 	return &JWTPlugin{pluginConfig: config}
 }
 
@@ -50,12 +51,14 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 	p.Logger = ctx.Logger
 	p.globalConfig = ctx.GetConfig()
 
-	// Reload config from ctx.GetConfig() to ensure we have the latest config
-	// (from DB via ConfigManager if available, or static config otherwise)
 	if err := util.LoadPluginConfig(ctx.GetConfig(), p.Metadata().ID, &p.pluginConfig); err != nil {
 		return err
 	}
 	p.pluginConfig.ApplyDefaults()
+	if err := p.pluginConfig.NormalizeAlgorithm(); err != nil {
+		p.Logger.Error("invalid jwt algorithm in plugin config", "error", err)
+		return err
+	}
 
 	sessionService, ok := ctx.ServiceRegistry.Get(models.ServiceSession.String()).(services.SessionService)
 	if !ok {
@@ -64,10 +67,17 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 	}
 	p.sessionService = sessionService
 
+	tokenService, ok := ctx.ServiceRegistry.Get(models.ServiceToken.String()).(services.TokenService)
+	if !ok {
+		p.Logger.Error("token service not found")
+		return errors.New("token service not available")
+	}
+	p.tokenService = tokenService
+
 	jwksRepo := repositories.NewBunJWKSRepository(ctx.DB)
 	refreshTokenRepo := repositories.NewRefreshTokenRepository(ctx.DB)
 
-	p.keyService = jwtservices.NewKeyService(jwksRepo, p.Logger, p.globalConfig.Secret, p.pluginConfig.Algorithm)
+	p.keyService = jwtservices.NewKeyService(jwksRepo, p.Logger, p.tokenService, p.globalConfig.Secret, p.pluginConfig.Algorithm)
 	p.cacheService = jwtservices.NewCacheService(jwksRepo, p.secondaryStorage, p.Logger, p.pluginConfig.JWKSCacheTTL)
 
 	if p.secondaryStorage == nil {
@@ -76,21 +86,17 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		p.blacklistService = jwtservices.NewBlacklistService(p.secondaryStorage, p.Logger)
 	}
 
-	// Create refresh token storage adapter
 	p.refreshStorage = jwtservices.NewRefreshTokenStorageAdapter(refreshTokenRepo)
 
-	// Generate initial keys if missing
 	if err := p.keyService.GenerateKeysIfMissing(context.Background()); err != nil {
 		p.Logger.Error("failed to generate keys", "error", err)
 		return fmt.Errorf("failed to generate keys: %w", err)
 	}
 
-	// Pre-populate JWKS cache
 	if err := p.cacheService.InvalidateCache(context.Background()); err != nil {
 		p.Logger.Warn("failed to pre-populate cache on startup", "error", err)
 	}
 
-	// Create refresh token service
 	refreshServiceConfig := jwtservices.RefreshTokenServiceConfig{
 		GracePeriod:      p.pluginConfig.RefreshGracePeriod,
 		DisableIPLogging: p.pluginConfig.DisableIPLogging,
@@ -136,6 +142,10 @@ func (p *JWTPlugin) OnConfigUpdate(config *models.Config) error {
 	}
 
 	p.pluginConfig.ApplyDefaults()
+	if err := p.pluginConfig.NormalizeAlgorithm(); err != nil {
+		p.Logger.Error("invalid jwt algorithm in plugin config update", "error", err)
+		return err
+	}
 
 	// Invalidate JWKS cache to reflect any key rotation interval changes
 	if p.cacheService != nil {

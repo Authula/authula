@@ -109,12 +109,12 @@ func (p *OAuth2Plugin) initializeServices(ctx *models.PluginContext) error {
 
 func getEnvKey(provider, suffix string) string {
 	switch provider {
-	case "google":
+	case "discord":
 		if suffix == "CLIENT_ID" {
-			return env.EnvGoogleClientID
+			return env.EnvDiscordClientID
 		}
 		if suffix == "CLIENT_SECRET" {
-			return env.EnvGoogleClientSecret
+			return env.EnvDiscordClientSecret
 		}
 	case "github":
 		if suffix == "CLIENT_ID" {
@@ -123,12 +123,12 @@ func getEnvKey(provider, suffix string) string {
 		if suffix == "CLIENT_SECRET" {
 			return env.EnvGithubClientSecret
 		}
-	case "discord":
+	case "google":
 		if suffix == "CLIENT_ID" {
-			return env.EnvDiscordClientID
+			return env.EnvGoogleClientID
 		}
 		if suffix == "CLIENT_SECRET" {
-			return env.EnvDiscordClientSecret
+			return env.EnvGoogleClientSecret
 		}
 	}
 	return ""
@@ -139,10 +139,10 @@ func (p *OAuth2Plugin) registerBuiltInProviders() error {
 		validator func(types.ProviderConfig) error
 		creator   func(types.ProviderConfig) types.OAuth2Provider
 	}{
-		"google": {
+		"discord": {
 			validator: p.validateProviderConfig,
 			creator: func(cfg types.ProviderConfig) types.OAuth2Provider {
-				return services.NewGoogleProvider(cfg.ClientID, cfg.ClientSecret, cfg.RedirectURL)
+				return services.NewDiscordProvider(cfg.ClientID, cfg.ClientSecret, cfg.RedirectURL)
 			},
 		},
 		"github": {
@@ -151,10 +151,10 @@ func (p *OAuth2Plugin) registerBuiltInProviders() error {
 				return services.NewGitHubProvider(cfg.ClientID, cfg.ClientSecret, cfg.RedirectURL)
 			},
 		},
-		"discord": {
+		"google": {
 			validator: p.validateProviderConfig,
 			creator: func(cfg types.ProviderConfig) types.OAuth2Provider {
-				return services.NewDiscordProvider(cfg.ClientID, cfg.ClientSecret, cfg.RedirectURL)
+				return services.NewGoogleProvider(cfg.ClientID, cfg.ClientSecret, cfg.RedirectURL)
 			},
 		},
 	}

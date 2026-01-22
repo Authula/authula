@@ -104,7 +104,7 @@ func (uc *SendEmailVerificationUseCase) Send(ctx context.Context, email string, 
 		taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
 		defer cancel()
 
-		if err := uc.sendEmailVerification(taskCtx, user, verificationLink, uc.PluginConfig.EmailVerificationExpiresIn); err != nil {
+		if err := uc.sendEmailVerification(taskCtx, user, verificationLink); err != nil {
 			uc.Logger.Error(err.Error())
 		}
 	}()
@@ -112,22 +112,28 @@ func (uc *SendEmailVerificationUseCase) Send(ctx context.Context, email string, 
 	return nil
 }
 
-func (uc *SendEmailVerificationUseCase) sendEmailVerification(ctx context.Context, user *models.User, verificationLink string, expiresIn time.Duration) error {
+func (uc *SendEmailVerificationUseCase) sendEmailVerification(ctx context.Context, user *models.User, verificationLink string) error {
+	expiryInHours := int(uc.PluginConfig.EmailVerificationExpiresIn.Hours())
+	hoursText := "hours"
+	if expiryInHours < 2 {
+		hoursText = "hour"
+	}
 	subject := "Verify your email"
 	textBody := fmt.Sprintf("Verify your email by clicking the following link: %s.", verificationLink)
 	htmlBody := fmt.Sprintf(
 		strings.TrimSpace(
 			`<div>
 				<p>Hello %s,</p>
-				<p>Please verify your email address by clicking the following link: <a href=\"%s\">%s</a></p>
-				<p>This link will expire in %s hours.</p>
+				<p>Please verify your email address by clicking the following link: <a href="%s">%s</a></p>
+				<p>This link will expire in %d %s.</p>
 				<p>If you did not request this, please ignore this email.</p>
 			</div>`,
 		),
 		user.Email,
 		verificationLink,
 		verificationLink,
-		fmt.Sprintf("%d", int(expiresIn.Hours())),
+		expiryInHours,
+		hoursText,
 	)
 	return uc.MailerService.SendEmail(ctx, user.Email, subject, textBody, htmlBody)
 }

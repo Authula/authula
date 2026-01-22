@@ -36,7 +36,7 @@ func (p *BearerPlugin) validateBearerToken(reqCtx *models.RequestContext) error 
 	if err != nil {
 		p.logger.Debug("bearer token extraction failed", "error", err)
 		// Write 401 Unauthorized
-		reqCtx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
+		reqCtx.ResponseStatus = http.StatusUnauthorized
 		reqCtx.Handled = true
 		return nil
 	}
@@ -47,7 +47,7 @@ func (p *BearerPlugin) validateBearerToken(reqCtx *models.RequestContext) error 
 	if err != nil {
 		p.logger.Debug("bearer token validation failed", "error", err)
 		// Write 401 Unauthorized
-		reqCtx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
+		reqCtx.ResponseStatus = http.StatusUnauthorized
 		reqCtx.Handled = true
 		return nil
 	}
@@ -68,7 +68,7 @@ func (p *BearerPlugin) buildHooks() []models.Hook {
 			Stage:    models.HookBefore,
 			PluginID: HookIDBearerAuth.String(),
 			Handler:  p.validateBearerToken,
-			Order:    5, // Higher priority than session (which is 10)
+			Order:    5,
 		},
 	}
 }

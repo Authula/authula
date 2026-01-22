@@ -12,7 +12,7 @@ func BuildVerificationURL(baseURL string, basePath string, token string, callbac
 }
 
 // BuildActionURL centralizes URL building logic for token-based flows while preserving callback semantics.
-func BuildActionURL(baseURL, basePath, actionPath, token string, callbackURL *string) string {
+func BuildActionURL(baseURL string, basePath string, actionPath string, token string, callbackURL *string) string {
 	urlToConstruct := buildAbsoluteActionURL(baseURL, basePath, actionPath)
 	urlObj, _ := url.Parse(urlToConstruct)
 	q := urlObj.Query()

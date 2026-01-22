@@ -17,14 +17,6 @@ func Routes(plugin *OAuth2Plugin) []models.Route {
 		HMACKey: plugin.hmacKey,
 	}
 
-	refreshHandler := &handlers.RefreshHandler{
-		UseCase: useCases.RefreshUseCase,
-	}
-
-	linkHandler := &handlers.LinkHandler{
-		UseCase: useCases.LinkAccountUseCase,
-	}
-
 	return []models.Route{
 		{
 			Method:  "GET",
@@ -35,16 +27,6 @@ func Routes(plugin *OAuth2Plugin) []models.Route {
 			Method:  "GET",
 			Path:    "/oauth2/callback/{provider}",
 			Handler: callbackHandler.Handler(),
-		},
-		{
-			Method:  "POST",
-			Path:    "/oauth2/refresh/{provider}",
-			Handler: refreshHandler.Handler(),
-		},
-		{
-			Method:  "POST",
-			Path:    "/oauth2/link/{provider}",
-			Handler: linkHandler.Handler(),
 		},
 	}
 }

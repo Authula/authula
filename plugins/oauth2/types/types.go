@@ -11,20 +11,12 @@ import (
 
 // OAuth2PluginConfig represents the OAuth2 plugin configuration
 type OAuth2PluginConfig struct {
-	Enabled    bool                      `json:"enabled" toml:"enabled"`
-	CookieTTL  time.Duration             `json:"cookie_ttl" toml:"cookie_ttl"`
-	SessionTTL time.Duration             `json:"session_ttl" toml:"session_ttl"`
-	Providers  map[string]ProviderConfig `json:"providers" toml:"providers"`
+	Enabled   bool                      `json:"enabled" toml:"enabled"`
+	Providers map[string]ProviderConfig `json:"providers" toml:"providers"`
 }
 
 // ApplyDefaults applies default values to the config
 func (c *OAuth2PluginConfig) ApplyDefaults() {
-	if c.CookieTTL == 0 {
-		c.CookieTTL = 5 * time.Minute
-	}
-	if c.SessionTTL == 0 {
-		c.SessionTTL = 24 * time.Hour
-	}
 	if c.Providers == nil {
 		c.Providers = make(map[string]ProviderConfig)
 	}

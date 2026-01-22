@@ -25,7 +25,6 @@ func BuildUseCases(p *OAuth2Plugin) *usecases.UseCases {
 			p.providerRegistry,
 			p.logger,
 			trustedOrigins,
-			int(p.pluginConfig.CookieTTL.Seconds()),
 			p.hmacKey,
 		),
 		CallbackUseCase: usecases.NewCallbackUseCase(
@@ -38,16 +37,6 @@ func BuildUseCases(p *OAuth2Plugin) *usecases.UseCases {
 			p.sessionService,
 			p.tokenService,
 		),
-		RefreshUseCase: usecases.NewRefreshUseCase(
-			p.providerRegistry,
-			p.logger,
-		),
-		LinkAccountUseCase: usecases.NewLinkAccountUseCase(
-			p.providerRegistry,
-			p.logger,
-			p.userService,
-			p.accountService,
-		),
 	}
 }
 
@@ -59,14 +48,4 @@ func (a *API) Authorize(ctx context.Context, req *types.AuthorizeRequest) (*usec
 // Callback handles the OAuth2 callback
 func (a *API) Callback(ctx context.Context, req *types.CallbackRequest, ipAddress *string, userAgent *string) (*types.CallbackResult, error) {
 	return a.UseCases.CallbackUseCase.Callback(ctx, req, ipAddress, userAgent)
-}
-
-// Refresh refreshes an OAuth2 token for an authenticated user
-func (a *API) Refresh(ctx context.Context, userID, providerID string) (*usecases.RefreshResult, error) {
-	return a.UseCases.RefreshUseCase.Refresh(ctx, userID, providerID)
-}
-
-// LinkAccount links an OAuth2 account to an existing user
-func (a *API) LinkAccount(ctx context.Context, userID, providerID, providerAccountID string) (*usecases.LinkAccountResult, error) {
-	return a.UseCases.LinkAccountUseCase.LinkAccount(ctx, userID, providerID, providerAccountID)
 }

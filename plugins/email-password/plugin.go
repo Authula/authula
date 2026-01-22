@@ -29,6 +29,7 @@ type EmailPasswordPlugin struct {
 }
 
 func New(config types.EmailPasswordPluginConfig) *EmailPasswordPlugin {
+	config.ApplyDefaults()
 	return &EmailPasswordPlugin{
 		pluginConfig: config,
 	}

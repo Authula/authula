@@ -47,10 +47,10 @@ func main() {
 		Plugins: pluginsList,
 	})
 
-	ctx := context.Background()
-	auth.DropCoreMigrations(ctx)
-	auth.PluginRegistry.DropMigrations(ctx)
-	return
+	// ctx := context.Background()
+	// auth.PluginRegistry.DropMigrations(ctx)
+	// auth.DropCoreMigrations(ctx)
+	// return
 
 	// Channel to signal restart
 	restartChan := make(chan struct{})

@@ -134,7 +134,8 @@ func (uc *CallbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 	}
 
 	return &types.CallbackResult{
-		User:    user,
-		Session: newSession,
+		User:         user,
+		Session:      newSession,
+		SessionToken: sessionToken,
 	}, nil
 }

@@ -71,15 +71,16 @@ func (h *SignUpHandler) Handler() http.HandlerFunc {
 				taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
 				defer cancel()
 
-				err := h.SendEmailVerificationUseCase.Send(taskCtx, payload.Email, &payload.CallbackURL)
-				if err != nil {
+				if err := h.SendEmailVerificationUseCase.Send(taskCtx, payload.Email, &payload.CallbackURL); err != nil {
 					h.Logger.Error("failed to send email", "err", err)
 				}
 			}()
 		}
 
 		reqCtx.SetUserIDInContext(result.User.ID)
+		reqCtx.Values[models.ContextSessionID.String()] = result.Session.ID
 		if h.PluginConfig.AutoSignIn {
+			h.Logger.Debug("auto sign in enabled; setting session token in request context", "session_token", result.SessionToken)
 			reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken
 		}
 
