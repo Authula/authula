@@ -40,9 +40,6 @@ const (
 
 // RouterOptions contains configuration options for the Router
 type RouterOptions struct {
-	// MaxBufferSize is the maximum amount of data to buffer in response body (default: 10MB)
-	// When exceeded, buffering is bypassed for that response
-	MaxBufferSize int
 	// AsyncHookTimeout is the timeout for async hook execution (default: 30 seconds)
 	// If a hook takes longer than this, it will be cancelled
 	AsyncHookTimeout time.Duration
@@ -54,7 +51,6 @@ type RouterOptions struct {
 // DefaultRouterOptions returns router options with sensible defaults
 func DefaultRouterOptions() *RouterOptions {
 	return &RouterOptions{
-		MaxBufferSize:    10 * 1024 * 1024, // 10MB
 		AsyncHookTimeout: 30 * time.Second,
 		HookErrorMode:    HookErrorModeContinue,
 	}
@@ -427,15 +423,10 @@ func (r *Router) Handler() http.Handler {
 
 // ServeHTTP implements http.Handler for testing and direct use
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// Check if this is a streaming response that should skip buffering
-	skipBuffer := r.isStreamingResponse(w.Header())
-
 	// Wrap response writer to defer writes
 	wrappedWriter := &router.DeferredResponseWriter{
-		Wrapped:       w,
-		Logger:        r.logger,
-		MaxBufferSize: r.opts.MaxBufferSize,
-		SkipBuffer:    skipBuffer,
+		Wrapped: w,
+		Logger:  r.logger,
 	}
 
 	// Create request context
@@ -452,13 +443,6 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// Associate request context with wrapped writer
 	wrappedWriter.SetRequestContext(reqCtx)
-
-	// Allow manual override of buffer skipping via context
-	if skipVal, ok := reqCtx.Values["skipBuffer"]; ok {
-		if skipBool, ok := skipVal.(bool); ok && skipBool {
-			wrappedWriter.SkipBuffer = true
-		}
-	}
 
 	// Lookup route metadata
 	metadata, pattern, exists := r.getRouteMetadata(req.Method, req.URL.Path)
@@ -514,38 +498,6 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// Flush deferred writes or captured response
 	r.finalizeResponse(reqCtx, wrappedWriter)
-}
-
-// isStreamingResponse checks if the response appears to be streaming based on headers
-func (r *Router) isStreamingResponse(headers http.Header) bool {
-	contentType := headers.Get("Content-Type")
-	if contentType == "" {
-		return false
-	}
-
-	// Check for streaming content types
-	streamingPatterns := []string{
-		"text/event-stream",
-		"application/octet-stream",
-		"multipart/",
-		"application/x-ndjson",
-	}
-
-	for _, pattern := range streamingPatterns {
-		if strings.Contains(contentType, pattern) {
-			r.logger.Debug("Detected streaming response, skipping buffering", "content_type", contentType)
-			return true
-		}
-	}
-
-	// Check for chunked encoding
-	transferEncoding := headers.Get("Transfer-Encoding")
-	if strings.Contains(strings.ToLower(transferEncoding), "chunked") {
-		r.logger.Debug("Detected chunked transfer encoding, skipping buffering")
-		return true
-	}
-
-	return false
 }
 
 func (r *Router) finalizeResponse(ctx *models.RequestContext, w *router.DeferredResponseWriter) {

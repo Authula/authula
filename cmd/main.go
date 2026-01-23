@@ -47,14 +47,6 @@ func main() {
 		Plugins: pluginsList,
 	})
 
-	// --------------------------------------
-	// TODO: remove this after testing
-	// ctx := context.Background()
-	// auth.PluginRegistry.DropMigrations(ctx)
-	// auth.DropCoreMigrations(ctx)
-	// return
-	// --------------------------------------
-
 	// Channel to signal restart
 	restartChan := make(chan struct{})
 	// Channel to signal shutdown

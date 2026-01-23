@@ -20,7 +20,6 @@ type SessionPlugin struct {
 	userService    services.UserService
 	sessionService services.SessionService
 	tokenService   services.TokenService
-	Api            SessionAPI
 }
 
 func New(config SessionPluginConfig) *SessionPlugin {
@@ -73,8 +72,6 @@ func (p *SessionPlugin) Init(ctx *models.PluginContext) error {
 	}
 	p.tokenService = tokenService
 
-	p.Api = newSessionAPI(p)
-
 	return nil
 }
 
@@ -101,10 +98,6 @@ func (p *SessionPlugin) AuthMiddleware() func(http.Handler) http.Handler {
 			if err != nil {
 				errorMsg := "unauthorized"
 				statusCode := http.StatusUnauthorized
-				if err.Error() == "session_expired" {
-					errorMsg = "session_expired"
-					p.ClearSessionCookie(w)
-				}
 				p.writeErrorResponse(w, statusCode, errorMsg)
 				return
 			}
@@ -151,9 +144,9 @@ func (p *SessionPlugin) validateSessionCookie(r *http.Request) (*models.Session,
 		return nil, err
 	}
 
-	if time.Now().UTC().After(session.ExpiresAt) {
+	if session.ExpiresAt.Before(time.Now().UTC()) {
 		p.sessionService.Delete(r.Context(), session.ID)
-		return nil, fmt.Errorf("session_expired")
+		return nil, fmt.Errorf("session expired")
 	}
 
 	return session, nil
@@ -206,8 +199,6 @@ func (p *SessionPlugin) ClearSessionCookie(w http.ResponseWriter) {
 // shouldRenewSession checks if the session is past 50% of its max age and should be renewed
 func (p *SessionPlugin) shouldRenewSession(session *models.Session) bool {
 	now := time.Now().UTC()
-
-	// Renew if within UpdateAge of expiry (Better Auth pattern)
 	timeToExpiry := session.ExpiresAt.Sub(now)
 	return timeToExpiry <= p.globalConfig.Session.UpdateAge
 }
@@ -226,7 +217,6 @@ func (p *SessionPlugin) renewSession(w http.ResponseWriter, r *http.Request, ses
 	}
 
 	p.SetSessionCookie(w, cookie.Value)
-	p.logger.Debug("session renewed", "session_id", session.ID)
 }
 
 func (p *SessionPlugin) Close() error {

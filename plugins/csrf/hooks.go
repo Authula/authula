@@ -23,67 +23,44 @@ func (id CSRFHookID) String() string {
 	return string(id)
 }
 
-// generateCSRFTokenHook generates and sets CSRF tokens for safe methods
-// This hook runs on all GET/HEAD/OPTIONS requests for authenticated users
-func (p *CSRFPlugin) generateCSRFTokenHook(ctx *models.RequestContext) error {
-	method := ctx.Method
-	if method == "" && ctx.Request != nil {
-		method = ctx.Request.Method
-	}
-
-	if method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions {
-		return nil
-	}
-
-	_, err := ctx.Request.Cookie(p.pluginConfig.CookieName)
-	if err != http.ErrNoCookie {
-		return nil
-	}
-
-	token := p.generateToken()
-	p.setCSRFCookie(ctx.ResponseWriter, ctx.Request, token)
-
-	p.logger.Debug("csrf token generated", "path", ctx.Path)
-
-	return nil
-}
-
-// combinedCSRFHook handles both token generation and validation
-func (p *CSRFPlugin) combinedCSRFHook(ctx *models.RequestContext) error {
-	method := ctx.Method
-	if method == "" && ctx.Request != nil {
-		method = ctx.Request.Method
-	}
-
-	isSafeMethod := method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions
-	if isSafeMethod {
-		return p.generateCSRFTokenHook(ctx)
-	}
-
-	return p.validateCSRFTokenHook(ctx)
-}
-
-// safeMethodMatcher returns true for safe HTTP methods with authenticated users
+// safeMethodMatcher returns true for safe HTTP methods (non-state-changing requests)
 func (p *CSRFPlugin) safeMethodMatcher(ctx *models.RequestContext) bool {
-	// Get method - from ctx.Method or from the request
 	method := ctx.Method
-	if method == "" && ctx.Request != nil {
-		method = ctx.Request.Method
-	}
-
-	// Only match safe methods (GET, HEAD, OPTIONS) for authenticated users
-	isSafeMethod := method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions
-	return isSafeMethod && ctx.UserID != nil
+	isValidMethod := method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions
+	p.logger.Debug("[safeMethodMatcher] checking method", "method", method, "isValidMethod", isValidMethod)
+	return isValidMethod
 }
 
 // unsafeMethodMatcher returns true for unsafe HTTP methods (state-changing requests)
 func (p *CSRFPlugin) unsafeMethodMatcher(ctx *models.RequestContext) bool {
 	method := ctx.Method
-	if method == "" && ctx.Request != nil {
-		method = ctx.Request.Method
+	isValidMethod := method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch || method == http.MethodDelete
+
+	return isValidMethod
+}
+
+// generateCSRFTokenHook generates and sets CSRF tokens for safe methods
+// This hook runs on all GET/HEAD/OPTIONS requests
+func (p *CSRFPlugin) generateCSRFTokenHook(reqCtx *models.RequestContext) error {
+	method := reqCtx.Method
+	p.logger.Debug("[generateCSRFTokenHook] checking method", "method", method)
+
+	if method != http.MethodOptions && method != http.MethodHead && method != http.MethodGet {
+		return nil
 	}
 
-	return method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch || method == http.MethodDelete
+	_, err := reqCtx.Request.Cookie(p.pluginConfig.CookieName)
+	if err != http.ErrNoCookie {
+		p.logger.Debug("csrf cookie already present, skipping generation", "path", reqCtx.Path)
+		return nil
+	}
+
+	token := p.generateToken()
+	p.setCSRFCookie(reqCtx, token)
+
+	p.logger.Debug("csrf token generated", "path", reqCtx.Path)
+
+	return nil
 }
 
 // validateCSRFTokenHook validates CSRF tokens on state-changing requests
@@ -93,9 +70,6 @@ func (p *CSRFPlugin) unsafeMethodMatcher(ctx *models.RequestContext) bool {
 func (p *CSRFPlugin) validateCSRFTokenHook(reqCtx *models.RequestContext) error {
 	// Get method - from ctx.Method or from the request
 	method := reqCtx.Method
-	if method == "" && reqCtx.Request != nil {
-		method = reqCtx.Request.Method
-	}
 
 	// Only validate on unsafe methods (POST, PUT, PATCH, DELETE)
 	if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
@@ -109,13 +83,10 @@ func (p *CSRFPlugin) validateCSRFTokenHook(reqCtx *models.RequestContext) error 
 		p.logger.Debug("csrf header validation failed", "error", err)
 		// The custom deny handler in the plugin's Init() method writes the response
 		// but we need to set it here too for the hook system
-		err := reqCtx.SetJSONResponse(
+		reqCtx.SetJSONResponse(
 			http.StatusForbidden,
 			map[string]any{"message": "csrf validation failed"},
 		)
-		if err != nil {
-			return err
-		}
 		reqCtx.Handled = true
 		return nil
 	}
@@ -138,15 +109,14 @@ func (p *CSRFPlugin) validateCSRFTokenHook(reqCtx *models.RequestContext) error 
 // Uses PluginID-based filtering so CSRF only executes when explicitly configured in route metadata
 func (p *CSRFPlugin) buildHooks() []models.Hook {
 	return []models.Hook{
-		// Combined CSRF hook: generates tokens for safe methods, validates for unsafe methods
+		// CSRF token generation hook: generates tokens for safe methods
 		// PluginID-based: only executes if "csrf.generate" is in route.Metadata["plugins"]
-		// Handler: generates token for safe methods, validates for unsafe methods
+		// Handler: generates token for safe methods
 		{
-			Stage:    models.HookBefore,
-			PluginID: HookIDCSRFGenerate.String(),
-			Matcher:  p.safeMethodMatcher,
-			Handler:  p.combinedCSRFHook,
-			Order:    15, // Execute after auth but before main handler
+			Stage:   models.HookBefore,
+			Matcher: p.safeMethodMatcher,
+			Handler: p.generateCSRFTokenHook,
+			Order:   5, // Execute before auth but before main handler
 		},
 
 		// CSRF protection hook: validates tokens on state-changing requests

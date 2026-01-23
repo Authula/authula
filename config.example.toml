@@ -124,6 +124,7 @@ enabled = true
 cookie_name = "gobetterauth_csrf"
 header_name = "X-GOBETTERAUTH-CSRF-TOKEN"
 max_age = "24h"
+secure = false
 same_site = "lax"  # Options: "lax", "strict", "none" (Note: HttpOnly=false and Secure=true are hardcoded for Double-Submit Cookie pattern)
 # Go 1.25+ Header-based CSRF Protection (Recommended)
 # When enabled, validates cross-origin requests using Sec-Fetch-Site and Origin/Host headers.

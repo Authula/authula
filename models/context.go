@@ -9,12 +9,11 @@ import (
 type ContextKey string
 
 const (
-	ContextUserID             ContextKey = "user_id"
-	ContextSessionID          ContextKey = "session_id"
-	ContextSessionToken       ContextKey = "session_token"
-	ContextRequestContext     ContextKey = "request_context"
-	ContextIdempotentSource   ContextKey = "auth.idempotent_source"
-	ContextIdempotentSkipMint ContextKey = "auth.idempotent_skip_mint"
+	ContextUserID                       ContextKey = "user_id"
+	ContextSessionID                    ContextKey = "session_id"
+	ContextSessionToken                 ContextKey = "session_token"
+	ContextRequestContext               ContextKey = "request_context"
+	ContextAuthIdempotentSkipTokensMint ContextKey = "auth.idempotent_skip_tokens_mint"
 )
 
 func (k ContextKey) String() string {
@@ -91,15 +90,19 @@ func (reqCtx *RequestContext) SetResponse(status int, headers http.Header, body 
 
 // SetJSONResponse marshals the provided payload and stores it as the
 // captured response body with the appropriate content type header.
-func (reqCtx *RequestContext) SetJSONResponse(status int, payload any) error {
+// If marshaling fails, it falls back to a 500 Internal Server Error response.
+func (reqCtx *RequestContext) SetJSONResponse(status int, payload any) {
 	data, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		// Fallback: set a plain text error response
+		headers := make(http.Header)
+		headers.Set("Content-Type", "text/plain")
+		reqCtx.SetResponse(500, headers, []byte("Internal Server Error"))
+		return
 	}
 	headers := make(http.Header)
 	headers.Set("Content-Type", "application/json")
 	reqCtx.SetResponse(status, headers, data)
-	return nil
 }
 
 func GetUserIDFromContext(ctx context.Context) (string, bool) {

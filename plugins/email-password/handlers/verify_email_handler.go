@@ -39,12 +39,12 @@ func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
 		if callbackURL != "" {
 			u, err := url.Parse(callbackURL)
 			if err != nil {
-				http.Redirect(w, r, callbackURL+"?token="+url.QueryEscape(tokenStr), http.StatusFound)
+				http.Redirect(reqCtx.ResponseWriter, r, callbackURL+"?token="+url.QueryEscape(tokenStr), http.StatusFound)
 			} else {
 				q := u.Query()
 				q.Set("token", tokenStr)
 				u.RawQuery = q.Encode()
-				http.Redirect(w, r, u.String(), http.StatusFound)
+				http.Redirect(reqCtx.ResponseWriter, r, u.String(), http.StatusFound)
 			}
 		} else {
 			reqCtx.SetJSONResponse(http.StatusOK, map[string]any{

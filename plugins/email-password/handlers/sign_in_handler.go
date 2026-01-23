@@ -48,14 +48,16 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 		if reqCtx.UserID != nil && *reqCtx.UserID != "" {
 			if sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && sessionID != "" {
 				existingSession, err := h.SignInUseCase.GetSessionByID(ctx, sessionID)
-				if err == nil && existingSession != nil {
+				if err == nil && existingSession != nil && existingSession.ExpiresAt.After(time.Now()) {
 					user, _ := h.SignInUseCase.GetUserByID(ctx, existingSession.UserID)
 					if user != nil {
-						h.Logger.Debug("idempotent login - user already authenticated",
+						h.Logger.Debug(
+							"idempotent login - user already authenticated",
 							"user_id", *reqCtx.UserID,
-							"session_id", sessionID)
+							"session_id", sessionID,
+						)
 
-						reqCtx.Values[models.ContextIdempotentSkipMint.String()] = true
+						reqCtx.Values[models.ContextAuthIdempotentSkipTokensMint.String()] = true
 
 						reqCtx.SetJSONResponse(http.StatusOK, types.SignInResponse{
 							User:    user,

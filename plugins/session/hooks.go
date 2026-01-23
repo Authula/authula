@@ -27,6 +27,8 @@ func (id SessionHookID) String() string {
 // validateSessionHook validates a session cookie from the request and sets UserID
 // This hook runs at HookBefore stage if "session.auth" is in route.Metadata["plugins"]
 func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error {
+	p.logger.Debug("[validateSessionHook] checking method", "method", reqCtx.Method)
+
 	// Cooperative auth: if UserID already set by another auth plugin, skip
 	if reqCtx.UserID != nil {
 		return nil
@@ -99,7 +101,6 @@ func (p *SessionPlugin) buildHooks() []models.Hook {
 			Handler:  p.validateSessionHook,
 			Order:    5,
 		},
-
 		// Session issuance hook: sets cookie after successful auth
 		{
 			Stage: models.HookAfter,
@@ -110,7 +111,6 @@ func (p *SessionPlugin) buildHooks() []models.Hook {
 			Handler: p.issueSessionCookieHook,
 			Order:   5,
 		},
-
 		// Session clear hook: clears cookie on sign-out
 		{
 			Stage:    models.HookAfter,

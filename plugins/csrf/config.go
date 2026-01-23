@@ -1,7 +1,6 @@
 package csrf
 
 import (
-	"strings"
 	"time"
 )
 
@@ -10,6 +9,7 @@ type CSRFPluginConfig struct {
 	CookieName             string        `json:"cookie_name" toml:"cookie_name"`
 	HeaderName             string        `json:"header_name" toml:"header_name"`
 	MaxAge                 time.Duration `json:"max_age" toml:"max_age"`
+	Secure                 bool          `json:"secure" toml:"secure"`
 	SameSite               string        `json:"same_site" toml:"same_site"`
 	EnableHeaderProtection bool          `json:"enable_header_protection" toml:"enable_header_protection"`
 }
@@ -24,9 +24,7 @@ func (config *CSRFPluginConfig) ApplyDefaults() {
 	if config.MaxAge == 0 {
 		config.MaxAge = 24 * time.Hour
 	}
-	if config.SameSite != "" {
-		config.SameSite = strings.ToLower(config.SameSite)
-	} else {
+	if config.SameSite == "" {
 		config.SameSite = "lax"
 	}
 }

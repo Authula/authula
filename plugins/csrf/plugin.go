@@ -157,9 +157,7 @@ func (p *CSRFPlugin) validateCSRFToken(ctx *models.RequestContext) error {
 	r := ctx.Request
 	cookie, err := r.Cookie(p.pluginConfig.CookieName)
 	if err != nil {
-		if err := ctx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "missing csrf cookie"}); err != nil {
-			return err
-		}
+		ctx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "missing csrf cookie"})
 		ctx.Handled = true
 		return nil
 	}
@@ -172,9 +170,7 @@ func (p *CSRFPlugin) validateCSRFToken(ctx *models.RequestContext) error {
 
 	// Compare cookie value with header/form value
 	if headerToken != cookie.Value {
-		if err := ctx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "invalid csrf token"}); err != nil {
-			return err
-		}
+		ctx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "invalid csrf token"})
 		ctx.Handled = true
 		return nil
 	}
@@ -186,8 +182,9 @@ func (p *CSRFPlugin) validateCSRFToken(ctx *models.RequestContext) error {
 func (p *CSRFPlugin) Middleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			userID, ok := r.Context().Value(models.ContextUserID).(string)
-			if !ok || userID == "" {
+			ctx := r.Context()
+			reqCtx, ok := models.GetRequestContext(ctx)
+			if !ok || reqCtx.UserID == nil || *reqCtx.UserID == "" {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -196,7 +193,7 @@ func (p *CSRFPlugin) Middleware() func(http.Handler) http.Handler {
 				_, err := r.Cookie(p.pluginConfig.CookieName)
 				if err == http.ErrNoCookie {
 					token := p.generateToken()
-					p.setCSRFCookie(w, r, token)
+					p.setCSRFCookie(reqCtx, token)
 				}
 				next.ServeHTTP(w, r)
 				return
@@ -204,9 +201,8 @@ func (p *CSRFPlugin) Middleware() func(http.Handler) http.Handler {
 
 			cookie, err := r.Cookie(p.pluginConfig.CookieName)
 			if err != nil {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusForbidden)
-				util.JSONResponse(w, http.StatusForbidden, map[string]string{"message": "missing csrf cookie"})
+				reqCtx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "missing csrf cookie"})
+				reqCtx.Handled = true
 				return
 			}
 
@@ -216,9 +212,8 @@ func (p *CSRFPlugin) Middleware() func(http.Handler) http.Handler {
 			}
 
 			if headerToken != cookie.Value {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusForbidden)
-				util.JSONResponse(w, http.StatusForbidden, map[string]string{"message": "invalid csrf token"})
+				reqCtx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "invalid csrf token"})
+				reqCtx.Handled = true
 				return
 			}
 
@@ -232,8 +227,7 @@ func (p *CSRFPlugin) Middleware() func(http.Handler) http.Handler {
 // - HttpOnly=false: Allows JavaScript to read the cookie value
 // - Secure: Set to true only for HTTPS requests (allows development over HTTP on localhost)
 // Also sets the token in a response header so the client can read and use it.
-func (p *CSRFPlugin) setCSRFCookie(w http.ResponseWriter, r *http.Request, token string) {
-	// Determine SameSite mode from config
+func (p *CSRFPlugin) setCSRFCookie(reqCtx *models.RequestContext, token string) {
 	var samesite http.SameSite
 	switch p.pluginConfig.SameSite {
 	case "strict":
@@ -246,20 +240,16 @@ func (p *CSRFPlugin) setCSRFCookie(w http.ResponseWriter, r *http.Request, token
 		samesite = http.SameSiteLaxMode
 	}
 
-	// Set Secure flag only for HTTPS requests (production),
-	// allow HTTP for development on localhost
-	secure := r.TLS != nil || r.URL.Scheme == "https"
-
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
 		Name:     p.pluginConfig.CookieName,
 		Value:    token,
 		Path:     "/",
-		HttpOnly: false,  // Hardcoded: Required for Double-Submit Cookie pattern
-		Secure:   secure, // Conditional: true for HTTPS (production), false for HTTP (development)
+		HttpOnly: false,                 // Hardcoded: Required for Double-Submit Cookie pattern
+		Secure:   p.pluginConfig.Secure, // Conditional: true for HTTPS (production), false for HTTP (development)
 		SameSite: samesite,
 		MaxAge:   int(p.pluginConfig.MaxAge.Seconds()),
 	})
 
 	// Set token in response header so client can read it
-	w.Header().Set(p.pluginConfig.HeaderName, token)
+	reqCtx.ResponseWriter.Header().Set(p.pluginConfig.HeaderName, token)
 }

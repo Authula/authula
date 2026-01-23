@@ -2,13 +2,12 @@ package router
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
-// deferredResponseWriter buffers response writes to allow hooks to modify headers after handler execution.
-// It has a maximum buffer size limit to prevent excessive memory usage.
-// For streaming responses (Server-Sent Events, WebSockets), use http.Header() directly without buffering.
+// DeferredResponseWriter buffers response writes to allow hooks to modify headers after handler execution.
 type DeferredResponseWriter struct {
 	Wrapped         http.ResponseWriter
 	Logger          models.Logger
@@ -21,10 +20,6 @@ type DeferredResponseWriter struct {
 	overrideStatus  int
 	overrideBody    []byte
 	overrideHeaders http.Header
-	// MaxBufferSize limits the maximum amount of data that can be buffered
-	MaxBufferSize int
-	// SkipBuffer indicates that buffering should be skipped (for streaming responses)
-	SkipBuffer bool
 }
 
 func (w *DeferredResponseWriter) SetRequestContext(ctx *models.RequestContext) {
@@ -71,28 +66,7 @@ func (w *DeferredResponseWriter) Write(b []byte) (int, error) {
 		w.headerWritten = true
 	}
 
-	// If skipBuffer is set or streaming response detected, bypass buffering
-	if w.SkipBuffer {
-		return w.Wrapped.Write(b)
-	}
-
 	w.writeDeferred = true
-
-	// Check if buffer would exceed max size
-	if len(w.buffer)+len(b) > w.MaxBufferSize {
-		w.Logger.Warn("Response buffer exceeded maximum size, bypassing buffering", "current", len(w.buffer), "requested", len(b), "max", w.MaxBufferSize)
-		// Bypass buffering for large responses - flush immediately
-		if len(w.buffer) > 0 {
-			// Flush existing buffer first
-			w.Wrapped.WriteHeader(w.statusCode)
-			w.Wrapped.Write(w.buffer)
-			w.buffer = nil
-		}
-		// Write new data directly without buffering
-		w.SkipBuffer = true
-		return w.Wrapped.Write(b)
-	}
-
 	w.buffer = append(w.buffer, b...)
 	return len(b), nil
 }
@@ -100,12 +74,44 @@ func (w *DeferredResponseWriter) Write(b []byte) (int, error) {
 // Flush writes all buffered data to the underlying writer
 func (w *DeferredResponseWriter) Flush() error {
 	if w.override {
+		// Preserve existing cookies set by previous hooks
+		existingCookies := w.Wrapped.Header()["Set-Cookie"]
+
+		// Apply override headers to wrapped writer (except Set-Cookie, which we merge)
 		if w.overrideHeaders != nil {
-			headers := w.Wrapped.Header()
 			for key, values := range w.overrideHeaders {
-				headers[key] = append([]string(nil), values...)
+				if key != "Set-Cookie" {
+					w.Wrapped.Header()[key] = append([]string(nil), values...)
+				}
 			}
 		}
+
+		// Merge cookies: existing (from previous hooks) + override (from context response)
+		allCookies := make([]string, 0, len(existingCookies))
+		allCookies = append(allCookies, existingCookies...)
+
+		if w.overrideHeaders != nil {
+			overrideCookies := w.overrideHeaders["Set-Cookie"]
+			for _, overrideCookie := range overrideCookies {
+				cookieName := extractCookieName(overrideCookie)
+				// Only add if not already present (no duplicate cookie names)
+				isDuplicate := false
+				for _, existing := range existingCookies {
+					if extractCookieName(existing) == cookieName {
+						isDuplicate = true
+						break
+					}
+				}
+				if !isDuplicate {
+					allCookies = append(allCookies, overrideCookie)
+				}
+			}
+		}
+
+		// Set all cookies on the wrapped writer
+		w.Wrapped.Header()["Set-Cookie"] = allCookies
+
+		// Write status and body
 		status := w.overrideStatus
 		if status == 0 {
 			if w.headerWritten {
@@ -121,6 +127,8 @@ func (w *DeferredResponseWriter) Flush() error {
 		}
 		return nil
 	}
+
+	// Normal response (no override)
 	if w.headerWritten {
 		w.Wrapped.WriteHeader(w.statusCode)
 	}
@@ -129,4 +137,12 @@ func (w *DeferredResponseWriter) Flush() error {
 		return err
 	}
 	return nil
+}
+
+// extractCookieName extracts the cookie name from a Set-Cookie header string
+func extractCookieName(cookieHeader string) string {
+	if before, _, ok := strings.Cut(cookieHeader, "="); ok {
+		return before
+	}
+	return cookieHeader
 }

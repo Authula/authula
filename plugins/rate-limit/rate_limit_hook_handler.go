@@ -88,9 +88,7 @@ func (h *RateLimitHookHandler) Handle() models.HookHandler {
 				"limit":       max,
 				"remaining":   0,
 			}
-			if err := ctx.SetJSONResponse(http.StatusTooManyRequests, payload); err != nil {
-				return err
-			}
+			ctx.SetJSONResponse(http.StatusTooManyRequests, payload)
 			ctx.Handled = true
 		}
 

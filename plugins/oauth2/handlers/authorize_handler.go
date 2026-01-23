@@ -47,7 +47,7 @@ func (h *AuthorizeHandler) Handler() http.HandlerFunc {
 		}
 
 		// Set cookies
-		http.SetCookie(w, &http.Cookie{
+		http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
 			Name:     constants.CookieState,
 			Value:    resp.StateCookie,
 			Path:     "/",
@@ -56,7 +56,7 @@ func (h *AuthorizeHandler) Handler() http.HandlerFunc {
 			SameSite: http.SameSiteLaxMode,
 			MaxAge:   int(time.Minute.Seconds()) * 5,
 		})
-		http.SetCookie(w, &http.Cookie{
+		http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
 			Name:     constants.CookieRedirectTo,
 			Value:    resp.RedirectCookie,
 			Path:     "/",
@@ -66,7 +66,7 @@ func (h *AuthorizeHandler) Handler() http.HandlerFunc {
 			MaxAge:   int(time.Minute.Seconds()) * 5,
 		})
 		if resp.VerifierCookie != nil {
-			http.SetCookie(w, &http.Cookie{
+			http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
 				Name:     constants.CookieVerifier,
 				Value:    *resp.VerifierCookie,
 				Path:     "/",
@@ -77,6 +77,6 @@ func (h *AuthorizeHandler) Handler() http.HandlerFunc {
 			})
 		}
 
-		http.Redirect(w, r, resp.AuthorizationURL, http.StatusTemporaryRedirect)
+		http.Redirect(reqCtx.ResponseWriter, r, resp.AuthorizationURL, http.StatusTemporaryRedirect)
 	}
 }

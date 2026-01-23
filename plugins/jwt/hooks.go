@@ -29,7 +29,7 @@ func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
 		return nil
 	}
 
-	if skipMint, ok := reqCtx.Values[models.ContextIdempotentSkipMint.String()].(bool); ok && skipMint {
+	if skipMint, ok := reqCtx.Values[models.ContextAuthIdempotentSkipTokensMint.String()].(bool); ok && skipMint {
 		p.Logger.Debug("skipping JWT minting - idempotent login")
 		return nil
 	}

@@ -548,62 +548,6 @@ func TestHookErrorModeSilent(t *testing.T) {
 	}
 }
 
-// TestBufferSizeConfiguration verifies that max buffer size is configurable
-func TestBufferSizeConfiguration(t *testing.T) {
-	smallBufferSize := 100
-	opts := &RouterOptions{
-		MaxBufferSize: smallBufferSize,
-	}
-	logger := &mockLogger{}
-	router := NewRouter(logger, "/api/auth", opts)
-
-	router.RegisterRoute(models.Route{
-		Method:  "GET",
-		Path:    "/large",
-		Handler: &testHandler{statusCode: 200, body: string(make([]byte, smallBufferSize+50))},
-	})
-
-	req := httptest.NewRequest("GET", "/api/auth/large", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != 200 {
-		t.Errorf("Expected status 200, got %d", w.Code)
-	}
-}
-
-// TestStreamingResponseDetection verifies that streaming responses skip buffering
-func TestStreamingResponseDetection(t *testing.T) {
-	logger := &mockLogger{}
-	router := NewRouter(logger, "/api/auth", nil)
-
-	streamingHandler := &testHandler{
-		statusCode: 200,
-		body:       "event: message\ndata: test\n\n",
-		headers: map[string]string{
-			"Content-Type": "text/event-stream",
-		},
-	}
-
-	router.RegisterRoute(models.Route{
-		Method:  "GET",
-		Path:    "/stream",
-		Handler: streamingHandler,
-	})
-
-	req := httptest.NewRequest("GET", "/api/auth/stream", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != 200 {
-		t.Errorf("Expected status 200, got %d", w.Code)
-	}
-
-	if ct := w.Header().Get("Content-Type"); ct != "text/event-stream" {
-		t.Errorf("Expected Content-Type text/event-stream, got %s", ct)
-	}
-}
-
 // testHandler is a simple HTTP handler for testing
 type testHandler struct {
 	statusCode int

@@ -78,7 +78,7 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 		if reqCtx.UserID != nil && *reqCtx.UserID != "" {
 			if sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && sessionID != "" {
 				existingSession, err := h.UseCase.GetSessionByID(ctx, sessionID)
-				if err == nil && existingSession != nil {
+				if err == nil && existingSession != nil && existingSession.ExpiresAt.After(time.Now()) {
 					user, _ := h.UseCase.GetUserByID(ctx, existingSession.UserID)
 					if user != nil {
 						reqCtx.SetJSONResponse(http.StatusOK, &types.CallbackResponse{
@@ -101,7 +101,7 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 		}
 
 		// Clear cookies
-		http.SetCookie(w, &http.Cookie{
+		http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
 			Name:     constants.CookieState,
 			Value:    "",
 			Path:     "/",
@@ -110,7 +110,7 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 			SameSite: http.SameSiteLaxMode,
 			MaxAge:   -1,
 		})
-		http.SetCookie(w, &http.Cookie{
+		http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
 			Name:     constants.CookieRedirectTo,
 			Value:    "",
 			Path:     "/",
@@ -119,7 +119,7 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 			SameSite: http.SameSiteLaxMode,
 			MaxAge:   -1,
 		})
-		http.SetCookie(w, &http.Cookie{
+		http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
 			Name:     constants.CookieVerifier,
 			Value:    "",
 			Path:     "/",
@@ -141,7 +141,7 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 		}
 
 		if redirectTo != "" {
-			http.Redirect(w, r, redirectTo, http.StatusFound)
+			http.Redirect(reqCtx.ResponseWriter, r, redirectTo, http.StatusFound)
 			return
 		}
 
