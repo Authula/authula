@@ -34,7 +34,7 @@ func (h *SignUpHandler) Handler() http.HandlerFunc {
 		var payload SignUpRequestPayload
 		if err := util.ParseJSON(r, &payload); err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
-				"message": "invalid request",
+				"message": "invalid request body",
 			})
 			reqCtx.Handled = true
 			return

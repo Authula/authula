@@ -124,13 +124,12 @@ func (uc *SendEmailVerificationUseCase) sendEmailVerification(ctx context.Contex
 		strings.TrimSpace(
 			`<div>
 				<p>Hello %s,</p>
-				<p>Please verify your email address by clicking the following link: <a href="%s">%s</a></p>
+				<p>Please verify your email address by clicking the following link: <a href="%s">Verify your email</a></p>
 				<p>This link will expire in %d %s.</p>
 				<p>If you did not request this, please ignore this email.</p>
 			</div>`,
 		),
 		user.Email,
-		verificationLink,
 		verificationLink,
 		expiryInHours,
 		hoursText,

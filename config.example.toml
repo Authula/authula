@@ -215,8 +215,8 @@ enabled = true
 
 # [plugins.jwt]
 # enabled = true
-# algorithm = "ed25519"
-# key_rotation_interval = "24h"
+# algorithm = "eddsa"
+# key_rotation_interval = "720h"
 # expires_in = "15m"
 # refresh_expires_in = "168h"
 # jwks_cache_ttl = "5m"

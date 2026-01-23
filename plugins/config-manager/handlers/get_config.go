@@ -36,5 +36,4 @@ func (h *ConfigManagerGetConfigHandler) Handle(w http.ResponseWriter, r *http.Re
 		"message": "config retrieved successfully",
 		"data":    config,
 	})
-	reqCtx.Handled = true
 }

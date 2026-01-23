@@ -5,7 +5,7 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/services"
+	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/usecases"
 )
 
 type RefreshTokenRequest struct {
@@ -18,8 +18,8 @@ type RefreshTokenResponse struct {
 }
 
 type RefreshTokenHandler struct {
-	Service services.RefreshTokenService
-	Logger  models.Logger
+	Logger              models.Logger
+	RefreshTokenUseCase usecases.RefreshTokenUseCase
 }
 
 func (h *RefreshTokenHandler) Handler() http.HandlerFunc {
@@ -44,27 +44,11 @@ func (h *RefreshTokenHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		result, err := h.Service.RefreshTokens(ctx, req.RefreshToken)
+		result, err := h.RefreshTokenUseCase.RefreshTokens(ctx, req.RefreshToken)
 		if err != nil {
-			h.Logger.Error("refresh token failed", "error", err)
-
-			status := http.StatusUnauthorized
-			message := "invalid or expired refresh token"
-
-			// Map specific errors to appropriate responses
-			switch err.Error() {
-			case "invalid refresh token", "refresh token expired":
-				status = http.StatusUnauthorized
-			case "session expired or invalid":
-				status = http.StatusUnauthorized
-				message = "session expired"
-			default:
-				status = http.StatusInternalServerError
-				message = "failed to refresh token"
-			}
-
-			reqCtx.SetJSONResponse(status, map[string]any{
-				"message": message,
+			h.Logger.Error(err.Error())
+			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
+				"message": "invalid or expired refresh token",
 			})
 			reqCtx.Handled = true
 			return
@@ -74,6 +58,5 @@ func (h *RefreshTokenHandler) Handler() http.HandlerFunc {
 			AccessToken:  result.AccessToken,
 			RefreshToken: result.RefreshToken,
 		})
-		reqCtx.Handled = true
 	}
 }

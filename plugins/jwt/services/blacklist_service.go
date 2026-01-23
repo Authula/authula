@@ -49,15 +49,15 @@ func (s *blacklistService) IsBlacklisted(ctx context.Context, jti string) (bool,
 
 	key := s.blacklistKey(jti)
 
-	_, err := s.storage.Get(ctx, key)
+	value, err := s.storage.Get(ctx, key)
 	if err != nil {
-		// Check for common "not found" errors
-		errMsg := err.Error()
-		if errMsg == "key not found" || errMsg == "cache miss" || errMsg == "record not found" {
-			return false, nil
-		}
 		s.logger.Error("failed to check blacklist", "jti", jti, "error", err)
 		return false, fmt.Errorf("failed to check blacklist: %w", err)
+	}
+
+	// Key not found means not blacklisted
+	if value == nil {
+		return false, nil
 	}
 
 	return true, nil

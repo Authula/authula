@@ -50,8 +50,8 @@ func (a *API) RequestPasswordReset(ctx context.Context, email string, callbackUR
 	return a.useCases.RequestPasswordResetUseCase.RequestReset(ctx, email, callbackURL)
 }
 
-func (a *API) ChangePassword(ctx context.Context, userID string, tokenStr string, newPassword string) error {
-	return a.useCases.ChangePasswordUseCase.ChangePassword(ctx, userID, tokenStr, newPassword)
+func (a *API) ChangePassword(ctx context.Context, tokenStr string, newPassword string) error {
+	return a.useCases.ChangePasswordUseCase.ChangePassword(ctx, tokenStr, newPassword)
 }
 
 func (a *API) RequestEmailChange(ctx context.Context, userID string, newEmail string, callbackURL *string) error {

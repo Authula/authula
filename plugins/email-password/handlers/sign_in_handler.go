@@ -32,7 +32,7 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 		var payload SignInRequestPayload
 		if err := util.ParseJSON(r, &payload); err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
-				"message": "invalid request",
+				"message": "invalid request body",
 			})
 			reqCtx.Handled = true
 			return
@@ -44,6 +44,28 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 			r.RemoteAddr,
 		)
 		userAgent := r.UserAgent()
+
+		if reqCtx.UserID != nil && *reqCtx.UserID != "" {
+			if sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && sessionID != "" {
+				existingSession, err := h.SignInUseCase.GetSessionByID(ctx, sessionID)
+				if err == nil && existingSession != nil {
+					user, _ := h.SignInUseCase.GetUserByID(ctx, existingSession.UserID)
+					if user != nil {
+						h.Logger.Debug("idempotent login - user already authenticated",
+							"user_id", *reqCtx.UserID,
+							"session_id", sessionID)
+
+						reqCtx.Values[models.ContextIdempotentSkipMint.String()] = true
+
+						reqCtx.SetJSONResponse(http.StatusOK, types.SignInResponse{
+							User:    user,
+							Session: existingSession,
+						})
+						return
+					}
+				}
+			}
+		}
 
 		result, err := h.SignInUseCase.SignIn(
 			ctx,

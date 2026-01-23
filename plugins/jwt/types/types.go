@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -25,9 +24,19 @@ func (a Algorithm) String() string {
 	return string(a)
 }
 
+type TokenType string
+
+const (
+	TokenTypeAccess  TokenType = "access_token"
+	TokenTypeRefresh TokenType = "refresh_token"
+)
+
+func (t TokenType) String() string {
+	return string(t)
+}
+
 // ParseAlgorithm parses a string into an Algorithm, accepting only canonical names (case-insensitive input)
 func ParseAlgorithm(s string) (Algorithm, error) {
-	s = strings.TrimSpace(strings.ToLower(s))
 	switch s {
 	case "eddsa":
 		return AlgEdDSA, nil
@@ -60,14 +69,15 @@ func ValidateAlgorithm(alg Algorithm) error {
 
 // JWTPluginConfig configures the JWKS-based JWT plugin
 type JWTPluginConfig struct {
-	Enabled             bool          `json:"enabled" toml:"enabled"`
-	Algorithm           Algorithm     `json:"algorithm" toml:"algorithm"`                         // EdDSA (default), RS256, PS256, ES256, ES512
-	KeyRotationInterval time.Duration `json:"key_rotation_interval" toml:"key_rotation_interval"` // Default: 90 days
-	ExpiresIn           time.Duration `json:"expires_in" toml:"expires_in"`                       // Access token TTL
-	RefreshExpiresIn    time.Duration `json:"refresh_expires_in" toml:"refresh_expires_in"`       // Refresh token TTL
-	JWKSCacheTTL        time.Duration `json:"jwks_cache_ttl" toml:"jwks_cache_ttl"`               // Cache TTL for JWKS, default 24 hours
-	RefreshGracePeriod  time.Duration `json:"refresh_grace_period" toml:"refresh_grace_period"`   // Grace period for refresh token reuse, default 10s
-	DisableIPLogging    bool          `json:"disable_ip_logging" toml:"disable_ip_logging"`       // Disable IP address logging for GDPR compliance
+	Enabled                bool          `json:"enabled" toml:"enabled"`
+	Algorithm              Algorithm     `json:"algorithm" toml:"algorithm"`                                 // EdDSA (default), RS256, PS256, ES256, ES512
+	KeyRotationInterval    time.Duration `json:"key_rotation_interval" toml:"key_rotation_interval"`         // Default: 30 days
+	KeyRotationGracePeriod time.Duration `json:"key_rotation_grace_period" toml:"key_rotation_grace_period"` // Grace period for old key validity after rotation, default: 1 hour
+	ExpiresIn              time.Duration `json:"expires_in" toml:"expires_in"`                               // Access token TTL
+	RefreshExpiresIn       time.Duration `json:"refresh_expires_in" toml:"refresh_expires_in"`               // Refresh token TTL
+	JWKSCacheTTL           time.Duration `json:"jwks_cache_ttl" toml:"jwks_cache_ttl"`                       // Cache TTL for JWKS, default 24 hours
+	RefreshGracePeriod     time.Duration `json:"refresh_grace_period" toml:"refresh_grace_period"`           // Grace period for refresh token reuse, default 10s
+	DisableIPLogging       bool          `json:"disable_ip_logging" toml:"disable_ip_logging"`               // Disable IP address logging for GDPR compliance
 }
 
 // ApplyDefaults returns sensible defaults for the JWT plugin
@@ -76,7 +86,10 @@ func (c *JWTPluginConfig) ApplyDefaults() {
 		c.Algorithm = AlgEdDSA
 	}
 	if c.KeyRotationInterval == 0 {
-		c.KeyRotationInterval = 90 * 24 * time.Hour
+		c.KeyRotationInterval = 30 * 24 * time.Hour
+	}
+	if c.KeyRotationGracePeriod == 0 {
+		c.KeyRotationGracePeriod = 1 * time.Hour
 	}
 	if c.ExpiresIn == 0 {
 		c.ExpiresIn = 15 * time.Minute
@@ -114,11 +127,11 @@ func (c *JWTPluginConfig) NormalizeAlgorithm() error {
 type JWKS struct {
 	bun.BaseModel `bun:"table:jwks"`
 
-	ID         string     `json:"id" bun:",pk,notnull"`
-	PublicKey  string     `json:"public_key" bun:",notnull"`
-	PrivateKey string     `json:"private_key" bun:",notnull"`
-	CreatedAt  time.Time  `json:"created_at" bun:",nullzero,notnull,default:current_timestamp"`
-	ExpiresAt  *time.Time `json:"expires_at"`
+	ID         string     `json:"id" bun:"column:id,pk,notnull"`
+	PublicKey  string     `json:"public_key" bun:"column:public_key,notnull"`
+	PrivateKey string     `json:"private_key" bun:"column:private_key,notnull"`
+	CreatedAt  time.Time  `json:"created_at" bun:"column:created_at,nullzero,notnull,default:current_timestamp"`
+	ExpiresAt  *time.Time `json:"expires_at" bun:"column:expires_at,nullzero"`
 }
 
 var _ bun.BeforeAppendModelHook = (*JWKS)(nil)
@@ -135,7 +148,7 @@ func (s *JWKS) BeforeAppendModel(ctx context.Context, query bun.Query) error {
 type Claims struct {
 	UserID    string `json:"user_id"`
 	SessionID string `json:"sid"`
-	Type      string `json:"type"` // "access" or "refresh"
+	Type      string `json:"type"` // "access_token" or "refresh_token"
 	Sub       string `json:"sub"`
 	Iss       string `json:"iss"`
 	Aud       string `json:"aud"`
@@ -157,14 +170,14 @@ type TokenPair struct {
 type RefreshTokenRecord struct {
 	bun.BaseModel `bun:"table:refresh_tokens"`
 
-	ID               string     `json:"id" bun:"pk,notnull"`
-	SessionID        string     `json:"session_id" bun:"notnull"`
-	TokenHash        string     `json:"token_hash" bun:"notnull,unique"` // SHA256 hash of refresh token
-	ExpiresAt        time.Time  `json:"expires_at" bun:",notnull"`
-	IsRevoked        bool       `json:"is_revoked" bun:",notnull,default:false"`
-	RevokedAt        *time.Time `json:"revoked_at"`
-	LastReuseAttempt *time.Time `json:"last_reuse_attempt" bun:""` // Tracks first reuse attempt within grace period
-	CreatedAt        time.Time  `json:"created_at" bun:",nullzero,notnull,default:current_timestamp"`
+	ID               string     `json:"id" bun:"column:id,pk,notnull"`
+	SessionID        string     `json:"session_id" bun:"column:session_id,notnull"`
+	TokenHash        string     `json:"token_hash" bun:"column:token_hash,notnull,unique"`
+	ExpiresAt        time.Time  `json:"expires_at" bun:"column:expires_at,notnull"`
+	IsRevoked        bool       `json:"is_revoked" bun:"column:is_revoked,notnull,default:false"`
+	RevokedAt        *time.Time `json:"revoked_at" bun:"column:revoked_at,nullzero"`
+	LastReuseAttempt *time.Time `json:"last_reuse_attempt" bun:"column:last_reuse_attempt,nullzero"`
+	CreatedAt        time.Time  `json:"created_at" bun:"column:created_at,nullzero,notnull,default:current_timestamp"`
 }
 
 var _ bun.BeforeAppendModelHook = (*RefreshTokenRecord)(nil)

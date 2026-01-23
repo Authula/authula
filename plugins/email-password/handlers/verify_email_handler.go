@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/usecases"
@@ -36,7 +37,15 @@ func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
 
 		callbackURL := r.URL.Query().Get("callback_url")
 		if callbackURL != "" {
-			http.Redirect(w, r, callbackURL, http.StatusFound)
+			u, err := url.Parse(callbackURL)
+			if err != nil {
+				http.Redirect(w, r, callbackURL+"?token="+url.QueryEscape(tokenStr), http.StatusFound)
+			} else {
+				q := u.Query()
+				q.Set("token", tokenStr)
+				u.RawQuery = q.Encode()
+				http.Redirect(w, r, u.String(), http.StatusFound)
+			}
 		} else {
 			reqCtx.SetJSONResponse(http.StatusOK, map[string]any{
 				"message": "email verified successfully",

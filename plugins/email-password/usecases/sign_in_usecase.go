@@ -97,3 +97,11 @@ func (uc *SignInUseCase) publishSignedInEvent(user *models.User) {
 		},
 	)
 }
+
+func (uc *SignInUseCase) GetSessionByID(ctx context.Context, sessionID string) (*models.Session, error) {
+	return uc.SessionService.GetByID(ctx, sessionID)
+}
+
+func (uc *SignInUseCase) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
+	return uc.UserService.GetByID(ctx, userID)
+}

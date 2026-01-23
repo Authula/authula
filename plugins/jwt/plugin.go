@@ -21,12 +21,12 @@ type JWTPlugin struct {
 	Logger           models.Logger
 	sessionService   services.SessionService
 	tokenService     services.TokenService
+	jwtService       *jwtservices.JWTServiceImpl
 	refreshService   jwtservices.RefreshTokenService
 	keyService       jwtservices.KeyService
 	cacheService     jwtservices.CacheService
 	secondaryStorage models.SecondaryStorage
 	blacklistService jwtservices.BlacklistService
-	refreshStorage   jwtservices.RefreshTokenStorage
 }
 
 func New(config types.JWTPluginConfig) *JWTPlugin {
@@ -54,7 +54,7 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 	if err := util.LoadPluginConfig(ctx.GetConfig(), p.Metadata().ID, &p.pluginConfig); err != nil {
 		return err
 	}
-	p.pluginConfig.ApplyDefaults()
+
 	if err := p.pluginConfig.NormalizeAlgorithm(); err != nil {
 		p.Logger.Error("invalid jwt algorithm in plugin config", "error", err)
 		return err
@@ -74,6 +74,10 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 	}
 	p.tokenService = tokenService
 
+	if ss, ok := ctx.ServiceRegistry.Get(models.ServiceSecondaryStorage.String()).(services.SecondaryStorageService); ok {
+		p.secondaryStorage = ss.GetStorage()
+	}
+
 	jwksRepo := repositories.NewBunJWKSRepository(ctx.DB)
 	refreshTokenRepo := repositories.NewRefreshTokenRepository(ctx.DB)
 
@@ -86,37 +90,56 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		p.blacklistService = jwtservices.NewBlacklistService(p.secondaryStorage, p.Logger)
 	}
 
-	p.refreshStorage = jwtservices.NewRefreshTokenStorageAdapter(refreshTokenRepo)
-
 	if err := p.keyService.GenerateKeysIfMissing(context.Background()); err != nil {
 		p.Logger.Error("failed to generate keys", "error", err)
 		return fmt.Errorf("failed to generate keys: %w", err)
+	}
+
+	rotated, err := p.keyService.RotateKeysIfNeeded(
+		context.Background(),
+		p.pluginConfig.KeyRotationInterval,
+		p.pluginConfig.KeyRotationGracePeriod,
+		func(ctx context.Context) error {
+			return p.cacheService.InvalidateCache(ctx)
+		},
+	)
+	if err != nil {
+		p.Logger.Warn("failed to check/rotate keys on startup", "error", err)
+	} else if rotated {
+		p.Logger.Info("key rotation occurred on startup due to interval expiration")
 	}
 
 	if err := p.cacheService.InvalidateCache(context.Background()); err != nil {
 		p.Logger.Warn("failed to pre-populate cache on startup", "error", err)
 	}
 
-	refreshServiceConfig := jwtservices.RefreshTokenServiceConfig{
-		GracePeriod:      p.pluginConfig.RefreshGracePeriod,
-		DisableIPLogging: p.pluginConfig.DisableIPLogging,
+	jwtServiceImpl, ok := jwtservices.NewJWTService(
+		p.Logger,
+		p.sessionService,
+		p.tokenService,
+		p.keyService,
+		p.cacheService,
+		p.blacklistService,
+		p.pluginConfig.ExpiresIn,
+		p.pluginConfig.RefreshExpiresIn,
+	).(*jwtservices.JWTServiceImpl)
+	if !ok {
+		return errors.New("failed to create JWT service")
 	}
+	p.jwtService = jwtServiceImpl
 
 	p.refreshService = jwtservices.NewRefreshTokenService(
-		p.globalConfig,
 		p.Logger,
 		ctx.EventBus,
 		p.sessionService,
-		p.refreshStorage,
-		refreshServiceConfig,
+		p.jwtService,
+		refreshTokenRepo,
+		p.pluginConfig.RefreshGracePeriod,
+		p.pluginConfig.DisableIPLogging,
+		p.pluginConfig.RefreshExpiresIn,
 	)
 
-	jwtService := jwtservices.NewJWTService(
-		p.cacheService,
-		p.blacklistService,
-		p.sessionService,
-	)
-	ctx.ServiceRegistry.Register(models.ServiceJWT.String(), jwtService)
+	ctx.ServiceRegistry.Register(models.ServiceJWT.String(), jwtServiceImpl)
 
 	return nil
 }
@@ -147,11 +170,23 @@ func (p *JWTPlugin) OnConfigUpdate(config *models.Config) error {
 		return err
 	}
 
-	// Invalidate JWKS cache to reflect any key rotation interval changes
+	rotated, err := p.keyService.RotateKeysIfNeeded(
+		context.Background(),
+		p.pluginConfig.KeyRotationInterval,
+		p.pluginConfig.KeyRotationGracePeriod,
+		func(ctx context.Context) error {
+			return p.cacheService.InvalidateCache(ctx)
+		},
+	)
+	if err != nil {
+		p.Logger.Warn("failed to rotate keys after config update", "error", err)
+	} else if rotated {
+		p.Logger.Info("key rotation occurred after config update")
+	}
+
 	if p.cacheService != nil {
 		if err := p.cacheService.InvalidateCache(context.Background()); err != nil {
 			p.Logger.Error("failed to invalidate JWKS cache on config update", "error", err)
-			// Don't fail the update - cache will be repopulated on next use
 		}
 	}
 

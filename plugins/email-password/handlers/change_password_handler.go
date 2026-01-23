@@ -20,7 +20,11 @@ type ChangePasswordHandler struct {
 func (h *ChangePasswordHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
+		reqCtx, ok := models.GetRequestContext(ctx)
+		if !ok || reqCtx == nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
 
 		var payload ChangePasswordPayload
 		if err := util.ParseJSON(r, &payload); err != nil {
@@ -31,7 +35,7 @@ func (h *ChangePasswordHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		err := h.UseCase.ChangePassword(ctx, *reqCtx.UserID, payload.Token, payload.Password)
+		err := h.UseCase.ChangePassword(ctx, payload.Token, payload.Password)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),

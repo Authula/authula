@@ -5,20 +5,28 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/handlers"
+	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/usecases"
 )
 
-// Routes returns all HTTP routes for the JWT plugin
 func Routes(plugin *JWTPlugin) []models.Route {
-	// Create refresh token handler
+	refreshUseCase := usecases.NewRefreshTokenUseCase(
+		plugin.Logger,
+		plugin.refreshService,
+	)
+
+	jwksUseCase := usecases.NewJWKSUseCase(
+		plugin.Logger,
+		plugin.cacheService,
+	)
+
 	refreshHandler := &handlers.RefreshTokenHandler{
-		Service: plugin.refreshService,
-		Logger:  plugin.Logger,
+		Logger:              plugin.Logger,
+		RefreshTokenUseCase: refreshUseCase,
 	}
 
-	// Create JWKS handler
 	jwksHandler := &handlers.WellKnownJWKSHandler{
-		CacheService: plugin.cacheService,
-		Logger:       plugin.Logger,
+		Logger:      plugin.Logger,
+		JWKSUseCase: jwksUseCase,
 	}
 
 	return []models.Route{

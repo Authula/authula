@@ -23,20 +23,16 @@ func (id BearerHookID) String() string {
 // This hook runs at HookBefore stage if "bearer.auth" is in route.Metadata["plugins"]
 // Validates the token using the JWT service and sets ctx.UserID if valid.
 func (p *BearerPlugin) validateBearerToken(reqCtx *models.RequestContext) error {
-	p.logger.Debug("bearer auth hook running", "path", reqCtx.Path, "method", reqCtx.Method)
-
 	// Cooperative auth: if UserID already set by another auth plugin, skip
 	if reqCtx.UserID != nil {
-		p.logger.Debug("user already authenticated, skipping bearer validation")
 		return nil
 	}
 
-	// Extract bearer token from Authorization header
 	token, err := p.extractToken(reqCtx.Request)
 	if err != nil {
-		p.logger.Debug("bearer token extraction failed", "error", err)
-		// Write 401 Unauthorized
-		reqCtx.ResponseStatus = http.StatusUnauthorized
+		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
+			"message": err.Error(),
+		})
 		reqCtx.Handled = true
 		return nil
 	}
@@ -47,13 +43,14 @@ func (p *BearerPlugin) validateBearerToken(reqCtx *models.RequestContext) error 
 	if err != nil {
 		p.logger.Debug("bearer token validation failed", "error", err)
 		// Write 401 Unauthorized
-		reqCtx.ResponseStatus = http.StatusUnauthorized
+		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
+			"message": "Bearer token invalid or expired",
+		})
 		reqCtx.Handled = true
 		return nil
 	}
 
 	reqCtx.SetUserIDInContext(userID)
-	p.logger.Debug("bearer token validation successful", "user_id", userID)
 
 	return nil
 }

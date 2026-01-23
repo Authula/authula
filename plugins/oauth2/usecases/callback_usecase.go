@@ -139,3 +139,11 @@ func (uc *CallbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 		SessionToken: sessionToken,
 	}, nil
 }
+
+func (uc *CallbackUseCase) GetSessionByID(ctx context.Context, sessionID string) (*models.Session, error) {
+	return uc.SessionService.GetByID(ctx, sessionID)
+}
+
+func (uc *CallbackUseCase) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
+	return uc.UserService.GetByID(ctx, userID)
+}

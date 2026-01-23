@@ -75,6 +75,22 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 		)
 		userAgent := r.UserAgent()
 
+		if reqCtx.UserID != nil && *reqCtx.UserID != "" {
+			if sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && sessionID != "" {
+				existingSession, err := h.UseCase.GetSessionByID(ctx, sessionID)
+				if err == nil && existingSession != nil {
+					user, _ := h.UseCase.GetUserByID(ctx, existingSession.UserID)
+					if user != nil {
+						reqCtx.SetJSONResponse(http.StatusOK, &types.CallbackResponse{
+							User:    user,
+							Session: existingSession,
+						})
+						return
+					}
+				}
+			}
+		}
+
 		result, err := h.UseCase.Callback(ctx, req, &ipAddress, &userAgent)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]string{

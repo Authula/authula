@@ -27,7 +27,6 @@ type ChangePasswordUseCase struct {
 
 func (uc *ChangePasswordUseCase) ChangePassword(
 	ctx context.Context,
-	userID string,
 	tokenValue string,
 	newPassword string,
 ) error {
@@ -54,9 +53,6 @@ func (uc *ChangePasswordUseCase) ChangePassword(
 	}
 	if user == nil {
 		return constants.ErrUserNotFound
-	}
-	if user.ID != userID {
-		return constants.ErrUserNotAuthorized
 	}
 
 	account, err := uc.AccountService.GetByUserIDAndProvider(ctx, *verification.UserID, models.AuthProviderEmail.String())

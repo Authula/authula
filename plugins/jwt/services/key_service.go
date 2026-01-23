@@ -90,24 +90,27 @@ func (s *keyService) IsKeyRotationDue(ctx context.Context, rotationInterval time
 }
 
 // RotateKeysIfNeeded rotates keys if they're past the rotation interval
-func (s *keyService) RotateKeysIfNeeded(ctx context.Context, rotationInterval time.Duration, invalidateCacheFunc func(context.Context) error) (bool, error) {
+// gracePeriod specifies how long old keys remain valid after rotation
+func (s *keyService) RotateKeysIfNeeded(ctx context.Context, rotationInterval time.Duration, gracePeriod time.Duration, invalidateCacheFunc func(context.Context) error) (bool, error) {
 	if !s.IsKeyRotationDue(ctx, rotationInterval) {
 		return false, nil
 	}
 
 	s.logger.Debug("rotating keys due to age", "algorithm", s.algorithm)
 
-	// Mark old keys as expired
+	now := time.Now()
+	expirationTime := now.Add(gracePeriod)
+
 	keys, err := s.repo.GetJWKSKeys(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to get keys for rotation: %w", err)
 	}
 
-	now := time.Now()
 	for _, key := range keys {
-		if err := s.repo.MarkKeyExpired(ctx, key.ID, now); err != nil {
-			return false, fmt.Errorf("failed to expire old key: %w", err)
+		if err := s.repo.MarkKeyExpired(ctx, key.ID, expirationTime); err != nil {
+			return false, fmt.Errorf("failed to set expiration on old key: %w", err)
 		}
+		s.logger.Debug("marked key as expiring after grace period", "key_id", key.ID, "expires_at", expirationTime)
 	}
 
 	if err := s.generateAndStoreKey(ctx); err != nil {
@@ -117,10 +120,10 @@ func (s *keyService) RotateKeysIfNeeded(ctx context.Context, rotationInterval ti
 	if invalidateCacheFunc != nil {
 		if err := invalidateCacheFunc(ctx); err != nil {
 			s.logger.Warn("failed to invalidate cache after key rotation", "error", err)
-			// Don't fail rotation; cache will be refreshed on next access
 		}
 	}
 
+	s.logger.Info("key rotation completed", "grace_period", gracePeriod, "old_keys_expire_at", expirationTime)
 	return true, nil
 }
 

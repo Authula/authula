@@ -9,28 +9,15 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/types"
 )
 
-// RefreshTokenStorage defines storage operations for refresh tokens
-type RefreshTokenStorage interface {
-	StoreRefreshToken(ctx context.Context, record *types.RefreshTokenRecord) error
-	GetRefreshToken(ctx context.Context, tokenHash string) (*types.RefreshTokenRecord, error)
-	RevokeRefreshToken(ctx context.Context, tokenHash string) error
-	SetLastReuseAttempt(ctx context.Context, tokenHash string) error
-	RevokeAllSessionTokens(ctx context.Context, sessionID string) error
-}
-
-// RefreshTokenService handles refresh token operations
-type RefreshTokenService interface {
-	// RefreshTokens refreshes the access and refresh tokens using the provided refresh token
-	RefreshTokens(ctx context.Context, refreshToken string) (*RefreshTokenResponse, error)
-
-	// StoreInitialRefreshToken stores the initial refresh token along with its session ID and expiration time
-	StoreInitialRefreshToken(ctx context.Context, refreshToken string, sessionID string, expiresAt time.Time) error
-}
-
 // RefreshTokenResponse contains the result of a token refresh operation
 type RefreshTokenResponse struct {
 	AccessToken  string
 	RefreshToken string
+}
+
+// JwtService defines the JWT operations
+type JwtService interface {
+	GenerateTokens(ctx context.Context, userID string, sessionID string) (*types.TokenPair, error)
 }
 
 // KeyService manages cryptographic key generation, rotation, and retrieval
@@ -45,8 +32,37 @@ type KeyService interface {
 	IsKeyRotationDue(ctx context.Context, rotationInterval time.Duration) bool
 
 	// RotateKeysIfNeeded rotates keys if they're past the rotation interval
+	// gracePeriod specifies how long old keys remain valid after rotation
 	// Returns true if rotation occurred, false otherwise
-	RotateKeysIfNeeded(ctx context.Context, rotationInterval time.Duration, invalidateCacheFunc func(context.Context) error) (bool, error)
+	RotateKeysIfNeeded(ctx context.Context, rotationInterval time.Duration, gracePeriod time.Duration, invalidateCacheFunc func(context.Context) error) (bool, error)
+}
+
+// RefreshTokenStorage defines storage operations for refresh tokens
+type RefreshTokenStorage interface {
+	StoreRefreshToken(ctx context.Context, record *types.RefreshTokenRecord) error
+	GetRefreshToken(ctx context.Context, tokenHash string) (*types.RefreshTokenRecord, error)
+	RevokeRefreshToken(ctx context.Context, tokenHash string) error
+	SetLastReuseAttempt(ctx context.Context, tokenHash string) error
+	RevokeAllSessionTokens(ctx context.Context, sessionID string) error
+}
+
+// RefreshTokenRepository defines data access operations for refresh tokens
+type RefreshTokenRepository interface {
+	StoreRefreshToken(ctx context.Context, record *types.RefreshTokenRecord) error
+	GetRefreshToken(ctx context.Context, tokenHash string) (*types.RefreshTokenRecord, error)
+	RevokeRefreshToken(ctx context.Context, tokenHash string) error
+	RevokeAllSessionTokens(ctx context.Context, sessionID string) error
+	SetLastReuseAttempt(ctx context.Context, tokenHash string) error
+	CleanupExpiredTokens(ctx context.Context) error
+}
+
+// RefreshTokenService handles refresh token operations
+type RefreshTokenService interface {
+	// RefreshTokens refreshes the access and refresh tokens using the provided refresh token
+	RefreshTokens(ctx context.Context, refreshToken string) (*RefreshTokenResponse, error)
+
+	// StoreInitialRefreshToken stores the initial refresh token along with its session ID and expiration time
+	StoreInitialRefreshToken(ctx context.Context, refreshToken string, sessionID string, expiresAt time.Time) error
 }
 
 // BlacklistService handles token blacklisting/revocation
@@ -80,10 +96,4 @@ type CacheService interface {
 
 	// GetJWKSWithFallback retrieves JWKS from cache with database fallback
 	GetJWKSWithFallback(ctx context.Context) (jwk.Set, error)
-}
-
-// JWTAPI defines the JWT operations needed by the refresh service
-type JWTAPI interface {
-	GenerateTokens(ctx context.Context, userID string, sessionID string) (*types.TokenPair, error)
-	GetRefreshTokenExpiry() time.Duration
 }

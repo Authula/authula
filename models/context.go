@@ -9,10 +9,12 @@ import (
 type ContextKey string
 
 const (
-	ContextUserID         ContextKey = "user_id"
-	ContextSessionID      ContextKey = "session_id"
-	ContextSessionToken   ContextKey = "session_token"
-	ContextRequestContext ContextKey = "request_context"
+	ContextUserID             ContextKey = "user_id"
+	ContextSessionID          ContextKey = "session_id"
+	ContextSessionToken       ContextKey = "session_token"
+	ContextRequestContext     ContextKey = "request_context"
+	ContextIdempotentSource   ContextKey = "auth.idempotent_source"
+	ContextIdempotentSkipMint ContextKey = "auth.idempotent_skip_mint"
 )
 
 func (k ContextKey) String() string {

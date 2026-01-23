@@ -62,7 +62,6 @@ func (h *ConfigManagerUpdateConfigHandler) Handle(w http.ResponseWriter, r *http
 		"message": "configuration updated successfully",
 		"data":    responseConfig,
 	})
-	reqCtx.Handled = true
 }
 
 // flattenConfig converts nested map into dot-notation keys for the config manager

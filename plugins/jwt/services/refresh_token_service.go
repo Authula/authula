@@ -14,45 +14,41 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/constants"
 	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/events"
-	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/repositories"
 	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/types"
 	coreservices "github.com/GoBetterAuth/go-better-auth/services"
 )
 
-// RefreshTokenServiceConfig contains configuration for the refresh token service
-type RefreshTokenServiceConfig struct {
-	GracePeriod      time.Duration
-	DisableIPLogging bool
-}
-
 type refreshTokenService struct {
-	config           *models.Config
 	logger           models.Logger
 	eventBus         models.EventBus
+	sessionService   coreservices.SessionService
+	jwtService       JwtService
+	storage          RefreshTokenRepository
 	gracePeriod      time.Duration
 	disableIPLogging bool
-	jwtAPI           JWTAPI
-	sessionService   coreservices.SessionService
-	storage          RefreshTokenStorage
+	refreshExpiresIn time.Duration
 }
 
 // NewRefreshTokenService creates a new refresh token service
 func NewRefreshTokenService(
-	config *models.Config,
 	logger models.Logger,
 	eventBus models.EventBus,
 	sessionService coreservices.SessionService,
-	storage RefreshTokenStorage,
-	svcConfig RefreshTokenServiceConfig,
+	jwtService JwtService,
+	storage RefreshTokenRepository,
+	gracePeriod time.Duration,
+	disableIPLogging bool,
+	refreshExpiresIn time.Duration,
 ) RefreshTokenService {
 	return &refreshTokenService{
-		config:           config,
 		logger:           logger,
 		eventBus:         eventBus,
-		gracePeriod:      svcConfig.GracePeriod,
-		disableIPLogging: svcConfig.DisableIPLogging,
 		sessionService:   sessionService,
+		jwtService:       jwtService,
 		storage:          storage,
+		gracePeriod:      gracePeriod,
+		disableIPLogging: disableIPLogging,
+		refreshExpiresIn: refreshExpiresIn,
 	}
 }
 
@@ -71,6 +67,10 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 		s.logger.Error("refresh token not found in database", "error", err)
 		return nil, fmt.Errorf("invalid refresh token")
 	}
+	if record == nil {
+		s.logger.Debug("refresh token not found in database")
+		return nil, fmt.Errorf("invalid refresh token")
+	}
 
 	// Check if token is revoked - THREE-TIER REUSE ATTACK DETECTION
 	if record.IsRevoked {
@@ -82,32 +82,36 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 			return nil, fmt.Errorf("invalid refresh token")
 		}
 
-		deltaMs := now.Sub(*revokedAt).Milliseconds()
 		gracePeriodMs := s.gracePeriod.Milliseconds()
 
 		// Tier 1: First reuse within grace period - RECOVERY
-		if deltaMs <= gracePeriodMs && record.LastReuseAttempt == nil {
-			s.logger.Warn("[AUTH_REUSE_RECOVERY] Refresh token reuse detected within grace period. Recovering.",
-				"session_id", record.SessionID,
-				"delta_ms", deltaMs,
-				"grace_period_ms", gracePeriodMs,
-			)
+		// This handles legitimate concurrent requests or quick retries
+		if record.LastReuseAttempt == nil {
+			deltaMs := now.Sub(*revokedAt).Milliseconds()
+			if deltaMs <= gracePeriodMs {
+				s.logger.Warn("[AUTH_REUSE_RECOVERY] Refresh token reuse detected within grace period. Recovering.",
+					"session_id", record.SessionID,
+					"delta_ms", deltaMs,
+					"grace_period_ms", gracePeriodMs,
+				)
 
-			// Update LastReuseAttempt to mark first reuse
-			if err := s.storage.SetLastReuseAttempt(ctx, tokenHash); err != nil {
-				s.logger.Error("failed to set last reuse attempt", "error", err)
-				// Continue anyway - token rotation will still work
+				// Update LastReuseAttempt to mark this reuse
+				if err := s.storage.SetLastReuseAttempt(ctx, tokenHash); err != nil {
+					s.logger.Error("failed to set last reuse attempt", "error", err)
+				}
+
+				// Emit recovery event
+				s.emitTokenReuseRecoveredEvent(record.SessionID, tokenHash, deltaMs, gracePeriodMs, auditMeta)
+
+				// Continue with normal token rotation - user stays logged in
+				return s.completeTokenRotation(ctx, tokenHash, record)
 			}
-
-			// Emit recovery event (fail-open: don't block if event bus fails)
-			s.emitTokenReuseRecoveredEvent(record.SessionID, tokenHash, deltaMs, gracePeriodMs, auditMeta)
-
-			// Continue with normal token rotation - user stays logged in
-			return s.completeTokenRotation(ctx, tokenHash, record)
 		}
 
 		// Tier 2: Repeated reuse within grace period - THROTTLE
-		if deltaMs <= gracePeriodMs && record.LastReuseAttempt != nil {
+		// Multiple reuses within short window suggests possible attack or bug
+		deltaMs := now.Sub(*revokedAt).Milliseconds()
+		if deltaMs <= gracePeriodMs {
 			s.logger.Warn("[AUTH_REUSE_THROTTLED] Repeated token reuse within grace period. Rejecting to prevent spam.",
 				"session_id", record.SessionID,
 				"delta_ms", deltaMs,
@@ -117,25 +121,18 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 			// Emit throttled event
 			s.emitTokenReuseThrottledEvent(record.SessionID, tokenHash, deltaMs, gracePeriodMs, auditMeta)
 
-			// Reject without killing session (may be legitimate retry)
+			// Reject without killing session (may be legitimate concurrent retry)
 			return nil, fmt.Errorf("invalid refresh token")
 		}
 
-		// Tier 3: Reuse after grace period - MALICIOUS (potential attack)
-		s.logger.Error("[SECURITY] Refresh token reuse detected OUTSIDE grace period. Revoking entire session.",
+		// Tier 3: Reuse after grace period - REJECT (but don't revoke session)
+		// This could be a legitimate delayed retry (e.g., network issues, offline for a while)
+		// We reject the token but don't assume it's an attack requiring session revocation
+		s.logger.Debug("[AUTH_REUSE_DELAYED] Refresh token reuse detected after grace period. Rejecting token.",
 			"session_id", record.SessionID,
 			"delta_ms", deltaMs,
 			"grace_period_ms", gracePeriodMs,
-			"revoked_at", revokedAt,
 		)
-
-		// Emit malicious event
-		s.emitTokenReuseMaliciousEvent(record.SessionID, tokenHash, deltaMs, gracePeriodMs, auditMeta)
-
-		// Revoke all tokens for this session as a security measure
-		if err := s.storage.RevokeAllSessionTokens(ctx, record.SessionID); err != nil {
-			s.logger.Error("failed to revoke session tokens", "session_id", record.SessionID, "error", err)
-		}
 
 		return nil, fmt.Errorf("invalid refresh token")
 	}
@@ -171,7 +168,7 @@ func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHa
 	}
 
 	// STEP 2: Generate new token pair
-	tokenPair, err := s.jwtAPI.GenerateTokens(ctx, session.UserID, record.SessionID)
+	tokenPair, err := s.jwtService.GenerateTokens(ctx, session.UserID, record.SessionID)
 	if err != nil {
 		s.logger.Error("failed to generate new tokens", "user_id", session.UserID, "session_id", record.SessionID, "error", err)
 		return nil, fmt.Errorf("failed to generate tokens")
@@ -179,7 +176,7 @@ func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHa
 
 	// STEP 3: Store new refresh token in database
 	newTokenHash := HashRefreshToken(tokenPair.RefreshToken)
-	expiresAt := time.Now().Add(s.jwtAPI.GetRefreshTokenExpiry())
+	expiresAt := time.Now().Add(s.refreshExpiresIn)
 
 	newRecord := &types.RefreshTokenRecord{
 		ID:        uuid.New().String(),
@@ -307,34 +304,4 @@ func (s *refreshTokenService) StoreInitialRefreshToken(ctx context.Context, refr
 func HashRefreshToken(token string) string {
 	hash := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(hash[:])
-}
-
-// RefreshTokenStorageAdapter adapts repositories.RefreshTokenRepository to RefreshTokenStorage
-type RefreshTokenStorageAdapter struct {
-	repo repositories.RefreshTokenRepository
-}
-
-// NewRefreshTokenStorageAdapter creates a new adapter
-func NewRefreshTokenStorageAdapter(repo repositories.RefreshTokenRepository) RefreshTokenStorage {
-	return &RefreshTokenStorageAdapter{repo: repo}
-}
-
-func (a *RefreshTokenStorageAdapter) StoreRefreshToken(ctx context.Context, record *types.RefreshTokenRecord) error {
-	return a.repo.StoreRefreshToken(ctx, record)
-}
-
-func (a *RefreshTokenStorageAdapter) GetRefreshToken(ctx context.Context, tokenHash string) (*types.RefreshTokenRecord, error) {
-	return a.repo.GetRefreshToken(ctx, tokenHash)
-}
-
-func (a *RefreshTokenStorageAdapter) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
-	return a.repo.RevokeRefreshToken(ctx, tokenHash)
-}
-
-func (a *RefreshTokenStorageAdapter) SetLastReuseAttempt(ctx context.Context, tokenHash string) error {
-	return a.repo.SetLastReuseAttempt(ctx, tokenHash)
-}
-
-func (a *RefreshTokenStorageAdapter) RevokeAllSessionTokens(ctx context.Context, sessionID string) error {
-	return a.repo.RevokeAllSessionTokens(ctx, sessionID)
 }

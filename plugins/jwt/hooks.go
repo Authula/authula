@@ -1,18 +1,36 @@
 package jwt
 
 import (
+	"context"
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
+
+type JWTHookID string
+
+// Constants for jwt plugin hook IDs and metadata
+const (
+	// Responds with JWT tokens in HTTP Response after issuance
+	HookIDJWTRespondJSON JWTHookID = "jwt.respond_json"
+)
+
+func (id JWTHookID) String() string {
+	return string(id)
+}
 
 // issueTokensHook generates and stores JWT tokens for authenticated users
 // This hook runs at HookAfter stage if "jwt.issuance" is in route.Metadata["plugins"]
 // Expects ctx.Values["user_id"] and ctx.Values["session_id"] to be set
 func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
-	p.Logger.Debug("jwt issuance hook running", "path", reqCtx.Path)
-
 	if reqCtx.UserID == nil {
+		return nil
+	}
+
+	if skipMint, ok := reqCtx.Values[models.ContextIdempotentSkipMint.String()].(bool); ok && skipMint {
+		p.Logger.Debug("skipping JWT minting - idempotent login")
 		return nil
 	}
 
@@ -21,20 +39,43 @@ func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
 		return nil
 	}
 
-	tokenPair, err := p.GenerateTokens(p.globalConfig.Secret, *reqCtx.UserID, sessionID)
+	tokenPair, err := p.jwtService.GenerateTokens(context.Background(), *reqCtx.UserID, sessionID)
 	if err != nil {
 		p.Logger.Error("failed to generate JWT tokens", "user_id", *reqCtx.UserID, "session_id", sessionID, "error", err)
 		// Return error to fail the request - JWT generation should not silently fail
 		return fmt.Errorf("failed to generate authentication tokens: %w", err)
 	}
 
-	// Store tokens in context for response handling
+	expiresAt := time.Now().Add(p.pluginConfig.RefreshExpiresIn)
+	if err := p.refreshService.StoreInitialRefreshToken(reqCtx.Request.Context(), tokenPair.RefreshToken, sessionID, expiresAt); err != nil {
+		p.Logger.Error("failed to store refresh token", "user_id", *reqCtx.UserID, "session_id", sessionID, "error", err)
+		return fmt.Errorf("failed to store refresh token: %w", err)
+	}
+
+	// Store tokens in context for other hooks to handle sending response
 	reqCtx.Values["access_token"] = tokenPair.AccessToken
 	reqCtx.Values["refresh_token"] = tokenPair.RefreshToken
-	p.Logger.Debug("access token generated", "access_token", tokenPair.AccessToken)
-	p.Logger.Debug("refresh token generated", "refresh_token", tokenPair.RefreshToken)
 
-	p.Logger.Debug("jwt tokens generated successfully", "user_id", *reqCtx.UserID)
+	return nil
+}
+
+// respondHook hook sends the generated JWT tokens in the response
+func (p *JWTPlugin) respondHook(reqCtx *models.RequestContext) error {
+	if reqCtx.UserID == nil {
+		return nil
+	}
+
+	access, ok1 := reqCtx.Values["access_token"].(string)
+	refresh, ok2 := reqCtx.Values["refresh_token"].(string)
+	if !ok1 || !ok2 {
+		return nil
+	}
+
+	reqCtx.SetJSONResponse(http.StatusOK, map[string]any{
+		"access_token":  access,
+		"refresh_token": refresh,
+	})
+	reqCtx.Handled = true
 
 	return nil
 }
@@ -51,7 +92,14 @@ func (p *JWTPlugin) buildHooks() []models.Hook {
 				return ok && sessionID != "" && reqCtx.UserID != nil
 			},
 			Handler: p.issueTokensHook,
-			Order:   10, // Normal priority
+			Order:   10,
+		},
+		// JWT response hook: sends generated tokens in response
+		{
+			Stage:    models.HookOnResponse,
+			PluginID: HookIDJWTRespondJSON.String(),
+			Handler:  p.respondHook,
+			Order:    10,
 		},
 	}
 }

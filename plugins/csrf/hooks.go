@@ -90,11 +90,11 @@ func (p *CSRFPlugin) unsafeMethodMatcher(ctx *models.RequestContext) bool {
 // This hook runs on unsafe methods (POST, PUT, PATCH, DELETE)
 // First validates headers using Go 1.25 CrossOriginProtection (if enabled),
 // then validates the token using Double-Submit Cookie pattern
-func (p *CSRFPlugin) validateCSRFTokenHook(ctx *models.RequestContext) error {
+func (p *CSRFPlugin) validateCSRFTokenHook(reqCtx *models.RequestContext) error {
 	// Get method - from ctx.Method or from the request
-	method := ctx.Method
-	if method == "" && ctx.Request != nil {
-		method = ctx.Request.Method
+	method := reqCtx.Method
+	if method == "" && reqCtx.Request != nil {
+		method = reqCtx.Request.Method
 	}
 
 	// Only validate on unsafe methods (POST, PUT, PATCH, DELETE)
@@ -102,29 +102,33 @@ func (p *CSRFPlugin) validateCSRFTokenHook(ctx *models.RequestContext) error {
 		return nil
 	}
 
-	p.logger.Debug("csrf validation hook running", "path", ctx.Path, "method", method)
+	p.logger.Debug("csrf validation hook running", "path", reqCtx.Path, "method", method)
 
 	// Step 1: Validate header-based cross-origin protection (if enabled)
-	if err := p.validateHeaderProtection(ctx.Request); err != nil {
+	if err := p.validateHeaderProtection(reqCtx.Request); err != nil {
 		p.logger.Debug("csrf header validation failed", "error", err)
 		// The custom deny handler in the plugin's Init() method writes the response
 		// but we need to set it here too for the hook system
-		if err := ctx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "csrf validation failed"}); err != nil {
+		err := reqCtx.SetJSONResponse(
+			http.StatusForbidden,
+			map[string]any{"message": "csrf validation failed"},
+		)
+		if err != nil {
 			return err
 		}
-		ctx.Handled = true
+		reqCtx.Handled = true
 		return nil
 	}
 
 	// Step 2: Validate CSRF token (Double-Submit Cookie pattern)
-	if err := p.validateCSRFToken(ctx); err != nil {
+	if err := p.validateCSRFToken(reqCtx); err != nil {
 		p.logger.Debug("csrf token validation failed", "error", err)
 		// Mark as handled (test expects this instead of error return)
-		ctx.Handled = true
+		reqCtx.Handled = true
 		return nil // Return nil to avoid propagating error through hook chain
 	}
 
-	p.logger.Debug("csrf validation successful", "path", ctx.Path)
+	p.logger.Debug("csrf validation successful", "path", reqCtx.Path)
 
 	return nil
 }
