@@ -92,7 +92,7 @@ func (r *PluginRegistry) InitAll() error {
 			return err
 		}
 
-		r.logger.Debug("plugin initialized", "plugin", pluginID)
+		r.logger.Info("plugin initialized", "plugin", pluginID)
 	}
 
 	r.registerConfigWatchers()

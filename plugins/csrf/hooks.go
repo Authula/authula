@@ -43,22 +43,17 @@ func (p *CSRFPlugin) unsafeMethodMatcher(ctx *models.RequestContext) bool {
 // This hook runs on all GET/HEAD/OPTIONS requests
 func (p *CSRFPlugin) generateCSRFTokenHook(reqCtx *models.RequestContext) error {
 	method := reqCtx.Method
-	p.logger.Debug("[generateCSRFTokenHook] checking method", "method", method)
-
 	if method != http.MethodOptions && method != http.MethodHead && method != http.MethodGet {
 		return nil
 	}
 
 	_, err := reqCtx.Request.Cookie(p.pluginConfig.CookieName)
 	if err != http.ErrNoCookie {
-		p.logger.Debug("csrf cookie already present, skipping generation", "path", reqCtx.Path)
 		return nil
 	}
 
 	token := p.generateToken()
 	p.setCSRFCookie(reqCtx, token)
-
-	p.logger.Debug("csrf token generated", "path", reqCtx.Path)
 
 	return nil
 }

@@ -22,8 +22,7 @@ func (id JWTHookID) String() string {
 }
 
 // issueTokensHook generates and stores JWT tokens for authenticated users
-// This hook runs at HookAfter stage if "jwt.issuance" is in route.Metadata["plugins"]
-// Expects ctx.Values["user_id"] and ctx.Values["session_id"] to be set
+// This hook runs at HookAfter stage.
 func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
 	if reqCtx.UserID == nil {
 		return nil
@@ -81,15 +80,14 @@ func (p *JWTPlugin) respondHook(reqCtx *models.RequestContext) error {
 }
 
 // buildHooks returns the configured hooks for this plugin
-// Uses the new PluginID-based hook filtering for metadata-driven execution
 func (p *JWTPlugin) buildHooks() []models.Hook {
 	return []models.Hook{
 		// JWT issuance hook: generates access and refresh tokens after authentication
 		{
 			Stage: models.HookAfter,
 			Matcher: func(reqCtx *models.RequestContext) bool {
-				sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string)
-				return ok && sessionID != "" && reqCtx.UserID != nil
+				authSuccess, ok := reqCtx.Values[models.ContextAuthSuccess.String()].(bool)
+				return ok && authSuccess
 			},
 			Handler: p.issueTokensHook,
 			Order:   10,

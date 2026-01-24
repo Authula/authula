@@ -78,10 +78,10 @@ func (h *SignUpHandler) Handler() http.HandlerFunc {
 		}
 
 		reqCtx.SetUserIDInContext(result.User.ID)
-		reqCtx.Values[models.ContextSessionID.String()] = result.Session.ID
 		if h.PluginConfig.AutoSignIn {
-			h.Logger.Debug("auto sign in enabled; setting session token in request context", "session_token", result.SessionToken)
+			reqCtx.Values[models.ContextSessionID.String()] = result.Session.ID
 			reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken
+			reqCtx.Values[models.ContextAuthSuccess.String()] = true
 		}
 
 		reqCtx.SetJSONResponse(http.StatusCreated, types.SignUpResponse{

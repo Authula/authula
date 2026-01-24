@@ -15,6 +15,10 @@ const (
 	// Validates session cookie and sets ctx.UserID if valid
 	HookIDSessionAuth SessionHookID = "session.auth"
 
+	// HookIDSessionAuthOptional identifies the optional session authentication hook.
+	// Validates session cookie and sets ctx.UserID if valid, but does not return unauthorized if invalid
+	HookIDSessionAuthOptional SessionHookID = "session.auth.optional"
+
 	// HookIDSessionClear identifies the session clear hook.
 	// Clears session cookie on sign-out
 	HookIDSessionClear SessionHookID = "session.clear"
@@ -27,8 +31,6 @@ func (id SessionHookID) String() string {
 // validateSessionHook validates a session cookie from the request and sets UserID
 // This hook runs at HookBefore stage if "session.auth" is in route.Metadata["plugins"]
 func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error {
-	p.logger.Debug("[validateSessionHook] checking method", "method", reqCtx.Method)
-
 	// Cooperative auth: if UserID already set by another auth plugin, skip
 	if reqCtx.UserID != nil {
 		return nil
@@ -58,6 +60,46 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 	}
 
 	reqCtx.SetUserIDInContext(session.UserID)
+	reqCtx.Values[models.ContextSessionID.String()] = session.ID
+
+	// Optionally renew session if it's past 50% of its max age
+	if p.shouldRenewSession(session) {
+		p.renewSession(reqCtx.ResponseWriter, reqCtx.Request, session)
+	}
+
+	return nil
+}
+
+// validateSessionHookOptional validates a session cookie from the request and sets UserID if valid.
+// This hook runs at HookBefore stage if "session.auth.optional" is in route.Metadata["plugins"]
+// Unlike validateSessionHook, it does not return unauthorized errors; it simply skips if no valid session.
+func (p *SessionPlugin) validateSessionHookOptional(reqCtx *models.RequestContext) error {
+	// Cooperative auth: if UserID already set by another auth plugin, skip
+	if reqCtx.UserID != nil {
+		return nil
+	}
+
+	cookie, err := reqCtx.Request.Cookie(p.globalConfig.Session.CookieName)
+	if err != nil {
+		// No cookie, skip silently
+		return nil
+	}
+
+	sessionToken := cookie.Value
+	hashedToken := p.tokenService.Hash(sessionToken)
+	session, err := p.sessionService.GetByToken(reqCtx.Request.Context(), hashedToken)
+	if err != nil || session == nil {
+		// Invalid session, skip silently
+		return nil
+	}
+
+	if session.ExpiresAt.Before(time.Now().UTC()) {
+		// Expired session, skip silently
+		return nil
+	}
+
+	reqCtx.SetUserIDInContext(session.UserID)
+	reqCtx.Values[models.ContextSessionID.String()] = session.ID
 
 	// Optionally renew session if it's past 50% of its max age
 	if p.shouldRenewSession(session) {
@@ -69,9 +111,11 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 
 // issueSessionCookieHook hook handles generating sessions and setting the session cookie on successful authentication.
 // This hook always runs by default at HookAfter stage.
-// JWT tokens (access_token, refresh_token) are client-side only and sent in the response body,
-// not as cookies. Only the session token is stored as a cookie for stateful session validation.
 func (p *SessionPlugin) issueSessionCookieHook(reqCtx *models.RequestContext) error {
+	if reqCtx.UserID == nil {
+		return nil
+	}
+
 	sessionToken, ok := reqCtx.Values[models.ContextSessionToken.String()].(string)
 	if !ok || sessionToken == "" {
 		return nil
@@ -101,12 +145,19 @@ func (p *SessionPlugin) buildHooks() []models.Hook {
 			Handler:  p.validateSessionHook,
 			Order:    5,
 		},
+		// Optional session authentication hook: validates cookie, sets UserID if valid, no errors
+		{
+			Stage:    models.HookBefore,
+			PluginID: HookIDSessionAuthOptional.String(),
+			Handler:  p.validateSessionHookOptional,
+			Order:    5,
+		},
 		// Session issuance hook: sets cookie after successful auth
 		{
 			Stage: models.HookAfter,
 			Matcher: func(reqCtx *models.RequestContext) bool {
-				sessionToken, ok := reqCtx.Values[models.ContextSessionToken.String()].(string)
-				return ok && sessionToken != "" && reqCtx.UserID != nil
+				authSuccess, ok := reqCtx.Values[models.ContextAuthSuccess.String()].(bool)
+				return ok && authSuccess
 			},
 			Handler: p.issueSessionCookieHook,
 			Order:   5,

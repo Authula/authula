@@ -105,17 +105,17 @@ from_address = ""
 
 [plugins.cors]
 enabled = true
+allow_credentials = true
 allowed_origins = ["*"] # If using session plugin, specify exact origins instead of "*"
 allowed_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 allowed_headers = ["Authorization", "Content-Type", "Cookie", "Set-Cookie"]
 exposed_headers = []
-allow_credentials = true
 max_age = "24h"
 # IMPORTANT CORS NOTE: If using the session plugin, the CORS plugin must specify exact allowed_origins.
 # Setting allowed_origins = ["*"] with allow_credentials = true is NOT allowed by browsers and will fail.
 # Example CORS configuration when using sessions:
-# allowed_origins = ["https://yourdomain.com", "https://api.yourdomain.com"]
 # allow_credentials = true
+# allowed_origins = ["https://yourdomain.com", "https://api.yourdomain.com"]
 
 # --- CSRF Plugin (for protecting against CSRF attacks) ---
 

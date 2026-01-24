@@ -100,6 +100,7 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 		reqCtx.SetUserIDInContext(result.User.ID)
 		reqCtx.Values[models.ContextSessionID.String()] = result.Session.ID
 		reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken
+		reqCtx.Values[models.ContextAuthSuccess.String()] = true
 
 		reqCtx.SetJSONResponse(http.StatusOK, types.SignInResponse{
 			User:    result.User,

@@ -132,6 +132,7 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 		reqCtx.SetUserIDInContext(result.User.ID)
 		reqCtx.Values[models.ContextSessionID.String()] = result.Session.ID
 		reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken
+		reqCtx.Values[models.ContextAuthSuccess.String()] = true
 
 		var redirectTo string
 		if cookie, err := r.Cookie(constants.CookieRedirectTo); err == nil {

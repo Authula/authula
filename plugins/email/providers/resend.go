@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/resend/resend-go/v3"
 
@@ -18,8 +19,12 @@ type ResendProvider struct {
 	client *resend.Client
 }
 
-func NewResendProvider(config *emailtypes.EmailPluginConfig, logger models.Logger) (*ResendProvider, error) {
-	apiKey := os.Getenv(env.EnvResendApiKey)
+func NewResendProvider(
+	config *emailtypes.EmailPluginConfig,
+	logger models.Logger,
+) (*ResendProvider, error) {
+
+	apiKey := strings.TrimSpace(os.Getenv(env.EnvResendApiKey))
 	if apiKey == "" {
 		return nil, fmt.Errorf("%s environment variable is not set", env.EnvResendApiKey)
 	}
@@ -33,7 +38,18 @@ func NewResendProvider(config *emailtypes.EmailPluginConfig, logger models.Logge
 	}, nil
 }
 
-func (r *ResendProvider) SendEmail(ctx context.Context, to string, subject string, text string, html string) error {
+func (r *ResendProvider) SendEmail(
+	ctx context.Context,
+	to string,
+	subject string,
+	text string,
+	html string,
+) error {
+
+	if text == "" && html == "" {
+		return fmt.Errorf("email must have at least a text or html body")
+	}
+
 	params := &resend.SendEmailRequest{
 		To:      []string{to},
 		From:    r.config.FromAddress,
@@ -42,21 +58,23 @@ func (r *ResendProvider) SendEmail(ctx context.Context, to string, subject strin
 		Html:    html,
 	}
 
-	sent, err := r.client.Emails.Send(params)
+	sent, err := r.client.Emails.SendWithContext(ctx, params)
 	if err != nil {
 		r.logger.Error("failed to send email via Resend", map[string]any{
-			"to":      to,
-			"subject": subject,
-			"error":   err.Error(),
+			"provider": "resend",
+			"to":       to,
+			"subject":  subject,
+			"error":    err.Error(),
 		})
-		return fmt.Errorf("failed to send email via Resend: %w", err)
+		return fmt.Errorf("resend send failed: %w", err)
 	}
 
-	if sent == nil {
-		return fmt.Errorf("failed to send email via Resend: no response received")
+	if sent == nil || sent.Id == "" {
+		return fmt.Errorf("resend send failed: empty response")
 	}
 
-	r.logger.Debug("email sent successfully via Resend", map[string]any{
+	r.logger.Debug("email sent successfully", map[string]any{
+		"provider":  "resend",
 		"to":        to,
 		"subject":   subject,
 		"messageId": sent.Id,
