@@ -121,7 +121,7 @@ max_age = "24h"
 
 [plugins.csrf]
 enabled = true
-cookie_name = "gobetterauth_csrf"
+cookie_name = "gobetterauth_csrf_token"
 header_name = "X-GOBETTERAUTH-CSRF-TOKEN"
 max_age = "24h"
 secure = false

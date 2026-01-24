@@ -16,7 +16,7 @@ type CSRFPluginConfig struct {
 
 func (config *CSRFPluginConfig) ApplyDefaults() {
 	if config.CookieName == "" {
-		config.CookieName = "gobetterauth_csrf"
+		config.CookieName = "gobetterauth_csrf_token"
 	}
 	if config.HeaderName == "" {
 		config.HeaderName = "X-GOBETTERAUTH-CSRF-TOKEN"

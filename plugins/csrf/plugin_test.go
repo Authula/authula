@@ -74,8 +74,8 @@ func TestCSRFPlugin_New(t *testing.T) {
 			name:   "Default values",
 			config: CSRFPluginConfig{},
 			verify: func(t *testing.T, p *CSRFPlugin) {
-				if p.pluginConfig.CookieName != "gobetterauth_csrf" {
-					t.Errorf("expected CookieName to be 'gobetterauth_csrf', got %q", p.pluginConfig.CookieName)
+				if p.pluginConfig.CookieName != "gobetterauth_csrf_token" {
+					t.Errorf("expected CookieName to be 'gobetterauth_csrf_token', got %q", p.pluginConfig.CookieName)
 				}
 				if p.pluginConfig.HeaderName != "X-GOBETTERAUTH-CSRF-TOKEN" {
 					t.Errorf("expected HeaderName to be 'X-GOBETTERAUTH-CSRF-TOKEN', got %q", p.pluginConfig.HeaderName)
@@ -192,7 +192,7 @@ func TestCSRFPlugin_SafeMethodGenerateTokenOnce(t *testing.T) {
 
 	// Second GET request with the cookie - should NOT regenerate token
 	req2 := httptest.NewRequest(http.MethodGet, "/authenticated", nil)
-	req2.AddCookie(&http.Cookie{Name: "gobetterauth_csrf", Value: token1})
+	req2.AddCookie(&http.Cookie{Name: "gobetterauth_csrf_token", Value: token1})
 	w2 := httptest.NewRecorder()
 	ctx2 := &models.RequestContext{
 		Request:        req2,
@@ -290,7 +290,7 @@ func TestCSRFPlugin_UnsafeMethodValidateToken(t *testing.T) {
 
 			if tt.provideCookie {
 				req.AddCookie(&http.Cookie{
-					Name:  "gobetterauth_csrf",
+					Name:  "gobetterauth_csrf_token",
 					Value: tt.cookieValue,
 				})
 			}
@@ -515,8 +515,8 @@ func TestCSRFPlugin_SetCSRFCookie(t *testing.T) {
 				t.Errorf("cookie value should be %q, got %q", token, cookie.Value)
 			}
 
-			if cookie.Name != "gobetterauth_csrf" {
-				t.Errorf("cookie name should be 'gobetterauth_csrf', got %q", cookie.Name)
+			if cookie.Name != "gobetterauth_csrf_token" {
+				t.Errorf("cookie name should be 'gobetterauth_csrf_token', got %q", cookie.Name)
 			}
 
 			if cookie.HttpOnly {
@@ -592,10 +592,10 @@ func TestCSRFPlugin_UnsafeMethodWithFormToken(t *testing.T) {
 
 	// Test POST with token in form data (fallback)
 	userID := stringPtr("authenticated-user")
-	req := httptest.NewRequest(http.MethodPost, "/authenticated", strings.NewReader("gobetterauth_csrf=matching_token"))
+	req := httptest.NewRequest(http.MethodPost, "/authenticated", strings.NewReader("gobetterauth_csrf_token=matching_token"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{
-		Name:  "gobetterauth_csrf",
+		Name:  "gobetterauth_csrf_token",
 		Value: "matching_token",
 	})
 
@@ -930,7 +930,7 @@ func TestCSRFPlugin_TokenGenerationRequiresAuthentication(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/authenticated-endpoint", nil)
 			if tt.existingCookie {
 				req.AddCookie(&http.Cookie{
-					Name:  "gobetterauth_csrf",
+					Name:  "gobetterauth_csrf_token",
 					Value: "existing_token",
 				})
 			}
@@ -1080,7 +1080,7 @@ func TestCSRFPlugin_AuthenticatedUnsafeMethodStillValidates(t *testing.T) {
 
 			if tt.provideCookie {
 				req.AddCookie(&http.Cookie{
-					Name:  "gobetterauth_csrf",
+					Name:  "gobetterauth_csrf_token",
 					Value: tt.cookieValue,
 				})
 			}
@@ -1299,13 +1299,13 @@ func TestCSRFPlugin_MiddlewareValidation(t *testing.T) {
 				tokenValue := "test-token-123"
 				if tt.hasValidToken {
 					req.AddCookie(&http.Cookie{
-						Name:  "gobetterauth_csrf",
+						Name:  "gobetterauth_csrf_token",
 						Value: tokenValue,
 					})
 					req.Header.Set("X-GOBETTERAUTH-CSRF-TOKEN", tokenValue)
 				} else {
 					req.AddCookie(&http.Cookie{
-						Name:  "gobetterauth_csrf",
+						Name:  "gobetterauth_csrf_token",
 						Value: "cookie-token",
 					})
 					req.Header.Set("X-GOBETTERAUTH-CSRF-TOKEN", "header-token")
@@ -1515,7 +1515,7 @@ func TestCSRFPlugin_HeaderProtectionAllowsSafeMethods(t *testing.T) {
 func TestCSRFPlugin_TokenValidationStillRequiredWithHeaderProtection(t *testing.T) {
 	config := CSRFPluginConfig{
 		EnableHeaderProtection: true,
-		CookieName:             "gobetterauth_csrf",
+		CookieName:             "gobetterauth_csrf_token",
 		HeaderName:             "X-GOBETTERAUTH-CSRF-TOKEN",
 	}
 
@@ -1573,7 +1573,7 @@ func TestCSRFPlugin_HeaderProtectionConfigReload(t *testing.T) {
 			models.PluginCSRF.String(): map[string]any{
 				"enabled":                  true,
 				"enable_header_protection": true,
-				"cookie_name":              "gobetterauth_csrf",
+				"cookie_name":              "gobetterauth_csrf_token",
 				"header_name":              "X-GOBETTERAUTH-CSRF-TOKEN",
 				"max_age":                  "24h",
 				"same_site":                "lax",
