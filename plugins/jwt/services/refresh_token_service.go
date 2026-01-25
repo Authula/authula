@@ -25,7 +25,6 @@ type refreshTokenService struct {
 	jwtService       JwtService
 	storage          RefreshTokenRepository
 	gracePeriod      time.Duration
-	disableIPLogging bool
 	refreshExpiresIn time.Duration
 }
 
@@ -37,7 +36,6 @@ func NewRefreshTokenService(
 	jwtService JwtService,
 	storage RefreshTokenRepository,
 	gracePeriod time.Duration,
-	disableIPLogging bool,
 	refreshExpiresIn time.Duration,
 ) RefreshTokenService {
 	return &refreshTokenService{
@@ -47,7 +45,6 @@ func NewRefreshTokenService(
 		jwtService:       jwtService,
 		storage:          storage,
 		gracePeriod:      gracePeriod,
-		disableIPLogging: disableIPLogging,
 		refreshExpiresIn: refreshExpiresIn,
 	}
 }
@@ -68,7 +65,6 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 		return nil, fmt.Errorf("invalid refresh token")
 	}
 	if record == nil {
-		s.logger.Debug("refresh token not found in database")
 		return nil, fmt.Errorf("invalid refresh token")
 	}
 
@@ -145,7 +141,6 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHash string, record *types.RefreshTokenRecord) (*RefreshTokenResponse, error) {
 	// Check if token is expired
 	if time.Now().After(record.ExpiresAt) {
-		s.logger.Debug("refresh token expired", "expires_at", record.ExpiresAt)
 		return nil, fmt.Errorf("refresh token expired")
 	}
 
@@ -192,11 +187,6 @@ func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHa
 		// Token was already revoked, this is critical
 		return nil, fmt.Errorf("failed to rotate token")
 	}
-
-	s.logger.Debug("refresh token rotated successfully",
-		"session_id", record.SessionID,
-		"user_id", session.UserID,
-	)
 
 	return &RefreshTokenResponse{
 		AccessToken:  tokenPair.AccessToken,

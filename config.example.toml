@@ -108,6 +108,7 @@ enabled = true
 allow_credentials = true
 allowed_origins = ["*"] # If using session plugin, specify exact origins instead of "*"
 allowed_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+# If using the CSRF plugin, ensure the CSRF token header is included here
 allowed_headers = ["Authorization", "Content-Type", "Cookie", "Set-Cookie"]
 exposed_headers = []
 max_age = "24h"
@@ -222,7 +223,6 @@ enabled = true
 # refresh_expires_in = "168h"
 # jwks_cache_ttl = "5m"
 # refresh_grace_period = "1m"
-# disable_ip_logging = false
 
 # --- Bearer Plugin (use for SPAs and mobile apps) ---
 

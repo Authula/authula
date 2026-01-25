@@ -59,13 +59,11 @@ func (p *RateLimitPlugin) trySecondaryStorage() RateLimitProvider {
 
 	secondaryStorageService, ok := p.ctx.ServiceRegistry.Get(models.ServiceSecondaryStorage.String()).(services.SecondaryStorageService)
 	if !ok {
-		p.logger.Debug("secondary storage service not found in registry")
 		return nil
 	}
 
 	storage := secondaryStorageService.GetStorage()
 	if storage == nil {
-		p.logger.Debug("secondary storage instance is nil")
 		return nil
 	}
 

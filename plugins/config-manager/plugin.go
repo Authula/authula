@@ -74,7 +74,6 @@ func (p *ConfigManagerPlugin) Init(ctx *models.PluginContext) error {
 		p.configManager = configManager
 
 		ctx.ServiceRegistry.Register(models.ServiceConfigManager.String(), configManagerService)
-		p.logger.Debug("config manager service registered")
 
 		// If PluginRegistry supports SetConfigProvider, set the config provider to use ConfigManager
 		if registry, ok := ctx.ServiceRegistry.(interface{ SetConfigProvider(func() *models.Config) }); ok {

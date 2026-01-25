@@ -104,7 +104,6 @@ func (s *cacheService) FetchJWKSFromDatabase(ctx context.Context) (jwk.Set, erro
 // CacheJWKS stores the JWKS in the cache with the configured TTL
 func (s *cacheService) CacheJWKS(ctx context.Context, set jwk.Set) error {
 	if s.secondaryStorage == nil {
-		s.logger.Debug("secondary storage not available, skipping cache")
 		return nil
 	}
 
@@ -117,7 +116,6 @@ func (s *cacheService) CacheJWKS(ctx context.Context, set jwk.Set) error {
 		return fmt.Errorf("failed to cache JWKS: %w", err)
 	}
 
-	s.logger.Debug("cached JWKS", "ttl", s.cacheTTL)
 	return nil
 }
 
@@ -144,11 +142,8 @@ func (s *cacheService) InvalidateCache(ctx context.Context) error {
 func (s *cacheService) GetJWKSWithFallback(ctx context.Context) (jwk.Set, error) {
 	set, err := s.GetCachedJWKS(ctx)
 	if err == nil {
-		s.logger.Debug("retrieved JWKS from cache")
 		return set, nil
 	}
-
-	s.logger.Debug("cache miss, fetching from database", "error", err)
 
 	set, err = s.FetchJWKSFromDatabase(ctx)
 	if err != nil {

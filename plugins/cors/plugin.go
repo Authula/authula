@@ -36,11 +36,13 @@ func (p *CORSPlugin) Config() any {
 func (p *CORSPlugin) Init(ctx *models.PluginContext) error {
 	p.logger = ctx.Logger
 	p.ctx = ctx
+	globalConfig := ctx.GetConfig()
 
-	if err := util.LoadPluginConfig(ctx.GetConfig(), p.Metadata().ID, &p.config); err != nil {
+	if err := util.LoadPluginConfig(globalConfig, p.Metadata().ID, &p.config); err != nil {
 		return err
 	}
-	p.config.ApplyDefaults()
+
+	p.logger.Debug("CORS Check", "allowedOrigins", p.config.AllowedOrigins)
 
 	return nil
 }

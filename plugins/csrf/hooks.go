@@ -27,7 +27,6 @@ func (id CSRFHookID) String() string {
 func (p *CSRFPlugin) safeMethodMatcher(ctx *models.RequestContext) bool {
 	method := ctx.Method
 	isValidMethod := method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions
-	p.logger.Debug("[safeMethodMatcher] checking method", "method", method, "isValidMethod", isValidMethod)
 	return isValidMethod
 }
 
@@ -71,11 +70,8 @@ func (p *CSRFPlugin) validateCSRFTokenHook(reqCtx *models.RequestContext) error 
 		return nil
 	}
 
-	p.logger.Debug("csrf validation hook running", "path", reqCtx.Path, "method", method)
-
 	// Step 1: Validate header-based cross-origin protection (if enabled)
 	if err := p.validateHeaderProtection(reqCtx.Request); err != nil {
-		p.logger.Debug("csrf header validation failed", "error", err)
 		// The custom deny handler in the plugin's Init() method writes the response
 		// but we need to set it here too for the hook system
 		reqCtx.SetJSONResponse(
@@ -88,13 +84,10 @@ func (p *CSRFPlugin) validateCSRFTokenHook(reqCtx *models.RequestContext) error 
 
 	// Step 2: Validate CSRF token (Double-Submit Cookie pattern)
 	if err := p.validateCSRFToken(reqCtx); err != nil {
-		p.logger.Debug("csrf token validation failed", "error", err)
 		// Mark as handled (test expects this instead of error return)
 		reqCtx.Handled = true
 		return nil // Return nil to avoid propagating error through hook chain
 	}
-
-	p.logger.Debug("csrf validation successful", "path", reqCtx.Path)
 
 	return nil
 }

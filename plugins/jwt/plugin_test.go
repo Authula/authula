@@ -19,8 +19,8 @@ func TestJWTPluginConfig_DefaultConfig(t *testing.T) {
 			name:   "sets default algorithm",
 			config: types.JWTPluginConfig{},
 			check: func(t *testing.T, c types.JWTPluginConfig) {
-				if c.Algorithm != types.AlgEdDSA {
-					t.Errorf("Algorithm = %v, want %v", c.Algorithm, types.AlgEdDSA)
+				if c.Algorithm != types.JWTAlgEdDSA {
+					t.Errorf("Algorithm = %v, want %v", c.Algorithm, types.JWTAlgEdDSA)
 				}
 			},
 		},
@@ -305,12 +305,12 @@ func TestKeyRotationInterval_ConfigPreservation(t *testing.T) {
 }
 
 func TestKeyRotationInterval_AlgorithmCompatibility(t *testing.T) {
-	algorithms := []types.Algorithm{
-		types.AlgEdDSA,
-		types.AlgRS256,
-		types.AlgPS256,
-		types.AlgES256,
-		types.AlgES512,
+	algorithms := []types.JWTAlgorithm{
+		types.JWTAlgEdDSA,
+		types.JWTAlgRS256,
+		types.JWTAlgPS256,
+		types.JWTAlgES256,
+		types.JWTAlgES512,
 	}
 
 	for _, alg := range algorithms {
@@ -386,13 +386,12 @@ func TestKeyRotationInterval_BoundaryConditions(t *testing.T) {
 
 func TestKeyRotationInterval_WithOtherConfigOptions(t *testing.T) {
 	config := types.JWTPluginConfig{
-		Algorithm:           types.AlgEdDSA,
+		Algorithm:           types.JWTAlgEdDSA,
 		KeyRotationInterval: 45 * 24 * time.Hour,
 		ExpiresIn:           5 * time.Minute,
 		RefreshExpiresIn:    30 * 24 * time.Hour,
 		JWKSCacheTTL:        6 * time.Hour,
 		RefreshGracePeriod:  30 * time.Second,
-		DisableIPLogging:    true,
 	}
 	config.ApplyDefaults()
 
@@ -400,8 +399,8 @@ func TestKeyRotationInterval_WithOtherConfigOptions(t *testing.T) {
 		t.Errorf("KeyRotationInterval = %v, want %v", config.KeyRotationInterval, 45*24*time.Hour)
 	}
 
-	if config.Algorithm != types.AlgEdDSA {
-		t.Errorf("Algorithm = %v, want %v", config.Algorithm, types.AlgEdDSA)
+	if config.Algorithm != types.JWTAlgEdDSA {
+		t.Errorf("Algorithm = %v, want %v", config.Algorithm, types.JWTAlgEdDSA)
 	}
 
 	if config.ExpiresIn != 5*time.Minute {
@@ -418,10 +417,6 @@ func TestKeyRotationInterval_WithOtherConfigOptions(t *testing.T) {
 
 	if config.RefreshGracePeriod != 30*time.Second {
 		t.Errorf("RefreshGracePeriod = %v, want %v", config.RefreshGracePeriod, 30*time.Second)
-	}
-
-	if !config.DisableIPLogging {
-		t.Error("DisableIPLogging should remain true")
 	}
 }
 
@@ -799,14 +794,13 @@ func TestKeyRotationGracePeriod_EdgeCases(t *testing.T) {
 
 func TestKeyRotationGracePeriod_ConfigWithOtherOptions(t *testing.T) {
 	config := types.JWTPluginConfig{
-		Algorithm:              types.AlgEdDSA,
+		Algorithm:              types.JWTAlgEdDSA,
 		KeyRotationInterval:    45 * 24 * time.Hour,
 		KeyRotationGracePeriod: 30 * time.Minute,
 		ExpiresIn:              5 * time.Minute,
 		RefreshExpiresIn:       30 * 24 * time.Hour,
 		JWKSCacheTTL:           6 * time.Hour,
 		RefreshGracePeriod:     30 * time.Second,
-		DisableIPLogging:       true,
 	}
 	config.ApplyDefaults()
 
@@ -820,8 +814,8 @@ func TestKeyRotationGracePeriod_ConfigWithOtherOptions(t *testing.T) {
 			config.KeyRotationGracePeriod, 30*time.Minute)
 	}
 
-	if config.Algorithm != types.AlgEdDSA {
-		t.Errorf("Algorithm = %v, want %v", config.Algorithm, types.AlgEdDSA)
+	if config.Algorithm != types.JWTAlgEdDSA {
+		t.Errorf("Algorithm = %v, want %v", config.Algorithm, types.JWTAlgEdDSA)
 	}
 
 	if config.ExpiresIn != 5*time.Minute {

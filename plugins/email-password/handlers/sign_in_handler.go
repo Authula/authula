@@ -51,12 +51,6 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 				if err == nil && existingSession != nil && existingSession.ExpiresAt.After(time.Now()) {
 					user, _ := h.SignInUseCase.GetUserByID(ctx, existingSession.UserID)
 					if user != nil {
-						h.Logger.Debug(
-							"idempotent login - user already authenticated",
-							"user_id", *reqCtx.UserID,
-							"session_id", sessionID,
-						)
-
 						reqCtx.Values[models.ContextAuthIdempotentSkipTokensMint.String()] = true
 
 						reqCtx.SetJSONResponse(http.StatusOK, types.SignInResponse{

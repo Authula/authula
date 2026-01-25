@@ -38,7 +38,6 @@ func (s *blacklistService) BlacklistToken(ctx context.Context, jti string, expir
 		return fmt.Errorf("failed to blacklist token: %w", err)
 	}
 
-	s.logger.Debug("token blacklisted", "jti", jti, "ttl", ttl)
 	return nil
 }
 
@@ -80,7 +79,6 @@ func (s *blacklistService) BlacklistAllSessionTokens(ctx context.Context, sessio
 		return fmt.Errorf("failed to blacklist session tokens: %w", err)
 	}
 
-	s.logger.Debug("session tokens blacklisted", "session_id", sessionID, "ttl", ttl)
 	return nil
 }
 

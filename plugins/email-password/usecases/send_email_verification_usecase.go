@@ -26,7 +26,6 @@ func (uc *SendEmailVerificationUseCase) Send(ctx context.Context, email string, 
 	reqCtx, _ := models.GetRequestContext(ctx)
 
 	if !uc.PluginConfig.RequireEmailVerification {
-		uc.Logger.Debug("email verification is not enabled")
 		return nil
 	}
 
@@ -41,13 +40,11 @@ func (uc *SendEmailVerificationUseCase) Send(ctx context.Context, email string, 
 		return nil
 	}
 	if user == nil {
-		uc.Logger.Debug("user not found", map[string]any{"email": email})
 		// For security, we don't return an error indicating the user doesn't exist
 		return nil
 	}
 
 	if user.EmailVerified {
-		uc.Logger.Debug("email already verified", map[string]any{"user_id": user.ID})
 		return nil
 	}
 

@@ -101,7 +101,6 @@ func (uc *VerifyEmailUseCase) handleEmailChangeVerificationEmail(
 	tokenValue string,
 	newEmail string,
 ) error {
-	uc.Logger.Debug("handleEmailChangeVerificationEmail called", "userID", userID, "newEmail", newEmail)
 	if newEmail == "" {
 		return fmt.Errorf("new email cannot be empty")
 	}

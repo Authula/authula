@@ -25,12 +25,12 @@ type keyService struct {
 	repo         repositories.JWKSRepository
 	logger       models.Logger
 	secret       string
-	algorithm    types.Algorithm
+	algorithm    types.JWTAlgorithm
 	tokenService coreservices.TokenService
 }
 
 // NewKeyService creates a new key service
-func NewKeyService(repo repositories.JWKSRepository, logger models.Logger, tokenService coreservices.TokenService, secret string, algorithm types.Algorithm) KeyService {
+func NewKeyService(repo repositories.JWKSRepository, logger models.Logger, tokenService coreservices.TokenService, secret string, algorithm types.JWTAlgorithm) KeyService {
 	return &keyService{
 		repo:         repo,
 		logger:       logger,
@@ -48,11 +48,9 @@ func (s *keyService) GenerateKeysIfMissing(ctx context.Context) error {
 	}
 
 	if len(keys) > 0 {
-		s.logger.Debug("keys already exist, skipping generation")
 		return nil
 	}
 
-	s.logger.Debug("generating initial key pair", "algorithm", s.algorithm)
 	return s.generateAndStoreKey(ctx)
 }
 
@@ -82,7 +80,6 @@ func (s *keyService) GetActiveKey(ctx context.Context) (*types.JWKS, error) {
 func (s *keyService) IsKeyRotationDue(ctx context.Context, rotationInterval time.Duration) bool {
 	key, err := s.GetActiveKey(ctx)
 	if err != nil {
-		s.logger.Debug("failed to check key rotation", "error", err)
 		return false
 	}
 
@@ -96,8 +93,6 @@ func (s *keyService) RotateKeysIfNeeded(ctx context.Context, rotationInterval ti
 		return false, nil
 	}
 
-	s.logger.Debug("rotating keys due to age", "algorithm", s.algorithm)
-
 	now := time.Now()
 	expirationTime := now.Add(gracePeriod)
 
@@ -110,7 +105,6 @@ func (s *keyService) RotateKeysIfNeeded(ctx context.Context, rotationInterval ti
 		if err := s.repo.MarkKeyExpired(ctx, key.ID, expirationTime); err != nil {
 			return false, fmt.Errorf("failed to set expiration on old key: %w", err)
 		}
-		s.logger.Debug("marked key as expiring after grace period", "key_id", key.ID, "expires_at", expirationTime)
 	}
 
 	if err := s.generateAndStoreKey(ctx); err != nil {
@@ -128,9 +122,9 @@ func (s *keyService) RotateKeysIfNeeded(ctx context.Context, rotationInterval ti
 }
 
 // generateKey returns a newly generated private/public key pair for the given algorithm
-func generateKey(alg types.Algorithm) (priv any, pub any, err error) {
+func generateKey(alg types.JWTAlgorithm) (priv any, pub any, err error) {
 	switch alg {
-	case types.AlgRS256, types.AlgPS256:
+	case types.JWTAlgRS256, types.JWTAlgPS256:
 		priv, err = rsa.GenerateKey(rand.Reader, 2048)
 		if err != nil {
 			return nil, nil, err
@@ -138,7 +132,7 @@ func generateKey(alg types.Algorithm) (priv any, pub any, err error) {
 		pub = &priv.(*rsa.PrivateKey).PublicKey
 		return
 
-	case types.AlgES256:
+	case types.JWTAlgES256:
 		priv, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
 			return nil, nil, err
@@ -146,7 +140,7 @@ func generateKey(alg types.Algorithm) (priv any, pub any, err error) {
 		pub = &priv.(*ecdsa.PrivateKey).PublicKey
 		return
 
-	case types.AlgES512:
+	case types.JWTAlgES512:
 		priv, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 		if err != nil {
 			return nil, nil, err
@@ -154,7 +148,7 @@ func generateKey(alg types.Algorithm) (priv any, pub any, err error) {
 		pub = &priv.(*ecdsa.PrivateKey).PublicKey
 		return
 
-	case types.AlgEdDSA:
+	case types.JWTAlgEdDSA:
 		var seed [32]byte
 		if _, err := rand.Read(seed[:]); err != nil {
 			return nil, nil, fmt.Errorf("failed to read random seed: %w", err)
@@ -163,7 +157,7 @@ func generateKey(alg types.Algorithm) (priv any, pub any, err error) {
 		pub = priv.(ed25519.PrivateKey).Public()
 		return
 
-	case types.AlgECDHES:
+	case types.JWTAlgECDHES:
 		// ECDH-ES uses EC P-256 keys for key agreement (future JWE)
 		priv, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {

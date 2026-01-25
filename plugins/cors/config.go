@@ -14,7 +14,7 @@ type CORSPluginConfig struct {
 
 func (config *CORSPluginConfig) ApplyDefaults() {
 	if len(config.AllowedMethods) == 0 {
-		config.AllowedMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+		config.AllowedMethods = []string{"OPTIONS", "GET", "POST", "PUT", "PATCH", "DELETE"}
 	}
 	if len(config.AllowedHeaders) == 0 {
 		config.AllowedHeaders = []string{"Content-Type", "Authorization", "Cookie", "Set-Cookie"}

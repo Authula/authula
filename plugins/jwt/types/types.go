@@ -8,59 +8,58 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// Algorithm represents supported JWT/JWKS algorithms
-type Algorithm string
+type JWTAlgorithm string
 
 const (
-	AlgEdDSA  Algorithm = "EdDSA"
-	AlgRS256  Algorithm = "RS256"
-	AlgPS256  Algorithm = "PS256"
-	AlgES256  Algorithm = "ES256"
-	AlgES512  Algorithm = "ES512"
-	AlgECDHES Algorithm = "ECDH-ES"
+	JWTAlgEdDSA  JWTAlgorithm = "eddsa"
+	JWTAlgRS256  JWTAlgorithm = "rs256"
+	JWTAlgPS256  JWTAlgorithm = "ps256"
+	JWTAlgES256  JWTAlgorithm = "es256"
+	JWTAlgES512  JWTAlgorithm = "es512"
+	JWTAlgECDHES JWTAlgorithm = "ecdh-es"
 )
 
-func (a Algorithm) String() string {
+func (a JWTAlgorithm) String() string {
 	return string(a)
 }
 
-type TokenType string
+type JWTTokenType string
 
 const (
-	TokenTypeAccess  TokenType = "access_token"
-	TokenTypeRefresh TokenType = "refresh_token"
+	JWTTokenTypeAccess  JWTTokenType = "access_token"
+	JWTTokenTypeRefresh JWTTokenType = "refresh_token"
 )
 
-func (t TokenType) String() string {
+func (t JWTTokenType) String() string {
 	return string(t)
 }
 
 // ParseAlgorithm parses a string into an Algorithm, accepting only canonical names (case-insensitive input)
-func ParseAlgorithm(s string) (Algorithm, error) {
+func ParseAlgorithm(s string) (JWTAlgorithm, error) {
 	switch s {
 	case "eddsa":
-		return AlgEdDSA, nil
+		return JWTAlgEdDSA, nil
 	case "rs256":
-		return AlgRS256, nil
+		return JWTAlgRS256, nil
 	case "ps256":
-		return AlgPS256, nil
+		return JWTAlgPS256, nil
 	case "es256":
-		return AlgES256, nil
+		return JWTAlgES256, nil
 	case "es512":
-		return AlgES512, nil
+		return JWTAlgES512, nil
 	case "ecdh-es":
-		return AlgECDHES, nil
+		return JWTAlgECDHES, nil
 	default:
 		return "", errors.New("unsupported jwt algorithm")
 	}
 }
 
 // ValidateAlgorithm enforces that the algorithm can be used for JWT signing
-func ValidateAlgorithm(alg Algorithm) error {
+func ValidateAlgorithm(alg JWTAlgorithm) error {
 	switch alg {
-	case AlgEdDSA, AlgRS256, AlgPS256, AlgES256, AlgES512:
+	case JWTAlgEdDSA, JWTAlgRS256, JWTAlgPS256, JWTAlgES256, JWTAlgES512:
 		return nil
-	case AlgECDHES:
+	case JWTAlgECDHES:
 		return errors.New("ECDH-ES cannot be used for JWT signing")
 	default:
 		return errors.New("unsupported JWT algorithm")
@@ -70,20 +69,19 @@ func ValidateAlgorithm(alg Algorithm) error {
 // JWTPluginConfig configures the JWKS-based JWT plugin
 type JWTPluginConfig struct {
 	Enabled                bool          `json:"enabled" toml:"enabled"`
-	Algorithm              Algorithm     `json:"algorithm" toml:"algorithm"`                                 // EdDSA (default), RS256, PS256, ES256, ES512
+	Algorithm              JWTAlgorithm  `json:"algorithm" toml:"algorithm"`                                 // EdDSA (default), RS256, PS256, ES256, ES512
 	KeyRotationInterval    time.Duration `json:"key_rotation_interval" toml:"key_rotation_interval"`         // Default: 30 days
 	KeyRotationGracePeriod time.Duration `json:"key_rotation_grace_period" toml:"key_rotation_grace_period"` // Grace period for old key validity after rotation, default: 1 hour
 	ExpiresIn              time.Duration `json:"expires_in" toml:"expires_in"`                               // Access token TTL
 	RefreshExpiresIn       time.Duration `json:"refresh_expires_in" toml:"refresh_expires_in"`               // Refresh token TTL
 	JWKSCacheTTL           time.Duration `json:"jwks_cache_ttl" toml:"jwks_cache_ttl"`                       // Cache TTL for JWKS, default 24 hours
 	RefreshGracePeriod     time.Duration `json:"refresh_grace_period" toml:"refresh_grace_period"`           // Grace period for refresh token reuse, default 10s
-	DisableIPLogging       bool          `json:"disable_ip_logging" toml:"disable_ip_logging"`               // Disable IP address logging for GDPR compliance
 }
 
 // ApplyDefaults returns sensible defaults for the JWT plugin
 func (c *JWTPluginConfig) ApplyDefaults() {
 	if c.Algorithm == "" {
-		c.Algorithm = AlgEdDSA
+		c.Algorithm = JWTAlgEdDSA
 	}
 	if c.KeyRotationInterval == 0 {
 		c.KeyRotationInterval = 30 * 24 * time.Hour
@@ -109,7 +107,7 @@ func (c *JWTPluginConfig) ApplyDefaults() {
 // parsing config or on update to catch legacy or unsupported values.
 func (c *JWTPluginConfig) NormalizeAlgorithm() error {
 	if c.Algorithm == "" {
-		c.Algorithm = AlgEdDSA
+		c.Algorithm = JWTAlgEdDSA
 		return nil
 	}
 	parsed, err := ParseAlgorithm(string(c.Algorithm))

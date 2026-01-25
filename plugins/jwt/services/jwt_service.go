@@ -27,7 +27,7 @@ type JWTServiceImpl struct {
 	sessionService   services.SessionService
 	expiresIn        time.Duration
 	refreshExpiresIn time.Duration
-	algorithm        types.Algorithm
+	algorithm        types.JWTAlgorithm
 }
 
 // NewJWTService creates a new JWT service implementation
@@ -91,7 +91,7 @@ func (s *JWTServiceImpl) GenerateTokens(ctx context.Context, userID string, sess
 	accessClaims.Set(jwt.JwtIDKey, jti)
 	accessClaims.Set("user_id", userID)
 	accessClaims.Set("session_id", sessionID)
-	accessClaims.Set("type", types.TokenTypeAccess.String())
+	accessClaims.Set("type", types.JWTTokenTypeAccess.String())
 
 	accessTokenBytes, err := jwt.Sign(accessClaims, jwt.WithKey(keyAlgorithm, privKey))
 	if err != nil {
@@ -105,7 +105,7 @@ func (s *JWTServiceImpl) GenerateTokens(ctx context.Context, userID string, sess
 	refreshClaims.Set(jwt.JwtIDKey, jti)
 	refreshClaims.Set("user_id", userID)
 	refreshClaims.Set("session_id", sessionID)
-	refreshClaims.Set("type", types.TokenTypeRefresh.String())
+	refreshClaims.Set("type", types.JWTTokenTypeRefresh.String())
 
 	refreshTokenBytes, err := jwt.Sign(refreshClaims, jwt.WithKey(keyAlgorithm, privKey))
 	if err != nil {
@@ -148,7 +148,7 @@ func (s *JWTServiceImpl) ValidateToken(token string) (userID string, err error) 
 		return "", errors.New("missing token type claim")
 	}
 
-	if tokenType != types.TokenTypeAccess.String() {
+	if tokenType != types.JWTTokenTypeAccess.String() {
 		return "", errors.New("invalid token type")
 	}
 

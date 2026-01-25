@@ -73,12 +73,5 @@ func (r *ResendProvider) SendEmail(
 		return fmt.Errorf("resend send failed: empty response")
 	}
 
-	r.logger.Debug("email sent successfully", map[string]any{
-		"provider":  "resend",
-		"to":        to,
-		"subject":   subject,
-		"messageId": sent.Id,
-	})
-
 	return nil
 }

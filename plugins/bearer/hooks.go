@@ -42,10 +42,8 @@ func (p *BearerPlugin) validateBearerToken(reqCtx *models.RequestContext) error 
 	}
 
 	// Validate token via JWT service (doesn't directly validate JWT, uses JWT service)
-	p.logger.Debug("validating bearer token via JWT service")
 	userID, err := p.jwtService.ValidateToken(token)
 	if err != nil {
-		p.logger.Debug("bearer token validation failed", "error", err)
 		// Write 401 Unauthorized
 		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
 			"message": "Bearer token invalid or expired",
@@ -76,11 +74,8 @@ func (p *BearerPlugin) validateBearerTokenOptional(reqCtx *models.RequestContext
 	}
 
 	// Validate token via JWT service (doesn't directly validate JWT, uses JWT service)
-	p.logger.Debug("validating bearer token via JWT service")
 	userID, err := p.jwtService.ValidateToken(token)
 	if err != nil {
-		p.logger.Debug("bearer token validation failed", "error", err)
-		// Invalid token, skip silently
 		return nil
 	}
 

@@ -279,6 +279,8 @@ func (r *Router) runHooks(stage models.HookStage, ctx *models.RequestContext) {
 			continue
 		}
 
+		r.logger.Debug("runHooks", "hook", hook.PluginID)
+
 		// Async execution
 		if hook.Async {
 			go func(h models.Hook, originalCtx *models.RequestContext) {

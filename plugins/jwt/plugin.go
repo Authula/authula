@@ -135,7 +135,6 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		p.jwtService,
 		refreshTokenRepo,
 		p.pluginConfig.RefreshGracePeriod,
-		p.pluginConfig.DisableIPLogging,
 		p.pluginConfig.RefreshExpiresIn,
 	)
 
