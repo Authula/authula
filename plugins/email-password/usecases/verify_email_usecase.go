@@ -24,45 +24,45 @@ type VerifyEmailUseCase struct {
 	EventBus            models.EventBus
 }
 
-func (uc *VerifyEmailUseCase) VerifyEmail(ctx context.Context, tokenStr string) error {
+func (uc *VerifyEmailUseCase) VerifyEmail(ctx context.Context, tokenStr string) (models.VerificationType, error) {
 	hashedToken := uc.TokenService.Hash(tokenStr)
 
 	verification, err := uc.VerificationService.GetByToken(ctx, hashedToken)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if verification == nil || verification.ExpiresAt.Before(time.Now()) {
-		return constants.ErrInvalidOrExpiredToken
+		return "", constants.ErrInvalidOrExpiredToken
 	}
 
 	if verification.UserID == nil {
-		return constants.ErrUserNotFound
+		return "", constants.ErrUserNotFound
 	}
 
 	user, err := uc.UserService.GetByID(ctx, *verification.UserID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if user == nil {
-		return constants.ErrUserNotFound
+		return "", constants.ErrUserNotFound
 	}
 
 	switch verification.Type {
 	case models.TypeEmailVerification:
 		if err := uc.handleEmailVerification(ctx, user, verification.ID); err != nil {
-			return err
+			return "", err
 		}
 	case models.TypePasswordResetRequest:
 	case models.TypeEmailResetRequest:
 		if err := uc.handleEmailChangeVerificationEmail(ctx, *verification.UserID, tokenStr, verification.Identifier); err != nil {
-			return err
+			return "", err
 		}
 	default:
-		return constants.ErrInvalidEmailVerificationType
+		return "", constants.ErrInvalidEmailVerificationType
 	}
 
-	return nil
+	return verification.Type, nil
 }
 
 func (uc *VerifyEmailUseCase) handleEmailVerification(ctx context.Context, user *models.User, tokenID string) error {

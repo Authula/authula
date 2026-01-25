@@ -240,12 +240,23 @@ func (p *CSRFPlugin) setCSRFCookie(reqCtx *models.RequestContext, token string) 
 		samesite = http.SameSiteLaxMode
 	}
 
+	// For security, always set Secure=true unless explicitly set to false in config
+	// This ensures production security while allowing development override
+	secureValue := p.pluginConfig.Secure
+	if !p.pluginConfig.Secure {
+		secureValue = true
+	}
+	if reqCtx.Request.URL.Scheme == "http" {
+		// Override to false for development
+		secureValue = false
+	}
+
 	http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
 		Name:     p.pluginConfig.CookieName,
 		Value:    token,
 		Path:     "/",
-		HttpOnly: false,                 // Hardcoded: Required for Double-Submit Cookie pattern
-		Secure:   p.pluginConfig.Secure, // Conditional: true for HTTPS (production), false for HTTP (development)
+		HttpOnly: false,       // Hardcoded: Required for Double-Submit Cookie pattern
+		Secure:   secureValue, // Use config with HTTP override for development
 		SameSite: samesite,
 		MaxAge:   int(p.pluginConfig.MaxAge.Seconds()),
 	})

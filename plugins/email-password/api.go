@@ -38,7 +38,7 @@ func (a *API) SignIn(
 	return a.useCases.SignInUseCase.SignIn(ctx, email, password, callbackURL, ipAddress, userAgent)
 }
 
-func (a *API) VerifyEmail(ctx context.Context, tokenStr string) error {
+func (a *API) VerifyEmail(ctx context.Context, tokenStr string) (models.VerificationType, error) {
 	return a.useCases.VerifyEmailUseCase.VerifyEmail(ctx, tokenStr)
 }
 

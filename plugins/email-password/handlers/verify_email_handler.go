@@ -26,7 +26,7 @@ func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		err := h.VerifyEmailUseCase.VerifyEmail(ctx, tokenStr)
+		verificationType, err := h.VerifyEmailUseCase.VerifyEmail(ctx, tokenStr)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),
@@ -37,14 +37,18 @@ func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
 
 		callbackURL := r.URL.Query().Get("callback_url")
 		if callbackURL != "" {
-			u, err := url.Parse(callbackURL)
-			if err != nil {
-				http.Redirect(reqCtx.ResponseWriter, r, callbackURL+"?token="+url.QueryEscape(tokenStr), http.StatusFound)
+			if verificationType == models.TypePasswordResetRequest {
+				u, err := url.Parse(callbackURL)
+				if err != nil {
+					http.Redirect(reqCtx.ResponseWriter, r, callbackURL+"?token="+url.QueryEscape(tokenStr), http.StatusFound)
+				} else {
+					q := u.Query()
+					q.Set("token", tokenStr)
+					u.RawQuery = q.Encode()
+					http.Redirect(reqCtx.ResponseWriter, r, u.String(), http.StatusFound)
+				}
 			} else {
-				q := u.Query()
-				q.Set("token", tokenStr)
-				u.RawQuery = q.Encode()
-				http.Redirect(reqCtx.ResponseWriter, r, u.String(), http.StatusFound)
+				http.Redirect(reqCtx.ResponseWriter, r, callbackURL, http.StatusFound)
 			}
 		} else {
 			reqCtx.SetJSONResponse(http.StatusOK, map[string]any{
