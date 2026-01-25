@@ -53,15 +53,17 @@ func LoadPluginConfig[T any](config *models.Config, pluginID string, target *T) 
 	if !ok || rawConfig == nil {
 		return nil
 	}
+
 	return ParsePluginConfig(rawConfig, target)
 }
 
 // IsPluginEnabled checks if a plugin is enabled based on its metadata and configuration.
-func IsPluginEnabled(cfg *models.Config, pluginID string, requiredByDefault bool) bool {
-	if cfg == nil || cfg.Plugins == nil {
+func IsPluginEnabled(config *models.Config, pluginID string, requiredByDefault bool) bool {
+	if config == nil || config.Plugins == nil {
 		return requiredByDefault
 	}
-	rawConfig, ok := cfg.Plugins[pluginID]
+
+	rawConfig, ok := config.Plugins[pluginID]
 	if !ok || rawConfig == nil {
 		return requiredByDefault
 	}
@@ -73,6 +75,7 @@ func IsPluginEnabled(cfg *models.Config, pluginID string, requiredByDefault bool
 			}
 		}
 	}
+
 	return true
 }
 

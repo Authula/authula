@@ -79,6 +79,12 @@ func New(authConfig *AuthConfig) *Auth {
 	// Cache type-safe configs for all plugins and auto-enable those not explicitly disabled
 	for _, plugin := range authConfig.Plugins {
 		pluginID := plugin.Metadata().ID
+		pluginConfig := plugin.Config()
+
+		// Initialize config map if not exists
+		if authConfig.Config.Plugins[pluginID] == nil {
+			authConfig.Config.Plugins[pluginID] = make(map[string]any)
+		}
 
 		// Check if plugin is explicitly disabled in config
 		isDisabled := false
@@ -92,18 +98,17 @@ func New(authConfig *AuthConfig) *Auth {
 			}
 		}
 
-		// If not explicitly disabled, enable the plugin
+		// If not explicitly disabled and no enabled setting exists, set from plugin config
 		if !isDisabled {
-			if authConfig.Config.Plugins[pluginID] == nil {
-				authConfig.Config.Plugins[pluginID] = make(map[string]any)
-			}
 			if configMap, ok := authConfig.Config.Plugins[pluginID].(map[string]any); ok {
-				configMap["enabled"] = true
+				if _, hasEnabled := configMap["enabled"]; !hasEnabled {
+					configMap["enabled"] = getEnabledFromConfig(pluginConfig)
+				}
 			}
 		}
 
 		// Cache the type-safe config
-		authConfig.Config.PreParsedConfigs[pluginID] = plugin.Config()
+		authConfig.Config.PreParsedConfigs[pluginID] = pluginConfig
 	}
 
 	for _, plugin := range authConfig.Plugins {
@@ -144,6 +149,27 @@ func New(authConfig *AuthConfig) *Auth {
 	auth.registerMiddleware()
 
 	return auth
+}
+
+// getEnabledFromConfig tries to get Enabled field from plugin config
+func getEnabledFromConfig(config any) bool {
+	// Default to enabled if we can't determine the value
+	if config == nil {
+		return true
+	}
+
+	// Use existing util.ParsePluginConfig to convert struct to map
+	var configMap map[string]any
+	if err := util.ParsePluginConfig(config, &configMap); err != nil {
+		return true
+	}
+
+	if enabled, ok := configMap["enabled"].(bool); ok {
+		return enabled
+	}
+
+	// Default to true if not found
+	return true
 }
 
 func (auth *Auth) RunCoreMigrations(ctx context.Context) error {

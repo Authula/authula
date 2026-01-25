@@ -42,18 +42,14 @@ func (p *CORSPlugin) Init(ctx *models.PluginContext) error {
 		return err
 	}
 
-	p.logger.Debug("CORS Check", "allowedOrigins", p.config.AllowedOrigins)
-
-	return nil
-}
-
-func (p *CORSPlugin) Close() error {
 	return nil
 }
 
 // Middleware returns the CORS middleware that should be registered globally
 func (p *CORSPlugin) Middleware() []func(http.Handler) http.Handler {
-	return []func(http.Handler) http.Handler{p.CORSMiddleware()}
+	return []func(http.Handler) http.Handler{
+		p.CORSMiddleware(),
+	}
 }
 
 // CORSMiddleware returns a middleware that handles CORS requests
@@ -111,14 +107,15 @@ func (p *CORSPlugin) isOriginAllowed(origin string) bool {
 }
 
 func (p *CORSPlugin) OnConfigUpdate(config *models.Config) error {
-	if pluginCfg, ok := config.Plugins[models.PluginCORS.String()]; ok {
-		if err := util.ParsePluginConfig(pluginCfg, &p.config); err != nil {
-			p.logger.Error("failed to parse cors plugin config on update", "error", err)
-			return err
-		}
+	if err := util.LoadPluginConfig(config, p.Metadata().ID, &p.config); err != nil {
+		return err
 	}
 
 	p.config.ApplyDefaults()
 
+	return nil
+}
+
+func (p *CORSPlugin) Close() error {
 	return nil
 }
