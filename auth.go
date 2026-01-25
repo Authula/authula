@@ -47,7 +47,7 @@ func New(authConfig *AuthConfig) *Auth {
 
 	RunCoreMigrations(context.Background(), logger, authConfig.Config.Database.Provider, db)
 
-	router := NewRouter(logger, authConfig.Config.BasePath, nil)
+	router := NewRouter(authConfig.Config, logger, nil)
 
 	eventBus, err := InitEventBus(authConfig.Config)
 	if err != nil {
@@ -183,14 +183,20 @@ func (auth *Auth) DropCoreMigrations(ctx context.Context) error {
 // registerMiddleware registers all middleware from hooks and plugins
 func (auth *Auth) registerMiddleware() {
 	currentConfig := auth.PluginRegistry.GetConfig()
+
 	// Register Plugin Global Middleware
 	for _, plugin := range auth.PluginRegistry.Plugins() {
-		if !util.IsPluginEnabled(currentConfig, plugin.Metadata().ID, false) {
+		pluginID := plugin.Metadata().ID
+
+		if !util.IsPluginEnabled(currentConfig, pluginID, false) {
+			auth.logger.Debug("skipping disabled plugin", "plugin", pluginID)
 			continue
 		}
+
 		if middlewareProvider, ok := plugin.(models.PluginWithMiddleware); ok {
 			middleware := middlewareProvider.Middleware()
 			if len(middleware) == 0 {
+				auth.logger.Debug("no middleware functions returned", "plugin", pluginID)
 				continue
 			}
 			auth.router.RegisterMiddleware(middleware...)
@@ -269,7 +275,7 @@ func (auth *Auth) Handler() http.Handler {
 			),
 		)
 
-		currentConfig := auth.PluginRegistry.GetConfig()
+		currentConfig := auth.config
 
 		// Convert route mappings to metadata format for plugin routing
 		// This works identically whether RouteMappings come from config file or library mode

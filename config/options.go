@@ -30,7 +30,17 @@ func NewConfig(options ...ConfigOption) *models.Config {
 			HttpOnly:   true,
 			SameSite:   "lax",
 		},
-		Security: models.SecurityConfig{},
+		Security: models.SecurityConfig{
+			TrustedOrigins: []string{},
+			CORS: models.CORSConfig{
+				AllowCredentials: true,
+				AllowedOrigins:   []string{"*"},
+				AllowedMethods:   []string{"OPTIONS", "GET", "POST", "PUT", "PATCH", "DELETE"},
+				AllowedHeaders:   []string{"Authorization", "Content-Type", "Cookie", "Set-Cookie"},
+				ExposedHeaders:   []string{},
+				MaxAge:           24 * time.Hour,
+			},
+		},
 		Database: models.DatabaseConfig{
 			MaxOpenConns:    25,
 			MaxIdleConns:    5,
@@ -103,6 +113,52 @@ func WithSecret(secret string) ConfigOption {
 	}
 }
 
+func WithSession(config models.SessionConfig) ConfigOption {
+	return func(c *models.Config) {
+		if config.CookieName != "" {
+			c.Session.CookieName = config.CookieName
+		}
+		if config.ExpiresIn != 0 {
+			c.Session.ExpiresIn = config.ExpiresIn
+		}
+		if config.UpdateAge != 0 {
+			c.Session.UpdateAge = config.UpdateAge
+		}
+		if config.CookieMaxAge != 0 {
+			c.Session.CookieMaxAge = config.CookieMaxAge
+		}
+		c.Session.Secure = config.Secure
+		c.Session.HttpOnly = config.HttpOnly
+		if config.SameSite != "" {
+			c.Session.SameSite = config.SameSite
+		}
+	}
+}
+
+func WithSecurity(config models.SecurityConfig) ConfigOption {
+	return func(c *models.Config) {
+		if len(config.TrustedOrigins) > 0 {
+			c.Security.TrustedOrigins = config.TrustedOrigins
+		}
+		if len(config.CORS.AllowedOrigins) > 0 {
+			c.Security.CORS.AllowedOrigins = config.CORS.AllowedOrigins
+		}
+		if len(config.CORS.AllowedMethods) > 0 {
+			c.Security.CORS.AllowedMethods = config.CORS.AllowedMethods
+		}
+		if len(config.CORS.AllowedHeaders) > 0 {
+			c.Security.CORS.AllowedHeaders = config.CORS.AllowedHeaders
+		}
+		if len(config.CORS.ExposedHeaders) > 0 {
+			c.Security.CORS.ExposedHeaders = config.CORS.ExposedHeaders
+		}
+		c.Security.CORS.AllowCredentials = config.CORS.AllowCredentials
+		if config.CORS.MaxAge != 0 {
+			c.Security.CORS.MaxAge = config.CORS.MaxAge
+		}
+	}
+}
+
 func WithDatabase(config models.DatabaseConfig) ConfigOption {
 	return func(c *models.Config) {
 		if config.Provider != "" {
@@ -161,25 +217,6 @@ func WithEventBus(config models.EventBusConfig) ConfigOption {
 		}
 		if config.RabbitMQ != nil {
 			c.EventBus.RabbitMQ = config.RabbitMQ
-		}
-	}
-}
-
-func WithSession(config models.SessionConfig) ConfigOption {
-	return func(c *models.Config) {
-		if config.CookieName != "" {
-			c.Session.CookieName = config.CookieName
-		}
-		if config.ExpiresIn != 0 {
-			c.Session.ExpiresIn = config.ExpiresIn
-		}
-	}
-}
-
-func WithSecurity(config models.SecurityConfig) ConfigOption {
-	return func(c *models.Config) {
-		if len(config.TrustedOrigins) > 0 {
-			c.Security.TrustedOrigins = config.TrustedOrigins
 		}
 	}
 }

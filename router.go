@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -64,6 +65,7 @@ type routeEntry struct {
 
 // Router wraps chi.Router and manages hooks for the request lifecycle
 type Router struct {
+	config        *models.Config
 	logger        models.Logger
 	basePath      string
 	router        chi.Router
@@ -75,7 +77,7 @@ type Router struct {
 
 // NewRouter creates a new Router with Chi as the underlying router
 // opts can be nil to use default options
-func NewRouter(logger models.Logger, basePath string, opts *RouterOptions) *Router {
+func NewRouter(config *models.Config, logger models.Logger, opts *RouterOptions) *Router {
 	if opts == nil {
 		opts = DefaultRouterOptions()
 	}
@@ -93,8 +95,9 @@ func NewRouter(logger models.Logger, basePath string, opts *RouterOptions) *Rout
 	}))
 
 	return &Router{
+		config:        config,
 		logger:        logger,
-		basePath:      basePath,
+		basePath:      config.BasePath,
 		router:        r,
 		hooks:         []models.Hook{},
 		opts:          opts,
@@ -278,8 +281,6 @@ func (r *Router) runHooks(stage models.HookStage, ctx *models.RequestContext) {
 		if hook.Matcher != nil && !hook.Matcher(ctx) {
 			continue
 		}
-
-		r.logger.Debug("runHooks", "hook", hook.PluginID)
 
 		// Async execution
 		if hook.Async {
@@ -468,6 +469,13 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Store context in request
 	reqWithCtx := req.WithContext(models.NewContextWithRequestContext(req.Context(), reqCtx))
 
+	if req.Method == http.MethodOptions {
+		r.applyCORS(nil, wrappedWriter)
+		wrappedWriter.WriteHeader(http.StatusNoContent)
+		wrappedWriter.Flush()
+		return
+	}
+
 	// Stage 1: OnRequest hooks
 	r.runHooks(models.HookOnRequest, reqCtx)
 
@@ -503,8 +511,97 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Router) finalizeResponse(ctx *models.RequestContext, w *router.DeferredResponseWriter) {
+	r.applyCORS(ctx.Request, w)
+
 	if ctx.ResponseReady {
 		w.OverrideWithContext(ctx)
 	}
 	w.Flush()
+}
+
+func (r *Router) applyCORS(
+	req *http.Request,
+	w http.ResponseWriter,
+) {
+	corsConfig := r.config.Security.CORS
+
+	origin := req.Header.Get("Origin")
+
+	// Not a CORS request
+	if origin == "" {
+		return
+	}
+
+	// Check if origin is allowed
+	if !isOriginAllowed(origin, corsConfig.AllowedOrigins) {
+		// IMPORTANT:
+		// We still set these for preflight correctness,
+		// but we intentionally DO NOT set Allow-Origin
+		if req.Method == http.MethodOptions {
+			w.Header().Set(
+				"Access-Control-Allow-Methods",
+				strings.Join(corsConfig.AllowedMethods, ", "),
+			)
+			w.Header().Set(
+				"Access-Control-Allow-Headers",
+				strings.Join(corsConfig.AllowedHeaders, ", "),
+			)
+			w.Header().Set(
+				"Access-Control-Max-Age",
+				strconv.FormatInt(int64(corsConfig.MaxAge/time.Second), 10),
+			)
+		}
+		return
+	}
+
+	// ---- Allowed origin ----
+
+	// Never use "*" when credentials are enabled
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+
+	if corsConfig.AllowCredentials {
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	}
+
+	if len(corsConfig.ExposedHeaders) > 0 {
+		w.Header().Set(
+			"Access-Control-Expose-Headers",
+			strings.Join(corsConfig.ExposedHeaders, ", "),
+		)
+	}
+
+	// Preflight-specific headers
+	if req.Method == http.MethodOptions {
+		w.Header().Set(
+			"Access-Control-Allow-Methods",
+			strings.Join(corsConfig.AllowedMethods, ", "),
+		)
+		w.Header().Set(
+			"Access-Control-Allow-Headers",
+			strings.Join(corsConfig.AllowedHeaders, ", "),
+		)
+		w.Header().Set(
+			"Access-Control-Max-Age",
+			strconv.FormatInt(int64(corsConfig.MaxAge/time.Second), 10),
+		)
+	}
+}
+
+func isOriginAllowed(origin string, allowedOrigins []string) bool {
+	for _, allowed := range allowedOrigins {
+		if allowed == "*" {
+			return true
+		}
+
+		if allowed == origin {
+			return true
+		}
+
+		// Wildcard: *.example.com
+		if strings.HasPrefix(allowed, "*.") &&
+			strings.HasSuffix(origin, strings.TrimPrefix(allowed, "*")) {
+			return true
+		}
+	}
+	return false
 }

@@ -47,7 +47,17 @@ type SessionConfig struct {
 }
 
 type SecurityConfig struct {
-	TrustedOrigins []string `json:"trusted_origins" toml:"trusted_origins"`
+	TrustedOrigins []string   `json:"trusted_origins" toml:"trusted_origins"`
+	CORS           CORSConfig `json:"cors" toml:"cors"`
+}
+
+type CORSConfig struct {
+	AllowCredentials bool          `json:"allow_credentials" toml:"allow_credentials"`
+	AllowedOrigins   []string      `json:"allowed_origins" toml:"allowed_origins"`
+	AllowedMethods   []string      `json:"allowed_methods" toml:"allowed_methods"`
+	AllowedHeaders   []string      `json:"allowed_headers" toml:"allowed_headers"`
+	ExposedHeaders   []string      `json:"exposed_headers" toml:"exposed_headers"`
+	MaxAge           time.Duration `json:"max_age" toml:"max_age"`
 }
 
 type LoggerConfig struct {

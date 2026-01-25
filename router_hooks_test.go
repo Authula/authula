@@ -12,9 +12,11 @@ import (
 
 // TestRouterHooksExecution verifies that hooks are executed at the correct stages
 func TestRouterHooksExecution(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
 	logger := &mockLogger{}
-	router := NewRouter(logger, "/api/auth", nil)
-
+	router := NewRouter(config, logger, nil)
 	executedStages := []models.HookStage{}
 
 	// Register hooks at different stages
@@ -90,8 +92,11 @@ func TestRouterHooksExecution(t *testing.T) {
 
 // TestRouterHooksHandledFlag verifies that Handled flag stops further processing
 func TestRouterHooksHandledFlag(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
 	logger := &mockLogger{}
-	router := NewRouter(logger, "/api/auth", nil)
+	router := NewRouter(config, logger, nil)
 
 	executedHooks := 0
 
@@ -144,8 +149,11 @@ func TestRouterHooksHandledFlag(t *testing.T) {
 
 // TestRouterHooksMatcher verifies that matchers control hook execution
 func TestRouterHooksMatcher(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
 	logger := &mockLogger{}
-	router := NewRouter(logger, "/api/auth", nil)
+	router := NewRouter(config, logger, nil)
 
 	executedHooks := 0
 
@@ -200,8 +208,11 @@ func TestRouterHooksMatcher(t *testing.T) {
 
 // TestRouterHooksOrder verifies that hooks execute in order
 func TestRouterHooksOrder(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
 	logger := &mockLogger{}
-	router := NewRouter(logger, "/api/auth", nil)
+	router := NewRouter(config, logger, nil)
 
 	executionOrder := []int{}
 
@@ -259,8 +270,11 @@ func TestRouterHooksOrder(t *testing.T) {
 
 // TestRequestContextValues verifies that hooks can share data via Values map
 func TestRequestContextValues(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
 	logger := &mockLogger{}
-	router := NewRouter(logger, "/api/auth", nil)
+	router := NewRouter(config, logger, nil)
 
 	// First hook sets a value
 	router.RegisterHook(models.Hook{
@@ -356,8 +370,11 @@ func TestSessionBasedJWTArchitecture(t *testing.T) {
 
 // TestRouterPanicRecovery verifies that panics in sync hooks are recovered and logged
 func TestRouterPanicRecovery(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
 	logger := &mockLogger{}
-	router := NewRouter(logger, "/api/auth", nil)
+	router := NewRouter(config, logger, nil)
 
 	// Hook that panics
 	router.RegisterHook(models.Hook{
@@ -405,8 +422,11 @@ func TestAsyncHookTimeout(t *testing.T) {
 	opts := &RouterOptions{
 		AsyncHookTimeout: 100 * time.Millisecond, // Very short timeout
 	}
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
 	logger := &mockLogger{}
-	router := NewRouter(logger, "/api/auth", opts)
+	router := NewRouter(config, logger, opts)
 
 	router.RegisterHook(models.Hook{
 		Stage: models.HookOnResponse,
@@ -449,8 +469,11 @@ func TestHookErrorModeFailFast(t *testing.T) {
 	opts := &RouterOptions{
 		HookErrorMode: HookErrorModeFailFast,
 	}
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
 	logger := &mockLogger{}
-	router := NewRouter(logger, "/api/auth", opts)
+	router := NewRouter(config, logger, opts)
 
 	hookExecutionOrder := []int{}
 
@@ -507,8 +530,11 @@ func TestHookErrorModeSilent(t *testing.T) {
 	opts := &RouterOptions{
 		HookErrorMode: HookErrorModeSilent,
 	}
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
 	logger := &mockLogger{}
-	router := NewRouter(logger, "/api/auth", opts)
+	router := NewRouter(config, logger, opts)
 
 	hookExecutionOrder := []int{}
 

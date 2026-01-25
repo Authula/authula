@@ -84,7 +84,6 @@ func (p *CSRFPlugin) validateCSRFTokenHook(reqCtx *models.RequestContext) error 
 
 	// Step 2: Validate CSRF token (Double-Submit Cookie pattern)
 	if err := p.validateCSRFToken(reqCtx); err != nil {
-		// Mark as handled (test expects this instead of error return)
 		reqCtx.Handled = true
 		return nil // Return nil to avoid propagating error through hook chain
 	}

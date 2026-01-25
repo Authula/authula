@@ -35,6 +35,19 @@ same_site = "lax"  # Options: "lax", "strict", "none"
 
 [security]
 trusted_origins = []
+[security.cors]
+allow_credentials = true
+allowed_origins = ["*"] # If using session plugin, specify exact origins instead of "*"
+allowed_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+# If using the CSRF plugin, ensure the CSRF token header is included here
+allowed_headers = ["Authorization", "Content-Type", "Cookie", "Set-Cookie"]
+exposed_headers = []
+max_age = "24h"
+# IMPORTANT CORS NOTE: If using the session plugin, the CORS plugin must specify exact allowed_origins.
+# Setting allowed_origins = ["*"] with allow_credentials = true is NOT allowed by browsers and will fail.
+# Example CORS configuration when using sessions:
+# allow_credentials = true
+# allowed_origins = ["https://yourdomain.com", "https://api.yourdomain.com"]
 
 # -----------------------------------
 # - Logger Configuration
@@ -100,23 +113,6 @@ from_address = ""
 
 # Resend API Configuration (when provider = "resend")
 # NOTE: The Resend API key MUST be set via the RESEND_API_KEY environment variable.
-
-# --- CORS Plugin (to handle Cross-Origin Resource Sharing) ---
-
-[plugins.cors]
-enabled = true
-allow_credentials = true
-allowed_origins = ["*"] # If using session plugin, specify exact origins instead of "*"
-allowed_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-# If using the CSRF plugin, ensure the CSRF token header is included here
-allowed_headers = ["Authorization", "Content-Type", "Cookie", "Set-Cookie"]
-exposed_headers = []
-max_age = "24h"
-# IMPORTANT CORS NOTE: If using the session plugin, the CORS plugin must specify exact allowed_origins.
-# Setting allowed_origins = ["*"] with allow_credentials = true is NOT allowed by browsers and will fail.
-# Example CORS configuration when using sessions:
-# allow_credentials = true
-# allowed_origins = ["https://yourdomain.com", "https://api.yourdomain.com"]
 
 # --- CSRF Plugin (for protecting against CSRF attacks) ---
 

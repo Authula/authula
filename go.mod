@@ -20,6 +20,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/lestrrat-go/jwx/v3 v3.0.12
 	github.com/lib/pq v1.10.9
+	github.com/lmittmann/tint v1.1.2
 	github.com/mattn/go-sqlite3 v1.14.33
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/resend/resend-go/v3 v3.0.0
@@ -79,7 +80,6 @@ require (
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/lestrrat-go/option/v2 v2.0.0 // indirect
 	github.com/lithammer/shortuuid/v3 v3.0.7 // indirect
-	github.com/lmittmann/tint v1.1.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/nats-io/nats.go v1.48.0 // indirect

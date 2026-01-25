@@ -52,7 +52,6 @@ func (p *CSRFPlugin) Init(ctx *models.PluginContext) error {
 
 	p.pluginConfig.ApplyDefaults()
 
-	// Initialize header protection if enabled
 	if p.pluginConfig.EnableHeaderProtection {
 		if err := p.initializeHeaderProtection(); err != nil {
 			return err
@@ -153,25 +152,25 @@ func (p *CSRFPlugin) generateToken() string {
 }
 
 // validateCSRFToken validates the CSRF token for unsafe methods on protected endpoints
-func (p *CSRFPlugin) validateCSRFToken(ctx *models.RequestContext) error {
-	r := ctx.Request
+func (p *CSRFPlugin) validateCSRFToken(reqCtx *models.RequestContext) error {
+	r := reqCtx.Request
 	cookie, err := r.Cookie(p.pluginConfig.CookieName)
 	if err != nil {
-		ctx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "missing csrf cookie"})
-		ctx.Handled = true
+		reqCtx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "missing csrf cookie"})
+		reqCtx.Handled = true
 		return nil
 	}
 
-	// Get token from header or form
 	headerToken := r.Header.Get(p.pluginConfig.HeaderName)
 	if headerToken == "" {
-		headerToken = r.FormValue(p.pluginConfig.CookieName)
+		reqCtx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "missing csrf token in header"})
+		reqCtx.Handled = true
+		return nil
 	}
 
-	// Compare cookie value with header/form value
 	if headerToken != cookie.Value {
-		ctx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "invalid csrf token"})
-		ctx.Handled = true
+		reqCtx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "invalid csrf token"})
+		reqCtx.Handled = true
 		return nil
 	}
 
@@ -208,7 +207,9 @@ func (p *CSRFPlugin) Middleware() func(http.Handler) http.Handler {
 
 			headerToken := r.Header.Get(p.pluginConfig.HeaderName)
 			if headerToken == "" {
-				headerToken = r.FormValue(p.pluginConfig.CookieName)
+				reqCtx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "missing csrf token in header"})
+				reqCtx.Handled = true
+				return
 			}
 
 			if headerToken != cookie.Value {
@@ -240,23 +241,15 @@ func (p *CSRFPlugin) setCSRFCookie(reqCtx *models.RequestContext, token string) 
 		samesite = http.SameSiteLaxMode
 	}
 
-	// For security, always set Secure=true unless explicitly set to false in config
-	// This ensures production security while allowing development override
-	secureValue := p.pluginConfig.Secure
-	if !p.pluginConfig.Secure {
-		secureValue = true
-	}
-	if reqCtx.Request.URL.Scheme == "http" {
-		// Override to false for development
-		secureValue = false
-	}
+	// Secure must be true for HTTPS requests or when SameSite=None
+	secure := reqCtx.Request.URL.Scheme == "https" || samesite == http.SameSiteNoneMode || p.pluginConfig.Secure
 
 	http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
 		Name:     p.pluginConfig.CookieName,
 		Value:    token,
 		Path:     "/",
-		HttpOnly: false,       // Hardcoded: Required for Double-Submit Cookie pattern
-		Secure:   secureValue, // Use config with HTTP override for development
+		HttpOnly: false, // Hardcoded: Required for Double-Submit Cookie pattern
+		Secure:   secure,
 		SameSite: samesite,
 		MaxAge:   int(p.pluginConfig.MaxAge.Seconds()),
 	})

@@ -9,8 +9,11 @@ import (
 )
 
 func TestDynamicRouteHooks(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
 	logger := &TestLogger{}
-	router := NewRouter(logger, "/api/auth", nil)
+	router := NewRouter(config, logger, nil)
 
 	// Register a dynamic route: /api/auth/oauth2/callback/{provider}
 	router.SetRouteMetadataFromConfig(map[string]map[string]any{
@@ -27,7 +30,7 @@ func TestDynamicRouteHooks(t *testing.T) {
 		Handler: func(ctx *models.RequestContext) error {
 			hookCalled = true
 			// Store provider for verification
-			provider := ctx.Path[len("/api/auth/oauth2/callback/"):]
+			provider := ctx.Path[len(config.BasePath+"/oauth2/callback/"):]
 			ctx.Values["provider"] = provider
 			ctx.ResponseWriter.Header().Set("X-Provider", provider)
 			return nil

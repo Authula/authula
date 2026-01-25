@@ -8,7 +8,6 @@ import (
 	bearerplugin "github.com/GoBetterAuth/go-better-auth/plugins/bearer"
 	configmanagerplugin "github.com/GoBetterAuth/go-better-auth/plugins/config-manager"
 	configmanagerplugintypes "github.com/GoBetterAuth/go-better-auth/plugins/config-manager/types"
-	corsplugin "github.com/GoBetterAuth/go-better-auth/plugins/cors"
 	csrfplugin "github.com/GoBetterAuth/go-better-auth/plugins/csrf"
 	emailplugin "github.com/GoBetterAuth/go-better-auth/plugins/email"
 	emailpasswordplugin "github.com/GoBetterAuth/go-better-auth/plugins/email-password"
@@ -80,22 +79,6 @@ var pluginFactories = []PluginFactory{
 		},
 		Constructor: func(typedConfig any) models.Plugin {
 			return emailplugin.New(typedConfig.(emailplugintypes.EmailPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginCORS.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := corsplugin.CORSPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse cors plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return corsplugin.New(typedConfig.(corsplugin.CORSPluginConfig))
 		},
 	},
 	{

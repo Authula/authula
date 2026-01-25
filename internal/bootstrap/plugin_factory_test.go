@@ -18,7 +18,7 @@ func assertPanic(t *testing.T, f func()) {
 func TestBuildPluginsFromConfig_ValidPlugins(t *testing.T) {
 	cfg := &models.Config{
 		Plugins: map[string]any{
-			models.PluginCORS.String(): map[string]any{
+			models.PluginCSRF.String(): map[string]any{
 				"enabled": true,
 			},
 		},
@@ -33,7 +33,7 @@ func TestBuildPluginsFromConfig_ValidPlugins(t *testing.T) {
 	// Verify core plugin is present
 	hasCorePlugin := false
 	for _, p := range plugins {
-		if p.Metadata().ID == models.PluginCORS.String() {
+		if p.Metadata().ID == models.PluginCSRF.String() {
 			hasCorePlugin = true
 			break
 		}
@@ -46,7 +46,7 @@ func TestBuildPluginsFromConfig_ValidPlugins(t *testing.T) {
 func TestBuildPluginsFromConfig_UnknownPlugin(t *testing.T) {
 	cfg := &models.Config{
 		Plugins: map[string]any{
-			models.PluginCORS.String(): map[string]any{
+			models.PluginCSRF.String(): map[string]any{
 				"enabled": true,
 			},
 			"unknown_plugin": map[string]any{
@@ -61,7 +61,7 @@ func TestBuildPluginsFromConfig_UnknownPlugin(t *testing.T) {
 func TestBuildPluginsFromConfig_DisabledPlugins(t *testing.T) {
 	cfg := &models.Config{
 		Plugins: map[string]any{
-			models.PluginCORS.String(): map[string]any{
+			models.PluginCSRF.String(): map[string]any{
 				"enabled": true,
 			},
 			models.PluginCSRF.String(): map[string]any{
@@ -85,7 +85,7 @@ func TestBuildPluginsFromConfig_PluginOrder(t *testing.T) {
 			models.PluginConfigManager.String(): map[string]any{
 				"enabled": true,
 			},
-			models.PluginCORS.String(): map[string]any{
+			models.PluginCSRF.String(): map[string]any{
 				"enabled": true,
 			},
 		},
@@ -105,7 +105,7 @@ func TestBuildPluginsFromConfig_PluginOrder(t *testing.T) {
 func TestBuildPluginsFromConfig_CoreDisabled(t *testing.T) {
 	cfg := &models.Config{
 		Plugins: map[string]any{
-			models.PluginCORS.String(): map[string]any{
+			models.PluginCSRF.String(): map[string]any{
 				"enabled": false,
 			},
 		},
@@ -114,8 +114,8 @@ func TestBuildPluginsFromConfig_CoreDisabled(t *testing.T) {
 	plugins := BuildPluginsFromConfig(cfg)
 
 	for _, p := range plugins {
-		if p.Metadata().ID == models.PluginCORS.String() {
-			t.Errorf("cors plugin should not be in plugins list when disabled")
+		if p.Metadata().ID == models.PluginCSRF.String() {
+			t.Errorf("csrf plugin should not be in plugins list when disabled")
 		}
 	}
 }

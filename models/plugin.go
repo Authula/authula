@@ -14,7 +14,6 @@ const (
 	PluginConfigManager    PluginID = "config_manager"
 	PluginSecondaryStorage PluginID = "secondary_storage"
 	PluginEmail            PluginID = "email"
-	PluginCORS             PluginID = "cors"
 	PluginCSRF             PluginID = "csrf"
 	PluginEmailPassword    PluginID = "email_password"
 	PluginOAuth2           PluginID = "oauth2"

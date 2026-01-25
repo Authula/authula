@@ -12,8 +12,11 @@ import (
 // TestRouteMetadataPopulation verifies that route metadata is properly assigned to RequestContext
 func TestRouteMetadataPopulation(t *testing.T) {
 	// Create a router with test logger
+	config := &models.Config{
+		BasePath: "/auth",
+	}
 	logger := &testLogger{}
-	router := NewRouter(logger, "/auth", nil)
+	router := NewRouter(config, logger, nil)
 
 	// Set up route metadata from config
 	routeMetadata := map[string]map[string]any{
@@ -80,8 +83,11 @@ func TestRouteMetadataPopulation(t *testing.T) {
 
 // TestPluginIDBasedHookExecution verifies that hooks with PluginID only execute when their ID is in route metadata
 func TestPluginIDBasedHookExecution(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/auth",
+	}
 	logger := &testLogger{}
-	router := NewRouter(logger, "/auth", nil)
+	router := NewRouter(config, logger, nil)
 
 	// Set up route metadata
 	routeMetadata := map[string]map[string]any{
@@ -259,8 +265,11 @@ func TestRouteMetadataConversion(t *testing.T) {
 
 // TestHookExecutionOrder verifies that hooks execute in correct stage and order
 func TestHookExecutionOrder(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/auth",
+	}
 	logger := &testLogger{}
-	router := NewRouter(logger, "/auth", nil)
+	router := NewRouter(config, logger, nil)
 
 	var executionLog []string
 
@@ -335,8 +344,11 @@ func TestHookExecutionOrder(t *testing.T) {
 
 // TestDynamicRouteMatching verifies that hooks run against dynamic routes with path parameters
 func TestDynamicRouteMatching(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/auth",
+	}
 	logger := &testLogger{}
-	router := NewRouter(logger, "/auth", nil)
+	router := NewRouter(config, logger, nil)
 
 	// Set up route metadata with dynamic routes (using {param} syntax)
 	routeMetadata := map[string]map[string]any{
@@ -522,9 +534,11 @@ func TestRoutePathMatching(t *testing.T) {
 // TestDynamicPathWithBasePathDebug tests the exact scenario: /api/auth/oauth2/callback/google
 // with route mapping of /oauth2/callback/{provider} and basePath of /api/auth
 func TestDynamicPathWithBasePathDebug(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
 	logger := &testLogger{}
-	// Using basePath like in auth.go
-	router := NewRouter(logger, "/api/auth", nil)
+	router := NewRouter(config, logger, nil)
 
 	// Simulating what happens in auth.go Handler()
 	// The config has "/oauth2/callback/{provider}" which gets the basePath prefixed
@@ -585,9 +599,11 @@ func (l *testLogger) Error(msg string, args ...interface{}) {}
 
 // TestDoubleBasePathApplication tests that basePath is not applied twice
 func TestDoubleBasePathApplication(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
 	logger := &testLogger{}
-	// Using basePath like in auth.go
-	router := NewRouter(logger, "/api/auth", nil)
+	router := NewRouter(config, logger, nil)
 
 	// This simulates what auth.go does:
 	// 1. Route mapping: "/oauth2/callback/{provider}"
