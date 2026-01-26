@@ -134,8 +134,14 @@ func TestCSRFPlugin_New(t *testing.T) {
 func TestCSRFPlugin_GenerateToken(t *testing.T) {
 	p := New(CSRFPluginConfig{})
 
-	token1 := p.generateToken()
-	token2 := p.generateToken()
+	token1, err := p.tokenService.Generate()
+	if err != nil {
+		t.Fatalf("failed to generate token1: %v", err)
+	}
+	token2, err := p.tokenService.Generate()
+	if err != nil {
+		t.Fatalf("failed to generate token2: %v", err)
+	}
 
 	// Tokens should not be empty
 	if token1 == "" {

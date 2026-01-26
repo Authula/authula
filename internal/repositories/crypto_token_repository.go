@@ -26,13 +26,13 @@ func NewCryptoTokenRepository(secret string) TokenRepository {
 	}
 }
 
-// Generate generates a random 256-bit token encoded as base64url
+// Generate generates a random 256-bit token encoded as hex
 func (r *CryptoTokenRepositoryImpl) Generate() (string, error) {
 	b := make([]byte, 32)
 	if _, err := io.ReadFull(rand.Reader, b); err != nil {
 		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
+	return hex.EncodeToString(b), nil
 }
 
 // Hash creates a SHA256 hash of the token (for DB storage)

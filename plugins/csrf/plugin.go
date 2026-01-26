@@ -1,12 +1,12 @@
 package csrf
 
 import (
-	"crypto/rand"
-	"encoding/base64"
+	"fmt"
 	"net/http"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
+	rootservices "github.com/GoBetterAuth/go-better-auth/services"
 )
 
 // TODO: Phase 2
@@ -18,8 +18,9 @@ import (
 type CSRFPlugin struct {
 	globalConfig *models.Config
 	pluginConfig CSRFPluginConfig
-	ctx          *models.PluginContext
 	logger       models.Logger
+	tokenService rootservices.TokenService
+	ctx          *models.PluginContext
 	cop          *http.CrossOriginProtection
 }
 
@@ -57,6 +58,12 @@ func (p *CSRFPlugin) Init(ctx *models.PluginContext) error {
 			return err
 		}
 	}
+
+	tokenService, ok := ctx.ServiceRegistry.Get(models.ServiceToken.String()).(rootservices.TokenService)
+	if !ok {
+		return fmt.Errorf("token service not available in service registry")
+	}
+	p.tokenService = tokenService
 
 	return nil
 }
@@ -144,13 +151,6 @@ func (p *CSRFPlugin) validateHeaderProtection(r *http.Request) error {
 	return nil
 }
 
-// generateToken creates a new CSRF token using 32 bytes of cryptographic randomness
-func (p *CSRFPlugin) generateToken() string {
-	b := make([]byte, 32)
-	rand.Read(b)
-	return base64.StdEncoding.EncodeToString(b)
-}
-
 // validateCSRFToken validates the CSRF token for unsafe methods on protected endpoints
 func (p *CSRFPlugin) validateCSRFToken(reqCtx *models.RequestContext) error {
 	r := reqCtx.Request
@@ -191,7 +191,15 @@ func (p *CSRFPlugin) Middleware() func(http.Handler) http.Handler {
 			if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
 				_, err := r.Cookie(p.pluginConfig.CookieName)
 				if err == http.ErrNoCookie {
-					token := p.generateToken()
+					token, err := p.tokenService.Generate()
+					if err != nil {
+						reqCtx.SetJSONResponse(
+							http.StatusInternalServerError,
+							map[string]string{"message": "failed to generate csrf token"},
+						)
+						reqCtx.Handled = true
+						return
+					}
 					p.setCSRFCookie(reqCtx, token)
 				}
 				next.ServeHTTP(w, r)

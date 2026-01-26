@@ -470,15 +470,14 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	reqWithCtx := req.WithContext(models.NewContextWithRequestContext(req.Context(), reqCtx))
 
 	if req.Method == http.MethodOptions {
-		r.applyCORS(nil, wrappedWriter)
-		wrappedWriter.WriteHeader(http.StatusNoContent)
+		r.applyCORS(req, wrappedWriter)
+		wrappedWriter.WriteHeader(http.StatusOK)
 		wrappedWriter.Flush()
 		return
 	}
 
 	// Stage 1: OnRequest hooks
 	r.runHooks(models.HookOnRequest, reqCtx)
-
 	if reqCtx.Handled {
 		r.finalizeResponse(reqCtx, wrappedWriter)
 		return
@@ -486,7 +485,6 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// Stage 2: Before hooks
 	r.runHooks(models.HookBefore, reqCtx)
-
 	if reqCtx.Handled {
 		r.finalizeResponse(reqCtx, wrappedWriter)
 		return
@@ -497,7 +495,6 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// Stage 4: After hooks
 	r.runHooks(models.HookAfter, reqCtx)
-
 	if reqCtx.Handled {
 		r.finalizeResponse(reqCtx, wrappedWriter)
 		return
@@ -510,12 +507,17 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.finalizeResponse(reqCtx, wrappedWriter)
 }
 
-func (r *Router) finalizeResponse(ctx *models.RequestContext, w *router.DeferredResponseWriter) {
+func (r *Router) finalizeResponse(
+	ctx *models.RequestContext,
+	w *router.DeferredResponseWriter,
+) {
+	// CORS must ALWAYS be applied (success or failure)
 	r.applyCORS(ctx.Request, w)
 
 	if ctx.ResponseReady {
 		w.OverrideWithContext(ctx)
 	}
+
 	w.Flush()
 }
 
@@ -526,17 +528,20 @@ func (r *Router) applyCORS(
 	corsConfig := r.config.Security.CORS
 
 	origin := req.Header.Get("Origin")
-
-	// Not a CORS request
 	if origin == "" {
 		return
 	}
 
-	// Check if origin is allowed
+	// Required for caches when echoing origin
+	w.Header().Add("Vary", "Origin")
+
+	// Spec violation guard: credentials + wildcard
+	if corsConfig.AllowCredentials && slices.Contains(corsConfig.AllowedOrigins, "*") {
+		return
+	}
+
+	// Origin not allowed
 	if !isOriginAllowed(origin, corsConfig.AllowedOrigins) {
-		// IMPORTANT:
-		// We still set these for preflight correctness,
-		// but we intentionally DO NOT set Allow-Origin
 		if req.Method == http.MethodOptions {
 			w.Header().Set(
 				"Access-Control-Allow-Methods",
@@ -555,8 +560,6 @@ func (r *Router) applyCORS(
 	}
 
 	// ---- Allowed origin ----
-
-	// Never use "*" when credentials are enabled
 	w.Header().Set("Access-Control-Allow-Origin", origin)
 
 	if corsConfig.AllowCredentials {
@@ -570,7 +573,6 @@ func (r *Router) applyCORS(
 		)
 	}
 
-	// Preflight-specific headers
 	if req.Method == http.MethodOptions {
 		w.Header().Set(
 			"Access-Control-Allow-Methods",
@@ -592,12 +594,9 @@ func isOriginAllowed(origin string, allowedOrigins []string) bool {
 		if allowed == "*" {
 			return true
 		}
-
 		if allowed == origin {
 			return true
 		}
-
-		// Wildcard: *.example.com
 		if strings.HasPrefix(allowed, "*.") &&
 			strings.HasSuffix(origin, strings.TrimPrefix(allowed, "*")) {
 			return true

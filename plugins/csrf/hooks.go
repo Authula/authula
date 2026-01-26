@@ -51,7 +51,15 @@ func (p *CSRFPlugin) generateCSRFTokenHook(reqCtx *models.RequestContext) error 
 		return nil
 	}
 
-	token := p.generateToken()
+	token, err := p.tokenService.Generate()
+	if err != nil {
+		reqCtx.SetJSONResponse(
+			http.StatusInternalServerError,
+			map[string]string{"message": "failed to generate csrf token"},
+		)
+		reqCtx.Handled = true
+		return nil
+	}
 	p.setCSRFCookie(reqCtx, token)
 
 	return nil
