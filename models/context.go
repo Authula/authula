@@ -14,6 +14,7 @@ const (
 	ContextSessionToken                 ContextKey = "session_token"
 	ContextRequestContext               ContextKey = "request_context"
 	ContextAuthSuccess                  ContextKey = "auth.success"
+	ContextAuthSignOut                  ContextKey = "auth.sign_out"
 	ContextAuthIdempotentSkipTokensMint ContextKey = "auth.idempotent_skip_tokens_mint"
 )
 

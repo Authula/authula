@@ -18,14 +18,22 @@ const (
 	// HookIDSessionAuthOptional identifies the optional session authentication hook.
 	// Validates session cookie and sets ctx.UserID if valid, but does not return unauthorized if invalid
 	HookIDSessionAuthOptional SessionHookID = "session.auth.optional"
-
-	// HookIDSessionClear identifies the session clear hook.
-	// Clears session cookie on sign-out
-	HookIDSessionClear SessionHookID = "session.clear"
 )
 
 func (id SessionHookID) String() string {
 	return string(id)
+}
+
+// authSuccessMatcher returns true if the request context indicates a successful authentication
+func (p *SessionPlugin) authSuccessMatcher(reqCtx *models.RequestContext) bool {
+	authSuccess, ok := reqCtx.Values[models.ContextAuthSuccess.String()].(bool)
+	return ok && authSuccess
+}
+
+// signedOutMatcher returns true if the request context indicates a sign-out action
+func (p *SessionPlugin) signedOutMatcher(reqCtx *models.RequestContext) bool {
+	signedOut, ok := reqCtx.Values[models.ContextAuthSignOut.String()].(bool)
+	return ok && signedOut
 }
 
 // validateSessionHook validates a session cookie from the request and sets UserID
@@ -154,20 +162,17 @@ func (p *SessionPlugin) buildHooks() []models.Hook {
 		},
 		// Session issuance hook: sets cookie after successful auth
 		{
-			Stage: models.HookAfter,
-			Matcher: func(reqCtx *models.RequestContext) bool {
-				authSuccess, ok := reqCtx.Values[models.ContextAuthSuccess.String()].(bool)
-				return ok && authSuccess
-			},
+			Stage:   models.HookAfter,
+			Matcher: p.authSuccessMatcher,
 			Handler: p.issueSessionCookieHook,
 			Order:   5,
 		},
 		// Session clear hook: clears cookie on sign-out
 		{
-			Stage:    models.HookAfter,
-			PluginID: HookIDSessionClear.String(),
-			Handler:  p.clearSessionCookie,
-			Order:    10,
+			Stage:   models.HookAfter,
+			Matcher: p.signedOutMatcher,
+			Handler: p.clearSessionCookie,
+			Order:   10,
 		},
 	}
 }

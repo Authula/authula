@@ -24,18 +24,24 @@ func (id CSRFHookID) String() string {
 }
 
 // safeMethodMatcher returns true for safe HTTP methods (non-state-changing requests)
-func (p *CSRFPlugin) safeMethodMatcher(ctx *models.RequestContext) bool {
-	method := ctx.Method
+func (p *CSRFPlugin) safeMethodMatcher(reqCtx *models.RequestContext) bool {
+	method := reqCtx.Method
 	isValidMethod := method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions
 	return isValidMethod
 }
 
 // unsafeMethodMatcher returns true for unsafe HTTP methods (state-changing requests)
-func (p *CSRFPlugin) unsafeMethodMatcher(ctx *models.RequestContext) bool {
-	method := ctx.Method
+func (p *CSRFPlugin) unsafeMethodMatcher(reqCtx *models.RequestContext) bool {
+	method := reqCtx.Method
 	isValidMethod := method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch || method == http.MethodDelete
 
 	return isValidMethod
+}
+
+// signedOutMatcher returns true if the request context indicates a sign-out action
+func (p *CSRFPlugin) signedOutMatcher(reqCtx *models.RequestContext) bool {
+	signedOut, ok := reqCtx.Values[models.ContextAuthSignOut.String()].(bool)
+	return ok && signedOut
 }
 
 // generateCSRFTokenHook generates and sets CSRF tokens for safe methods
@@ -99,13 +105,25 @@ func (p *CSRFPlugin) validateCSRFTokenHook(reqCtx *models.RequestContext) error 
 	return nil
 }
 
+// clearCSRFTokenHook clears the CSRF token cookie
+func (p *CSRFPlugin) clearCSRFTokenHook(reqCtx *models.RequestContext) error {
+	http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
+		Name:     p.pluginConfig.CookieName,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: false,
+		Secure:   p.pluginConfig.Secure,
+		MaxAge:   -1,
+	})
+	return nil
+}
+
 // buildHooks returns the configured hooks for this plugin
 // CSRF protection is provided through both token generation and validation hooks
 // Uses PluginID-based filtering so CSRF only executes when explicitly configured in route metadata
 func (p *CSRFPlugin) buildHooks() []models.Hook {
 	return []models.Hook{
 		// CSRF token generation hook: generates tokens for safe methods
-		// PluginID-based: only executes if "csrf.generate" is in route.Metadata["plugins"]
 		// Handler: generates token for safe methods
 		{
 			Stage:   models.HookBefore,
@@ -113,7 +131,6 @@ func (p *CSRFPlugin) buildHooks() []models.Hook {
 			Handler: p.generateCSRFTokenHook,
 			Order:   5, // Execute before auth but before main handler
 		},
-
 		// CSRF protection hook: validates tokens on state-changing requests
 		// PluginID-based: only executes if "csrf.protect" is in route.Metadata["plugins"]
 		// Matcher: unsafe methods (POST, PUT, PATCH, DELETE)
@@ -123,6 +140,13 @@ func (p *CSRFPlugin) buildHooks() []models.Hook {
 			Matcher:  p.unsafeMethodMatcher,
 			Handler:  p.validateCSRFTokenHook,
 			Order:    15,
+		},
+		// CSRF clear hook: clears CSRF cookie on sign-out
+		{
+			Stage:   models.HookAfter,
+			Matcher: p.signedOutMatcher,
+			Handler: p.clearCSRFTokenHook,
+			Order:   15, // Execute after session clear
 		},
 	}
 }

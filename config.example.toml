@@ -324,3 +324,8 @@ buffer_size = 100
 # path = "/change-password"
 # method = "POST"
 # plugins = ["session.auth", "csrf.protect"]
+
+# [[route_mappings]]
+# path = "/sign-out"
+# method = "POST"
+# plugins = ["session.auth", "csrf.protect"]

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/types"
 )
 
 type JWTHookID string
@@ -51,8 +52,8 @@ func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
 	}
 
 	// Store tokens in context for other hooks to handle sending response
-	reqCtx.Values["access_token"] = tokenPair.AccessToken
-	reqCtx.Values["refresh_token"] = tokenPair.RefreshToken
+	reqCtx.Values[types.JWTTokenTypeAccess.String()] = tokenPair.AccessToken
+	reqCtx.Values[types.JWTTokenTypeRefresh.String()] = tokenPair.RefreshToken
 
 	return nil
 }
@@ -63,8 +64,8 @@ func (p *JWTPlugin) respondHook(reqCtx *models.RequestContext) error {
 		return nil
 	}
 
-	access, ok1 := reqCtx.Values["access_token"].(string)
-	refresh, ok2 := reqCtx.Values["refresh_token"].(string)
+	access, ok1 := reqCtx.Values[types.JWTTokenTypeAccess.String()].(string)
+	refresh, ok2 := reqCtx.Values[types.JWTTokenTypeRefresh.String()].(string)
 	if !ok1 || !ok2 {
 		return nil
 	}

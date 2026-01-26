@@ -46,6 +46,8 @@ func (h *SignOutHandler) Handler() http.HandlerFunc {
 			return
 		}
 
+		reqCtx.Values[models.ContextAuthSignOut.String()] = true
+
 		reqCtx.SetJSONResponse(http.StatusOK, result)
 	}
 }
