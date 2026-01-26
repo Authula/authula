@@ -77,6 +77,8 @@ func (h *AuthorizeHandler) Handler() http.HandlerFunc {
 			})
 		}
 
-		http.Redirect(reqCtx.ResponseWriter, r, resp.AuthorizationURL, http.StatusTemporaryRedirect)
+		reqCtx.SetJSONResponse(http.StatusOK, &types.AuthorizeResponse{
+			AuthURL: resp.AuthorizationURL,
+		})
 	}
 }
