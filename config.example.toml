@@ -17,6 +17,27 @@ base_path = "/auth"
 secret = ""
 
 # -----------------------------------
+# - Database Configuration
+# -----------------------------------
+
+[database]
+provider = "sqlite"
+# SECURITY NOTE: It is recommended to set the 'connection_string' via the 
+# GO_BETTER_AUTH_DATABASE_URL environment variable rather than hardcoding it here.
+url = "auth.db"
+max_open_conns = 25
+max_idle_conns = 5
+conn_max_lifetime = "10m"
+
+# -----------------------------------
+# - Logger Configuration
+# -----------------------------------
+
+[logger]
+level = "debug"  # Options: "debug", "info", "warn", "error"
+
+
+# -----------------------------------
 # - Session Configuration
 # -----------------------------------
 
@@ -50,24 +71,58 @@ max_age = "24h"
 # allowed_origins = ["https://yourdomain.com", "https://api.yourdomain.com"]
 
 # -----------------------------------
-# - Logger Configuration
+# - Event Bus Configuration
 # -----------------------------------
+# The event bus handles internal authentication events and allows plugins to communicate
+# Supports multiple providers via Watermill.
+# Provider options: "gochannel", "sqlite", "postgres", "redis", "kafka", "nats", "rabbitmq"
 
-[logger]
-level = "debug"  # Options: "debug", "info", "warn", "error"
+[event_bus]
+# Optional prefix for all event topics (default: "")
+prefix = ""
+# Maximum concurrent handlers for event processing (default: 100)
+max_concurrent_handlers = 100
 
-# -----------------------------------
-# - Database Configuration
-# -----------------------------------
+# GoChannel Configuration (Default - In-Memory)
+# Best for development and testing - events lost on restart
+# Other providers enable distributed event handling across multiple instances
+provider = "gochannel"
+[event_bus.go_channel]
+buffer_size = 100
 
-[database]
-provider = "sqlite"
-# SECURITY NOTE: It is recommended to set the 'connection_string' via the 
-# GO_BETTER_AUTH_DATABASE_URL environment variable rather than hardcoding it here.
-url = "auth.db"
-max_open_conns = 25
-max_idle_conns = 5
-conn_max_lifetime = "10m"
+# SQLite Configuration
+# Event storage in SQLite file (good for single-instance deployments with persistence)
+# provider = "sqlite"
+# [event_bus.sqlite]
+# db_path = "events.db"  # File path for the SQLite database (relative to current working directory)
+
+# Redis Configuration
+# Enables distributed event handling across multiple instances
+# provider = "redis"
+# [event_bus.redis]
+# Prefer to use EVENT_BUS_REDIS_URL environment variable to set the URL
+# url = "redis://localhost:6379/0"
+# consumer_group = "gobetterauth_consumer_group"
+
+# Kafka Configuration
+# For high-throughput, distributed event streaming
+# provider = "kafka"
+# [event_bus.kafka]
+# brokers = "localhost:9092"
+# consumer_group = "gobetterauth_consumer_group"
+
+# NATS Configuration
+# Lightweight, cloud-native messaging
+# provider = "nats"
+# [event_bus.nats]
+# url = "nats://localhost:4222"
+
+# AMQP Configuration (RabbitMQ)
+# Traditional message broker with advanced routing
+# provider = "rabbitmq"
+# [event_bus.rabbitmq]
+# Prefer to use EVENT_BUS_RABBITMQ_URL environment variable to set the URL
+# url = "amqp://guest:guest@localhost:5672/"
 
 # -----------------------------------
 # - Plugins Configuration
@@ -243,60 +298,6 @@ enabled = true
 # 
 # [plugins.ratelimit.database]
 # cleanup_interval = "1m"  # How often to remove expired entries from database (default: 1m)
-
-# -----------------------------------
-# - Event Bus Configuration
-# -----------------------------------
-# The event bus handles internal authentication events and allows plugins to communicate
-# Supports multiple providers via Watermill.
-# Provider options: "gochannel", "sqlite", "postgres", "redis", "kafka", "nats", "rabbitmq"
-
-[event_bus]
-# Optional prefix for all event topics (default: "")
-prefix = ""
-# Maximum concurrent handlers for event processing (default: 100)
-max_concurrent_handlers = 100
-
-# GoChannel Configuration (Default - In-Memory)
-# Best for development and testing - events lost on restart
-# Other providers enable distributed event handling across multiple instances
-provider = "gochannel"
-[event_bus.go_channel]
-buffer_size = 100
-
-# SQLite Configuration
-# Event storage in SQLite file (good for single-instance deployments with persistence)
-# provider = "sqlite"
-# [event_bus.sqlite]
-# db_path = "events.db"  # File path for the SQLite database (relative to current working directory)
-
-# Redis Configuration
-# Enables distributed event handling across multiple instances
-# provider = "redis"
-# [event_bus.redis]
-# Prefer to use EVENT_BUS_REDIS_URL environment variable to set the URL
-# url = "redis://localhost:6379/0"
-# consumer_group = "gobetterauth_consumer_group"
-
-# Kafka Configuration
-# For high-throughput, distributed event streaming
-# provider = "kafka"
-# [event_bus.kafka]
-# brokers = "localhost:9092"
-# consumer_group = "gobetterauth_consumer_group"
-
-# NATS Configuration
-# Lightweight, cloud-native messaging
-# provider = "nats"
-# [event_bus.nats]
-# url = "nats://localhost:4222"
-
-# AMQP Configuration (RabbitMQ)
-# Traditional message broker with advanced routing
-# provider = "rabbitmq"
-# [event_bus.rabbitmq]
-# Prefer to use EVENT_BUS_RABBITMQ_URL environment variable to set the URL
-# url = "amqp://guest:guest@localhost:5672/"
 
 # -----------------------------------
 # - Route-to-Plugin Mappings (Standalone Mode)

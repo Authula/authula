@@ -11,29 +11,34 @@ type Config struct {
 	BaseURL  string         `json:"base_url" toml:"base_url"`
 	BasePath string         `json:"base_path" toml:"base_path"`
 	Secret   string         `json:"secret" toml:"secret"`
-	Session  SessionConfig  `json:"session" toml:"session"`
-	Security SecurityConfig `json:"security" toml:"security"`
-
-	// Core infrastructure configuration
 	Database DatabaseConfig `json:"database" toml:"database"`
 	Logger   LoggerConfig   `json:"logger" toml:"logger"`
+	Session  SessionConfig  `json:"session" toml:"session"`
+	Security SecurityConfig `json:"security" toml:"security"`
 	EventBus EventBusConfig `json:"event_bus" toml:"event_bus"`
-
-	// Plugin configurations
-	Plugins PluginsConfig `json:"plugins" toml:"plugins"`
-
+	Plugins  PluginsConfig  `json:"plugins" toml:"plugins"`
 	// RouteMappings defines plugin-to-route mappings.
 	// Each route specifies which plugins should execute hooks for that endpoint.
 	// This enables fully declarative plugin routing in both standalone and library modes.
 	RouteMappings []RouteMapping `json:"route_mappings" toml:"route_mappings"`
-
 	// PreParsedConfigs stores the original typed plugin config objects.
 	// This allows skipping mapstructure unmarshalling and preserving type safety.
 	// Key: plugin ID, Value: typed config struct passed to Auth.New()
 	PreParsedConfigs map[string]any `json:"-" toml:"-"`
-
 	// DatabaseHooks allows you to hook into database operations for users, accounts, sessions, and verifications.
 	DatabaseHooks *CoreDatabaseHooks `json:"-" toml:"-"`
+}
+
+type DatabaseConfig struct {
+	Provider        string        `json:"provider" toml:"provider"`
+	URL             string        `json:"url" toml:"url"`
+	MaxOpenConns    int           `json:"max_open_conns" toml:"max_open_conns"`
+	MaxIdleConns    int           `json:"max_idle_conns" toml:"max_idle_conns"`
+	ConnMaxLifetime time.Duration `json:"conn_max_lifetime" toml:"conn_max_lifetime"`
+}
+
+type LoggerConfig struct {
+	Level string `json:"level" toml:"level"`
 }
 
 type SessionConfig struct {
@@ -58,18 +63,6 @@ type CORSConfig struct {
 	AllowedHeaders   []string      `json:"allowed_headers" toml:"allowed_headers"`
 	ExposedHeaders   []string      `json:"exposed_headers" toml:"exposed_headers"`
 	MaxAge           time.Duration `json:"max_age" toml:"max_age"`
-}
-
-type LoggerConfig struct {
-	Level string `json:"level" toml:"level"`
-}
-
-type DatabaseConfig struct {
-	Provider        string        `json:"provider" toml:"provider"`
-	URL             string        `json:"url" toml:"url"`
-	MaxOpenConns    int           `json:"max_open_conns" toml:"max_open_conns"`
-	MaxIdleConns    int           `json:"max_idle_conns" toml:"max_idle_conns"`
-	ConnMaxLifetime time.Duration `json:"conn_max_lifetime" toml:"conn_max_lifetime"`
 }
 
 type EventBusConfig struct {

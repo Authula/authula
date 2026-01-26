@@ -164,8 +164,8 @@ type TokenPair struct {
 	TokenType    string        `json:"token_type"`
 }
 
-// RefreshTokenRecord stores refresh token metadata for rotation tracking
-type RefreshTokenRecord struct {
+// RefreshToken represents a stored refresh token in the database
+type RefreshToken struct {
 	bun.BaseModel `bun:"table:refresh_tokens"`
 
 	ID               string     `json:"id" bun:"column:id,pk,notnull"`
@@ -173,14 +173,14 @@ type RefreshTokenRecord struct {
 	TokenHash        string     `json:"token_hash" bun:"column:token_hash,notnull,unique"`
 	ExpiresAt        time.Time  `json:"expires_at" bun:"column:expires_at,notnull"`
 	IsRevoked        bool       `json:"is_revoked" bun:"column:is_revoked,notnull,default:false"`
-	RevokedAt        *time.Time `json:"revoked_at" bun:"column:revoked_at,nullzero"`
-	LastReuseAttempt *time.Time `json:"last_reuse_attempt" bun:"column:last_reuse_attempt,nullzero"`
-	CreatedAt        time.Time  `json:"created_at" bun:"column:created_at,nullzero,notnull,default:current_timestamp"`
+	RevokedAt        *time.Time `json:"revoked_at" bun:"column:revoked_at"`
+	LastReuseAttempt *time.Time `json:"last_reuse_attempt" bun:"column:last_reuse_attempt"`
+	CreatedAt        time.Time  `json:"created_at" bun:"column:created_at,notnull,default:current_timestamp"`
 }
 
-var _ bun.BeforeAppendModelHook = (*RefreshTokenRecord)(nil)
+var _ bun.BeforeAppendModelHook = (*RefreshToken)(nil)
 
-func (s *RefreshTokenRecord) BeforeAppendModel(ctx context.Context, query bun.Query) error {
+func (s *RefreshToken) BeforeAppendModel(ctx context.Context, query bun.Query) error {
 	switch query.(type) {
 	case *bun.InsertQuery:
 		s.CreatedAt = time.Now()

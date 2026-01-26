@@ -138,7 +138,7 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 }
 
 // completeTokenRotation handles the token rotation after validation passes
-func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHash string, record *types.RefreshTokenRecord) (*RefreshTokenResponse, error) {
+func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHash string, record *types.RefreshToken) (*RefreshTokenResponse, error) {
 	// Check if token is expired
 	if time.Now().After(record.ExpiresAt) {
 		return nil, fmt.Errorf("refresh token expired")
@@ -173,7 +173,7 @@ func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHa
 	newTokenHash := HashRefreshToken(tokenPair.RefreshToken)
 	expiresAt := time.Now().Add(s.refreshExpiresIn)
 
-	newRecord := &types.RefreshTokenRecord{
+	newRecord := &types.RefreshToken{
 		ID:        uuid.New().String(),
 		SessionID: record.SessionID,
 		TokenHash: newTokenHash,
@@ -278,7 +278,7 @@ func (s *refreshTokenService) emitTokenReuseMaliciousEvent(sessionID, tokenHash 
 func (s *refreshTokenService) StoreInitialRefreshToken(ctx context.Context, refreshToken, sessionID string, expiresAt time.Time) error {
 	tokenHash := HashRefreshToken(refreshToken)
 
-	record := &types.RefreshTokenRecord{
+	record := &types.RefreshToken{
 		ID:        uuid.New().String(),
 		SessionID: sessionID,
 		TokenHash: tokenHash,

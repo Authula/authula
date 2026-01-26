@@ -39,8 +39,8 @@ type KeyService interface {
 
 // RefreshTokenStorage defines storage operations for refresh tokens
 type RefreshTokenStorage interface {
-	StoreRefreshToken(ctx context.Context, record *types.RefreshTokenRecord) error
-	GetRefreshToken(ctx context.Context, tokenHash string) (*types.RefreshTokenRecord, error)
+	StoreRefreshToken(ctx context.Context, record *types.RefreshToken) error
+	GetRefreshToken(ctx context.Context, tokenHash string) (*types.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, tokenHash string) error
 	SetLastReuseAttempt(ctx context.Context, tokenHash string) error
 	RevokeAllSessionTokens(ctx context.Context, sessionID string) error
@@ -48,8 +48,8 @@ type RefreshTokenStorage interface {
 
 // RefreshTokenRepository defines data access operations for refresh tokens
 type RefreshTokenRepository interface {
-	StoreRefreshToken(ctx context.Context, record *types.RefreshTokenRecord) error
-	GetRefreshToken(ctx context.Context, tokenHash string) (*types.RefreshTokenRecord, error)
+	StoreRefreshToken(ctx context.Context, record *types.RefreshToken) error
+	GetRefreshToken(ctx context.Context, tokenHash string) (*types.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, tokenHash string) error
 	RevokeAllSessionTokens(ctx context.Context, sessionID string) error
 	SetLastReuseAttempt(ctx context.Context, tokenHash string) error

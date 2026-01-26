@@ -11,7 +11,7 @@ CREATE INDEX idx_jwks_expires_at ON jwks(expires_at);
 CREATE TABLE IF NOT EXISTS refresh_tokens (
   id BINARY(16) NOT NULL PRIMARY KEY,
   session_id BINARY(16) NOT NULL,
-  token_hash VARCHAR(64) NOT NULL UNIQUE,
+  token_hash VARCHAR(64) UNIQUE NOT NULL,
   expires_at TIMESTAMP NOT NULL,
   is_revoked BOOLEAN DEFAULT FALSE,
   revoked_at TIMESTAMP NULL,
@@ -24,9 +24,8 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 );
 
 CREATE INDEX idx_refresh_tokens_session_id ON refresh_tokens(session_id);
-CREATE UNIQUE INDEX idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
 CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
-CREATE INDEX idx_refresh_tokens_is_revoked ON refresh_tokens(is_revoked);
+CREATE INDEX idx_refresh_tokens_active_session ON refresh_tokens(session_id, is_revoked);
 CREATE INDEX idx_refresh_tokens_last_reuse_attempt ON refresh_tokens(last_reuse_attempt);
 
 -- Cleanup query for expired tokens

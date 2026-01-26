@@ -17,11 +17,14 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   expires_at DATETIME NOT NULL,
   is_revoked INTEGER DEFAULT 0,
   revoked_at DATETIME NULL,
-  last_reuse_attempt DATETIME NULL,
+  last_reuse_attempt DATETIME NULL DEFAULT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_session_id ON refresh_tokens(session_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_is_revoked ON refresh_tokens(is_revoked);
+-- Partial Index (Optimized for SQLite)
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_revoked_only 
+ON refresh_tokens(is_revoked) 
+WHERE is_revoked = 1;
