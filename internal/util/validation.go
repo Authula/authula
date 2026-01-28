@@ -5,8 +5,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/go-playground/validator/v10"
+
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 var Validate *validator.Validate
