@@ -3,6 +3,7 @@ package gobetterauth
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"runtime/debug"
 	"slices"
@@ -93,6 +94,12 @@ func NewRouter(config *models.Config, logger models.Logger, opts *RouterOptions)
 	r.MethodNotAllowed(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}))
+
+	util.ValidateTrustedHeadersAndProxies(
+		logger,
+		config.Security.TrustedHeaders,
+		config.Security.TrustedProxies,
+	)
 
 	return &Router{
 		config:        config,
@@ -432,6 +439,17 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		Logger:  r.logger,
 	}
 
+	clientIP, err := util.ExtractClientIP(
+		r.logger,
+		req,
+		r.config.Security.TrustedHeaders,
+		r.config.Security.TrustedProxies,
+	)
+	if err != nil {
+		r.logger.Error("Failed to extract client IP", "error", err, "remoteAddr", req.RemoteAddr)
+		clientIP = net.ParseIP("0.0.0.0") // Safe fallback IP
+	}
+
 	// Create request context
 	reqCtx := &models.RequestContext{
 		Request:         req,
@@ -439,6 +457,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		Path:            req.URL.Path,
 		Method:          req.Method,
 		Headers:         req.Header,
+		ClientIP:        clientIP.String(),
 		Values:          make(map[string]any),
 		ResponseHeaders: make(http.Header),
 		Handled:         false,

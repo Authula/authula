@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
@@ -33,26 +32,19 @@ func NewRateLimitHookHandler(
 }
 
 func (h *RateLimitHookHandler) Handle() models.HookHandler {
-	return func(ctx *models.RequestContext) error {
+	return func(reqCtx *models.RequestContext) error {
 		// Skip rate limiting for OPTIONS preflight requests if CORS is handled externally
 		// or by the CORS plugin middleware (which runs later).
-		if ctx.Request.Method == http.MethodOptions {
+		if reqCtx.Request.Method == http.MethodOptions {
 			return nil
 		}
 
-		clientIP := util.ExtractClientIP(
-
-			ctx.Request.Header.Get("X-Forwarded-For"),
-			ctx.Request.Header.Get("X-Real-IP"),
-			ctx.Request.RemoteAddr,
-		)
-
-		key := h.pluginConfig.Prefix + clientIP
+		key := h.pluginConfig.Prefix + reqCtx.ClientIP
 
 		window := h.pluginConfig.Window
 		max := h.pluginConfig.Max
 
-		if rule, exists := h.customRules[ctx.Request.RequestURI]; exists {
+		if rule, exists := h.customRules[reqCtx.Request.RequestURI]; exists {
 			if rule.Disabled {
 				return nil
 			}
@@ -64,32 +56,32 @@ func (h *RateLimitHookHandler) Handle() models.HookHandler {
 			}
 		}
 
-		allowed, count, resetTime, err := h.provider.CheckAndIncrement(ctx.Request.Context(), key, window, max)
+		allowed, count, resetTime, err := h.provider.CheckAndIncrement(reqCtx.Request.Context(), key, window, max)
 		if err != nil {
 			h.logger.Error("failed to check rate limit", "error", err, "key", key)
 			// On error, allow the request to proceed (fail-open)
 			return nil
 		}
 
-		ctx.ResponseWriter.Header().Set("X-RateLimit-Limit", strconv.Itoa(max))
+		reqCtx.ResponseWriter.Header().Set("X-RateLimit-Limit", strconv.Itoa(max))
 		remaining := max - count
 		if remaining < 0 {
 			remaining = 0
 		}
-		ctx.ResponseWriter.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
-		ctx.ResponseWriter.Header().Set("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
+		reqCtx.ResponseWriter.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
+		reqCtx.ResponseWriter.Header().Set("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
 
 		if !allowed {
 			retryAfter := int(time.Until(resetTime).Seconds())
-			ctx.ResponseWriter.Header().Set("X-Retry-After", strconv.Itoa(retryAfter))
+			reqCtx.ResponseWriter.Header().Set("X-Retry-After", strconv.Itoa(retryAfter))
 			payload := map[string]any{
 				"message":     "rate limit exceeded",
 				"retry_after": retryAfter,
 				"limit":       max,
 				"remaining":   0,
 			}
-			ctx.SetJSONResponse(http.StatusTooManyRequests, payload)
-			ctx.Handled = true
+			reqCtx.SetJSONResponse(http.StatusTooManyRequests, payload)
+			reqCtx.Handled = true
 		}
 
 		return nil

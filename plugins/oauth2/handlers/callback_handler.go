@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
 	"github.com/GoBetterAuth/go-better-auth/plugins/oauth2/constants"
 	"github.com/GoBetterAuth/go-better-auth/plugins/oauth2/services"
@@ -68,13 +67,6 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		ipAddress := util.ExtractClientIP(
-			r.Header.Get("X-Forwarded-For"),
-			r.Header.Get("X-Real-IP"),
-			r.RemoteAddr,
-		)
-		userAgent := r.UserAgent()
-
 		if reqCtx.UserID != nil && *reqCtx.UserID != "" {
 			if sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && sessionID != "" {
 				existingSession, err := h.UseCase.GetSessionByID(ctx, sessionID)
@@ -91,7 +83,8 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 			}
 		}
 
-		result, err := h.UseCase.Callback(ctx, req, &ipAddress, &userAgent)
+		userAgent := r.UserAgent()
+		result, err := h.UseCase.Callback(ctx, req, &reqCtx.ClientIP, &userAgent)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]string{
 				"message": err.Error(),

@@ -36,7 +36,8 @@ type RequestContext struct {
 	Headers http.Header
 
 	// User information (may be nil if not authenticated)
-	UserID *string
+	UserID   *string
+	ClientIP string
 
 	// Generic key-value storage for hooks to share data
 	Values map[string]any

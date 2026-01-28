@@ -53,6 +53,8 @@ type SessionConfig struct {
 
 type SecurityConfig struct {
 	TrustedOrigins []string   `json:"trusted_origins" toml:"trusted_origins"`
+	TrustedHeaders []string   `json:"trusted_headers" toml:"trusted_headers"`
+	TrustedProxies []string   `json:"trusted_proxies" toml:"trusted_proxies"`
 	CORS           CORSConfig `json:"cors" toml:"cors"`
 }
 

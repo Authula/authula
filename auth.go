@@ -6,12 +6,13 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/uptrace/bun"
+
 	"github.com/GoBetterAuth/go-better-auth/internal"
 	"github.com/GoBetterAuth/go-better-auth/internal/plugins"
 	"github.com/GoBetterAuth/go-better-auth/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/models"
 	coreservices "github.com/GoBetterAuth/go-better-auth/services"
-	"github.com/uptrace/bun"
 )
 
 type AuthConfig struct {

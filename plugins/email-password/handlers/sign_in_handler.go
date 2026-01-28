@@ -19,6 +19,7 @@ type SignInRequestPayload struct {
 
 type SignInHandler struct {
 	Logger                       models.Logger
+	Config                       *models.Config
 	PluginConfig                 types.EmailPasswordPluginConfig
 	SignInUseCase                *usecases.SignInUseCase
 	SendEmailVerificationUseCase *usecases.SendEmailVerificationUseCase
@@ -38,13 +39,6 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		ipAddress := util.ExtractClientIP(
-			r.Header.Get("X-Forwarded-For"),
-			r.Header.Get("X-Real-IP"),
-			r.RemoteAddr,
-		)
-		userAgent := r.UserAgent()
-
 		if reqCtx.UserID != nil && *reqCtx.UserID != "" {
 			if sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && sessionID != "" {
 				existingSession, err := h.SignInUseCase.GetSessionByID(ctx, sessionID)
@@ -63,12 +57,13 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 			}
 		}
 
+		userAgent := r.UserAgent()
 		result, err := h.SignInUseCase.SignIn(
 			ctx,
 			payload.Email,
 			payload.Password,
 			&payload.CallbackURL,
-			&ipAddress,
+			&reqCtx.ClientIP,
 			&userAgent,
 		)
 		if err != nil {

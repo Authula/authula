@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -32,6 +33,8 @@ func NewConfig(options ...ConfigOption) *models.Config {
 		},
 		Security: models.SecurityConfig{
 			TrustedOrigins: []string{},
+			TrustedHeaders: []string{},
+			TrustedProxies: []string{},
 			CORS: models.CORSConfig{
 				AllowCredentials: true,
 				AllowedOrigins:   []string{"*"},
@@ -140,6 +143,19 @@ func WithSecurity(config models.SecurityConfig) ConfigOption {
 		if len(config.TrustedOrigins) > 0 {
 			c.Security.TrustedOrigins = config.TrustedOrigins
 		}
+		if len(config.TrustedHeaders) > 0 {
+			c.Security.TrustedHeaders = config.TrustedHeaders
+
+			// Normalize TrustedHeaders to Go's canonical format
+			// e.g., "x-forwarded-for" -> "X-Forwarded-For"
+			for i, h := range c.Security.TrustedHeaders {
+				c.Security.TrustedHeaders[i] = http.CanonicalHeaderKey(h)
+			}
+		}
+		if len(config.TrustedProxies) > 0 {
+			c.Security.TrustedProxies = config.TrustedProxies
+		}
+		// CORS
 		if len(config.CORS.AllowedOrigins) > 0 {
 			c.Security.CORS.AllowedOrigins = config.CORS.AllowedOrigins
 		}

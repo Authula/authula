@@ -1,8 +1,13 @@
 package util
 
 import (
+	"fmt"
 	"net"
+	"net/http"
+	"slices"
 	"strings"
+
+	"github.com/GoBetterAuth/go-better-auth/models"
 )
 
 // MaskIP masks the last octet of an IPv4 address for GDPR compliance
@@ -27,32 +32,82 @@ func MaskIP(ip string) string {
 	return ip
 }
 
-// ExtractClientIP extracts the client IP address from various sources
-// Checks X-Forwarded-For, X-Real-IP headers and falls back to RemoteAddr
-func ExtractClientIP(xForwardedFor string, realIp string, remoteAddr string) string {
-	// Check X-Forwarded-For header first (may contain multiple IPs)
-	if xForwardedFor != "" {
-		// Take the first IP from the list
-		ips := strings.Split(xForwardedFor, ",")
-		if len(ips) > 0 {
-			return strings.TrimSpace(ips[0])
+// ExtractClientIP extracts the client IP address from various sources accurately
+func ExtractClientIP(logger models.Logger, req *http.Request, trustedHeaders []string, trustedProxies []string) (net.IP, error) {
+	host := getHost(req.RemoteAddr)
+	remoteIP := net.ParseIP(host)
+	if remoteIP == nil {
+		return nil, fmt.Errorf("invalid remote IP: %s", host)
+	}
+
+	// SECURITY GATE: If no trusted proxies are configured,
+	// we NEVER trust headers to prevent trivial spoofing.
+	if len(trustedProxies) == 0 {
+		return remoteIP, nil
+	}
+
+	// Verify if the immediate caller is a trusted proxy
+	if !isIPTrusted(remoteIP, trustedProxies) {
+		// Connection is from an untrusted source; use their direct IP
+		return remoteIP, nil
+	}
+
+	// Build the header priority list (User defined + Defaults)
+	headers := make([]string, 0, len(trustedHeaders)+2)
+	headers = append(headers, trustedHeaders...)
+	for _, d := range []string{"X-Forwarded-For"} {
+		if !slices.Contains(headers, d) {
+			headers = append(headers, d)
 		}
 	}
 
-	// Check X-Real-IP header
-	if realIp != "" {
-		return realIp
-	}
-
-	// Fall back to RemoteAddr
-	if remoteAddr != "" {
-		// RemoteAddr might include port, extract just the IP
-		ip, _, err := net.SplitHostPort(remoteAddr)
-		if err != nil {
-			return remoteAddr
+	// Traverse headers to find the first valid IP
+	for _, h := range headers {
+		val := req.Header.Get(h)
+		if val == "" {
+			continue
 		}
-		return ip
+
+		// Handle list headers (like X-Forwarded-For: client, proxy1)
+		parts := strings.SplitSeq(val, ",")
+		for part := range parts {
+			ipStr := strings.TrimSpace(part)
+
+			// Handle cases where the header might contain a port (e.g., 1.2.3.4:8080)
+			if sh, _, err := net.SplitHostPort(ipStr); err == nil {
+				ipStr = sh
+			}
+
+			if ip := net.ParseIP(ipStr); ip != nil {
+				return ip, nil
+			}
+		}
 	}
 
-	return ""
+	return remoteIP, nil
+}
+
+func getHost(remoteAddr string) string {
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		return host
+	}
+	return remoteAddr // It's an IP without port
+}
+
+// isIPTrusted checks if an IP matches a list of exact IPs or CIDR ranges.
+func isIPTrusted(ip net.IP, trustedProxies []string) bool {
+	for _, trusted := range trustedProxies {
+		// Check for exact IP match
+		if ip.String() == trusted {
+			return true
+		}
+
+		// Check for CIDR range match (e.g., 10.0.0.0/8)
+		_, subnet, err := net.ParseCIDR(trusted)
+		if err == nil && subnet.Contains(ip) {
+			return true
+		}
+	}
+
+	return false
 }

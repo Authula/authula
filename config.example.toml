@@ -36,7 +36,6 @@ conn_max_lifetime = "10m"
 [logger]
 level = "debug"  # Options: "debug", "info", "warn", "error"
 
-
 # -----------------------------------
 # - Session Configuration
 # -----------------------------------
@@ -56,6 +55,8 @@ same_site = "lax"  # Options: "lax", "strict", "none"
 
 [security]
 trusted_origins = []
+trusted_headers = [] # e.g., ["X-Real-IP", "CF-Connecting-IP" (cloudflare), ...]
+trusted_proxies = []
 [security.cors]
 allow_credentials = true
 allowed_origins = ["*"] # If using session plugin, specify exact origins instead of "*"

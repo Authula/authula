@@ -21,6 +21,7 @@ type SignUpRequestPayload struct {
 
 type SignUpHandler struct {
 	Logger                       models.Logger
+	Config                       *models.Config
 	PluginConfig                 types.EmailPasswordPluginConfig
 	SignUpUseCase                *usecases.SignUpUseCase
 	SendEmailVerificationUseCase *usecases.SendEmailVerificationUseCase
@@ -40,13 +41,7 @@ func (h *SignUpHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		ipAddress := util.ExtractClientIP(
-			r.Header.Get("X-Forwarded-For"),
-			r.Header.Get("X-Real-IP"),
-			r.RemoteAddr,
-		)
 		userAgent := r.UserAgent()
-
 		result, err := h.SignUpUseCase.SignUp(
 			ctx,
 			payload.Name,
@@ -54,7 +49,7 @@ func (h *SignUpHandler) Handler() http.HandlerFunc {
 			payload.Password,
 			&payload.Image,
 			&payload.CallbackURL,
-			&ipAddress,
+			&reqCtx.ClientIP,
 			&userAgent,
 		)
 		if err != nil {
