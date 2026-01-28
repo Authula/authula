@@ -134,7 +134,7 @@ buffer_size = 100
 # --- Config Manager Plugin (allows runtime configuration changes via the Admin API) ---
 
 [plugins.config_manager]
-enabled = true
+enabled = false
 
 # --- Secondary Storage Plugin (provides secondary storage backends for other plugins) ---
 
