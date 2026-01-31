@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 // MockLogger is a minimal logger for testing

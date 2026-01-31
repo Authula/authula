@@ -1,8 +1,8 @@
 package secondarystorage
 
 import (
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 // SecondaryStorageServiceImpl implements the SecondaryStorageService interface

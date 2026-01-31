@@ -13,9 +13,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/router"
-	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/router"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 // HookErrorMode defines how the router handles errors from hook handlers

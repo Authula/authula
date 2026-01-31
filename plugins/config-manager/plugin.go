@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/config-manager/handlers"
-	configmanagerservices "github.com/GoBetterAuth/go-better-auth/plugins/config-manager/services"
-	"github.com/GoBetterAuth/go-better-auth/plugins/config-manager/types"
-	"github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager/handlers"
+	configmanagerservices "github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 type ConfigManagerPlugin struct {

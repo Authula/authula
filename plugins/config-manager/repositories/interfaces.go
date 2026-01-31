@@ -3,7 +3,7 @@ package repositories
 import (
 	"context"
 
-	"github.com/GoBetterAuth/go-better-auth/plugins/config-manager/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager/types"
 )
 
 // AuthSettingsRepository defines the interface for auth settings persistence

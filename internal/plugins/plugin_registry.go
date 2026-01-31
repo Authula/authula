@@ -7,9 +7,9 @@ import (
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/migrate"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 // PluginRegistry manages plugin registration and lifecycle

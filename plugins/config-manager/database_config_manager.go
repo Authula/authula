@@ -12,10 +12,10 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/config-manager/repositories"
-	"github.com/GoBetterAuth/go-better-auth/plugins/config-manager/types"
-	"github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager/repositories"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 // DatabaseConfigManager implements ConfigManager using a database backend.

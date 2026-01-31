@@ -4,7 +4,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/env"
+	"github.com/GoBetterAuth/go-better-auth/v2/env"
 )
 
 type RateLimitPluginConfig struct {

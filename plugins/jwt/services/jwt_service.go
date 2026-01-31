@@ -12,9 +12,9 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/types"
-	"github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 // JWTServiceImpl is the concrete implementation of the JWTService interface

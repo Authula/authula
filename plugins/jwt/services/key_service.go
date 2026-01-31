@@ -13,12 +13,12 @@ import (
 	"fmt"
 	"time"
 
-	coreservices "github.com/GoBetterAuth/go-better-auth/services"
+	coreservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 	"github.com/google/uuid"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/repositories"
-	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/repositories"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/types"
 )
 
 type keyService struct {

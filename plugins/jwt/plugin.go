@@ -6,12 +6,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/repositories"
-	jwtservices "github.com/GoBetterAuth/go-better-auth/plugins/jwt/services"
-	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/types"
-	"github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/repositories"
+	jwtservices "github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 type JWTPlugin struct {

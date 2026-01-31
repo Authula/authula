@@ -4,7 +4,7 @@ import (
 	"context"
 	"maps"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 

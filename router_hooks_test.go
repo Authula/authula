@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 // TestRouterHooksExecution verifies that hooks are executed at the correct stages

@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 type ConfigManagerService interface {

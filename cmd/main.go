@@ -13,11 +13,11 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/joho/godotenv"
 
-	gobetterauth "github.com/GoBetterAuth/go-better-auth"
-	gobetterauthconfig "github.com/GoBetterAuth/go-better-auth/config"
-	gobetterauthenv "github.com/GoBetterAuth/go-better-auth/env"
-	"github.com/GoBetterAuth/go-better-auth/internal/bootstrap"
-	gobetterauthmodels "github.com/GoBetterAuth/go-better-auth/models"
+	gobetterauth "github.com/GoBetterAuth/go-better-auth/v2"
+	gobetterauthconfig "github.com/GoBetterAuth/go-better-auth/v2/config"
+	gobetterauthenv "github.com/GoBetterAuth/go-better-auth/v2/env"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/bootstrap"
+	gobetterauthmodels "github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 func getEnv(key, fallback string) string {

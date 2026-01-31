@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/types"
-	rootservices "github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email-password/types"
+	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 type RequestPasswordResetUseCase struct {

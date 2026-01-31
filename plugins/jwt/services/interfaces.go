@@ -6,7 +6,7 @@ import (
 
 	"github.com/lestrrat-go/jwx/v3/jwk"
 
-	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/types"
 )
 
 // RefreshTokenResponse contains the result of a token refresh operation

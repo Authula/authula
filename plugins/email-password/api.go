@@ -4,10 +4,10 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/handlers"
-	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/types"
-	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/usecases"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email-password/handlers"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email-password/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email-password/usecases"
 )
 
 type API struct {

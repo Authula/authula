@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/oauth2/services"
-	"github.com/GoBetterAuth/go-better-auth/plugins/oauth2/types"
-	rootservices "github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/oauth2/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/oauth2/types"
+	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 type CallbackUseCase struct {

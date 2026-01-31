@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/GoBetterAuth/go-better-auth/plugins/oauth2/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/oauth2/types"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )

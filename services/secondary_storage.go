@@ -1,6 +1,6 @@
 package services
 
-import "github.com/GoBetterAuth/go-better-auth/models"
+import "github.com/GoBetterAuth/go-better-auth/v2/models"
 
 // SecondaryStorageService provides access to the configured secondary storage backend
 type SecondaryStorageService interface {

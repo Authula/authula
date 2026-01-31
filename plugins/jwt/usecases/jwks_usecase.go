@@ -3,8 +3,8 @@ package usecases
 import (
 	"context"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/services"
 )
 
 type JWKSUseCaseImpl struct {

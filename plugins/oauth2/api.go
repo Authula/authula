@@ -3,8 +3,8 @@ package oauth2
 import (
 	"context"
 
-	"github.com/GoBetterAuth/go-better-auth/plugins/oauth2/types"
-	"github.com/GoBetterAuth/go-better-auth/plugins/oauth2/usecases"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/oauth2/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/oauth2/usecases"
 )
 
 type API struct {

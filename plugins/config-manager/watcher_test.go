@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 // MockConfigWatcher is a test implementation of PluginWithConfigWatcher

@@ -4,9 +4,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/types"
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 type GetMeUseCase struct {

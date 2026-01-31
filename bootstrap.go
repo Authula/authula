@@ -7,15 +7,15 @@ import (
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/migrate"
 
-	"github.com/GoBetterAuth/go-better-auth/events"
-	internal "github.com/GoBetterAuth/go-better-auth/internal"
-	internalbootstrap "github.com/GoBetterAuth/go-better-auth/internal/bootstrap"
-	internalevents "github.com/GoBetterAuth/go-better-auth/internal/events"
-	internalrepositories "github.com/GoBetterAuth/go-better-auth/internal/repositories"
-	internalsecurity "github.com/GoBetterAuth/go-better-auth/internal/security"
-	internalservices "github.com/GoBetterAuth/go-better-auth/internal/services"
-	"github.com/GoBetterAuth/go-better-auth/models"
-	coreservices "github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/events"
+	internal "github.com/GoBetterAuth/go-better-auth/v2/internal"
+	internalbootstrap "github.com/GoBetterAuth/go-better-auth/v2/internal/bootstrap"
+	internalevents "github.com/GoBetterAuth/go-better-auth/v2/internal/events"
+	internalrepositories "github.com/GoBetterAuth/go-better-auth/v2/internal/repositories"
+	internalsecurity "github.com/GoBetterAuth/go-better-auth/v2/internal/security"
+	internalservices "github.com/GoBetterAuth/go-better-auth/v2/internal/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	coreservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 // InitLogger initializes the logger based on configuration

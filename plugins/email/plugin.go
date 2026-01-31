@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/GoBetterAuth/go-better-auth/env"
-	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/email/providers"
-	emailtypes "github.com/GoBetterAuth/go-better-auth/plugins/email/types"
-	rootservices "github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/env"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email/providers"
+	emailtypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/email/types"
+	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 type EmailPlugin struct {

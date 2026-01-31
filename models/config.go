@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/events"
+	"github.com/GoBetterAuth/go-better-auth/v2/events"
 )
 
 // Config holds the core configuration for GoBetterAuth.

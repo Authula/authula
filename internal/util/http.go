@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 // MaskIP masks the last octet of an IPv4 address for GDPR compliance

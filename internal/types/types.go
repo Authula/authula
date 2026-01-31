@@ -3,7 +3,7 @@ package types
 import (
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 type HealthCheckResult struct {

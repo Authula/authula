@@ -18,8 +18,8 @@ import (
 	"github.com/uptrace/bun/dialect/sqlitedialect"
 	"github.com/uptrace/bun/extra/bundebug"
 
-	"github.com/GoBetterAuth/go-better-auth/env"
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/env"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 // DatabaseOptions configures database initialization

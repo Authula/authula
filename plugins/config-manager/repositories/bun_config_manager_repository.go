@@ -7,7 +7,7 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/GoBetterAuth/go-better-auth/plugins/config-manager/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager/types"
 )
 
 type bunConfigManagerRepository struct {

@@ -22,9 +22,9 @@ import (
 	"github.com/redis/go-redis/v9"
 	"zombiezen.com/go/sqlite/sqlitex"
 
-	"github.com/GoBetterAuth/go-better-auth/env"
-	"github.com/GoBetterAuth/go-better-auth/events"
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/env"
+	"github.com/GoBetterAuth/go-better-auth/v2/events"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 // InitWatermillProvider initializes a Watermill PubSub based on the provider config

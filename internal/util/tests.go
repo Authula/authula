@@ -4,7 +4,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 // Provides utility types and functions for tests

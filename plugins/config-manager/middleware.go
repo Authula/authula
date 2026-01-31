@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/GoBetterAuth/go-better-auth/env"
-	"github.com/GoBetterAuth/go-better-auth/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/env"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 )
 
 func ConfigManagerAuthMiddleware(next http.Handler) http.Handler {

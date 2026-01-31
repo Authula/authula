@@ -3,8 +3,8 @@ package configmanager
 import (
 	"github.com/uptrace/bun"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 // NewConfigManager creates a config manager based on the runtime mode and settings.

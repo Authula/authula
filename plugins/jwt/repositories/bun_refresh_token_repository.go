@@ -9,7 +9,7 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/types"
 )
 
 type refreshTokenRepositoryImpl struct {

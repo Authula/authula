@@ -3,7 +3,7 @@ package repositories
 import (
 	"context"
 
-	"github.com/GoBetterAuth/go-better-auth/plugins/jwt/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/types"
 )
 
 // RefreshTokenRepository provides data access for refresh token records

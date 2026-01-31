@@ -8,7 +8,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/GoBetterAuth/go-better-auth/env"
+	"github.com/GoBetterAuth/go-better-auth/v2/env"
 )
 
 // RedisSecondaryStorageOptions configures a Redis secondary storage instance

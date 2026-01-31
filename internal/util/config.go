@@ -6,7 +6,7 @@ import (
 
 	mapstructure "github.com/go-viper/mapstructure/v2"
 
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 // ParsePluginConfig is a utility function to parse plugin configuration from the generic config map.

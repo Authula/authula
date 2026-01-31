@@ -1,6 +1,6 @@
 package secondarystorage
 
-import "github.com/GoBetterAuth/go-better-auth/models"
+import "github.com/GoBetterAuth/go-better-auth/v2/models"
 
 // secondaryStorageAPI is the concrete implementation of SecondaryStorageAPI
 type secondaryStorageAPI struct {

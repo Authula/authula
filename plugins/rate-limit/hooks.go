@@ -1,7 +1,7 @@
 package ratelimit
 
 import (
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 // buildHooks returns the configured hooks for this plugin

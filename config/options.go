@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/env"
-	"github.com/GoBetterAuth/go-better-auth/events"
-	"github.com/GoBetterAuth/go-better-auth/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/env"
+	"github.com/GoBetterAuth/go-better-auth/v2/events"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 const defaultSecret = "go-better-auth-secret-0123456789"

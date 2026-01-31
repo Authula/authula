@@ -9,9 +9,9 @@ import (
 
 	"github.com/wneessen/go-mail"
 
-	"github.com/GoBetterAuth/go-better-auth/env"
-	"github.com/GoBetterAuth/go-better-auth/models"
-	emailtypes "github.com/GoBetterAuth/go-better-auth/plugins/email/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/env"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	emailtypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/email/types"
 )
 
 type SMTPProvider struct {

@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/types"
-	"github.com/GoBetterAuth/go-better-auth/plugins/email-password/usecases"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email-password/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email-password/usecases"
 )
 
 type SignInRequestPayload struct {

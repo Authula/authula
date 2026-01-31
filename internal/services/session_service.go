@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/repositories"
-	"github.com/GoBetterAuth/go-better-auth/internal/security"
-	"github.com/GoBetterAuth/go-better-auth/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/models"
-	"github.com/GoBetterAuth/go-better-auth/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/repositories"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/security"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 type sessionService struct {
