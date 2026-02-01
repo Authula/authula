@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/rate-limit/types"
 )
 
 // TestInMemoryProvider tests the in-memory rate limit provider
@@ -63,7 +64,7 @@ func TestRateLimitPluginConfig(t *testing.T) {
 		Window:   1 * time.Minute,
 		Max:      100,
 		Prefix:   "ratelimit:",
-		Provider: RateLimitProviderInMemory,
+		Provider: types.RateLimitProviderInMemory,
 	}
 
 	plugin := New(config)
@@ -83,7 +84,7 @@ func TestProviderNames(t *testing.T) {
 	provider := NewInMemoryProvider()
 	defer provider.Close()
 
-	if name := provider.GetName(); name != string(RateLimitProviderInMemory) {
+	if name := provider.GetName(); name != string(types.RateLimitProviderInMemory) {
 		t.Errorf("in-memory provider name should be 'memory', got %s", name)
 	}
 }

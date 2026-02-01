@@ -1,7 +1,6 @@
 package jwt
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -130,31 +129,6 @@ func TestJWTPlugin_Metadata(t *testing.T) {
 	expectedID := models.PluginJWT.String()
 	if metadata.ID != expectedID {
 		t.Errorf("Plugin ID = %v, want %v", metadata.ID, expectedID)
-	}
-}
-
-func TestJWTPlugin_Migrations(t *testing.T) {
-	plugin := New(types.JWTPluginConfig{})
-	ctx := context.Background()
-
-	// Test that migrations returns a non-nil embed.FS for postgres
-	migrations, err := plugin.Migrations(ctx, "postgres")
-	if err != nil {
-		t.Errorf("Migrations() error = %v, want nil", err)
-	}
-
-	if migrations == nil {
-		t.Errorf("Migrations() returned nil, want non-nil embed.FS")
-	}
-
-	// Test that migrations returns a non-nil embed.FS for mysql
-	migrations, err = plugin.Migrations(ctx, "mysql")
-	if err != nil {
-		t.Errorf("Migrations() error = %v, want nil", err)
-	}
-
-	if migrations == nil {
-		t.Errorf("Migrations() returned nil, want non-nil embed.FS for mysql")
 	}
 }
 

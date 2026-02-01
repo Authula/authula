@@ -2,7 +2,6 @@ package jwt
 
 import (
 	"context"
-	"embed"
 	"errors"
 	"fmt"
 
@@ -11,10 +10,12 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/repositories"
 	jwtservices "github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/services"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/types"
+	sharedmigrations "github.com/GoBetterAuth/go-better-auth/v2/plugins/shared/migrations"
 	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 type JWTPlugin struct {
+	sharedmigrations.BaseMigrationProvider
 	globalConfig     *models.Config
 	pluginConfig     types.JWTPluginConfig
 	ctx              *models.PluginContext
@@ -31,7 +32,10 @@ type JWTPlugin struct {
 
 func New(config types.JWTPluginConfig) *JWTPlugin {
 	config.ApplyDefaults()
-	return &JWTPlugin{pluginConfig: config}
+	return &JWTPlugin{
+		BaseMigrationProvider: sharedmigrations.BaseMigrationProvider{FS: MigrationFS},
+		pluginConfig:          config,
+	}
 }
 
 func (p *JWTPlugin) Metadata() models.PluginMetadata {
@@ -141,10 +145,6 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 	ctx.ServiceRegistry.Register(models.ServiceJWT.String(), jwtServiceImpl)
 
 	return nil
-}
-
-func (p *JWTPlugin) Migrations(ctx context.Context, dbProvider string) (*embed.FS, error) {
-	return GetMigrations(ctx, dbProvider)
 }
 
 func (p *JWTPlugin) Routes() []models.Route {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/rate-limit/types"
 	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
@@ -14,7 +15,7 @@ type RateLimitPlugin struct {
 	ctx      *models.PluginContext
 	logger   models.Logger
 	handler  *RateLimitHookHandler
-	provider RateLimitProvider
+	provider types.RateLimitProvider
 }
 
 func New(config RateLimitPluginConfig) *RateLimitPlugin {
@@ -52,7 +53,7 @@ func (p *RateLimitPlugin) Init(ctx *models.PluginContext) error {
 
 // trySecondaryStorage attempts to initialize a provider using the secondary-storage service.
 // Returns the provider if successful, or nil if not.
-func (p *RateLimitPlugin) trySecondaryStorage() RateLimitProvider {
+func (p *RateLimitPlugin) trySecondaryStorage() types.RateLimitProvider {
 	if p.ctx == nil {
 		return nil
 	}
@@ -71,14 +72,6 @@ func (p *RateLimitPlugin) trySecondaryStorage() RateLimitProvider {
 	provider := NewSecondaryStorageProvider(actualProviderName, storage)
 
 	return provider
-}
-
-func (p *RateLimitPlugin) Migrations(ctx context.Context, dbProvider string) (*embed.FS, error) {
-	if p.config.Provider == RateLimitProviderDatabase {
-		return GetMigrations(ctx, dbProvider)
-	}
-	// Return nil to explicitly skip migrations for non-DB providers
-	return nil, nil
 }
 
 func (p *RateLimitPlugin) Close() error {
@@ -104,8 +97,19 @@ func (p *RateLimitPlugin) Hooks() []models.Hook {
 	return p.buildHooks()
 }
 
+// Migrations implements the PluginWithMigrations interface.
+// Only returns migrations if the Provider is configured as "database".
+// For "memory" or "redis" providers, no database tables are needed.
+func (p *RateLimitPlugin) Migrations(ctx context.Context, dbProvider string) (*embed.FS, error) {
+	// Check if database provider is configured
+	if p.config.Provider != types.RateLimitProviderDatabase {
+		return nil, nil // No DB tables needed for memory/redis providers
+	}
+	return MigrationFS.GetMigrations(ctx, dbProvider)
+}
+
 func (p *RateLimitPlugin) initProvider(ctx *models.PluginContext) error {
-	if p.config.Provider == RateLimitProviderRedis {
+	if p.config.Provider == types.RateLimitProviderRedis {
 		if provider := p.trySecondaryStorage(); provider != nil {
 			p.provider = provider
 			p.handler = NewRateLimitHookHandler(
@@ -119,7 +123,7 @@ func (p *RateLimitPlugin) initProvider(ctx *models.PluginContext) error {
 		p.logger.Warn("Redis provider not available via secondary-storage, falling back to in-memory")
 	}
 
-	if p.config.Provider == RateLimitProviderDatabase {
+	if p.config.Provider == types.RateLimitProviderDatabase {
 		if ctx.DB != nil {
 			dbConfig := DatabaseStorageConfig{}
 			if p.config.Database != nil {

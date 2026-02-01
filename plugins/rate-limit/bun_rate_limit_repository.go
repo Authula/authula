@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/rate-limit/types"
 	"github.com/uptrace/bun"
 )
 
@@ -19,8 +20,8 @@ func NewRateLimitRepository(db bun.IDB) RateLimitRepository {
 }
 
 // GetByKey retrieves a rate limit record by its key
-func (r *rateLimitRepositoryImpl) GetByKey(ctx context.Context, key string) (*RateLimit, error) {
-	var record RateLimit
+func (r *rateLimitRepositoryImpl) GetByKey(ctx context.Context, key string) (*types.RateLimit, error) {
+	var record types.RateLimit
 
 	err := r.db.NewSelect().
 		Model(&record).
@@ -38,10 +39,10 @@ func (r *rateLimitRepositoryImpl) GetByKey(ctx context.Context, key string) (*Ra
 }
 
 // UpdateOrCreate updates an existing rate limit record or creates a new one
-func (r *rateLimitRepositoryImpl) UpdateOrCreate(ctx context.Context, key string, window time.Duration) (*RateLimit, error) {
+func (r *rateLimitRepositoryImpl) UpdateOrCreate(ctx context.Context, key string, window time.Duration) (*types.RateLimit, error) {
 	now := time.Now()
 	expiresAt := now.Add(window)
-	record := &RateLimit{
+	record := &types.RateLimit{
 		Key:       key,
 		Count:     1,
 		ExpiresAt: expiresAt,
@@ -75,7 +76,7 @@ func (r *rateLimitRepositoryImpl) UpdateOrCreate(ctx context.Context, key string
 // CleanupExpired removes expired rate limit records
 func (r *rateLimitRepositoryImpl) CleanupExpired(ctx context.Context, now time.Time) error {
 	_, err := r.db.NewDelete().
-		Model((*RateLimit)(nil)).
+		Model((*types.RateLimit)(nil)).
 		Where("expires_at < ?", now).
 		Exec(ctx)
 

@@ -51,16 +51,6 @@ type Plugin interface {
 	Close() error
 }
 
-// PluginWithMigrations is an optional interface for plugins that have database migrations
-type PluginWithMigrations interface {
-	// Migrations returns the embedded SQL migrations filesystem for the given database provider.
-	// The dbProvider parameter should be one of: "postgres", "mysql", "sqlite".
-	// The returned embed.FS should contain migration files organized as:
-	//   - 20250115000001_migration_name.up.sql
-	//   - 20250115000001_migration_name.down.sql
-	Migrations(ctx context.Context, dbProvider string) (*embed.FS, error)
-}
-
 // PluginWithRoutes is an optional interface for plugins that provide HTTP routes
 type PluginWithRoutes interface {
 	Routes() []Route
@@ -156,6 +146,17 @@ type Hook struct {
 // to provide request lifecycle hooks.
 type PluginWithHooks interface {
 	Hooks() []Hook
+}
+
+// PluginWithMigrations is an optional interface for plugins that need database migrations.
+// Plugins implementing this interface will have their migrations run after Init() is called,
+// allowing them to check their configuration to determine if database tables are needed.
+type PluginWithMigrations interface {
+	// Migrations returns the embedded migration files for the specified database provider.
+	// The plugin should use //go:embed directives to include migration SQL files.
+	// If the plugin doesn't need migrations for the current configuration (e.g., using
+	// in-memory or Redis provider), it should return nil, nil.
+	Migrations(ctx context.Context, dbProvider string) (*embed.FS, error)
 }
 
 type PluginOption func(p Plugin)

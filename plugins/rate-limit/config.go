@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/env"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/rate-limit/types"
 )
 
 type RateLimitPluginConfig struct {
@@ -21,7 +22,7 @@ type RateLimitPluginConfig struct {
 	Prefix string `json:"prefix,omitempty" toml:"prefix"`
 
 	// Custom rules for specific paths or methods
-	CustomRules map[string]RateLimitRule `json:"custom_rules" toml:"custom_rules"`
+	CustomRules map[string]types.RateLimitRule `json:"custom_rules" toml:"custom_rules"`
 
 	// Provider specifies which rate limit backend to use
 	// Options: "memory", "redis", "database"
@@ -30,7 +31,7 @@ type RateLimitPluginConfig struct {
 	// Note: rate limit plugin can use either its own provider (if specified) or the
 	// secondary-storage plugin if available. If secondary-storage plugin is configured
 	// and enabled, that takes precedence over the provider selection here.
-	Provider RateLimitProviderType `json:"provider" toml:"provider"`
+	Provider types.RateLimitProviderType `json:"provider" toml:"provider"`
 
 	// Memory contains configuration options for in-memory storage
 	Memory *MemoryStorageConfig `json:"memory,omitempty" toml:"memory"`
@@ -68,8 +69,6 @@ func (config *RateLimitPluginConfig) ApplyDefaults() {
 		config.Prefix = "ratelimit:"
 	}
 	if config.CustomRules == nil {
-		config.CustomRules = make(map[string]RateLimitRule)
+		config.CustomRules = make(map[string]types.RateLimitRule)
 	}
-	// The provider can only be changed via a server restart.
-	// TODO: in the future, we need to look into enabling this without a server restart.
 }

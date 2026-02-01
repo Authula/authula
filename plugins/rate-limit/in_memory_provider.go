@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/rate-limit/types"
 )
 
 // InMemoryProvider is a thread-safe in-memory rate limit provider
@@ -44,7 +46,7 @@ func NewInMemoryProviderWithConfig(config MemoryStorageConfig) *InMemoryProvider
 
 // GetName returns the provider name
 func (p *InMemoryProvider) GetName() string {
-	return string(RateLimitProviderInMemory)
+	return string(types.RateLimitProviderInMemory)
 }
 
 // CheckAndIncrement checks if a request is allowed and increments the counter

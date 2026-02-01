@@ -9,9 +9,11 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/env"
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	sharedmigrations "github.com/GoBetterAuth/go-better-auth/v2/plugins/shared/migrations"
 )
 
 type SecondaryStoragePlugin struct {
+	sharedmigrations.BaseMigrationProvider
 	config  SecondaryStoragePluginConfig
 	logger  models.Logger
 	storage models.SecondaryStorage
@@ -21,7 +23,8 @@ type SecondaryStoragePlugin struct {
 func New(config SecondaryStoragePluginConfig) *SecondaryStoragePlugin {
 	config.ApplyDefaults()
 	return &SecondaryStoragePlugin{
-		config: config,
+		BaseMigrationProvider: sharedmigrations.BaseMigrationProvider{FS: MigrationFS},
+		config:                config,
 	}
 }
 
@@ -29,6 +32,7 @@ func New(config SecondaryStoragePluginConfig) *SecondaryStoragePlugin {
 // This allows library mode users to provide their own storage backend
 func NewWithStorage(providerName string, storage models.SecondaryStorage) *SecondaryStoragePlugin {
 	return &SecondaryStoragePlugin{
+		BaseMigrationProvider: sharedmigrations.BaseMigrationProvider{FS: MigrationFS},
 		config: SecondaryStoragePluginConfig{
 			Provider: SecondaryStorageProvider(providerName),
 		},
@@ -154,19 +158,19 @@ func (p *SecondaryStoragePlugin) initRedisProvider(ctx *models.PluginContext) (m
 	})
 }
 
-func (p *SecondaryStoragePlugin) Migrations(ctx context.Context, dbProvider string) (*embed.FS, error) {
-	if p.config.Provider == SecondaryStorageProviderDatabase {
-		return GetMigrations(ctx, dbProvider)
-	}
-	// Return nil to explicitly skip migrations for non-DB providers
-	return nil, nil
-}
-
 func (p *SecondaryStoragePlugin) Close() error {
 	if p.storage != nil {
 		return p.storage.Close()
 	}
 	return nil
+}
+
+func (p *SecondaryStoragePlugin) Migrations(ctx context.Context, dbProvider string) (*embed.FS, error) {
+	// Check if database provider is configured
+	if p.config.Provider != SecondaryStorageProviderDatabase {
+		return nil, nil
+	}
+	return MigrationFS.GetMigrations(ctx, dbProvider)
 }
 
 func (p *SecondaryStoragePlugin) OnConfigUpdate(config *models.Config) error {

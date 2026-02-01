@@ -11,6 +11,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
+
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/secondary-storage/types"
 )
 
 // Helper function to create an in-memory SQLite database for testing
@@ -24,7 +26,7 @@ func newTestDB(t *testing.T) bun.IDB {
 
 	// Create the KeyValueStore table
 	ctx := context.Background()
-	if _, err := db.NewCreateTable().Model(&KeyValueStore{}).Exec(ctx); err != nil {
+	if _, err := db.NewCreateTable().Model(&types.KeyValueStore{}).Exec(ctx); err != nil {
 		t.Fatalf("failed to create KeyValueStore table: %v", err)
 	}
 
@@ -346,7 +348,7 @@ func TestDatabaseStorage_ConcurrentReads(t *testing.T) {
 	db := bun.NewDB(sqldb, sqlitedialect.New())
 
 	ctx := context.Background()
-	if _, err := db.NewCreateTable().Model(&KeyValueStore{}).Exec(ctx); err != nil {
+	if _, err := db.NewCreateTable().Model(&types.KeyValueStore{}).Exec(ctx); err != nil {
 		t.Fatalf("failed to create KeyValueStore table: %v", err)
 	}
 
@@ -601,7 +603,7 @@ func TestDatabaseStorage_PersistenceAcrossInstances(t *testing.T) {
 	db := bun.NewDB(sqldb, sqlitedialect.New())
 
 	ctx := context.Background()
-	if _, err := db.NewCreateTable().Model(&KeyValueStore{}).Exec(ctx); err != nil {
+	if _, err := db.NewCreateTable().Model(&types.KeyValueStore{}).Exec(ctx); err != nil {
 		t.Fatalf("failed to create KeyValueStore table: %v", err)
 	}
 

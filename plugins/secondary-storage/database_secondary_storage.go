@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/secondary-storage/types"
 )
 
 // DatabaseSecondaryStorage implements the SecondaryStorage interface using Bun ORM.
@@ -65,7 +67,7 @@ func (storage *DatabaseSecondaryStorage) Get(ctx context.Context, key string) (a
 	default:
 	}
 
-	var entry KeyValueStore
+	var entry types.KeyValueStore
 	err := storage.db.NewSelect().Model(&entry).Where("key = ?", key).Scan(ctx)
 
 	if err != nil {
@@ -86,7 +88,7 @@ func (storage *DatabaseSecondaryStorage) Get(ctx context.Context, key string) (a
 	// Check if entry has expired
 	if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
 		// Delete the expired entry
-		if _, err := storage.db.NewDelete().Model(&KeyValueStore{}).Where("key = ?", key).Exec(ctx); err != nil {
+		if _, err := storage.db.NewDelete().Model(&types.KeyValueStore{}).Where("key = ?", key).Exec(ctx); err != nil {
 			slog.Error("error deleting expired entry", slog.String("key", key), slog.Any("error", err))
 		}
 		return nil, nil
@@ -109,7 +111,7 @@ func (storage *DatabaseSecondaryStorage) Set(ctx context.Context, key string, va
 		return fmt.Errorf("value must be of type string, got %T", value)
 	}
 
-	entry := KeyValueStore{
+	entry := types.KeyValueStore{
 		Key:   key,
 		Value: valueStr,
 	}
@@ -137,7 +139,7 @@ func (storage *DatabaseSecondaryStorage) Delete(ctx context.Context, key string)
 	default:
 	}
 
-	_, err := storage.db.NewDelete().Model(&KeyValueStore{}).Where("key = ?", key).Exec(ctx)
+	_, err := storage.db.NewDelete().Model(&types.KeyValueStore{}).Where("key = ?", key).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("database error: %w", err)
 	}
@@ -159,7 +161,7 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 
 	var count int
 
-	var entry KeyValueStore
+	var entry types.KeyValueStore
 	err := storage.db.NewSelect().Model(&entry).Where("key = ?", key).Scan(ctx)
 
 	if err != nil && err != context.Canceled && err != context.DeadlineExceeded {
@@ -167,7 +169,7 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 			// Entry exists, check if it's expired
 			if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
 				// Delete the expired entry
-				if _, err := storage.db.NewDelete().Model(&KeyValueStore{}).Where("key = ?", key).Exec(ctx); err != nil {
+				if _, err := storage.db.NewDelete().Model(&types.KeyValueStore{}).Where("key = ?", key).Exec(ctx); err != nil {
 					slog.Error("error deleting expired entry during incr", slog.String("key", key), slog.Any("error", err))
 				}
 			} else {
@@ -185,7 +187,7 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 		// Entry exists, check if it's expired
 		if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
 			// Delete the expired entry
-			if _, err := storage.db.NewDelete().Model(&KeyValueStore{}).Where("key = ?", key).Exec(ctx); err != nil {
+			if _, err := storage.db.NewDelete().Model(&types.KeyValueStore{}).Where("key = ?", key).Exec(ctx); err != nil {
 				slog.Error("error deleting expired entry during incr", slog.String("key", key), slog.Any("error", err))
 			}
 		} else {
@@ -200,7 +202,7 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 
 	count++
 
-	newEntry := KeyValueStore{
+	newEntry := types.KeyValueStore{
 		Key:   key,
 		Value: strconv.Itoa(count),
 	}
@@ -240,7 +242,7 @@ func (storage *DatabaseSecondaryStorage) removeExpiredEntries() {
 	now := time.Now()
 	ctx := context.Background()
 
-	_, err := storage.db.NewDelete().Model(&KeyValueStore{}).
+	_, err := storage.db.NewDelete().Model(&types.KeyValueStore{}).
 		Where("expires_at IS NOT NULL AND expires_at < ?", now).
 		Exec(ctx)
 
@@ -258,7 +260,7 @@ func (storage *DatabaseSecondaryStorage) TTL(ctx context.Context, key string) (*
 	default:
 	}
 
-	var entry KeyValueStore
+	var entry types.KeyValueStore
 	err := storage.db.NewSelect().Model(&entry).Where("key = ?", key).Scan(ctx)
 
 	if err != nil {

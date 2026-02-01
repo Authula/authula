@@ -1,8 +1,6 @@
 package configmanager
 
 import (
-	"context"
-	"embed"
 	"fmt"
 	"net/http"
 
@@ -11,10 +9,12 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager/handlers"
 	configmanagerservices "github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager/services"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager/types"
+	sharedmigrations "github.com/GoBetterAuth/go-better-auth/v2/plugins/shared/migrations"
 	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 type ConfigManagerPlugin struct {
+	sharedmigrations.BaseMigrationProvider
 	config        types.ConfigManagerPluginConfig
 	logger        models.Logger
 	ctx           *models.PluginContext
@@ -23,7 +23,8 @@ type ConfigManagerPlugin struct {
 
 func New(config types.ConfigManagerPluginConfig) *ConfigManagerPlugin {
 	return &ConfigManagerPlugin{
-		config: config,
+		BaseMigrationProvider: sharedmigrations.BaseMigrationProvider{FS: MigrationFS},
+		config:                config,
 	}
 }
 
@@ -84,10 +85,6 @@ func (p *ConfigManagerPlugin) Init(ctx *models.PluginContext) error {
 	}
 
 	return nil
-}
-
-func (p *ConfigManagerPlugin) Migrations(ctx context.Context, dbProvider string) (*embed.FS, error) {
-	return GetMigrations(ctx, dbProvider)
 }
 
 func (p *ConfigManagerPlugin) Routes() []models.Route {

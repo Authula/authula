@@ -177,13 +177,3 @@ type RefreshToken struct {
 	LastReuseAttempt *time.Time `json:"last_reuse_attempt" bun:"column:last_reuse_attempt"`
 	CreatedAt        time.Time  `json:"created_at" bun:"column:created_at,notnull,default:current_timestamp"`
 }
-
-var _ bun.BeforeAppendModelHook = (*RefreshToken)(nil)
-
-func (s *RefreshToken) BeforeAppendModel(ctx context.Context, query bun.Query) error {
-	switch query.(type) {
-	case *bun.InsertQuery:
-		s.CreatedAt = time.Now()
-	}
-	return nil
-}

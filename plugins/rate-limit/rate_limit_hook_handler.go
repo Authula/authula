@@ -6,21 +6,22 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/rate-limit/types"
 )
 
 type RateLimitHookHandler struct {
 	config       *models.Config
 	logger       models.Logger
 	pluginConfig RateLimitPluginConfig
-	provider     RateLimitProvider
-	customRules  map[string]RateLimitRule
+	provider     types.RateLimitProvider
+	customRules  map[string]types.RateLimitRule
 }
 
 func NewRateLimitHookHandler(
 	config *models.Config,
 	logger models.Logger,
 	pluginConfig RateLimitPluginConfig,
-	provider RateLimitProvider,
+	provider types.RateLimitProvider,
 ) *RateLimitHookHandler {
 	return &RateLimitHookHandler{
 		config:       config,

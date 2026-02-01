@@ -22,7 +22,7 @@ type AuthSettings struct {
 	// The unique key for the config block (e.g., "runtime_config" for the main config)
 	Key string `json:"key" bun:",unique,type:varchar(255)"`
 	// Value contains the JSON-encoded configuration data
-	Value json.RawMessage `json:"value" bun:"type:jsonb"`
+	Value json.RawMessage `json:"value" bun:"type:json"`
 	// CreatedAt is the timestamp when this setting was created
 	CreatedAt time.Time `json:"created_at" bun:",nullzero,notnull,default:current_timestamp"`
 	// UpdatedAt is the timestamp when this setting was last updated
