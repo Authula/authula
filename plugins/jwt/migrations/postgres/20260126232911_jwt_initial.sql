@@ -1,3 +1,5 @@
+-- +goose Up
+
 CREATE TABLE IF NOT EXISTS jwks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   public_key TEXT NOT NULL,
@@ -26,9 +28,17 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expir
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_revoked_only ON refresh_tokens(is_revoked) WHERE is_revoked = TRUE;
 
 -- Function to cleanup expired tokens
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION cleanup_expired_refresh_tokens()
 RETURNS VOID AS $$
 BEGIN
   DELETE FROM refresh_tokens WHERE expires_at < NOW();
 END;
 $$ LANGUAGE plpgsql;
+-- +goose StatementEnd
+
+-- +goose Down
+
+DROP FUNCTION IF EXISTS cleanup_expired_refresh_tokens();
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS jwks;

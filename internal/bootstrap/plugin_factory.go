@@ -31,7 +31,6 @@ type PluginFactory struct {
 }
 
 // pluginFactories is an ordered list of registered plugin factories.
-// The order matters: core must be initialized first, then others.
 var pluginFactories = []PluginFactory{
 	{
 		ID:                models.PluginConfigManager.String(),

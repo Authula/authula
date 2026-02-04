@@ -1,14 +1,10 @@
 package gobetterauth
 
 import (
-	"context"
-
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/migrate"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/events"
-	internal "github.com/GoBetterAuth/go-better-auth/v2/internal"
 	internalbootstrap "github.com/GoBetterAuth/go-better-auth/v2/internal/bootstrap"
 	internalevents "github.com/GoBetterAuth/go-better-auth/v2/internal/events"
 	internalrepositories "github.com/GoBetterAuth/go-better-auth/v2/internal/repositories"
@@ -91,92 +87,4 @@ func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.
 		VerificationService: verificationService,
 		TokenService:        tokenService,
 	}
-}
-
-func RunCoreMigrations(ctx context.Context, logger models.Logger, dbProvider string, db bun.IDB) error {
-	sqlFS, err := internal.GetMigrations(ctx, dbProvider)
-	if err != nil {
-		logger.Error(err.Error())
-		return err
-	}
-
-	if sqlFS == nil {
-		logger.Debug("no migrations found for core")
-	}
-
-	migrations := migrate.NewMigrations()
-	if err := migrations.Discover(*sqlFS); err != nil {
-		logger.Debug("no migrations found for core")
-		return nil
-	}
-
-	bunDB, ok := db.(*bun.DB)
-	if !ok {
-		logger.Debug("database is not *bun.DB, skipping migrations")
-		return nil
-	}
-
-	m := migrate.NewMigrator(bunDB, migrations)
-
-	if err := m.Init(ctx); err != nil {
-		logger.Error("failed to init migrations table", "error", err)
-		return err
-	}
-
-	if _, err := m.Migrate(ctx); err != nil {
-		logger.Error("failed to run migrations", "error", err)
-		return err
-	}
-
-	logger.Debug("core migrations completed")
-
-	return nil
-}
-
-func DropCoreMigrations(ctx context.Context, logger models.Logger, dbProvider string, db bun.IDB) error {
-	sqlFS, err := internal.GetMigrations(ctx, dbProvider)
-	if err != nil {
-		logger.Error(err.Error())
-		return err
-	}
-
-	if sqlFS == nil {
-		logger.Debug("no migrations found for core")
-		return nil
-	}
-
-	migrations := migrate.NewMigrations()
-	if err := migrations.Discover(*sqlFS); err != nil {
-		logger.Debug("no migrations found for core")
-		return nil
-	}
-
-	bunDB, ok := db.(*bun.DB)
-	if !ok {
-		logger.Debug("database is not *bun.DB, skipping drop migrations")
-		return nil
-	}
-
-	m := migrate.NewMigrator(bunDB, migrations)
-
-	if err := m.Init(ctx); err != nil {
-		logger.Error("failed to init migrations table", "error", err)
-		return err
-	}
-
-	// Rollback all applied migrations
-	for {
-		group, err := m.Rollback(ctx)
-		if err != nil {
-			logger.Error("failed to rollback migrations", "error", err)
-			return err
-		}
-		if group == nil || len(group.Migrations) == 0 {
-			break
-		}
-	}
-
-	logger.Debug("core migrations dropped")
-
-	return nil
 }

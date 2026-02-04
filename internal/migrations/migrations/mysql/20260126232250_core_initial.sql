@@ -1,3 +1,5 @@
+-- +goose Up
+
 SET NAMES utf8mb4;
 SET CHARACTER SET utf8mb4;
 
@@ -12,8 +14,6 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE INDEX idx_users_email ON users(email);
 
 -- ACCOUNTS
 
@@ -102,3 +102,16 @@ BEGIN
 END$$
 
 DELIMITER ;
+
+-- +goose Down
+
+-- Drop procedures
+DROP PROCEDURE IF EXISTS cleanup_all_expired;
+DROP PROCEDURE IF EXISTS cleanup_verifications;
+DROP PROCEDURE IF EXISTS cleanup_sessions;
+
+-- Drop tables
+DROP TABLE IF EXISTS verifications;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS accounts;
+DROP TABLE IF EXISTS users;

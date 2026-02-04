@@ -9,6 +9,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/migrations"
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/plugins"
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
@@ -46,7 +47,15 @@ func New(authConfig *AuthConfig) *Auth {
 		panic(fmt.Errorf("failed to initialize database: %w", err))
 	}
 
-	RunCoreMigrations(context.Background(), logger, authConfig.Config.Database.Provider, db)
+	if err = migrations.RunCoreMigrations(
+		context.Background(),
+		logger,
+		authConfig.Config.Logger.Level,
+		authConfig.Config.Database.Provider,
+		db,
+	); err != nil {
+		panic(fmt.Errorf("failed to run core migrations: %w", err))
+	}
 
 	router := NewRouter(authConfig.Config, logger, nil)
 
@@ -77,56 +86,23 @@ func New(authConfig *AuthConfig) *Auth {
 		authConfig.Config.Plugins = make(models.PluginsConfig)
 	}
 
-	// Cache type-safe configs for all plugins and auto-enable those not explicitly disabled
 	for _, plugin := range authConfig.Plugins {
 		pluginID := plugin.Metadata().ID
-		pluginConfig := plugin.Config()
-
-		// Initialize config map if not exists
-		if authConfig.Config.Plugins[pluginID] == nil {
-			authConfig.Config.Plugins[pluginID] = make(map[string]any)
+		// Cache type-safe configs for all plugins
+		authConfig.Config.PreParsedConfigs[pluginID] = plugin.Config()
+		if !util.IsPluginEnabled(authConfig.Config, pluginID) {
+			continue
 		}
-
-		// Check if plugin is explicitly disabled in config
-		isDisabled := false
-		if pluginConfig, ok := authConfig.Config.Plugins[pluginID]; ok {
-			if configMap, ok := pluginConfig.(map[string]any); ok {
-				if enabled, found := configMap["enabled"]; found {
-					if b, ok := enabled.(bool); ok && !b {
-						isDisabled = true
-					}
-				}
-			}
-		}
-
-		// If not explicitly disabled and no enabled setting exists, set from plugin config
-		if !isDisabled {
-			if configMap, ok := authConfig.Config.Plugins[pluginID].(map[string]any); ok {
-				if _, hasEnabled := configMap["enabled"]; !hasEnabled {
-					configMap["enabled"] = getEnabledFromConfig(pluginConfig)
-				}
-			}
-		}
-
-		// Cache the type-safe config
-		authConfig.Config.PreParsedConfigs[pluginID] = pluginConfig
-	}
-
-	for _, plugin := range authConfig.Plugins {
 		if err := pluginRegistry.Register(plugin); err != nil {
 			panic(fmt.Errorf("failed to register plugin: %w", err))
 		}
 	}
 
-	// Run plugin migrations
 	if err := pluginRegistry.RunMigrations(context.Background()); err != nil {
 		logger.Error("failed to run plugin migrations", "error", err)
 		panic(fmt.Errorf("failed to run plugin migrations: %w", err))
 	}
 
-	// Initialize all plugins in order
-	// Plugin ordering is managed by the plugin registry to ensure dependencies are satisfied
-	// (e.g., Core initializes before ConfigManager, ConfigManager before others)
 	if err := pluginRegistry.InitAll(); err != nil {
 		logger.Error("failed to initialize plugins", "error", err)
 		panic(fmt.Errorf("failed to initialize plugins: %w", err))
@@ -152,33 +128,24 @@ func New(authConfig *AuthConfig) *Auth {
 	return auth
 }
 
-// getEnabledFromConfig tries to get Enabled field from plugin config
-func getEnabledFromConfig(config any) bool {
-	// Default to enabled if we can't determine the value
-	if config == nil {
-		return true
-	}
-
-	// Use existing util.ParsePluginConfig to convert struct to map
-	var configMap map[string]any
-	if err := util.ParsePluginConfig(config, &configMap); err != nil {
-		return true
-	}
-
-	if enabled, ok := configMap["enabled"].(bool); ok {
-		return enabled
-	}
-
-	// Default to true if not found
-	return true
-}
-
 func (auth *Auth) RunCoreMigrations(ctx context.Context) error {
-	return RunCoreMigrations(ctx, auth.logger, auth.config.Database.Provider, auth.db)
+	return migrations.RunCoreMigrations(
+		ctx,
+		auth.logger,
+		auth.config.Logger.Level,
+		auth.config.Database.Provider,
+		auth.db,
+	)
 }
 
 func (auth *Auth) DropCoreMigrations(ctx context.Context) error {
-	return DropCoreMigrations(ctx, auth.logger, auth.config.Database.Provider, auth.db)
+	return migrations.DropCoreMigrations(
+		ctx,
+		auth.logger,
+		auth.config.Logger.Level,
+		auth.config.Database.Provider,
+		auth.db,
+	)
 }
 
 // registerMiddleware registers all middleware from hooks and plugins
@@ -189,7 +156,7 @@ func (auth *Auth) registerMiddleware() {
 	for _, plugin := range auth.PluginRegistry.Plugins() {
 		pluginID := plugin.Metadata().ID
 
-		if !util.IsPluginEnabled(currentConfig, pluginID, false) {
+		if !util.IsPluginEnabled(currentConfig, pluginID) {
 			auth.logger.Debug("skipping disabled plugin", "plugin", pluginID)
 			continue
 		}
@@ -296,7 +263,7 @@ func (auth *Auth) Handler() http.Handler {
 
 		// Register Plugin Routes
 		for _, plugin := range auth.PluginRegistry.Plugins() {
-			if !util.IsPluginEnabled(currentConfig, plugin.Metadata().ID, false) {
+			if !util.IsPluginEnabled(currentConfig, plugin.Metadata().ID) {
 				continue
 			}
 			if routeProvider, ok := plugin.(models.PluginWithRoutes); ok {
@@ -310,7 +277,7 @@ func (auth *Auth) Handler() http.Handler {
 
 		// Register Plugin Hooks
 		for _, plugin := range auth.PluginRegistry.Plugins() {
-			if !util.IsPluginEnabled(currentConfig, plugin.Metadata().ID, false) {
+			if !util.IsPluginEnabled(currentConfig, plugin.Metadata().ID) {
 				continue
 			}
 			if hookProvider, ok := plugin.(models.PluginWithHooks); ok {

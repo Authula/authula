@@ -1,7 +1,6 @@
 package types
 
 import (
-	"context"
 	"errors"
 	"time"
 
@@ -125,21 +124,11 @@ func (c *JWTPluginConfig) NormalizeAlgorithm() error {
 type JWKS struct {
 	bun.BaseModel `bun:"table:jwks"`
 
-	ID         string     `json:"id" bun:"column:id,pk,notnull"`
-	PublicKey  string     `json:"public_key" bun:"column:public_key,notnull"`
-	PrivateKey string     `json:"private_key" bun:"column:private_key,notnull"`
-	CreatedAt  time.Time  `json:"created_at" bun:"column:created_at,nullzero,notnull,default:current_timestamp"`
-	ExpiresAt  *time.Time `json:"expires_at" bun:"column:expires_at,nullzero"`
-}
-
-var _ bun.BeforeAppendModelHook = (*JWKS)(nil)
-
-func (s *JWKS) BeforeAppendModel(ctx context.Context, query bun.Query) error {
-	switch query.(type) {
-	case *bun.InsertQuery:
-		s.CreatedAt = time.Now()
-	}
-	return nil
+	ID         string     `json:"id" bun:"column:id,pk"`
+	PublicKey  string     `json:"public_key" bun:"column:public_key"`
+	PrivateKey string     `json:"private_key" bun:"column:private_key"`
+	ExpiresAt  *time.Time `json:"expires_at" bun:"column:expires_at"`
+	CreatedAt  time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp"`
 }
 
 // Claims represents standard JWT claims
@@ -168,22 +157,12 @@ type TokenPair struct {
 type RefreshToken struct {
 	bun.BaseModel `bun:"table:refresh_tokens"`
 
-	ID               string     `json:"id" bun:"column:id,pk,notnull"`
-	SessionID        string     `json:"session_id" bun:"column:session_id,notnull"`
-	TokenHash        string     `json:"token_hash" bun:"column:token_hash,notnull,unique"`
-	ExpiresAt        time.Time  `json:"expires_at" bun:"column:expires_at,notnull"`
-	IsRevoked        bool       `json:"is_revoked" bun:"column:is_revoked,notnull,default:false"`
+	ID               string     `json:"id" bun:"column:id,pk"`
+	SessionID        string     `json:"session_id" bun:"column:session_id"`
+	TokenHash        string     `json:"token_hash" bun:"column:token_hash"`
+	ExpiresAt        time.Time  `json:"expires_at" bun:"column:expires_at"`
+	IsRevoked        bool       `json:"is_revoked" bun:"column:is_revoked"`
 	RevokedAt        *time.Time `json:"revoked_at" bun:"column:revoked_at"`
 	LastReuseAttempt *time.Time `json:"last_reuse_attempt" bun:"column:last_reuse_attempt"`
-	CreatedAt        time.Time  `json:"created_at" bun:"column:created_at,notnull,default:current_timestamp"`
-}
-
-var _ bun.BeforeAppendModelHook = (*RefreshToken)(nil)
-
-func (s *RefreshToken) BeforeAppendModel(ctx context.Context, query bun.Query) error {
-	switch query.(type) {
-	case *bun.InsertQuery:
-		s.CreatedAt = time.Now()
-	}
-	return nil
+	CreatedAt        time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp"`
 }

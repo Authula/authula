@@ -1,7 +1,6 @@
 package models
 
 import (
-	"context"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -20,29 +19,16 @@ func (vt VerificationType) String() string {
 }
 
 type Verification struct {
-	bun.BaseModel `bun:"table:verifications,alias:v"`
+	bun.BaseModel `bun:"table:verifications"`
 
-	ID         string           `json:"id" bun:",pk"`
-	UserID     *string          `json:"user_id" bun:",nullzero"`
-	Identifier string           `json:"identifier" bun:",notnull"` // email or other identifier
-	Token      string           `json:"token" bun:",unique,notnull"`
-	Type       VerificationType `json:"type" bun:",notnull"`
-	ExpiresAt  time.Time        `json:"expires_at" bun:",notnull"`
-	CreatedAt  time.Time        `json:"created_at" bun:",nullzero,notnull,default:current_timestamp"`
-	UpdatedAt  time.Time        `json:"updated_at" bun:",nullzero,notnull,default:current_timestamp"`
+	ID         string           `json:"id" bun:"column:id,pk"`
+	UserID     *string          `json:"user_id" bun:"column:user_id"`
+	Identifier string           `json:"identifier" bun:"column:identifier"` // email or other identifier
+	Token      string           `json:"token" bun:"column:token"`
+	Type       VerificationType `json:"type" bun:"column:type"`
+	ExpiresAt  time.Time        `json:"expires_at" bun:"column:expires_at"`
+	CreatedAt  time.Time        `json:"created_at" bun:"column:created_at,default:current_timestamp"`
+	UpdatedAt  time.Time        `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
 
 	User *User `json:"-" bun:"rel:belongs-to,join:user_id=id"`
-}
-
-var _ bun.BeforeAppendModelHook = (*Verification)(nil)
-
-func (s *Verification) BeforeAppendModel(ctx context.Context, query bun.Query) error {
-	switch query.(type) {
-	case *bun.InsertQuery:
-		s.CreatedAt = time.Now()
-		s.UpdatedAt = time.Now()
-	case *bun.UpdateQuery:
-		s.UpdatedAt = time.Now()
-	}
-	return nil
 }

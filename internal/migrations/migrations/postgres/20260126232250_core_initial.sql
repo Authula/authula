@@ -1,14 +1,18 @@
+-- +goose Up
+
 -- Enable pgcrypto extension for UUID generation
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- Create a function to automatically update updated_at timestamp
-CREATE OR REPLACE FUNCTION core_update_updated_at_column_func()
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION core_set_updated_at_fn()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
+-- +goose StatementEnd
 
 -- USERS
 
@@ -22,13 +26,11 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-
 DROP TRIGGER IF EXISTS update_users_updated_at_trigger ON users;
 CREATE TRIGGER update_users_updated_at_trigger
   BEFORE UPDATE ON users
   FOR EACH ROW
-  EXECUTE FUNCTION core_update_updated_at_column_func();
+  EXECUTE FUNCTION core_set_updated_at_fn();
 
 -- ACCOUNTS
 
@@ -51,13 +53,12 @@ CREATE TABLE IF NOT EXISTS accounts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);
-CREATE INDEX IF NOT EXISTS idx_accounts_account_provider ON accounts(account_id, provider_id);
 
 DROP TRIGGER IF EXISTS update_accounts_updated_at_trigger ON accounts;
 CREATE TRIGGER update_accounts_updated_at_trigger
   BEFORE UPDATE ON accounts
   FOR EACH ROW
-  EXECUTE FUNCTION core_update_updated_at_column_func();
+  EXECUTE FUNCTION core_set_updated_at_fn();
 
 -- SESSIONS
 
@@ -73,7 +74,6 @@ CREATE TABLE IF NOT EXISTS sessions (
   CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 
@@ -81,7 +81,7 @@ DROP TRIGGER IF EXISTS update_sessions_updated_at_trigger ON sessions;
 CREATE TRIGGER update_sessions_updated_at_trigger
   BEFORE UPDATE ON sessions
   FOR EACH ROW
-  EXECUTE FUNCTION core_update_updated_at_column_func();
+  EXECUTE FUNCTION core_set_updated_at_fn();
 
 -- VERIFICATIONS
 
@@ -99,7 +99,6 @@ CREATE TABLE IF NOT EXISTS verifications (
 
 CREATE INDEX IF NOT EXISTS idx_verifications_user_id ON verifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_verifications_identifier ON verifications(identifier);
-CREATE INDEX IF NOT EXISTS idx_verifications_token ON verifications(token);
 CREATE INDEX IF NOT EXISTS idx_verifications_type ON verifications(type);
 CREATE INDEX IF NOT EXISTS idx_verifications_expires_at ON verifications(expires_at);
 
@@ -107,10 +106,11 @@ DROP TRIGGER IF EXISTS update_verifications_updated_at_trigger ON verifications;
 CREATE TRIGGER update_verifications_updated_at_trigger
   BEFORE UPDATE ON verifications
   FOR EACH ROW
-  EXECUTE FUNCTION core_update_updated_at_column_func();
+  EXECUTE FUNCTION core_set_updated_at_fn();
 
 -- Create a cleanup function for expired records
-CREATE OR REPLACE FUNCTION cleanup_expired_records()
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION cleanup_expired_records_fn()
 RETURNS void AS $$
 BEGIN
   -- Delete expired sessions
@@ -120,3 +120,19 @@ BEGIN
   DELETE FROM verifications WHERE expires_at < NOW();
 END;
 $$ LANGUAGE plpgsql;
+-- +goose StatementEnd
+
+-- +goose Down
+
+DROP TRIGGER IF EXISTS update_verifications_updated_at_trigger ON verifications;
+DROP TRIGGER IF EXISTS update_sessions_updated_at_trigger ON sessions;  
+DROP TRIGGER IF EXISTS update_accounts_updated_at_trigger ON accounts;
+DROP TRIGGER IF EXISTS update_users_updated_at_trigger ON users;
+
+DROP TABLE IF EXISTS verifications CASCADE;
+DROP TABLE IF EXISTS sessions CASCADE;
+DROP TABLE IF EXISTS accounts CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+DROP FUNCTION IF EXISTS cleanup_expired_records_fn();
+DROP FUNCTION IF EXISTS core_set_updated_at_fn();

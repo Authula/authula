@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/migrate"
 
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/migrations"
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/services"
@@ -74,7 +74,7 @@ func (r *PluginRegistry) InitAll() error {
 		pluginID := plugin.Metadata().ID
 		cfg := r.configProvider()
 
-		if !util.IsPluginEnabled(cfg, pluginID, false) {
+		if !util.IsPluginEnabled(cfg, pluginID) {
 			r.logger.Debug("plugin disabled, skipping initialization", "plugin", pluginID)
 			continue
 		}
@@ -130,7 +130,7 @@ func (r *PluginRegistry) RunMigrations(ctx context.Context) error {
 		pluginID := plugin.Metadata().ID
 		cfg := r.configProvider()
 
-		if !util.IsPluginEnabled(cfg, pluginID, false) {
+		if !util.IsPluginEnabled(cfg, pluginID) {
 			r.logger.Debug("plugin disabled, skipping migrations", "plugin", pluginID)
 			continue
 		}
@@ -154,40 +154,9 @@ func (r *PluginRegistry) RunMigrations(ctx context.Context) error {
 			continue
 		}
 
-		migrations := migrate.NewMigrations()
-		if err := migrations.Discover(*sqlFS); err != nil {
-			r.logger.Debug("no migrations found for plugin",
-				"plugin", pluginID,
-				"error", err,
-			)
-			continue
-		}
-
-		bunDB, ok := r.db.(*bun.DB)
-		if !ok {
-			r.logger.Debug("database is not *bun.DB, skipping migrations", "plugin", pluginID)
-			continue
-		}
-
-		m := migrate.NewMigrator(bunDB, migrations)
-
-		if err := m.Init(ctx); err != nil {
-			r.logger.Error("failed to init migrations table",
-				"plugin", pluginID,
-				"error", err,
-			)
+		if err := migrations.RunMigrations(ctx, r.logger, dbProvider, r.db, *sqlFS, "migrations/"+dbProvider); err != nil {
 			return err
 		}
-
-		if _, err := m.Migrate(ctx); err != nil {
-			r.logger.Error("failed to run migrations",
-				"plugin", pluginID,
-				"error", err,
-			)
-			return err
-		}
-
-		r.logger.Debug("plugin migrations completed", "plugin", pluginID)
 	}
 
 	return nil
@@ -220,47 +189,9 @@ func (r *PluginRegistry) DropMigrations(ctx context.Context) error {
 			continue
 		}
 
-		migrations := migrate.NewMigrations()
-		if err := migrations.Discover(*sqlFS); err != nil {
-			r.logger.Debug("no migrations found for plugin",
-				"plugin", pluginID,
-				"error", err,
-			)
-			continue
-		}
-
-		bunDB, ok := r.db.(*bun.DB)
-		if !ok {
-			r.logger.Debug("database is not *bun.DB, skipping migrations", "plugin", pluginID)
-			continue
-		}
-
-		m := migrate.NewMigrator(bunDB, migrations)
-
-		if err := m.Init(ctx); err != nil {
-			r.logger.Error("failed to init migrations table",
-				"plugin", pluginID,
-				"error", err,
-			)
+		if err := migrations.DropMigrations(ctx, r.logger, dbProvider, r.db, *sqlFS, "migrations/"+dbProvider); err != nil {
 			return err
 		}
-
-		// Rollback all applied migrations
-		for {
-			group, err := m.Rollback(ctx)
-			if err != nil {
-				r.logger.Error("failed to rollback migrations",
-					"plugin", pluginID,
-					"error", err,
-				)
-				return err
-			}
-			if group == nil || len(group.Migrations) == 0 {
-				break
-			}
-		}
-
-		r.logger.Debug("plugin migrations dropped", "plugin", pluginID)
 	}
 
 	return nil

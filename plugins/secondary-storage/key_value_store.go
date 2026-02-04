@@ -11,9 +11,9 @@ import (
 type KeyValueStore struct {
 	bun.BaseModel `bun:"table:key_value_store"`
 
-	Key       string     `json:"key" bun:",pk,type:varchar(255)"`
-	Value     string     `json:"value"`
-	ExpiresAt *time.Time `json:"expires_at" bun:"expires_at,nullzero"`
-	CreatedAt time.Time  `json:"created_at" bun:"created_at,notnull,default:current_timestamp"`
-	UpdatedAt time.Time  `json:"updated_at" bun:"updated_at,notnull,default:current_timestamp"`
+	Key       string     `json:"key" bun:"column:key,pk"`
+	Value     string     `json:"value" bun:"column:value"`
+	ExpiresAt *time.Time `json:"expires_at" bun:"column:expires_at"`
+	CreatedAt time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp"`
+	UpdatedAt time.Time  `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
 }

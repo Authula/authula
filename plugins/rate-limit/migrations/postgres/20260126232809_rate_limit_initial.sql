@@ -1,3 +1,5 @@
+-- +goose Up
+
 CREATE UNLOGGED TABLE IF NOT EXISTS rate_limits (
   key VARCHAR(255) PRIMARY KEY,
   count INTEGER NOT NULL,
@@ -5,3 +7,7 @@ CREATE UNLOGGED TABLE IF NOT EXISTS rate_limits (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rate_limits_expires_at ON rate_limits(expires_at);
+
+-- +goose Down
+
+DROP TABLE IF EXISTS rate_limits;
