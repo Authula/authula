@@ -58,22 +58,30 @@ func LoadPluginConfig[T any](config *models.Config, pluginID string, target *T) 
 }
 
 // IsPluginEnabled checks if a plugin is enabled based on its metadata and configuration.
-func IsPluginEnabled(config *models.Config, pluginID string, requiredByDefault bool) bool {
-	if config == nil || config.Plugins == nil {
-		return requiredByDefault
+func IsPluginEnabled(config *models.Config, pluginID string) bool {
+	if config == nil {
+		return false
+	}
+
+	if config.PreParsedConfigs != nil {
+		if preParsed, ok := config.PreParsedConfigs[pluginID]; ok && preParsed != nil {
+			if enabled, found := getEnabledFromConfig(preParsed); found {
+				return enabled
+			}
+		}
+	}
+
+	if config.Plugins == nil {
+		return false
 	}
 
 	rawConfig, ok := config.Plugins[pluginID]
 	if !ok || rawConfig == nil {
-		return requiredByDefault
+		return false
 	}
 
-	if configMap, ok := rawConfig.(map[string]any); ok {
-		if enabled, found := configMap["enabled"]; found {
-			if b, ok := enabled.(bool); ok {
-				return b
-			}
-		}
+	if enabled, found := getEnabledFromConfig(rawConfig); found {
+		return enabled
 	}
 
 	return true

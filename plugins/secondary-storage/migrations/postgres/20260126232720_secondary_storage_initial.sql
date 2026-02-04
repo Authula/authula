@@ -1,3 +1,5 @@
+-- migrate:up
+
 -- Create a function to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION key_value_store_update_updated_at_func()
 RETURNS TRIGGER AS $$
@@ -22,3 +24,8 @@ CREATE TRIGGER key_value_store_update_updated_at_trigger
   BEFORE UPDATE ON key_value_store
   FOR EACH ROW
   EXECUTE FUNCTION key_value_store_update_updated_at_func();
+
+-- migrate:down
+
+DROP TRIGGER IF EXISTS key_value_store_update_updated_at_trigger ON key_value_store;
+DROP TABLE IF EXISTS key_value_store;

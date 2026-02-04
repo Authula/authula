@@ -1,3 +1,5 @@
+-- migrate:up
+
 -- SQLite Secondary Storage Plugin Schema
 
 CREATE TABLE IF NOT EXISTS key_value_store (
@@ -9,3 +11,7 @@ CREATE TABLE IF NOT EXISTS key_value_store (
 );
 
 CREATE INDEX IF NOT EXISTS idx_key_value_store_expires_at ON key_value_store(expires_at);
+
+-- migrate:down
+
+DROP TABLE IF EXISTS key_value_store;

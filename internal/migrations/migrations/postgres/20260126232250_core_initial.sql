@@ -1,8 +1,10 @@
+-- migrate:up
+
 -- Enable pgcrypto extension for UUID generation
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- Create a function to automatically update updated_at timestamp
-CREATE OR REPLACE FUNCTION core_update_updated_at_column_func()
+CREATE OR REPLACE FUNCTION core_set_updated_at_fn()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
@@ -28,7 +30,7 @@ DROP TRIGGER IF EXISTS update_users_updated_at_trigger ON users;
 CREATE TRIGGER update_users_updated_at_trigger
   BEFORE UPDATE ON users
   FOR EACH ROW
-  EXECUTE FUNCTION core_update_updated_at_column_func();
+  EXECUTE FUNCTION core_set_updated_at_fn();
 
 -- ACCOUNTS
 
@@ -57,7 +59,7 @@ DROP TRIGGER IF EXISTS update_accounts_updated_at_trigger ON accounts;
 CREATE TRIGGER update_accounts_updated_at_trigger
   BEFORE UPDATE ON accounts
   FOR EACH ROW
-  EXECUTE FUNCTION core_update_updated_at_column_func();
+  EXECUTE FUNCTION core_set_updated_at_fn();
 
 -- SESSIONS
 
@@ -81,7 +83,7 @@ DROP TRIGGER IF EXISTS update_sessions_updated_at_trigger ON sessions;
 CREATE TRIGGER update_sessions_updated_at_trigger
   BEFORE UPDATE ON sessions
   FOR EACH ROW
-  EXECUTE FUNCTION core_update_updated_at_column_func();
+  EXECUTE FUNCTION core_set_updated_at_fn();
 
 -- VERIFICATIONS
 
@@ -107,10 +109,10 @@ DROP TRIGGER IF EXISTS update_verifications_updated_at_trigger ON verifications;
 CREATE TRIGGER update_verifications_updated_at_trigger
   BEFORE UPDATE ON verifications
   FOR EACH ROW
-  EXECUTE FUNCTION core_update_updated_at_column_func();
+  EXECUTE FUNCTION core_set_updated_at_fn();
 
 -- Create a cleanup function for expired records
-CREATE OR REPLACE FUNCTION cleanup_expired_records()
+CREATE OR REPLACE FUNCTION cleanup_expired_records_fn()
 RETURNS void AS $$
 BEGIN
   -- Delete expired sessions
@@ -120,3 +122,18 @@ BEGIN
   DELETE FROM verifications WHERE expires_at < NOW();
 END;
 $$ LANGUAGE plpgsql;
+
+-- migrate:down
+
+DROP TRIGGER IF EXISTS update_verifications_updated_at_trigger ON verifications;
+DROP TRIGGER IF EXISTS update_sessions_updated_at_trigger ON sessions;  
+DROP TRIGGER IF EXISTS update_accounts_updated_at_trigger ON accounts;
+DROP TRIGGER IF EXISTS update_users_updated_at_trigger ON users;
+
+DROP TABLE IF EXISTS verifications CASCADE;
+DROP TABLE IF EXISTS sessions CASCADE;
+DROP TABLE IF EXISTS accounts CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+DROP FUNCTION IF EXISTS cleanup_expired_records_fn();
+DROP FUNCTION IF EXISTS core_set_updated_at_fn();

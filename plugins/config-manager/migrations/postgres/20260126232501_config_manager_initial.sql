@@ -1,3 +1,5 @@
+-- migrate:up
+
 -- Create a function to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION config_manager_update_updated_at_column_func()
 RETURNS TRIGGER AS $$
@@ -26,3 +28,9 @@ CREATE TRIGGER update_auth_settings_updated_at_trigger
   BEFORE UPDATE ON auth_settings
   FOR EACH ROW
   EXECUTE FUNCTION config_manager_update_updated_at_column_func();
+
+-- migrate:down
+
+DROP TRIGGER IF EXISTS update_auth_settings_updated_at_trigger ON auth_settings;
+DROP TABLE IF EXISTS auth_settings;
+DROP SEQUENCE IF EXISTS config_version_seq;

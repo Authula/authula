@@ -1,3 +1,5 @@
+-- migrate:up
+
 CREATE TABLE IF NOT EXISTS jwks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   public_key TEXT NOT NULL,
@@ -32,3 +34,9 @@ BEGIN
   DELETE FROM refresh_tokens WHERE expires_at < NOW();
 END;
 $$ LANGUAGE plpgsql;
+
+-- migrate:down
+
+DROP FUNCTION IF EXISTS cleanup_expired_refresh_tokens();
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS jwks;

@@ -1,3 +1,5 @@
+-- migrate:up
+
 CREATE TABLE IF NOT EXISTS jwks (
   id BINARY(16) NOT NULL PRIMARY KEY,
   public_key TEXT NOT NULL,
@@ -40,3 +42,9 @@ BEGIN
 END$$
 
 DELIMITER ;
+
+-- migrate:down
+
+DROP PROCEDURE IF EXISTS cleanup_expired_refresh_tokens;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS jwks;

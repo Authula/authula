@@ -1,3 +1,5 @@
+-- migrate:up
+
 SET NAMES utf8mb4;
 SET CHARACTER SET utf8mb4;
 
@@ -10,3 +12,7 @@ CREATE TABLE IF NOT EXISTS auth_settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE INDEX idx_auth_settings_key ON auth_settings(`key`);
+
+-- migrate:down
+
+DROP TABLE IF EXISTS auth_settings;

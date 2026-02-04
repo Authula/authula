@@ -1,3 +1,5 @@
+-- migrate:up
+
 -- SQLite Rate Limit Plugin Schema
 -- Note: This table is temporary/in-memory and ephemeral
 

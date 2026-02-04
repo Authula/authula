@@ -1,1 +1,0 @@
--- SQLite rate limits cleanup (temp table auto-cleaned)

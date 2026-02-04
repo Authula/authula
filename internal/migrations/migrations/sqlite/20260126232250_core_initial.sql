@@ -1,3 +1,5 @@
+-- migrate:up
+
 -- SQLite Core Plugin Schema
 -- IMPORTANT: To enforce foreign key constraints in SQLite, ensure you run:
 PRAGMA foreign_keys = ON;
@@ -77,3 +79,11 @@ CREATE INDEX IF NOT EXISTS idx_verifications_identifier ON verifications(identif
 CREATE INDEX IF NOT EXISTS idx_verifications_token ON verifications(token);
 CREATE INDEX IF NOT EXISTS idx_verifications_type ON verifications(type);
 CREATE INDEX IF NOT EXISTS idx_verifications_expires_at ON verifications(expires_at);
+
+-- migrate:down
+
+-- Drop tables
+DROP TABLE IF EXISTS verifications;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS accounts;
+DROP TABLE IF EXISTS users;
