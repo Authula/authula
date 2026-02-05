@@ -191,7 +191,6 @@ func (r *Router) SetRouteMetadataFromConfig(routeMetadata map[string]map[string]
 			r.routeMetadata[fullKey] = existing
 		} else {
 			r.routeMetadata[fullKey] = metadata
-
 			segments := strings.Split(strings.Trim(path, "/"), "/")
 			r.routeEntries = append(r.routeEntries, routeEntry{
 				Method:   method,
