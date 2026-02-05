@@ -137,14 +137,15 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 			}
 		}
 
+		reqCtx.SetJSONResponse(http.StatusOK, &types.CallbackResponse{
+			User:    result.User,
+			Session: result.Session,
+			SessionToken: result.SessionToken,
+		})
+		
 		if redirectTo != "" {
 			http.Redirect(reqCtx.ResponseWriter, r, redirectTo, http.StatusFound)
 			return
 		}
-
-		reqCtx.SetJSONResponse(http.StatusOK, &types.CallbackResponse{
-			User:    result.User,
-			Session: result.Session,
-		})
 	}
 }
