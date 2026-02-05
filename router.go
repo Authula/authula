@@ -3,6 +3,7 @@ package gobetterauth
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"runtime/debug"
@@ -162,8 +163,10 @@ func (r *Router) RegisterCustomRoutes(routes []models.Route) {
 // Dynamic routes use {paramName} syntax and match any actual parameter value at that position.
 // At request time, the router first tries exact path matching, then falls back to pattern matching.
 func (r *Router) SetRouteMetadataFromConfig(routeMetadata map[string]map[string]any) {
-	r.routeMetadata = make(map[string]map[string]any)
-	r.routeEntries = make([]routeEntry, 0, len(routeMetadata))
+	if r.routeMetadata == nil {
+		r.routeMetadata = make(map[string]map[string]any)
+		r.routeEntries = make([]routeEntry, 0, len(routeMetadata))
+	}
 
 	for key, metadata := range routeMetadata {
 		parts := strings.SplitN(key, ":", 2)
@@ -182,14 +185,20 @@ func (r *Router) SetRouteMetadataFromConfig(routeMetadata map[string]map[string]
 		}
 
 		fullKey := method + ":" + path
-		r.routeMetadata[fullKey] = metadata
 
-		segments := strings.Split(strings.Trim(path, "/"), "/")
-		r.routeEntries = append(r.routeEntries, routeEntry{
-			Method:   method,
-			Segments: segments,
-			Metadata: metadata,
-		})
+		if existing, ok := r.routeMetadata[fullKey]; ok {
+			maps.Copy(existing, metadata)
+			r.routeMetadata[fullKey] = existing
+		} else {
+			r.routeMetadata[fullKey] = metadata
+
+			segments := strings.Split(strings.Trim(path, "/"), "/")
+			r.routeEntries = append(r.routeEntries, routeEntry{
+				Method:   method,
+				Segments: segments,
+				Metadata: metadata,
+			})
+		}
 	}
 }
 
