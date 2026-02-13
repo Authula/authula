@@ -13,14 +13,14 @@ help: # Display this help screen
 # Build commands`
 build: # Build the package (library)
 	@echo "Building $(APP_NAME) package..."
-	@GOEXPERIMENT=greenteagc go build ./...
+	@go build ./...
 	@echo "Build complete!"
 
 build-exe: # Build the binary executable
 	@echo "Building $(APP_NAME) binary..."
 	@mkdir -p ./tmp
 	@rm -rf ./tmp/$(APP_NAME)
-	@GOEXPERIMENT=greenteagc go build -o $(BINARY_PATH) ./cmd/main.go
+	@go build -o $(BINARY_PATH) ./cmd/main.go
 	@echo "Binary built: $(BINARY_PATH)"
 
 run: # Run the application

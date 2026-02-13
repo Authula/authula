@@ -605,15 +605,15 @@ func TestCSRFPlugin_HookOrder(t *testing.T) {
 	// hooks[2]: Token clear hook (HookAfter)
 
 	if hooks[0].Stage != models.HookBefore {
-		t.Errorf("first hook should be HookBefore, got %q", hooks[0].Stage)
+		t.Errorf("first hook should be HookBefore, got %v", hooks[0].Stage)
 	}
 
 	if hooks[1].Stage != models.HookBefore {
-		t.Errorf("second hook should be HookBefore, got %q", hooks[1].Stage)
+		t.Errorf("second hook should be HookBefore, got %v", hooks[1].Stage)
 	}
 
 	if hooks[2].Stage != models.HookAfter {
-		t.Errorf("third hook should be HookAfter, got %q", hooks[2].Stage)
+		t.Errorf("third hook should be HookAfter, got %v", hooks[2].Stage)
 	}
 
 	if hooks[0].Order != 5 {
