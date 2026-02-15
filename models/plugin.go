@@ -22,6 +22,7 @@ const (
 	PluginJWT              PluginID = "jwt"
 	PluginBearer           PluginID = "bearer"
 	PluginRateLimit        PluginID = "ratelimit"
+	PluginMagicLink        PluginID = "magic_link"
 )
 
 func (id PluginID) String() string {

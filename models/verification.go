@@ -9,9 +9,11 @@ import (
 type VerificationType string
 
 const (
-	TypeEmailVerification    VerificationType = "email_verification"
-	TypePasswordResetRequest VerificationType = "password_reset_request"
-	TypeEmailResetRequest    VerificationType = "email_reset_request"
+	TypeEmailVerification      VerificationType = "email_verification"
+	TypePasswordResetRequest   VerificationType = "password_reset_request"
+	TypeEmailResetRequest      VerificationType = "email_reset_request"
+	TypeMagicLinkSignInRequest VerificationType = "magic_link_sign_in_request"
+	TypeMagicLinkExchangeCode  VerificationType = "magic_link_exchange_code"
 )
 
 func (vt VerificationType) String() string {

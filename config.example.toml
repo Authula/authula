@@ -302,6 +302,13 @@ enabled = true
 # [plugins.ratelimit.database]
 # cleanup_interval = "1m"  # How often to remove expired entries from database (default: 1m)
 
+# --- Magic Link Plugin (Passwordless Authentication) ---
+
+[plugins.magic_link]
+enabled = true
+expires_in = "15m"
+disable_sign_up = false
+
 # -----------------------------------
 # - Route-to-Plugin Mappings (Standalone Mode)
 # -----------------------------------

@@ -15,6 +15,8 @@ import (
 	emailplugintypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/email/types"
 	jwtplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt"
 	jwtplugintypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/types"
+	magiclinkplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/magic-link"
+	magiclinkplugintypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/magic-link/types"
 	oauth2plugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/oauth2"
 	oauth2plugintypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/oauth2/types"
 	ratelimitplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/rate-limit"
@@ -190,6 +192,22 @@ var pluginFactories = []PluginFactory{
 		},
 		Constructor: func(typedConfig any) models.Plugin {
 			return ratelimitplugin.New(typedConfig.(ratelimitplugin.RateLimitPluginConfig))
+		},
+	},
+	{
+		ID:                models.PluginMagicLink.String(),
+		RequiredByDefault: false,
+		ConfigParser: func(rawConfig any) (any, error) {
+			config := magiclinkplugintypes.MagicLinkPluginConfig{}
+			if rawConfig != nil {
+				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
+					return nil, fmt.Errorf("failed to parse magic link plugin config: %w", err)
+				}
+			}
+			return config, nil
+		},
+		Constructor: func(typedConfig any) models.Plugin {
+			return magiclinkplugin.New(typedConfig.(magiclinkplugintypes.MagicLinkPluginConfig))
 		},
 	},
 }
