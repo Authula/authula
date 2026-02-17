@@ -192,13 +192,6 @@ Perfect for:
 
 ---
 
-### 🚀 Roadmap
-
-- Many more plugins including Admin, Organizations, RBAC, MFA...
-- And more to be announced!
-
----
-
 ### 📜 License
 
 Apache 2.0 License
