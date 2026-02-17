@@ -77,7 +77,14 @@ func (p *GitHubProvider) getGitHubUserEmail(ctx context.Context, token *oauth2.T
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch emails: %w", err)
 	}
-	defer resp.Body.Close()
+	if resp != nil && resp.Body != nil {
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				// Optionally log the error, e.g. using log.Printf
+				fmt.Printf("error closing response body: %v\n", err)
+			}
+		}()
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to fetch emails: status %d", resp.StatusCode)

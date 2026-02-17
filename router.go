@@ -595,7 +595,9 @@ func (r *Router) finalizeResponse(
 		w.OverrideWithContext(ctx)
 	}
 
-	w.Flush()
+	if err := w.Flush(); err != nil {
+		r.logger.Error("Failed to flush response", "error", err)
+	}
 }
 
 func (r *Router) applyCORS(

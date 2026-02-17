@@ -64,7 +64,14 @@ func FetchUserInfo(ctx context.Context, token *oauth2.Token, url string) (map[st
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
-	defer resp.Body.Close()
+	if resp != nil && resp.Body != nil {
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				// Optionally log the error, e.g. using log.Printf
+				fmt.Printf("error closing response body: %v\n", err)
+			}
+		}()
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get user info: status %d", resp.StatusCode)

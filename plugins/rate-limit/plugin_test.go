@@ -11,7 +11,11 @@ import (
 // TestInMemoryProvider tests the in-memory rate limit provider
 func TestInMemoryProvider(t *testing.T) {
 	provider := NewInMemoryProvider()
-	defer provider.Close()
+	defer func() {
+		if err := provider.Close(); err != nil {
+			t.Fatalf("failed to close provider: %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 	window := 1 * time.Minute
@@ -81,7 +85,11 @@ func TestRateLimitPluginConfig(t *testing.T) {
 // TestProviderNames ensures the provider is initialized with correct name
 func TestProviderNames(t *testing.T) {
 	provider := NewInMemoryProvider()
-	defer provider.Close()
+	defer func() {
+		if err := provider.Close(); err != nil {
+			t.Fatalf("failed to close provider: %v", err)
+		}
+	}()
 
 	if name := provider.GetName(); name != string(RateLimitProviderInMemory) {
 		t.Errorf("in-memory provider name should be 'memory', got %s", name)

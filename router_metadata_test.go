@@ -682,7 +682,7 @@ func TestRouteGroupMetadata(t *testing.T) {
 	metadataPluginsAny := router.routeMetadata["GET:/test/metadata"]["plugins"]
 	metadataPlugins := metadataPluginsAny.([]string)
 
-	if !(slices.Contains(metadataPlugins, "session.auth") && slices.Contains(metadataPlugins, "bearer.auth")) {
+	if !slices.Contains(metadataPlugins, "session.auth") || !slices.Contains(metadataPlugins, "bearer.auth") {
 		t.Errorf("expected session.auth and bearer.auth in plugins, got %s", metadataPlugins)
 	}
 }

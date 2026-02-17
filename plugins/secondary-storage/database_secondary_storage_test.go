@@ -53,7 +53,11 @@ func assertStringDB(t *testing.T, value any, expected string) {
 func TestNewDatabaseStorage(t *testing.T) {
 	db := newTestDB(t)
 	storage := newTestDatabaseStorage(t, db)
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	if storage == nil {
 		t.Fatal("expected NewDatabaseSecondaryStorage to return a non-nil instance")
@@ -67,7 +71,11 @@ func TestNewDatabaseStorage(t *testing.T) {
 func TestDatabaseStorage_SetSuccess(t *testing.T) {
 	db := newTestDB(t)
 	storage := newTestDatabaseStorage(t, db)
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 	key := "test_key"
@@ -89,7 +97,11 @@ func TestDatabaseStorage_SetSuccess(t *testing.T) {
 func TestDatabaseStorage_SetInvalidType(t *testing.T) {
 	db := newTestDB(t)
 	storage := newTestDatabaseStorage(t, db)
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 

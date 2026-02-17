@@ -220,9 +220,15 @@ func TestInitWatermillProvider_SQLite_DefaultPath(t *testing.T) {
 		}
 	}()
 	defer func() {
-		os.Remove("events.db")
-		os.Remove("events.db-shm")
-		os.Remove("events.db-wal")
+		if err := os.Remove("events.db"); err != nil && !os.IsNotExist(err) {
+			t.Errorf("failed to remove events.db: %v", err)
+		}
+		if err := os.Remove("events.db-shm"); err != nil && !os.IsNotExist(err) {
+			t.Errorf("failed to remove events.db-shm: %v", err)
+		}
+		if err := os.Remove("events.db-wal"); err != nil && !os.IsNotExist(err) {
+			t.Errorf("failed to remove events.db-wal: %v", err)
+		}
 	}()
 
 	if pubsub == nil {
@@ -248,9 +254,15 @@ func TestInitWatermillProvider_SQLite_EmptyPath(t *testing.T) {
 		}
 	}()
 	defer func() {
-		os.Remove("events.db")
-		os.Remove("events.db-shm")
-		os.Remove("events.db-wal")
+		if err := os.Remove("events.db"); err != nil && !os.IsNotExist(err) {
+			t.Errorf("failed to remove events.db: %v", err)
+		}
+		if err := os.Remove("events.db-shm"); err != nil && !os.IsNotExist(err) {
+			t.Errorf("failed to remove events.db-shm: %v", err)
+		}
+		if err := os.Remove("events.db-wal"); err != nil && !os.IsNotExist(err) {
+			t.Errorf("failed to remove events.db-wal: %v", err)
+		}
 	}()
 
 	if pubsub == nil {
@@ -276,9 +288,15 @@ func TestInitWatermillProvider_SQLite_CustomPath(t *testing.T) {
 		}
 	}()
 	defer func() {
-		os.Remove("/tmp/test_events.db")
-		os.Remove("/tmp/test_events.db-shm")
-		os.Remove("/tmp/test_events.db-wal")
+		if err := os.Remove("/tmp/test_events.db"); err != nil && !os.IsNotExist(err) {
+			t.Errorf("failed to remove /tmp/test_events.db: %v", err)
+		}
+		if err := os.Remove("/tmp/test_events.db-shm"); err != nil && !os.IsNotExist(err) {
+			t.Errorf("failed to remove /tmp/test_events.db-shm: %v", err)
+		}
+		if err := os.Remove("/tmp/test_events.db-wal"); err != nil && !os.IsNotExist(err) {
+			t.Errorf("failed to remove /tmp/test_events.db-wal: %v", err)
+		}
 	}()
 
 	if pubsub == nil {
