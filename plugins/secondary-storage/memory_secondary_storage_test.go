@@ -31,7 +31,11 @@ func assertString(t *testing.T, value any, expected string) {
 
 func TestNewMemorySecondaryStorage(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	if storage == nil {
 		t.Fatal("expected NewMemoryStorage to return a non-nil instance")
@@ -48,7 +52,11 @@ func TestNewMemorySecondaryStorage(t *testing.T) {
 
 func TestSet_Success(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 	key := "test_key"
@@ -69,7 +77,11 @@ func TestSet_Success(t *testing.T) {
 
 func TestSet_InvalidType(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -81,7 +93,11 @@ func TestSet_InvalidType(t *testing.T) {
 
 func TestSet_ContextCancelled(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -98,7 +114,11 @@ func TestSet_ContextCancelled(t *testing.T) {
 
 func TestGet_Success(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 	key := "test_key"
@@ -118,7 +138,11 @@ func TestGet_Success(t *testing.T) {
 
 func TestGet_KeyNotFound(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -134,7 +158,11 @@ func TestGet_KeyNotFound(t *testing.T) {
 
 func TestGet_ContextCancelled(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -152,7 +180,11 @@ func TestGet_ContextCancelled(t *testing.T) {
 func TestGet_ExpiredEntry(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		storage := newTestMemorySecondaryStorage()
-		defer storage.Close()
+		defer func() {
+			if err := storage.Close(); err != nil {
+				t.Fatalf("expected no error on Close, got %v", err)
+			}
+		}()
 
 		ctx := context.Background()
 		key := "expiring_key"
@@ -189,7 +221,11 @@ func TestGet_ExpiredEntry(t *testing.T) {
 
 func TestDelete_Success(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 	key := "test_key"
@@ -215,7 +251,11 @@ func TestDelete_Success(t *testing.T) {
 
 func TestDelete_KeyNotFound(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -227,7 +267,11 @@ func TestDelete_KeyNotFound(t *testing.T) {
 
 func TestDelete_ContextCancelled(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -244,7 +288,11 @@ func TestDelete_ContextCancelled(t *testing.T) {
 
 func TestValueMutation_Prevented(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 	key := "test_key"
@@ -264,7 +312,11 @@ func TestValueMutation_Prevented(t *testing.T) {
 func TestSet_WithTTL(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		storage := newTestMemorySecondaryStorage()
-		defer storage.Close()
+		defer func() {
+			if err := storage.Close(); err != nil {
+				t.Fatalf("expected no error on Close, got %v", err)
+			}
+		}()
 
 		ctx := context.Background()
 		key := "ttl_key"
@@ -311,7 +363,11 @@ func TestSet_WithTTL(t *testing.T) {
 
 func TestSet_OverwriteExisting(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 	key := "test_key"
@@ -329,7 +385,11 @@ func TestSet_OverwriteExisting(t *testing.T) {
 
 func TestConcurrentReads(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 	key := "concurrent_key"
@@ -359,7 +419,11 @@ func TestConcurrentReads(t *testing.T) {
 
 func TestConcurrentWritesAndReads(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 	numGoroutines := 50
@@ -389,7 +453,11 @@ func TestConcurrentWritesAndReads(t *testing.T) {
 
 func TestConcurrentDeletes(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 	numKeys := 50
@@ -440,7 +508,11 @@ func TestCleanupExpiredEntries(t *testing.T) {
 		}
 		// Start the cleanup goroutine with the custom interval
 		go storage.cleanupExpiredEntries()
-		defer storage.Close()
+		defer func() {
+			if err := storage.Close(); err != nil {
+				t.Fatalf("expected no error on Close, got %v", err)
+			}
+		}()
 
 		ctx := context.Background()
 
@@ -503,7 +575,11 @@ func TestClose_StopsCleanup(t *testing.T) {
 
 func TestMultipleKeys(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -528,7 +604,11 @@ func TestMultipleKeys(t *testing.T) {
 func TestContextDeadline(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		storage := newTestMemorySecondaryStorage()
-		defer storage.Close()
+		defer func() {
+			if err := storage.Close(); err != nil {
+				t.Fatalf("expected no error on Close, got %v", err)
+			}
+		}()
 
 		// Create a context with a timeout using fake time
 		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
@@ -566,7 +646,11 @@ func TestContextDeadline(t *testing.T) {
 
 func TestRaceConditions(t *testing.T) {
 	storage := newTestMemorySecondaryStorage()
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 	key := "race_key"
