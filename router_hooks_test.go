@@ -588,7 +588,10 @@ func (h *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.WriteHeader(h.statusCode)
-	w.Write([]byte(h.body))
+	if _, err := w.Write([]byte(h.body)); err != nil {
+		// Log the error instead of panicking to avoid stopping other tests
+		fmt.Printf("failed to write response body: %v\n", err)
+	}
 }
 
 type mockLogger struct{}
