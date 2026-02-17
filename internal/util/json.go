@@ -3,13 +3,7 @@ package util
 import (
 	"encoding/json"
 	"net/http"
-
-	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
-
-type requestContextProvider interface {
-	GetRequestContext() *models.RequestContext
-}
 
 func ParseJSON(r *http.Request, dest any) error {
 	decoder := json.NewDecoder(r.Body)
@@ -19,5 +13,7 @@ func ParseJSON(r *http.Request, dest any) error {
 func JSONResponse(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }

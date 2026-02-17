@@ -65,12 +65,3 @@ func TestConfigWatcherNotification(t *testing.T) {
 func TestConfigWatcherErrorHandling(t *testing.T) {
 	t.Skip("Config watcher error handling is currently disabled")
 }
-
-// Helper functions
-
-type testLogger struct{}
-
-func (l *testLogger) Debug(msg string, args ...any) {}
-func (l *testLogger) Info(msg string, args ...any)  {}
-func (l *testLogger) Warn(msg string, args ...any)  {}
-func (l *testLogger) Error(msg string, args ...any) {}

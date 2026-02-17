@@ -248,32 +248,6 @@ func (s *refreshTokenService) emitTokenReuseThrottledEvent(sessionID, tokenHash 
 	util.PublishEventAsync(s.eventBus, s.logger, eventMsg)
 }
 
-func (s *refreshTokenService) emitTokenReuseMaliciousEvent(sessionID, tokenHash string, deltaMs, gracePeriodMs int64, meta events.AuditMetadata) {
-	if s.eventBus == nil {
-		return
-	}
-
-	event := &events.TokenReuseMaliciousEvent{
-		Type:              constants.EventTokenReuseMalicious,
-		SessionID:         sessionID,
-		TokenHash:         tokenHash,
-		DeltaMs:           deltaMs,
-		GracePeriodConfig: fmt.Sprintf("%dms", gracePeriodMs),
-		Metadata:          meta,
-		Timestamp:         time.Now().UTC().Format(time.RFC3339),
-	}
-
-	payload, _ := json.Marshal(event)
-	eventMsg := models.Event{
-		Type:      constants.EventTokenReuseMalicious,
-		Timestamp: time.Now().UTC(),
-		Payload:   payload,
-	}
-
-	// Publish event asynchronously - don't block on event bus
-	util.PublishEventAsync(s.eventBus, s.logger, eventMsg)
-}
-
 // StoreInitialRefreshToken stores the first refresh token when user logs in
 func (s *refreshTokenService) StoreInitialRefreshToken(ctx context.Context, refreshToken, sessionID string, expiresAt time.Time) error {
 	tokenHash := HashRefreshToken(refreshToken)

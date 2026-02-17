@@ -38,7 +38,11 @@ func newTestGoChannelPubSub(logger watermill.LoggerAdapter, bufferSize int) mode
 func TestNewGoChannelPubSub_Default(t *testing.T) {
 	ps := newTestGoChannelPubSub(nil, 0)
 	assert.NotNil(t, ps)
-	defer ps.Close()
+	defer func() {
+		if err := ps.Close(); err != nil {
+			t.Errorf("failed to close PubSub: %v", err)
+		}
+	}()
 
 	// Test basic publish/subscribe
 	ctx := context.Background()
@@ -72,7 +76,11 @@ func TestNewGoChannelPubSub_WithOptions(t *testing.T) {
 	logger := watermill.NewStdLogger(false, false)
 	ps := newTestGoChannelPubSub(logger, 500)
 	assert.NotNil(t, ps)
-	defer ps.Close()
+	defer func() {
+		if err := ps.Close(); err != nil {
+			t.Errorf("failed to close PubSub: %v", err)
+		}
+	}()
 
 	// Test that it still works
 	ctx := context.Background()
@@ -98,7 +106,11 @@ func TestNewGoChannelPubSub_WithOptions(t *testing.T) {
 
 func TestNewGoChannelPubSub_MultipleSubscribers(t *testing.T) {
 	ps := newTestGoChannelPubSub(nil, 100)
-	defer ps.Close()
+	defer func() {
+		if err := ps.Close(); err != nil {
+			t.Errorf("failed to close PubSub: %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 

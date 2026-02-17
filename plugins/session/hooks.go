@@ -24,18 +24,6 @@ func (id SessionHookID) String() string {
 	return string(id)
 }
 
-// authSuccessMatcher returns true if the request context indicates a successful authentication
-func (p *SessionPlugin) authSuccessMatcher(reqCtx *models.RequestContext) bool {
-	authSuccess, ok := reqCtx.Values[models.ContextAuthSuccess.String()].(bool)
-	return ok && authSuccess
-}
-
-// signedOutMatcher returns true if the request context indicates a sign-out action
-func (p *SessionPlugin) signedOutMatcher(reqCtx *models.RequestContext) bool {
-	signedOut, ok := reqCtx.Values[models.ContextAuthSignOut.String()].(bool)
-	return ok && signedOut
-}
-
 // validateSessionHook validates a session cookie from the request and sets UserID
 // This hook runs at HookBefore stage if "session.auth" is in route.Metadata["plugins"]
 func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error {
@@ -175,4 +163,16 @@ func (p *SessionPlugin) buildHooks() []models.Hook {
 			Order:   10,
 		},
 	}
+}
+
+// authSuccessMatcher returns true if the request context indicates a successful authentication
+func (p *SessionPlugin) authSuccessMatcher(reqCtx *models.RequestContext) bool {
+	authSuccess, ok := reqCtx.Values[models.ContextAuthSuccess.String()].(bool)
+	return ok && authSuccess
+}
+
+// signedOutMatcher returns true if the request context indicates a sign-out action
+func (p *SessionPlugin) signedOutMatcher(reqCtx *models.RequestContext) bool {
+	signedOut, ok := reqCtx.Values[models.ContextAuthSignOut.String()].(bool)
+	return ok && signedOut
 }

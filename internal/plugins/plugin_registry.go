@@ -6,7 +6,7 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/GoBetterAuth/go-better-auth/v2/internal/migrations"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/migrationmanager"
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/services"
@@ -14,13 +14,14 @@ import (
 
 // PluginRegistry manages plugin registration and lifecycle
 type PluginRegistry struct {
-	config          *models.Config
-	logger          models.Logger
-	db              bun.IDB
-	serviceRegistry models.ServiceRegistry
-	eventBus        models.EventBus
-	plugins         []models.Plugin
-	configProvider  func() *models.Config
+	config           *models.Config
+	logger           models.Logger
+	db               bun.IDB
+	migrationManager *migrationmanager.Manager
+	serviceRegistry  models.ServiceRegistry
+	eventBus         models.EventBus
+	plugins          []models.Plugin
+	configProvider   func() *models.Config
 }
 
 // NewPluginRegistry creates a new plugin registry
@@ -28,16 +29,18 @@ func NewPluginRegistry(
 	config *models.Config,
 	logger models.Logger,
 	db bun.IDB,
+	migrationManager *migrationmanager.Manager,
 	serviceRegistry models.ServiceRegistry,
 	eventBus models.EventBus,
 ) *PluginRegistry {
 	registry := &PluginRegistry{
-		config:          config,
-		logger:          logger,
-		db:              db,
-		serviceRegistry: serviceRegistry,
-		eventBus:        eventBus,
-		plugins:         make([]models.Plugin, 0),
+		config:           config,
+		logger:           logger,
+		db:               db,
+		migrationManager: migrationManager,
+		serviceRegistry:  serviceRegistry,
+		eventBus:         eventBus,
+		plugins:          make([]models.Plugin, 0),
 	}
 
 	registry.configProvider = func() *models.Config {
@@ -124,77 +127,40 @@ func (r *PluginRegistry) registerConfigWatchers() {
 }
 
 func (r *PluginRegistry) RunMigrations(ctx context.Context) error {
-	dbProvider := r.config.Database.Provider
+	if r.migrationManager == nil || r.migrationManager.Migrator() == nil {
+		return nil
+	}
 
-	for _, plugin := range r.plugins {
+	cfg := r.configProvider()
+	if cfg == nil {
+		return fmt.Errorf("config provider returned nil config")
+	}
+
+	dbProvider := cfg.Database.Provider
+	selector := func(plugin models.Plugin) bool {
 		pluginID := plugin.Metadata().ID
-		cfg := r.configProvider()
-
 		if !util.IsPluginEnabled(cfg, pluginID) {
 			r.logger.Debug("plugin disabled, skipping migrations", "plugin", pluginID)
-			continue
+			return false
 		}
-
-		migrator, ok := plugin.(models.PluginWithMigrations)
-		if !ok {
-			continue
-		}
-
-		sqlFS, err := migrator.Migrations(ctx, dbProvider)
-		if err != nil {
-			r.logger.Error("failed to get migrations",
-				"plugin", pluginID,
-				"error", err,
-			)
-			return err
-		}
-
-		if sqlFS == nil {
-			r.logger.Debug("plugin has no migrations", "plugin", pluginID)
-			continue
-		}
-
-		if err := migrations.RunMigrations(ctx, r.logger, dbProvider, r.db, *sqlFS, "migrations/"+dbProvider); err != nil {
-			return err
-		}
+		return true
 	}
 
-	return nil
+	return r.migrationManager.RunPlugins(ctx, dbProvider, r.plugins, selector)
 }
 
-// DropMigrations drops database migrations for all enabled plugins
+// DropMigrations rolls back migrations for all registered plugins regardless of enablement state.
 func (r *PluginRegistry) DropMigrations(ctx context.Context) error {
-	dbProvider := r.config.Database.Provider
-
-	for i := len(r.plugins) - 1; i >= 0; i-- {
-		plugin := r.plugins[i]
-		pluginID := plugin.Metadata().ID
-
-		migrator, ok := plugin.(models.PluginWithMigrations)
-		if !ok {
-			continue
-		}
-
-		sqlFS, err := migrator.Migrations(ctx, dbProvider)
-		if err != nil {
-			r.logger.Error("failed to get migrations",
-				"plugin", pluginID,
-				"error", err,
-			)
-			return err
-		}
-
-		if sqlFS == nil {
-			r.logger.Debug("plugin has no migrations", "plugin", pluginID)
-			continue
-		}
-
-		if err := migrations.DropMigrations(ctx, r.logger, dbProvider, r.db, *sqlFS, "migrations/"+dbProvider); err != nil {
-			return err
-		}
+	if r.migrationManager == nil || r.migrationManager.Migrator() == nil {
+		return nil
 	}
 
-	return nil
+	cfg := r.configProvider()
+	if cfg == nil {
+		return fmt.Errorf("config provider returned nil config")
+	}
+
+	return r.migrationManager.DropPlugins(ctx, cfg.Database.Provider, r.plugins, nil)
 }
 
 func (r *PluginRegistry) Plugins() []models.Plugin {

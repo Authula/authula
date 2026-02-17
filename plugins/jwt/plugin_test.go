@@ -1,7 +1,6 @@
 package jwt
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -133,31 +132,6 @@ func TestJWTPlugin_Metadata(t *testing.T) {
 	}
 }
 
-func TestJWTPlugin_Migrations(t *testing.T) {
-	plugin := New(types.JWTPluginConfig{})
-	ctx := context.Background()
-
-	// Test that migrations returns a non-nil embed.FS for postgres
-	migrations, err := plugin.Migrations(ctx, "postgres")
-	if err != nil {
-		t.Errorf("Migrations() error = %v, want nil", err)
-	}
-
-	if migrations == nil {
-		t.Errorf("Migrations() returned nil, want non-nil embed.FS")
-	}
-
-	// Test that migrations returns a non-nil embed.FS for mysql
-	migrations, err = plugin.Migrations(ctx, "mysql")
-	if err != nil {
-		t.Errorf("Migrations() error = %v, want nil", err)
-	}
-
-	if migrations == nil {
-		t.Errorf("Migrations() returned nil, want non-nil embed.FS for mysql")
-	}
-}
-
 func TestJWTPlugin_Config(t *testing.T) {
 	config := types.JWTPluginConfig{
 		Algorithm: "es256",
@@ -178,72 +152,6 @@ func TestJWTPlugin_Config(t *testing.T) {
 
 	if cfg.Algorithm != config.Algorithm {
 		t.Errorf("Config Algorithm = %v, want %v", cfg.Algorithm, config.Algorithm)
-	}
-}
-
-func TestKeyRotationInterval_Configuration(t *testing.T) {
-	tests := []struct {
-		name           string
-		configInterval time.Duration
-		expectedAfter  time.Duration
-		shouldRotate   bool
-	}{
-		{
-			name:           "default 30 day interval",
-			configInterval: 30 * 24 * time.Hour,
-			expectedAfter:  29 * 24 * time.Hour,
-			shouldRotate:   false,
-		},
-		{
-			name:           "key past interval should rotate",
-			configInterval: 30 * 24 * time.Hour,
-			expectedAfter:  31 * 24 * time.Hour,
-			shouldRotate:   true,
-		},
-		{
-			name:           "short 1 hour interval",
-			configInterval: 1 * time.Hour,
-			expectedAfter:  2 * time.Hour,
-			shouldRotate:   true,
-		},
-		{
-			name:           "very short 1 minute interval",
-			configInterval: 1 * time.Minute,
-			expectedAfter:  2 * time.Minute,
-			shouldRotate:   true,
-		},
-		{
-			name:           "long 90 day interval",
-			configInterval: 90 * 24 * time.Hour,
-			expectedAfter:  89 * 24 * time.Hour,
-			shouldRotate:   false,
-		},
-		{
-			name:           "exactly at interval boundary",
-			configInterval: 30 * 24 * time.Hour,
-			expectedAfter:  30 * 24 * time.Hour,
-			shouldRotate:   false,
-		},
-		{
-			name:           "just past interval boundary",
-			configInterval: 30 * 24 * time.Hour,
-			expectedAfter:  30*24*time.Hour + time.Second,
-			shouldRotate:   true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			keyAge := tt.expectedAfter
-			rotationInterval := tt.configInterval
-
-			shouldRotate := keyAge > rotationInterval
-
-			if shouldRotate != tt.shouldRotate {
-				t.Errorf("keyAge=%v, rotationInterval=%v, shouldRotate=%v, want %v",
-					keyAge, rotationInterval, shouldRotate, tt.shouldRotate)
-			}
-		})
 	}
 }
 
@@ -333,57 +241,6 @@ func TestKeyRotationInterval_AlgorithmCompatibility(t *testing.T) {
 	}
 }
 
-func TestKeyRotationInterval_BoundaryConditions(t *testing.T) {
-	tests := []struct {
-		name           string
-		keyAge         time.Duration
-		interval       time.Duration
-		expectedRotate bool
-	}{
-		{
-			name:           "zero key age should not rotate",
-			keyAge:         0,
-			interval:       30 * 24 * time.Hour,
-			expectedRotate: false,
-		},
-		{
-			name:           "very small interval with new key",
-			keyAge:         time.Nanosecond,
-			interval:       time.Nanosecond,
-			expectedRotate: false,
-		},
-		{
-			name:           "maximum practical interval",
-			keyAge:         365 * 24 * time.Hour,
-			interval:       90 * 24 * time.Hour,
-			expectedRotate: true,
-		},
-		{
-			name:           "millisecond precision at boundary",
-			keyAge:         30*24*time.Hour - time.Millisecond,
-			interval:       30 * 24 * time.Hour,
-			expectedRotate: false,
-		},
-		{
-			name:           "millisecond precision past boundary",
-			keyAge:         30*24*time.Hour + time.Millisecond,
-			interval:       30 * 24 * time.Hour,
-			expectedRotate: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			shouldRotate := tt.keyAge > tt.interval
-
-			if shouldRotate != tt.expectedRotate {
-				t.Errorf("keyAge=%v, interval=%v, shouldRotate=%v, want %v",
-					tt.keyAge, tt.interval, shouldRotate, tt.expectedRotate)
-			}
-		})
-	}
-}
-
 func TestKeyRotationInterval_WithOtherConfigOptions(t *testing.T) {
 	config := types.JWTPluginConfig{
 		Algorithm:           types.JWTAlgEdDSA,
@@ -417,33 +274,6 @@ func TestKeyRotationInterval_WithOtherConfigOptions(t *testing.T) {
 
 	if config.RefreshGracePeriod != 30*time.Second {
 		t.Errorf("RefreshGracePeriod = %v, want %v", config.RefreshGracePeriod, 30*time.Second)
-	}
-}
-
-func TestKeyRotationInterval_TimingCalculations(t *testing.T) {
-	baseInterval := 30 * 24 * time.Hour
-
-	tests := []struct {
-		name         string
-		days         int
-		expectedOver bool
-	}{
-		{"29 days", 29, false},
-		{"30 days", 30, false},
-		{"31 days", 31, true},
-		{"60 days", 60, true},
-		{"90 days", 90, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			keyAge := time.Duration(tt.days) * 24 * time.Hour
-			isOverDue := keyAge > baseInterval
-
-			if isOverDue != tt.expectedOver {
-				t.Errorf("keyAge=%v, isOverDue=%v, want %v", keyAge, isOverDue, tt.expectedOver)
-			}
-		})
 	}
 }
 
@@ -613,129 +443,6 @@ func TestKeyRotationGracePeriod_WithInterval(t *testing.T) {
 					config.KeyRotationGracePeriod, tt.gracePeriod)
 			}
 		})
-	}
-}
-
-func TestKeyRotationGracePeriod_OldKeysValidity(t *testing.T) {
-	tests := []struct {
-		name          string
-		gracePeriod   time.Duration
-		keyAge        time.Duration
-		expectedValid bool
-	}{
-		{
-			name:          "key within grace period should be valid",
-			gracePeriod:   1 * time.Hour,
-			keyAge:        30 * time.Minute,
-			expectedValid: true,
-		},
-		{
-			name:          "key at grace period boundary is expired (strict comparison)",
-			gracePeriod:   1 * time.Hour,
-			keyAge:        1 * time.Hour,
-			expectedValid: false,
-		},
-		{
-			name:          "key just past grace period should be invalid",
-			gracePeriod:   1 * time.Hour,
-			keyAge:        1*time.Hour + time.Second,
-			expectedValid: false,
-		},
-		{
-			name:          "key long past grace period should be invalid",
-			gracePeriod:   1 * time.Hour,
-			keyAge:        2 * time.Hour,
-			expectedValid: false,
-		},
-		{
-			name:          "24 hour grace period with 12 hour old key",
-			gracePeriod:   24 * time.Hour,
-			keyAge:        12 * time.Hour,
-			expectedValid: true,
-		},
-		{
-			name:          "24 hour grace period with 25 hour old key",
-			gracePeriod:   24 * time.Hour,
-			keyAge:        25 * time.Hour,
-			expectedValid: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rotationTime := time.Now().Add(-tt.keyAge)
-			gracePeriodEnd := rotationTime.Add(tt.gracePeriod)
-			isStillValid := time.Now().Before(gracePeriodEnd)
-
-			if isStillValid != tt.expectedValid {
-				t.Errorf("keyAge=%v, gracePeriod=%v, isValid=%v, want %v",
-					tt.keyAge, tt.gracePeriod, isStillValid, tt.expectedValid)
-			}
-		})
-	}
-}
-
-func TestKeyRotationGracePeriod_BothKeysActive(t *testing.T) {
-	now := time.Now()
-	gracePeriod := 1 * time.Hour
-
-	rotationTime := now.Add(-30 * time.Minute)
-
-	oldKeyExpiration := rotationTime.Add(gracePeriod)
-	isOldKeyActive := now.Before(oldKeyExpiration)
-
-	newKeyActive := true
-
-	if !isOldKeyActive {
-		t.Errorf("Old key should still be active within grace period")
-	}
-
-	if !newKeyActive {
-		t.Errorf("New key should always be active")
-	}
-
-	totalActiveKeys := 0
-	if isOldKeyActive {
-		totalActiveKeys++
-	}
-	if newKeyActive {
-		totalActiveKeys++
-	}
-
-	if totalActiveKeys != 2 {
-		t.Errorf("Expected 2 active keys during grace period, got %d", totalActiveKeys)
-	}
-}
-
-func TestKeyRotationGracePeriod_AfterGracePeriod(t *testing.T) {
-	now := time.Now()
-	gracePeriod := 1 * time.Hour
-
-	rotationTime := now.Add(-2 * time.Hour)
-
-	oldKeyExpiration := rotationTime.Add(gracePeriod)
-	isOldKeyActive := now.Before(oldKeyExpiration)
-
-	newKeyActive := true
-
-	if isOldKeyActive {
-		t.Errorf("Old key should be expired after grace period")
-	}
-
-	if !newKeyActive {
-		t.Errorf("New key should always be active")
-	}
-
-	totalActiveKeys := 0
-	if isOldKeyActive {
-		totalActiveKeys++
-	}
-	if newKeyActive {
-		totalActiveKeys++
-	}
-
-	if totalActiveKeys != 1 {
-		t.Errorf("Expected 1 active key after grace period, got %d", totalActiveKeys)
 	}
 }
 

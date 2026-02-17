@@ -1,10 +1,8 @@
 package ratelimit
 
 import (
-	"context"
-	"embed"
-
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/migrations"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
@@ -45,7 +43,9 @@ func (p *RateLimitPlugin) Init(ctx *models.PluginContext) error {
 	}
 
 	p.config.ApplyDefaults()
-	p.initProvider(p.ctx)
+	if err := p.initProvider(p.ctx); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -72,13 +72,15 @@ func (p *RateLimitPlugin) trySecondaryStorage() RateLimitProvider {
 
 	return provider
 }
-
-func (p *RateLimitPlugin) Migrations(ctx context.Context, dbProvider string) (*embed.FS, error) {
-	if p.config.Provider == RateLimitProviderDatabase {
-		return GetMigrations(ctx, dbProvider)
+func (p *RateLimitPlugin) Migrations(provider string) []migrations.Migration {
+	if p.config.Provider != RateLimitProviderDatabase {
+		return nil
 	}
-	// Return nil to explicitly skip migrations for non-DB providers
-	return nil, nil
+	return rateLimitMigrationsForProvider(provider)
+}
+
+func (p *RateLimitPlugin) DependsOn() []string {
+	return nil
 }
 
 func (p *RateLimitPlugin) Close() error {
@@ -95,7 +97,10 @@ func (p *RateLimitPlugin) OnConfigUpdate(config *models.Config) error {
 	}
 
 	p.config.ApplyDefaults()
-	p.initProvider(p.ctx)
+	if err := p.initProvider(p.ctx); err != nil {
+		p.logger.Error("failed to re-initialize provider on config update", "error", err)
+		return err
+	}
 
 	return nil
 }

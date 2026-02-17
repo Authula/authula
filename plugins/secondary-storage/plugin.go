@@ -1,13 +1,12 @@
 package secondarystorage
 
 import (
-	"context"
-	"embed"
 	"os"
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/env"
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/migrations"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
@@ -154,12 +153,15 @@ func (p *SecondaryStoragePlugin) initRedisProvider(ctx *models.PluginContext) (m
 	})
 }
 
-func (p *SecondaryStoragePlugin) Migrations(ctx context.Context, dbProvider string) (*embed.FS, error) {
-	if p.config.Provider == SecondaryStorageProviderDatabase {
-		return GetMigrations(ctx, dbProvider)
+func (p *SecondaryStoragePlugin) Migrations(provider string) []migrations.Migration {
+	if p.config.Provider != SecondaryStorageProviderDatabase {
+		return nil
 	}
-	// Return nil to explicitly skip migrations for non-DB providers
-	return nil, nil
+	return secondaryStorageMigrationsForProvider(provider)
+}
+
+func (p *SecondaryStoragePlugin) DependsOn() []string {
+	return nil
 }
 
 func (p *SecondaryStoragePlugin) Close() error {
@@ -178,11 +180,6 @@ func (p *SecondaryStoragePlugin) OnConfigUpdate(config *models.Config) error {
 	}
 
 	p.config.ApplyDefaults()
-
-	// Note: Don't reinitialize storage on config update to avoid losing data
-	// The provider and connection settings would require a full restart to safely change
-	// This is acceptable because secondary storage provider changes are infrequent
-	// and typically only happen at deployment/restart time
 
 	return nil
 }

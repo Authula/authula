@@ -2,11 +2,11 @@ package jwt
 
 import (
 	"context"
-	"embed"
 	"errors"
 	"fmt"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/migrations"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/repositories"
 	jwtservices "github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/services"
@@ -143,8 +143,12 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 	return nil
 }
 
-func (p *JWTPlugin) Migrations(ctx context.Context, dbProvider string) (*embed.FS, error) {
-	return GetMigrations(ctx, dbProvider)
+func (p *JWTPlugin) Migrations(provider string) []migrations.Migration {
+	return jwtMigrationsForProvider(provider)
+}
+
+func (p *JWTPlugin) DependsOn() []string {
+	return nil
 }
 
 func (p *JWTPlugin) Routes() []models.Route {

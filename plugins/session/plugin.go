@@ -145,7 +145,9 @@ func (p *SessionPlugin) validateSessionCookie(r *http.Request) (*models.Session,
 	}
 
 	if session.ExpiresAt.Before(time.Now().UTC()) {
-		p.sessionService.Delete(r.Context(), session.ID)
+		if err := p.sessionService.Delete(r.Context(), session.ID); err != nil {
+			p.logger.Error("failed to delete expired session", "error", err)
+		}
 		return nil, fmt.Errorf("session expired")
 	}
 

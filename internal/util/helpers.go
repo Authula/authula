@@ -2,8 +2,10 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"maps"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -88,4 +90,39 @@ func NormalizePath(p string) string {
 	}
 	p = strings.TrimSuffix(p, "/")
 	return p
+}
+
+// FormatDuration converts a time.Duration to a human-readable string.
+// It intelligently selects the most appropriate unit (minutes, hours, or days)
+// and handles singular/plural forms correctly.
+// Examples: "15 minutes", "1 hour", "24 hours", "2 days"
+func FormatDuration(d time.Duration) string {
+	totalMinutes := int(d.Minutes())
+	totalHours := int(d.Hours())
+	totalDays := int(d.Hours() / 24)
+
+	// Use days if duration is >= 1 day
+	if totalDays > 0 {
+		unit := "day"
+		if totalDays != 1 {
+			unit = "days"
+		}
+		return fmt.Sprintf("%d %s", totalDays, unit)
+	}
+
+	// Use hours if duration is >= 1 hour
+	if totalHours > 0 {
+		unit := "hour"
+		if totalHours != 1 {
+			unit = "hours"
+		}
+		return fmt.Sprintf("%d %s", totalHours, unit)
+	}
+
+	// Otherwise use minutes
+	unit := "minute"
+	if totalMinutes != 1 {
+		unit = "minutes"
+	}
+	return fmt.Sprintf("%d %s", totalMinutes, unit)
 }

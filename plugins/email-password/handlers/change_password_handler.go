@@ -48,5 +48,4 @@ func (h *ChangePasswordHandler) Handler() http.HandlerFunc {
 			"message": "password updated",
 		})
 	}
-
 }

@@ -12,18 +12,7 @@ type ConfigManagerGetConfigHandler struct {
 
 func (h *ConfigManagerGetConfigHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
-	reqCtx, ok := models.GetRequestContext(ctx)
-	if !ok {
-		reqCtx = &models.RequestContext{
-			Method:         r.Method,
-			Path:           r.URL.Path,
-			ResponseWriter: w,
-			Request:        r,
-			Values:         make(map[string]any),
-		}
-		r = r.WithContext(models.SetRequestContext(ctx, reqCtx))
-	}
+	reqCtx, _ := models.GetRequestContext(ctx)
 
 	config := h.ConfigManager.GetConfig()
 	if config == nil {

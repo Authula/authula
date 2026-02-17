@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/uptrace/bun"
 )
 
 // DatabaseProvider is a database-backed rate limit provider for persistent rate limiting
 type DatabaseProvider struct {
+	logger          models.Logger
 	db              bun.IDB
 	repository      RateLimitRepository
 	cleanupInterval time.Duration
@@ -77,6 +79,7 @@ func (p *DatabaseProvider) cleanupExpired() {
 	for range ticker.C {
 		if err := p.repository.CleanupExpired(context.Background(), time.Now()); err != nil {
 			// Log error if available, but don't crash the goroutine
+			p.logger.Error("failed to cleanup expired rate limit records", "error", err)
 			// This is a best-effort cleanup; failures won't block the rate limiter
 		}
 	}

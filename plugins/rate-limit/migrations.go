@@ -2,29 +2,79 @@ package ratelimit
 
 import (
 	"context"
-	"embed"
-	"fmt"
+
+	"github.com/uptrace/bun"
+
+	"github.com/GoBetterAuth/go-better-auth/v2/migrations"
 )
 
-//go:embed migrations/sqlite/*.sql
-var sqliteFS embed.FS
+func rateLimitMigrationsForProvider(provider string) []migrations.Migration {
+	return migrations.ForProvider(provider, migrations.ProviderVariants{
+		"sqlite":   func() []migrations.Migration { return []migrations.Migration{rateLimitSQLiteInitial()} },
+		"postgres": func() []migrations.Migration { return []migrations.Migration{rateLimitPostgresInitial()} },
+		"mysql":    func() []migrations.Migration { return []migrations.Migration{rateLimitMySQLInitial()} },
+	})
+}
 
-//go:embed migrations/postgres/*.sql
-var postgresFS embed.FS
+func rateLimitSQLiteInitial() migrations.Migration {
+	return migrations.Migration{
+		Version: "20260130000000_rate_limit_initial",
+		Up: func(ctx context.Context, tx bun.Tx) error {
+			return migrations.ExecStatements(
+				ctx,
+				tx,
+				`PRAGMA temp_store = MEMORY;`,
+				`CREATE TEMP TABLE IF NOT EXISTS rate_limits (
+  key TEXT PRIMARY KEY,
+  count INTEGER NOT NULL,
+  expires_at DATETIME NOT NULL
+);`,
+				`CREATE INDEX IF NOT EXISTS idx_rate_limits_expires_at ON rate_limits(expires_at);`,
+			)
+		},
+		Down: func(ctx context.Context, tx bun.Tx) error {
+			return migrations.ExecStatements(ctx, tx, `DROP TABLE IF EXISTS rate_limits;`)
+		},
+	}
+}
 
-//go:embed migrations/mysql/*.sql
-var mysqlFS embed.FS
+func rateLimitPostgresInitial() migrations.Migration {
+	return migrations.Migration{
+		Version: "20260130000000_rate_limit_initial",
+		Up: func(ctx context.Context, tx bun.Tx) error {
+			return migrations.ExecStatements(
+				ctx,
+				tx,
+				`CREATE UNLOGGED TABLE IF NOT EXISTS rate_limits (
+  key VARCHAR(255) PRIMARY KEY,
+  count INTEGER NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+);`,
+				`CREATE INDEX IF NOT EXISTS idx_rate_limits_expires_at ON rate_limits(expires_at);`,
+			)
+		},
+		Down: func(ctx context.Context, tx bun.Tx) error {
+			return migrations.ExecStatements(ctx, tx, `DROP TABLE IF EXISTS rate_limits;`)
+		},
+	}
+}
 
-// GetMigrations returns the migrations for the specified database provider.
-func GetMigrations(ctx context.Context, provider string) (*embed.FS, error) {
-	switch provider {
-	case "sqlite":
-		return &sqliteFS, nil
-	case "postgres":
-		return &postgresFS, nil
-	case "mysql":
-		return &mysqlFS, nil
-	default:
-		return nil, fmt.Errorf("unsupported database provider: %s", provider)
+func rateLimitMySQLInitial() migrations.Migration {
+	return migrations.Migration{
+		Version: "20260130000000_rate_limit_initial",
+		Up: func(ctx context.Context, tx bun.Tx) error {
+			return migrations.ExecStatements(
+				ctx,
+				tx,
+				`CREATE TABLE IF NOT EXISTS rate_limits (
+  key VARCHAR(255) PRIMARY KEY,
+  count INTEGER NOT NULL,
+  expires_at TIMESTAMP NOT NULL
+) ENGINE=MEMORY;`,
+			)
+		},
+		Down: func(ctx context.Context, tx bun.Tx) error {
+			return migrations.ExecStatements(ctx, tx, `DROP TABLE IF EXISTS rate_limits;`)
+		},
 	}
 }

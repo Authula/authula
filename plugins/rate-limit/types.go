@@ -2,7 +2,6 @@ package ratelimit
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -18,13 +17,6 @@ const (
 
 func (r RateLimitProviderType) String() string {
 	return string(r)
-}
-
-// RateLimitStore holds in-memory rate limit data
-type RateLimitStore struct {
-	mu    sync.RWMutex
-	data  map[string]*RateLimitEntry
-	rules map[string]RateLimitRule
 }
 
 // RateLimit represents a rate limit entry in the database for Bun ORM

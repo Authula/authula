@@ -9,9 +9,10 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal"
-	"github.com/GoBetterAuth/go-better-auth/v2/internal/migrations"
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/migrationmanager"
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/plugins"
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/migrations"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	coreservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
@@ -23,15 +24,17 @@ type AuthConfig struct {
 
 // Auth is a composition root and entry point for the authentication framework.
 type Auth struct {
-	config          *models.Config
-	logger          models.Logger
-	db              bun.IDB
-	router          *Router
-	ServiceRegistry models.ServiceRegistry
-	PluginRegistry  models.PluginRegistry
-	handlerOnce     sync.Once
-	coreServices    *coreservices.CoreServices
-	Api             internal.CoreAPI
+	config           *models.Config
+	logger           models.Logger
+	db               bun.IDB
+	migrator         *migrations.Migrator
+	migrationManager *migrationmanager.Manager
+	router           *Router
+	ServiceRegistry  models.ServiceRegistry
+	PluginRegistry   models.PluginRegistry
+	handlerOnce      sync.Once
+	coreServices     *coreservices.CoreServices
+	Api              internal.CoreAPI
 }
 
 // New creates a new Auth instance using the provided config and plugins.
@@ -47,13 +50,14 @@ func New(authConfig *AuthConfig) *Auth {
 		panic(fmt.Errorf("failed to initialize database: %w", err))
 	}
 
-	if err = migrations.RunCoreMigrations(
-		context.Background(),
-		logger,
-		authConfig.Config.Logger.Level,
-		authConfig.Config.Database.Provider,
-		db,
-	); err != nil {
+	migrator, err := migrations.NewMigrator(db, logger)
+	if err != nil {
+		panic(fmt.Errorf("failed to create migrator: %w", err))
+	}
+
+	migrationManager := migrationmanager.NewManager(migrator)
+
+	if err := migrationManager.RunCore(context.Background(), authConfig.Config.Database.Provider); err != nil {
 		panic(fmt.Errorf("failed to run core migrations: %w", err))
 	}
 
@@ -72,6 +76,7 @@ func New(authConfig *AuthConfig) *Auth {
 		authConfig.Config,
 		logger,
 		db,
+		migrationManager,
 		serviceRegistry,
 		eventBus,
 	)
@@ -111,14 +116,16 @@ func New(authConfig *AuthConfig) *Auth {
 	api := internal.NewCoreAPI(logger, coreServices.UserService, coreServices.SessionService)
 
 	auth := &Auth{
-		config:          authConfig.Config,
-		logger:          logger,
-		db:              db,
-		router:          router,
-		ServiceRegistry: serviceRegistry,
-		PluginRegistry:  pluginRegistry,
-		coreServices:    coreServices,
-		Api:             api,
+		config:           authConfig.Config,
+		logger:           logger,
+		db:               db,
+		migrator:         migrator,
+		migrationManager: migrationManager,
+		router:           router,
+		ServiceRegistry:  serviceRegistry,
+		PluginRegistry:   pluginRegistry,
+		coreServices:     coreServices,
+		Api:              api,
 	}
 
 	// Register middleware NOW (before any routes are registered)
@@ -129,23 +136,17 @@ func New(authConfig *AuthConfig) *Auth {
 }
 
 func (auth *Auth) RunCoreMigrations(ctx context.Context) error {
-	return migrations.RunCoreMigrations(
-		ctx,
-		auth.logger,
-		auth.config.Logger.Level,
-		auth.config.Database.Provider,
-		auth.db,
-	)
+	if auth.migrationManager == nil {
+		return fmt.Errorf("migrator not initialized")
+	}
+	return auth.migrationManager.RunCore(ctx, auth.config.Database.Provider)
 }
 
 func (auth *Auth) DropCoreMigrations(ctx context.Context) error {
-	return migrations.DropCoreMigrations(
-		ctx,
-		auth.logger,
-		auth.config.Logger.Level,
-		auth.config.Database.Provider,
-		auth.db,
-	)
+	if auth.migrationManager == nil {
+		return fmt.Errorf("migrator not initialized")
+	}
+	return auth.migrationManager.DropCore(ctx, auth.config.Database.Provider)
 }
 
 // registerMiddleware registers all middleware from hooks and plugins

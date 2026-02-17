@@ -1,12 +1,11 @@
 package configmanager
 
 import (
-	"context"
-	"embed"
 	"fmt"
 	"net/http"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/migrations"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager/handlers"
 	configmanagerservices "github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager/services"
@@ -86,8 +85,12 @@ func (p *ConfigManagerPlugin) Init(ctx *models.PluginContext) error {
 	return nil
 }
 
-func (p *ConfigManagerPlugin) Migrations(ctx context.Context, dbProvider string) (*embed.FS, error) {
-	return GetMigrations(ctx, dbProvider)
+func (p *ConfigManagerPlugin) Migrations(provider string) []migrations.Migration {
+	return configManagerMigrationsForProvider(provider)
+}
+
+func (p *ConfigManagerPlugin) DependsOn() []string {
+	return nil
 }
 
 func (p *ConfigManagerPlugin) Routes() []models.Route {

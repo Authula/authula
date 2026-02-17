@@ -22,9 +22,11 @@ func (h *WellKnownJWKSHandler) Handler() http.HandlerFunc {
 			h.Logger.Error("failed to fetch JWKS", "error", err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{
+			if err := json.NewEncoder(w).Encode(map[string]string{
 				"error": "failed to fetch JWKS",
-			})
+			}); err != nil {
+				h.Logger.Error("failed to encode error response", "error", err)
+			}
 			return
 		}
 

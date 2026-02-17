@@ -10,11 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/joho/godotenv"
 
 	gobetterauth "github.com/GoBetterAuth/go-better-auth/v2"
-	gobetterauthconfig "github.com/GoBetterAuth/go-better-auth/v2/config"
+	"github.com/GoBetterAuth/go-better-auth/v2/cmd/shared/configloader"
 	gobetterauthenv "github.com/GoBetterAuth/go-better-auth/v2/env"
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/bootstrap"
 	gobetterauthmodels "github.com/GoBetterAuth/go-better-auth/v2/models"
@@ -114,28 +113,13 @@ func runServer(logger gobetterauthmodels.Logger, auth *gobetterauth.Auth, restar
 func loadConfig() *gobetterauthmodels.Config {
 	configPath := getEnv(gobetterauthenv.EnvConfigPath, "config.toml")
 
-	data, err := os.ReadFile(configPath)
+	config, exists, err := configloader.Load(configPath)
 	if err != nil {
-		slog.Debug("No config file found, continuing", "path", configPath, "error", err)
-		return gobetterauthconfig.NewConfig()
+		panic(err)
+	}
+	if !exists {
+		slog.Debug("No config file found, continuing", "path", configPath)
 	}
 
-	var loadedConfig gobetterauthmodels.Config
-	if err := toml.Unmarshal(data, &loadedConfig); err != nil {
-		panic(fmt.Errorf("failed to unmarshal config: %w", err))
-	}
-
-	return gobetterauthconfig.NewConfig(
-		gobetterauthconfig.WithAppName(loadedConfig.AppName),
-		gobetterauthconfig.WithBaseURL(loadedConfig.BaseURL),
-		gobetterauthconfig.WithBasePath(loadedConfig.BasePath),
-		gobetterauthconfig.WithDatabase(loadedConfig.Database),
-		gobetterauthconfig.WithLogger(loadedConfig.Logger),
-		gobetterauthconfig.WithSecret(loadedConfig.Secret),
-		gobetterauthconfig.WithSession(loadedConfig.Session),
-		gobetterauthconfig.WithSecurity(loadedConfig.Security),
-		gobetterauthconfig.WithEventBus(loadedConfig.EventBus),
-		gobetterauthconfig.WithPlugins(loadedConfig.Plugins),
-		gobetterauthconfig.WithRouteMappings(loadedConfig.RouteMappings),
-	)
+	return config
 }

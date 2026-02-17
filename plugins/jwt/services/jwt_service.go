@@ -27,7 +27,6 @@ type JWTServiceImpl struct {
 	sessionService   services.SessionService
 	expiresIn        time.Duration
 	refreshExpiresIn time.Duration
-	algorithm        types.JWTAlgorithm
 }
 
 // NewJWTService creates a new JWT service implementation
@@ -85,13 +84,27 @@ func (s *JWTServiceImpl) GenerateTokens(ctx context.Context, userID string, sess
 	jti := uuid.New().String()
 
 	accessClaims := jwt.New()
-	accessClaims.Set(jwt.SubjectKey, userID)
-	accessClaims.Set(jwt.IssuedAtKey, now)
-	accessClaims.Set(jwt.ExpirationKey, now.Add(s.expiresIn))
-	accessClaims.Set(jwt.JwtIDKey, jti)
-	accessClaims.Set("user_id", userID)
-	accessClaims.Set("session_id", sessionID)
-	accessClaims.Set("type", types.JWTTokenTypeAccess.String())
+	if err := accessClaims.Set(jwt.SubjectKey, userID); err != nil {
+		return nil, fmt.Errorf("failed to set subject: %w", err)
+	}
+	if err := accessClaims.Set(jwt.IssuedAtKey, now); err != nil {
+		return nil, fmt.Errorf("failed to set issued at: %w", err)
+	}
+	if err := accessClaims.Set(jwt.ExpirationKey, now.Add(s.expiresIn)); err != nil {
+		return nil, fmt.Errorf("failed to set expiration: %w", err)
+	}
+	if err := accessClaims.Set(jwt.JwtIDKey, jti); err != nil {
+		return nil, fmt.Errorf("failed to set JWT ID: %w", err)
+	}
+	if err := accessClaims.Set("user_id", userID); err != nil {
+		return nil, fmt.Errorf("failed to set user_id: %w", err)
+	}
+	if err := accessClaims.Set("session_id", sessionID); err != nil {
+		return nil, fmt.Errorf("failed to set session_id: %w", err)
+	}
+	if err := accessClaims.Set("type", types.JWTTokenTypeAccess.String()); err != nil {
+		return nil, fmt.Errorf("failed to set type: %w", err)
+	}
 
 	accessTokenBytes, err := jwt.Sign(accessClaims, jwt.WithKey(keyAlgorithm, privKey))
 	if err != nil {
@@ -99,13 +112,27 @@ func (s *JWTServiceImpl) GenerateTokens(ctx context.Context, userID string, sess
 	}
 
 	refreshClaims := jwt.New()
-	refreshClaims.Set(jwt.SubjectKey, userID)
-	refreshClaims.Set(jwt.IssuedAtKey, now)
-	refreshClaims.Set(jwt.ExpirationKey, now.Add(s.refreshExpiresIn))
-	refreshClaims.Set(jwt.JwtIDKey, jti)
-	refreshClaims.Set("user_id", userID)
-	refreshClaims.Set("session_id", sessionID)
-	refreshClaims.Set("type", types.JWTTokenTypeRefresh.String())
+	if err := refreshClaims.Set(jwt.SubjectKey, userID); err != nil {
+		return nil, fmt.Errorf("failed to set subject in refresh token: %w", err)
+	}
+	if err := refreshClaims.Set(jwt.IssuedAtKey, now); err != nil {
+		return nil, fmt.Errorf("failed to set issued at in refresh token: %w", err)
+	}
+	if err := refreshClaims.Set(jwt.ExpirationKey, now.Add(s.refreshExpiresIn)); err != nil {
+		return nil, fmt.Errorf("failed to set expiration in refresh token: %w", err)
+	}
+	if err := refreshClaims.Set(jwt.JwtIDKey, jti); err != nil {
+		return nil, fmt.Errorf("failed to set JWT ID in refresh token: %w", err)
+	}
+	if err := refreshClaims.Set("user_id", userID); err != nil {
+		return nil, fmt.Errorf("failed to set user_id in refresh token: %w", err)
+	}
+	if err := refreshClaims.Set("session_id", sessionID); err != nil {
+		return nil, fmt.Errorf("failed to set session_id in refresh token: %w", err)
+	}
+	if err := refreshClaims.Set("type", types.JWTTokenTypeRefresh.String()); err != nil {
+		return nil, fmt.Errorf("failed to set type in refresh token: %w", err)
+	}
 
 	refreshTokenBytes, err := jwt.Sign(refreshClaims, jwt.WithKey(keyAlgorithm, privKey))
 	if err != nil {

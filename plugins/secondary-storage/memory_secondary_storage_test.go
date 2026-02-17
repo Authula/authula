@@ -104,7 +104,9 @@ func TestGet_Success(t *testing.T) {
 	key := "test_key"
 	value := "test_value"
 
-	storage.Set(ctx, key, value, nil)
+	if err := storage.Set(ctx, key, value, nil); err != nil {
+		t.Fatalf("expected no error on Set, got %v", err)
+	}
 
 	retrieved, err := storage.Get(ctx, "test_key")
 	if err != nil {
@@ -193,7 +195,9 @@ func TestDelete_Success(t *testing.T) {
 	key := "test_key"
 	value := "test_value"
 
-	storage.Set(ctx, key, value, nil)
+	if err := storage.Set(ctx, key, value, nil); err != nil {
+		t.Fatalf("expected no error on Set, got %v", err)
+	}
 
 	err := storage.Delete(ctx, key)
 	if err != nil {
@@ -246,7 +250,9 @@ func TestValueMutation_Prevented(t *testing.T) {
 	key := "test_key"
 	originalValue := "original"
 
-	storage.Set(ctx, key, originalValue, nil)
+	if err := storage.Set(ctx, key, originalValue, nil); err != nil {
+		t.Fatalf("expected no error on Set, got %v", err)
+	}
 
 	retrieved, _ := storage.Get(ctx, key)
 	assertString(t, retrieved, "original")
@@ -310,8 +316,12 @@ func TestSet_OverwriteExisting(t *testing.T) {
 	ctx := context.Background()
 	key := "test_key"
 
-	storage.Set(ctx, key, "value1", nil)
-	storage.Set(ctx, key, "value2", nil)
+	if err := storage.Set(ctx, key, "value1", nil); err != nil {
+		t.Fatalf("expected no error on Set, got %v", err)
+	}
+	if err := storage.Set(ctx, key, "value2", nil); err != nil {
+		t.Fatalf("expected no error on Set, got %v", err)
+	}
 
 	retrieved, _ := storage.Get(ctx, key)
 	assertString(t, retrieved, "value2")
@@ -325,7 +335,9 @@ func TestConcurrentReads(t *testing.T) {
 	key := "concurrent_key"
 	value := "concurrent_value"
 
-	storage.Set(ctx, key, value, nil)
+	if err := storage.Set(ctx, key, value, nil); err != nil {
+		t.Fatalf("expected no error on Set, got %v", err)
+	}
 
 	numGoroutines := 100
 	var wg sync.WaitGroup
@@ -355,23 +367,21 @@ func TestConcurrentWritesAndReads(t *testing.T) {
 
 	// Spawn writers
 	for i := range numGoroutines {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			key := "key_" + string(rune(i))
 			value := "value_" + string(rune(i))
-			storage.Set(ctx, key, value, nil)
-		}()
+			if err := storage.Set(ctx, key, value, nil); err != nil {
+				t.Fatalf("expected no error on Set, got %v", err)
+			}
+		})
 	}
 
 	// Spawn readers
 	for i := range numGoroutines {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			key := "key_" + string(rune(i))
 			_, _ = storage.Get(ctx, key)
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -387,19 +397,21 @@ func TestConcurrentDeletes(t *testing.T) {
 	// Setup: add keys
 	for i := range numKeys {
 		key := "delete_key_" + string(rune(i))
-		value := []byte("delete_value_" + string(rune(i)))
-		storage.Set(ctx, key, value, nil)
+		value := "delete_value_" + string(rune(i))
+		if err := storage.Set(ctx, key, value, nil); err != nil {
+			t.Fatalf("expected no error on Set, got %v", err)
+		}
 	}
 
 	// Concurrent deletes
 	var wg sync.WaitGroup
 	for i := range numKeys {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			key := "delete_key_" + string(rune(i))
-			storage.Delete(ctx, key)
-		}()
+			if err := storage.Delete(ctx, key); err != nil {
+				t.Fatalf("expected no error on Delete, got %v", err)
+			}
+		})
 	}
 
 	wg.Wait()
@@ -437,7 +449,9 @@ func TestCleanupExpiredEntries(t *testing.T) {
 		for i := range 10 {
 			key := "cleanup_key_" + string(rune(i))
 			value := "cleanup_value_" + string(rune(i))
-			storage.Set(ctx, key, value, &ttl)
+			if err := storage.Set(ctx, key, value, &ttl); err != nil {
+				t.Fatalf("expected no error on Set, got %v", err)
+			}
 		}
 
 		// Verify entries exist
@@ -497,7 +511,9 @@ func TestMultipleKeys(t *testing.T) {
 	values := []string{"value1", "value2", "value3"}
 
 	for i := range keys {
-		storage.Set(ctx, keys[i], values[i], nil)
+		if err := storage.Set(ctx, keys[i], values[i], nil); err != nil {
+			t.Fatalf("expected no error on Set, got %v", err)
+		}
 	}
 
 	for i := range keys {
@@ -561,22 +577,27 @@ func TestRaceConditions(t *testing.T) {
 	// Run concurrent operations
 	var wg sync.WaitGroup
 	for i := range numGoroutines {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			// Interleave operations
 			switch i % 3 {
 			case 0:
-				storage.Set(ctx, key, "value", nil)
+				if err := storage.Set(ctx, key, "value", nil); err != nil {
+					t.Fatalf("expected no error on Set, got %v", err)
+				}
 				atomic.AddInt64(&counter, 1)
 			case 1:
-				storage.Get(ctx, key)
+				_, err := storage.Get(ctx, key)
+				if err != nil {
+					t.Fatalf("expected no error on Get, got %v", err)
+				}
 				atomic.AddInt64(&counter, 1)
 			default:
-				storage.Delete(ctx, key)
+				if err := storage.Delete(ctx, key); err != nil {
+					t.Fatalf("expected no error on Delete, got %v", err)
+				}
 				atomic.AddInt64(&counter, 1)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

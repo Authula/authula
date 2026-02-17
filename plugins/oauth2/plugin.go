@@ -177,7 +177,9 @@ func (p *OAuth2Plugin) registerBuiltInProviders() error {
 		if err := provider.validator(providerConfig); err != nil {
 			return err
 		}
-		p.providerRegistry.Register(name, provider.creator(providerConfig))
+		if err := p.providerRegistry.Register(name, provider.creator(providerConfig)); err != nil {
+			return fmt.Errorf("failed to register provider %s: %w", name, err)
+		}
 	}
 
 	return nil

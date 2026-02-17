@@ -1399,7 +1399,9 @@ func TestCSRFPlugin_MiddlewareValidation(t *testing.T) {
 					w.WriteHeader(reqCtx.ResponseStatus)
 				}
 				if len(reqCtx.ResponseBody) > 0 {
-					w.Write(reqCtx.ResponseBody)
+					if _, err := w.Write(reqCtx.ResponseBody); err != nil {
+						t.Fatalf("failed to write response body: %v", err)
+					}
 				}
 			}
 

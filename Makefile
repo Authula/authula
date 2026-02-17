@@ -1,10 +1,14 @@
 # Variables
 APP_NAME=go-better-auth
 BINARY_PATH=./tmp/$(APP_NAME)
+MIGRATE_CONFIG?=./config.toml
+MIGRATE_ARGS?=
+MIGRATE_CMD=CGO_ENABLED=1 go run ./cmd/migrate
 
 .PHONY: help build build-exe run dev test clean install setup
 .PHONY: test-coverage
 .PHONY: lint fmt vet deps-update all check quick-check ci
+.PHONY: migrate-core-up migrate-core-down migrate-plugins-up migrate-plugins-down migrate-status
 
 # Help command
 help: # Display this help screen
@@ -34,11 +38,11 @@ dev: # Run the application with live reloading using air
 # Test commands
 test: # Run all tests
 	@echo "Running tests..."
-	@CGO_ENABLED=1 go test -v ./...
+	@CGO_ENABLED=1 go test -race -v ./...
 
 test-coverage: # Run tests with coverage report
 	@echo "Running tests with coverage..."
-	@CGO_ENABLED=1 go test -v -coverprofile=coverage.out ./...
+	@CGO_ENABLED=1 go test -race -v -coverprofile=coverage.out ./...
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 	@go tool cover -func=coverage.out | grep total | awk '{print "Total coverage: " $$3}'
@@ -61,7 +65,7 @@ library-test: test # Run library mode tests
 setup: install # Setup development environment
 	@echo "Setting up development environment..."
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	@go install github.com/cosmtrek/air@latest
+	@go install github.com/air-verse/air@latest
 	@echo "Development environment setup complete!"
 
 # Clean commands
@@ -95,6 +99,22 @@ ci: clean install check # CI pipeline (clean, install, check)
 
 # Integration testing
 integration-test: docker-down docker-up docker-test # Run integration tests with Docker
+
+# Migration commands
+migrate-core-up: # Run core migrations (up)
+	@$(MIGRATE_CMD) core up --config $(MIGRATE_CONFIG) $(MIGRATE_ARGS)
+
+migrate-core-down: # Roll back core migrations
+	@$(MIGRATE_CMD) core down --config $(MIGRATE_CONFIG) $(MIGRATE_ARGS)
+
+migrate-plugins-up: # Run plugin migrations (up)
+	@$(MIGRATE_CMD) plugins up --config $(MIGRATE_CONFIG) $(MIGRATE_ARGS)
+
+migrate-plugins-down: # Roll back plugin migrations
+	@$(MIGRATE_CMD) plugins down --config $(MIGRATE_CONFIG) $(MIGRATE_ARGS)
+
+migrate-status: # Show migration status
+	@$(MIGRATE_CMD) status --config $(MIGRATE_CONFIG) $(MIGRATE_ARGS)
 
 # Default target
 .DEFAULT_GOAL := help

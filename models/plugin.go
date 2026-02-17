@@ -2,10 +2,11 @@ package models
 
 import (
 	"context"
-	"embed"
 	"net/http"
 
 	"github.com/uptrace/bun"
+
+	"github.com/GoBetterAuth/go-better-auth/v2/migrations"
 )
 
 type PluginID string
@@ -53,7 +54,8 @@ type Plugin interface {
 
 // PluginWithMigrations is an optional interface for plugins that have database migrations
 type PluginWithMigrations interface {
-	Migrations(ctx context.Context, dbProvider string) (*embed.FS, error)
+	Migrations(provider string) []migrations.Migration
+	DependsOn() []string
 }
 
 // PluginWithRoutes is an optional interface for plugins that provide HTTP routes
