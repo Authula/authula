@@ -172,11 +172,6 @@ docker run -itd -p 8080:8080 \
 
 Use it from any language or framework over HTTP.
 
-Perfect for:
-
-- microservices
-- polyglot stacks
-
 ---
 
 ### 🧠 Design Principles
