@@ -192,12 +192,6 @@ Perfect for:
 
 ---
 
-### 📜 License
-
-Apache 2.0 License
-
----
-
 ### Docs
 
 For more info and a full guide on how to use this library, check out the [Docs](https://go-better-auth.vercel.app/docs).
