@@ -209,6 +209,8 @@ Your contributions are welcome! Here's how you can get involved:
 - Set up your development environment by following our [Contribution Guide](./.github/CONTRIBUTING.md).
 - Contribute code by making a [pull request](https://github.com/GoBetterAuth/go-better-auth/) to enhance features, improve user experience, or fix issues.
 
+[![Star History Chart](https://api.star-history.com/svg?repos=GoBetterAuth/go-better-auth&type=date&legend=top-left)](https://www.star-history.com/#GoBetterAuth/go-better-auth&type=date&legend=top-left)
+
 ---
 
 ### Support & Community
