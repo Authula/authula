@@ -18,7 +18,6 @@ import (
 
 // Mocks
 
-// mockUserServiceWithError is a custom mock that returns an error for GetByEmail
 type mockUserServiceWithError struct{}
 
 func (m *mockUserServiceWithError) GetByEmail(ctx context.Context, email string) (*models.User, error) {

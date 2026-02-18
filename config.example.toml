@@ -304,10 +304,10 @@ enabled = true
 
 # --- Magic Link Plugin (Passwordless Authentication) ---
 
-[plugins.magic_link]
-enabled = true
-expires_in = "15m"
-disable_sign_up = false
+# [plugins.magic_link]
+# enabled = true
+# expires_in = "15m"
+# disable_sign_up = false
 
 # -----------------------------------
 # - Route-to-Plugin Mappings (Standalone Mode)
