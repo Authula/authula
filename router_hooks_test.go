@@ -574,6 +574,42 @@ func TestHookErrorModeSilent(t *testing.T) {
 	}
 }
 
+// TestRouterRedirectHandledRequest ensures RedirectURL responses are honored even when ctx.Handled is true
+func TestRouterRedirectHandledRequest(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
+	logger := &mockLogger{}
+	router := NewRouter(config, logger, nil)
+	redirectURL := "https://example.com/callback"
+
+	router.RegisterRoute(models.Route{
+		Method: "GET",
+		Path:   "/test",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reqCtx, ok := models.GetRequestContext(r.Context())
+			if !ok {
+				t.Fatal("expected request context")
+			}
+			reqCtx.RedirectURL = redirectURL
+			reqCtx.ResponseStatus = http.StatusFound
+			reqCtx.Handled = true
+		}),
+	})
+
+	req := httptest.NewRequest("GET", "/api/auth/test", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusFound {
+		t.Fatalf("expected status %d, got %d", http.StatusFound, w.Code)
+	}
+
+	if location := w.Header().Get("Location"); location != redirectURL {
+		t.Fatalf("expected Location header %q, got %q", redirectURL, location)
+	}
+}
+
 // testHandler is a simple HTTP handler for testing
 type testHandler struct {
 	statusCode int
@@ -589,7 +625,6 @@ func (h *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(h.statusCode)
 	if _, err := w.Write([]byte(h.body)); err != nil {
-		// Log the error instead of panicking to avoid stopping other tests
 		fmt.Printf("failed to write response body: %v\n", err)
 	}
 }

@@ -138,7 +138,9 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 		}
 
 		if redirectTo != "" {
-			http.Redirect(reqCtx.ResponseWriter, r, redirectTo, http.StatusFound)
+			reqCtx.RedirectURL = redirectTo
+			reqCtx.ResponseStatus = http.StatusFound
+			reqCtx.Handled = true
 			return
 		}
 

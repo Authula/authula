@@ -556,6 +556,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Stage 1: OnRequest hooks
 	r.runHooks(models.HookOnRequest, reqCtx)
 	if reqCtx.Handled {
+		r.applyRedirectIfSet(reqCtx)
 		r.finalizeResponse(reqCtx, wrappedWriter)
 		return
 	}
@@ -563,6 +564,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Stage 2: Before hooks
 	r.runHooks(models.HookBefore, reqCtx)
 	if reqCtx.Handled {
+		r.applyRedirectIfSet(reqCtx)
 		r.finalizeResponse(reqCtx, wrappedWriter)
 		return
 	}
@@ -573,15 +575,35 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Stage 4: After hooks
 	r.runHooks(models.HookAfter, reqCtx)
 	if reqCtx.Handled {
+		r.applyRedirectIfSet(reqCtx)
 		r.finalizeResponse(reqCtx, wrappedWriter)
 		return
 	}
+
+	// Handle declarative redirects: if handler set RedirectURL, prepare redirect response
+	// This happens after HookAfter so that all hooks (including cookie-setting hooks) have run
+	r.applyRedirectIfSet(reqCtx)
 
 	// Stage 5: OnResponse hooks
 	r.runHooks(models.HookOnResponse, reqCtx)
 
 	// Flush deferred writes or captured response
 	r.finalizeResponse(reqCtx, wrappedWriter)
+}
+
+func (r *Router) applyRedirectIfSet(reqCtx *models.RequestContext) {
+	if reqCtx.RedirectURL == "" {
+		return
+	}
+
+	statusCode := reqCtx.ResponseStatus
+	if statusCode == 0 {
+		statusCode = http.StatusFound
+	}
+
+	redirectHeaders := make(http.Header)
+	redirectHeaders.Set("Location", reqCtx.RedirectURL)
+	reqCtx.SetResponse(statusCode, redirectHeaders, nil)
 }
 
 func (r *Router) finalizeResponse(

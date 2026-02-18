@@ -57,6 +57,10 @@ type RequestContext struct {
 	ResponseBody    []byte
 	ResponseReady   bool
 	ResponseData    any
+
+	// Redirect fields allow handlers to declare a redirect declaratively
+	// The router will perform the redirect after all HookAfter hooks run
+	RedirectURL string // URL to redirect to (empty = no redirect)
 }
 
 // NewContextWithRequestContext returns a new context with the RequestContext attached
