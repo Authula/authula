@@ -163,6 +163,7 @@ enabled = true
 provider = "smtp"  # Options: "smtp", "resend"
 # Can also be set via FROM_ADDRESS environment variable
 from_address = ""
+tls_mode = "starttls" # Options: "off", "starttls", "tls"
 
 # Optional: Fallback provider if primary fails
 # fallback_provider = "resend"

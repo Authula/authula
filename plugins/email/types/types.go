@@ -10,13 +10,28 @@ type TemplateData struct {
 	Extra    map[string]string `json:"extra"`
 }
 
-// EmailProviderType defines the email provider to use
 type EmailProviderType string
 
 const (
 	ProviderSMTP   EmailProviderType = "smtp"
 	ProviderResend EmailProviderType = "resend"
 )
+
+func (e EmailProviderType) String() string {
+	return string(e)
+}
+
+type SMTPTLSMode string
+
+const (
+	SMTPTLSModeOff      SMTPTLSMode = "off"
+	SMTPTLSModeStartTLS SMTPTLSMode = "starttls"
+	SMTPTLSModeTLS      SMTPTLSMode = "tls"
+)
+
+func (m SMTPTLSMode) String() string {
+	return string(m)
+}
 
 // EmailPluginConfig contains configuration for the email plugin
 type EmailPluginConfig struct {
@@ -30,4 +45,7 @@ type EmailPluginConfig struct {
 
 	// FromAddress is the email address to send from
 	FromAddress string `json:"from_address" toml:"from_address"`
+
+	// TLSMode defines the TLS mode for SMTP provider
+	TLSMode SMTPTLSMode `json:"tls_mode" toml:"tls_mode"`
 }

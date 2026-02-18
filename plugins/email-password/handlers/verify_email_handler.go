@@ -40,16 +40,20 @@ func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
 			if verificationType == models.TypePasswordResetRequest {
 				u, err := url.Parse(callbackURL)
 				if err != nil {
-					http.Redirect(reqCtx.ResponseWriter, r, callbackURL+"?token="+url.QueryEscape(tokenStr), http.StatusFound)
+					reqCtx.RedirectURL = callbackURL + "?token=" + url.QueryEscape(tokenStr)
+					reqCtx.ResponseStatus = http.StatusFound
 				} else {
 					q := u.Query()
 					q.Set("token", tokenStr)
 					u.RawQuery = q.Encode()
-					http.Redirect(reqCtx.ResponseWriter, r, u.String(), http.StatusFound)
+					reqCtx.RedirectURL = u.String()
+					reqCtx.ResponseStatus = http.StatusFound
 				}
 			} else {
-				http.Redirect(reqCtx.ResponseWriter, r, callbackURL, http.StatusFound)
+				reqCtx.RedirectURL = callbackURL
+				reqCtx.ResponseStatus = http.StatusFound
 			}
+			reqCtx.Handled = true
 		} else {
 			reqCtx.SetJSONResponse(http.StatusOK, map[string]any{
 				"message": "email verified successfully",
