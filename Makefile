@@ -101,20 +101,29 @@ ci: clean install check # CI pipeline (clean, install, check)
 integration-test: docker-down docker-up docker-test # Run integration tests with Docker
 
 # Migration commands
+migrate-help: # Show migration CLI help
+	@$(MIGRATE_CMD) --help
+
 migrate-core-up: # Run core migrations (up)
 	@$(MIGRATE_CMD) core up --config $(MIGRATE_CONFIG) $(MIGRATE_ARGS)
 
 migrate-core-down: # Roll back core migrations
 	@$(MIGRATE_CMD) core down --config $(MIGRATE_CONFIG) $(MIGRATE_ARGS)
 
-migrate-plugins-up: # Run plugin migrations (up)
+migrate-plugins-up: # Run plugin migrations (up) - use MIGRATE_ARGS for filtering (e.g., --only email-password)
 	@$(MIGRATE_CMD) plugins up --config $(MIGRATE_CONFIG) $(MIGRATE_ARGS)
 
-migrate-plugins-down: # Roll back plugin migrations
+migrate-plugins-down: # Roll back plugin migrations - use MIGRATE_ARGS for filtering (e.g., --except email-password)
 	@$(MIGRATE_CMD) plugins down --config $(MIGRATE_CONFIG) $(MIGRATE_ARGS)
 
-migrate-status: # Show migration status
+migrate-status: # Show migration status - use MIGRATE_ARGS to filter by plugin (e.g., --plugin jwt)
 	@$(MIGRATE_CMD) status --config $(MIGRATE_CONFIG) $(MIGRATE_ARGS)
+
+# Run all migrations (core + plugins)
+migrate-up: migrate-core-up migrate-plugins-up
+
+# Roll back all migrations (core + plugins)
+migrate-down: migrate-plugins-down migrate-core-down
 
 # Default target
 .DEFAULT_GOAL := help
