@@ -3,16 +3,17 @@
 ### Code Style Guide
 
 - Always write clean code that is easy to read and maintain.
-- Follow consistent naming conventions for variables, functions, and structs.
-- Include comments where necessary to explain complex logic. DO NOT write comments for every line of code, only for parts that are not immediately clear. The code should be self-explanatory as much as possible.
+- Follow consistent naming conventions for variables, functions, and classes.
+- Include comments where necessary to explain complex logic.
 - Ensure proper error handling throughout the codebase.
 - Follow best practices and concepts from SOLID principles for better software design.
 - Use Go modules for dependency management.
 - Adhere to idiomatic Go practices as outlined in the official Go documentation.
-- Use `gofmt` to format your code and run `make lint` and fix any linting errors before committing.
+- Use `gofmt` to format your code before committing.
 - Avoid global variables unless absolutely necessary.
-- Use interfaces to define behavior and promote decoupling. Never code to implementations. When writing services, make sure they implement an interface of a repository e.g. `UserService` imports `UserRepository`. This ensures that the service can be easily tested and swapped out with different implementations if needed.
+- Use interfaces to define behavior and promote decoupling. Never code to implementations unless you're writing api services which are structs that handle business logic and import repositories for database access.
 - For other services, define interfaces in the `interfaces.go` file within the `services` package and implement them in separate files just like the password service is an interface which has an argon2 implementation. So now it can easily be swapped out for another implementation if needed without changing the rest of the code that depends on it.
+- API routes, handlers and services should be organized within their respective plugins to maintain modularity. Take a look at the email-password plugin as a guide to implement all other plugins.
 
 # Testing Guidelines
 
