@@ -164,12 +164,20 @@ provider = "smtp"  # Options: "smtp", "resend"
 # Can also be set via FROM_ADDRESS environment variable
 from_address = ""
 tls_mode = "starttls" # Options: "off", "starttls", "tls"
-
 # Optional: Fallback provider if primary fails
 # fallback_provider = "resend"
 
-# Resend API Configuration (when provider = "resend")
-# NOTE: The Resend API key MUST be set via the RESEND_API_KEY environment variable.
+# SMTP Configuration (when provider = "smtp")
+# [plugins.email.smtp]
+# host = ""
+# port = # Options: 25, 465, 587, 2525,
+# user = ""
+# pass = ""
+
+# Resend Configuration (when provider = "resend")
+# [plugins.email.resend]
+# NOTE: it is recommended to set the Resend API key via the RESEND_API_KEY environment variable rather than hardcoding it here.
+# api_key = ""
 
 # --- CSRF Plugin (for protecting against CSRF attacks) ---
 

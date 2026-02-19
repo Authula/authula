@@ -8,8 +8,8 @@ import (
 
 	"github.com/resend/resend-go/v3"
 
-	"github.com/GoBetterAuth/go-better-auth/v2/env"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email/constants"
 	emailtypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/email/types"
 )
 
@@ -23,10 +23,14 @@ func NewResendProvider(
 	config *emailtypes.EmailPluginConfig,
 	logger models.Logger,
 ) (*ResendProvider, error) {
-
-	apiKey := strings.TrimSpace(os.Getenv(env.EnvResendApiKey))
+	apiKey := strings.TrimSpace(os.Getenv(constants.EnvResendApiKey))
 	if apiKey == "" {
-		return nil, fmt.Errorf("%s environment variable is not set", env.EnvResendApiKey)
+		if config.Resend != nil && config.Resend.ApiKey != "" {
+			apiKey = config.Resend.ApiKey
+		} else {
+			logger.Error("Resend API key is not set in environment variable or config")
+			return nil, fmt.Errorf("%s environment variable is not set", constants.EnvResendApiKey)
+		}
 	}
 
 	client := resend.NewClient(apiKey)
@@ -45,7 +49,6 @@ func (r *ResendProvider) SendEmail(
 	text string,
 	html string,
 ) error {
-
 	if text == "" && html == "" {
 		return fmt.Errorf("email must have at least a text or html body")
 	}

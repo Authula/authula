@@ -48,4 +48,21 @@ type EmailPluginConfig struct {
 
 	// TLSMode defines the TLS mode for SMTP provider
 	TLSMode SMTPTLSMode `json:"tls_mode" toml:"tls_mode"`
+
+	// SMTP configuration
+	SMTP *SMTPConfig `json:"smtp" toml:"smtp"`
+
+	// Resend configuration
+	Resend *ResendConfig `json:"resend" toml:"resend"`
+}
+
+type SMTPConfig struct {
+	Host     string `json:"host" toml:"host"`
+	Port     int    `json:"port" toml:"port"`
+	Username string `json:"username" toml:"username"`
+	Password string `json:"password" toml:"password"`
+}
+
+type ResendConfig struct {
+	ApiKey string `json:"api_key" toml:"api_key"`
 }

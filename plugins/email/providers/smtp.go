@@ -9,8 +9,8 @@ import (
 
 	"github.com/wneessen/go-mail"
 
-	"github.com/GoBetterAuth/go-better-auth/v2/env"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email/constants"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email/types"
 )
 
@@ -28,19 +28,24 @@ func NewSMTPProvider(
 	config *types.EmailPluginConfig,
 	logger models.Logger,
 ) (*SMTPProvider, error) {
-	host := strings.TrimSpace(os.Getenv(env.EnvSMTPHost))
+	host := strings.TrimSpace(os.Getenv(constants.EnvSMTPHost))
 	if host == "" {
-		return nil, fmt.Errorf("%s environment variable is not set", env.EnvSMTPHost)
+		if config.SMTP == nil || strings.TrimSpace(config.SMTP.Host) == "" {
+			return nil, fmt.Errorf("%s environment variable is not set and no SMTP host provided in config", constants.EnvSMTPHost)
+		}
+		host = strings.TrimSpace(config.SMTP.Host)
 	}
 
-	portStr := strings.TrimSpace(os.Getenv(env.EnvSMTPPort))
+	portStr := strings.TrimSpace(os.Getenv(constants.EnvSMTPPort))
 	if portStr == "" {
-		return nil, fmt.Errorf("%s environment variable is not set", env.EnvSMTPPort)
+		if config.SMTP == nil || config.SMTP.Port == 0 {
+			return nil, fmt.Errorf("%s environment variable is not set and no SMTP port provided in config", constants.EnvSMTPPort)
+		}
+		portStr = strconv.Itoa(config.SMTP.Port)
 	}
-
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
-		return nil, fmt.Errorf("%s must be a valid integer: %w", env.EnvSMTPPort, err)
+		return nil, fmt.Errorf("%s must be a valid integer: %w", constants.EnvSMTPPort, err)
 	}
 
 	tlsMode := strings.ToLower(strings.TrimSpace(config.TLSMode.String()))
@@ -57,11 +62,24 @@ func NewSMTPProvider(
 	}
 
 	// If credentials are supplied, require TLS (prevent AUTH over plaintext).
-	user := strings.TrimSpace(os.Getenv(env.EnvSMTPUser))
-	pass := strings.TrimSpace(os.Getenv(env.EnvSMTPPass))
+	user := strings.TrimSpace(os.Getenv(constants.EnvSMTPUser))
+	if user == "" {
+		if config.SMTP != nil && strings.TrimSpace(config.SMTP.Username) != "" {
+			user = strings.TrimSpace(config.SMTP.Username)
+		}
+	}
+	pass := strings.TrimSpace(os.Getenv(constants.EnvSMTPPass))
+	if pass == "" {
+		if config.SMTP != nil && strings.TrimSpace(config.SMTP.Password) != "" {
+			pass = strings.TrimSpace(config.SMTP.Password)
+		}
+	}
 	if (user != "" || pass != "") && tlsPolicy == mail.NoTLS {
-		return nil, fmt.Errorf("SMTP credentials supplied but TLS is disabled; set SMTP_TLS_MODE to %q or %q, or remove SMTP_USER/SMTP_PASS",
-			types.SMTPTLSModeStartTLS.String(), types.SMTPTLSModeTLS.String())
+		return nil, fmt.Errorf(
+			"SMTP credentials supplied but TLS is disabled; set tls_mode to %q or %q, or remove SMTP_USER/SMTP_PASS",
+			types.SMTPTLSModeStartTLS.String(),
+			types.SMTPTLSModeTLS.String(),
+		)
 	}
 
 	return &SMTPProvider{

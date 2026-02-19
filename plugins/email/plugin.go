@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/GoBetterAuth/go-better-auth/v2/env"
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email/constants"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email/providers"
 	emailtypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/email/types"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
@@ -49,12 +49,12 @@ func (p *EmailPlugin) Init(ctx *models.PluginContext) error {
 		})
 	}
 
-	if emailFrom := os.Getenv(env.EnvEmailFrom); emailFrom != "" {
+	if emailFrom := os.Getenv(constants.EnvEmailFrom); emailFrom != "" {
 		p.PluginConfig.FromAddress = emailFrom
 	}
 
 	if p.PluginConfig.FromAddress == "" {
-		return fmt.Errorf("email plugin requires 'from_address' to be configured in %s env var or config", env.EnvEmailFrom)
+		return fmt.Errorf("email plugin requires 'from_address' to be configured in %s env var or config", constants.EnvEmailFrom)
 	}
 
 	primaryProvider, err := p.initializeProvider(p.PluginConfig.Provider, true)
@@ -71,58 +71,9 @@ func (p *EmailPlugin) Init(ctx *models.PluginContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize email service: %w", err)
 	}
-
 	p.EmailService = emailService
 
 	ctx.ServiceRegistry.Register(models.ServiceMailer.String(), NewMailerServiceAdapter(emailService))
-
-	return nil
-}
-
-func (p *EmailPlugin) OnConfigUpdate(config *models.Config) error {
-	oldProvider := p.PluginConfig.Provider
-	oldFromAddress := p.PluginConfig.FromAddress
-
-	// Reload configuration
-	if err := util.LoadPluginConfig(config, p.Metadata().ID, p.PluginConfig); err != nil {
-		p.Logger.Warn("failed to reload email plugin config", map[string]any{
-			"error": err.Error(),
-		})
-		return nil // Non-fatal error
-	}
-
-	// Reinitialize if provider or from address changed
-	if oldProvider != p.PluginConfig.Provider || oldFromAddress != p.PluginConfig.FromAddress {
-		if err := p.reinitializeProviders(); err != nil {
-			p.Logger.Error("failed to reinitialize email providers", map[string]any{
-				"error": err.Error(),
-			})
-			return nil // Non-fatal error
-		}
-	}
-
-	return nil
-}
-
-func (p *EmailPlugin) reinitializeProviders() error {
-	primaryProvider, err := p.initializeProvider(p.PluginConfig.Provider, true)
-	if err != nil {
-		return err
-	}
-
-	var fallbackProvider rootservices.MailerService
-	if p.PluginConfig.FallbackProvider != "" && p.PluginConfig.FallbackProvider != p.PluginConfig.Provider {
-		fallbackProvider, _ = p.initializeProvider(p.PluginConfig.FallbackProvider, false)
-	}
-
-	emailService, err := NewEmailService(p.Logger, p.PluginConfig, primaryProvider, fallbackProvider)
-	if err != nil {
-		return fmt.Errorf("failed to reinitialize email service: %w", err)
-	}
-
-	p.EmailService = emailService
-
-	p.ctx.ServiceRegistry.Register(models.ServiceMailer.String(), NewMailerServiceAdapter(emailService))
 
 	return nil
 }

@@ -12,16 +12,6 @@ const (
 	EnvGithubClientID     = "GITHUB_CLIENT_ID"
 	EnvGithubClientSecret = "GITHUB_CLIENT_SECRET"
 
-	// EMAIL / SMTP
-
-	EnvResendApiKey = "RESEND_API_KEY"
-
-	EnvSMTPHost  = "SMTP_HOST"
-	EnvSMTPPort  = "SMTP_PORT"
-	EnvSMTPUser  = "SMTP_USER"
-	EnvSMTPPass  = "SMTP_PASS"
-	EnvEmailFrom = "FROM_ADDRESS"
-
 	// POSTGRES
 
 	EnvPostgresURL = "POSTGRES_URL"
@@ -49,7 +39,6 @@ const (
 	// GO BETTER AUTH
 
 	EnvConfigPath  = "GO_BETTER_AUTH_CONFIG_PATH"
-	EnvAdminApiKey = "GO_BETTER_AUTH_ADMIN_API_KEY"
 	EnvBaseURL     = "GO_BETTER_AUTH_BASE_URL"
 	EnvSecret      = "GO_BETTER_AUTH_SECRET"
 	EnvDatabaseURL = "GO_BETTER_AUTH_DATABASE_URL"
