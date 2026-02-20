@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
@@ -20,6 +21,12 @@ type SessionPlugin struct {
 	userService    services.UserService
 	sessionService services.SessionService
 	tokenService   services.TokenService
+
+	// Cleanup goroutine management
+	stopCleanup    chan struct{}
+	done           chan struct{}
+	cleanupOnce    sync.Once
+	cleanupStarted bool
 }
 
 func New(config SessionPluginConfig) *SessionPlugin {
@@ -71,6 +78,13 @@ func (p *SessionPlugin) Init(ctx *models.PluginContext) error {
 		return errors.New("token service not available")
 	}
 	p.tokenService = tokenService
+
+	// Initialize cleanup channels and start cleanup goroutine
+	p.stopCleanup = make(chan struct{})
+	p.done = make(chan struct{})
+	if p.pluginConfig.AutoCleanup {
+		p.startCleanup()
+	}
 
 	return nil
 }
@@ -221,6 +235,47 @@ func (p *SessionPlugin) renewSession(w http.ResponseWriter, r *http.Request, ses
 	p.SetSessionCookie(w, cookie.Value)
 }
 
+// startCleanup initializes and starts the session cleanup goroutine
+func (p *SessionPlugin) startCleanup() {
+	if p.cleanupStarted {
+		return
+	}
+	p.cleanupStarted = true
+	go p.cleanupExpiredEntries()
+}
+
+// cleanupExpiredEntries runs the session cleanup loop
+func (p *SessionPlugin) cleanupExpiredEntries() {
+	ticker := time.NewTicker(p.pluginConfig.CleanupInterval)
+	defer ticker.Stop()
+	defer close(p.done)
+
+	for {
+		select {
+		case <-p.stopCleanup:
+			p.logger.Debug("session cleanup goroutine stopped")
+			return
+		case <-ticker.C:
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			if err := p.sessionService.RunCleanup(ctx, p.pluginConfig.MaxSessionsPerUser); err != nil {
+				p.logger.Error("session cleanup failed", "error", err)
+			}
+			cancel()
+		}
+	}
+}
+
 func (p *SessionPlugin) Close() error {
+	if p.pluginConfig.AutoCleanup {
+		p.cleanupOnce.Do(func() {
+			if p.cleanupStarted && p.stopCleanup != nil {
+				close(p.stopCleanup)
+				// Wait for cleanup goroutine to finish
+				if p.done != nil {
+					<-p.done
+				}
+			}
+		})
+	}
 	return nil
 }

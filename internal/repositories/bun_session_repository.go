@@ -93,6 +93,58 @@ func (r *BunSessionRepository) DeleteByUserID(ctx context.Context, userID string
 	return err
 }
 
+func (r *BunSessionRepository) DeleteExpiredSessions(ctx context.Context) error {
+	_, err := r.db.NewDelete().Model(&models.Session{}).Where("expires_at < CURRENT_TIMESTAMP").Exec(ctx)
+	return err
+}
+
+func (r *BunSessionRepository) DeleteOldestSessionsByUserID(ctx context.Context, userID string, maxCount int) error {
+	if maxCount <= 0 {
+		_, err := r.db.NewDelete().Model(&models.Session{}).Where("user_id = ?", userID).Exec(ctx)
+		return err
+	}
+
+	var allSessions []*models.Session
+	err := r.db.NewSelect().
+		Model(&allSessions).
+		Where("user_id = ?", userID).
+		Order("created_at ASC").
+		Scan(ctx)
+	if err != nil {
+		return err
+	}
+
+	amountToDelete := len(allSessions) - maxCount
+	if amountToDelete <= 0 {
+		return nil
+	}
+
+	var deleteIDs []string
+	for i := 0; i < amountToDelete && i < len(allSessions); i++ {
+		deleteIDs = append(deleteIDs, allSessions[i].ID)
+	}
+
+	if len(deleteIDs) > 0 {
+		_, err = r.db.NewDelete().
+			Model(&models.Session{}).
+			Where("id IN (?)", bun.In(deleteIDs)).
+			Exec(ctx)
+		return err
+	}
+
+	return nil
+}
+
+func (r *BunSessionRepository) GetDistinctUserIDs(ctx context.Context) ([]string, error) {
+	var userIDs []string
+	err := r.db.NewSelect().
+		Model(&models.Session{}).
+		Distinct().
+		Column("user_id").
+		Scan(ctx, &userIDs)
+	return userIDs, err
+}
+
 func (r *BunSessionRepository) WithTx(tx bun.IDB) SessionRepository {
 	return &BunSessionRepository{db: tx}
 }

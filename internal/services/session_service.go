@@ -111,3 +111,39 @@ func (s *sessionService) Delete(ctx context.Context, id string) error {
 func (s *sessionService) DeleteAllByUserID(ctx context.Context, userID string) error {
 	return s.repo.DeleteByUserID(ctx, userID)
 }
+
+func (s *sessionService) CleanupExpiredSessions(ctx context.Context) error {
+	return s.repo.DeleteExpiredSessions(ctx)
+}
+
+func (s *sessionService) EnforceMaxSessionsPerUser(ctx context.Context, maxPerUser int) error {
+	if maxPerUser <= 0 {
+		return nil
+	}
+
+	userIDs, err := s.repo.GetDistinctUserIDs(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, userID := range userIDs {
+		err := s.repo.DeleteOldestSessionsByUserID(ctx, userID, maxPerUser)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *sessionService) RunCleanup(ctx context.Context, maxPerUser int) error {
+	if err := s.CleanupExpiredSessions(ctx); err != nil {
+		return err
+	}
+
+	if err := s.EnforceMaxSessionsPerUser(ctx, maxPerUser); err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -145,15 +145,18 @@ func (m *MockAccountService) UpdateFields(ctx context.Context, userID string, fi
 }
 
 type MockSessionService struct {
-	t                   *testing.T
-	strict              bool
-	GetByIDFn           func(ctx context.Context, id string) (*models.Session, error)
-	CreateFn            func(ctx context.Context, userID, hashedToken string, ipAddress, userAgent *string, maxAge time.Duration) (*models.Session, error)
-	GetByUserIDFn       func(ctx context.Context, userID string) (*models.Session, error)
-	GetByTokenFn        func(ctx context.Context, hashedToken string) (*models.Session, error)
-	UpdateFn            func(ctx context.Context, session *models.Session) (*models.Session, error)
-	DeleteFn            func(ctx context.Context, id string) error
-	DeleteAllByUserIDFn func(ctx context.Context, userID string) error
+	t                           *testing.T
+	strict                      bool
+	GetByIDFn                   func(ctx context.Context, id string) (*models.Session, error)
+	CreateFn                    func(ctx context.Context, userID, hashedToken string, ipAddress, userAgent *string, maxAge time.Duration) (*models.Session, error)
+	GetByUserIDFn               func(ctx context.Context, userID string) (*models.Session, error)
+	GetByTokenFn                func(ctx context.Context, hashedToken string) (*models.Session, error)
+	UpdateFn                    func(ctx context.Context, session *models.Session) (*models.Session, error)
+	DeleteFn                    func(ctx context.Context, id string) error
+	DeleteAllByUserIDFn         func(ctx context.Context, userID string) error
+	CleanupExpiredSessionsFn    func(ctx context.Context) error
+	EnforceMaxSessionsPerUserFn func(ctx context.Context, maxPerUser int) error
+	RunCleanupFn                func(ctx context.Context, maxPerUser int) error
 }
 
 func NewMockSessionService(t *testing.T) *MockSessionService {
@@ -214,6 +217,30 @@ func (m *MockSessionService) DeleteAllByUserID(ctx context.Context, userID strin
 		return m.DeleteAllByUserIDFn(ctx, userID)
 	}
 	failUnexpected(m.t, m.strict, "MockSessionService.DeleteAllByUserID")
+	return nil
+}
+
+func (m *MockSessionService) CleanupExpiredSessions(ctx context.Context) error {
+	if m.CleanupExpiredSessionsFn != nil {
+		return m.CleanupExpiredSessionsFn(ctx)
+	}
+	failUnexpected(m.t, m.strict, "MockSessionService.CleanupExpiredSessions")
+	return nil
+}
+
+func (m *MockSessionService) EnforceMaxSessionsPerUser(ctx context.Context, maxPerUser int) error {
+	if m.EnforceMaxSessionsPerUserFn != nil {
+		return m.EnforceMaxSessionsPerUserFn(ctx, maxPerUser)
+	}
+	failUnexpected(m.t, m.strict, "MockSessionService.EnforceMaxSessionsPerUser")
+	return nil
+}
+
+func (m *MockSessionService) RunCleanup(ctx context.Context, maxPerUser int) error {
+	if m.RunCleanupFn != nil {
+		return m.RunCleanupFn(ctx, maxPerUser)
+	}
+	failUnexpected(m.t, m.strict, "MockSessionService.RunCleanup")
 	return nil
 }
 

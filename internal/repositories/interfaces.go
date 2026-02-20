@@ -40,6 +40,9 @@ type SessionRepository interface {
 	Update(ctx context.Context, session *models.Session) (*models.Session, error)
 	Delete(ctx context.Context, id string) error
 	DeleteByUserID(ctx context.Context, userID string) error
+	DeleteExpiredSessions(ctx context.Context) error
+	DeleteOldestSessionsByUserID(ctx context.Context, userID string, keepCount int) error
+	GetDistinctUserIDs(ctx context.Context) ([]string, error)
 	WithTx(tx bun.IDB) SessionRepository
 }
 
