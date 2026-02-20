@@ -273,8 +273,8 @@ request_email_change_expires_in = "1h"
 # stored in the session record for security audit trails and session management features.
 [plugins.session]
 enabled = true
-auto_cleanup = false # Enable a flag to automatically clean up expired sessions
-cleanup_interval = "1m" # Interval for automatic cleanup of expired sessions and enforcing max sessions per user
+auto_cleanup = false # Flag to automatically clean up expired sessions
+cleanup_interval = "1m" # Interval for automatic cleanup of expired sessions
 max_sessions_per_user = 5 # Maximum concurrent sessions allowed per user (0 for unlimited)
 
 # --- JWT Plugin (use for SPAs and mobile apps) ---
