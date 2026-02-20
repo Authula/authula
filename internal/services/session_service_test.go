@@ -142,51 +142,6 @@ func (m *mockSessionRepository) GetDistinctUserIDs(ctx context.Context) ([]strin
 	return userIDs, nil
 }
 
-type mockUserRepository struct {
-	users []*models.User
-}
-
-func (m *mockUserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
-	for _, user := range m.users {
-		if user.ID == id {
-			return user, nil
-		}
-	}
-	return nil, nil
-}
-
-func (m *mockUserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
-	for _, user := range m.users {
-		if user.Email == email {
-			return user, nil
-		}
-	}
-	return nil, nil
-}
-
-func (m *mockUserRepository) Create(ctx context.Context, user *models.User) (*models.User, error) {
-	m.users = append(m.users, user)
-	return user, nil
-}
-
-func (m *mockUserRepository) Update(ctx context.Context, user *models.User) (*models.User, error) {
-	for i, u := range m.users {
-		if u.ID == user.ID {
-			m.users[i] = user
-			return user, nil
-		}
-	}
-	return user, nil
-}
-
-func (m *mockUserRepository) UpdateFields(ctx context.Context, id string, fields map[string]any) error {
-	return nil
-}
-
-func (m *mockUserRepository) WithTx(tx bun.IDB) repositories.UserRepository {
-	return m
-}
-
 func TestSessionService_CleanupExpiredSessions(t *testing.T) {
 	mockRepo := &mockSessionRepository{}
 	service := NewSessionService(mockRepo, nil, nil)
