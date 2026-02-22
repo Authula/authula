@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -61,6 +62,11 @@ func (r *BunVerificationRepository) Delete(ctx context.Context, id string) error
 
 func (r *BunVerificationRepository) DeleteByUserIDAndType(ctx context.Context, userID string, vType models.VerificationType) error {
 	_, err := r.db.NewDelete().Model(&models.Verification{}).Where("user_id = ? AND type = ?", userID, vType).Exec(ctx)
+	return err
+}
+
+func (r *BunVerificationRepository) DeleteExpired(ctx context.Context) error {
+	_, err := r.db.NewDelete().Model(&models.Verification{}).Where("expires_at < ?", time.Now().UTC()).Exec(ctx)
 	return err
 }
 

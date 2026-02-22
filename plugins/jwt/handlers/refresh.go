@@ -8,11 +8,11 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/jwt/usecases"
 )
 
-type RefreshTokenRequest struct {
+type refreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
-type RefreshTokenResponse struct {
+type refreshTokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 }
@@ -27,9 +27,9 @@ func (h *RefreshTokenHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		var req RefreshTokenRequest
+		var req refreshTokenRequest
 		if err := util.ParseJSON(r, &req); err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
 				"message": "invalid request body",
 			})
 			reqCtx.Handled = true
@@ -37,7 +37,7 @@ func (h *RefreshTokenHandler) Handler() http.HandlerFunc {
 		}
 
 		if req.RefreshToken == "" {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
+			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": "refresh_token is required",
 			})
 			reqCtx.Handled = true
@@ -54,7 +54,7 @@ func (h *RefreshTokenHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, RefreshTokenResponse{
+		reqCtx.SetJSONResponse(http.StatusOK, refreshTokenResponse{
 			AccessToken:  result.AccessToken,
 			RefreshToken: result.RefreshToken,
 		})

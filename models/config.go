@@ -9,16 +9,17 @@ import (
 // Config holds the core configuration for GoBetterAuth.
 type Config struct {
 	// Core identity
-	AppName  string         `json:"app_name" toml:"app_name"`
-	BaseURL  string         `json:"base_url" toml:"base_url"`
-	BasePath string         `json:"base_path" toml:"base_path"`
-	Secret   string         `json:"secret" toml:"secret"`
-	Database DatabaseConfig `json:"database" toml:"database"`
-	Logger   LoggerConfig   `json:"logger" toml:"logger"`
-	Session  SessionConfig  `json:"session" toml:"session"`
-	Security SecurityConfig `json:"security" toml:"security"`
-	EventBus EventBusConfig `json:"event_bus" toml:"event_bus"`
-	Plugins  PluginsConfig  `json:"plugins" toml:"plugins"`
+	AppName      string             `json:"app_name" toml:"app_name"`
+	BaseURL      string             `json:"base_url" toml:"base_url"`
+	BasePath     string             `json:"base_path" toml:"base_path"`
+	Secret       string             `json:"secret" toml:"secret"`
+	Database     DatabaseConfig     `json:"database" toml:"database"`
+	Logger       LoggerConfig       `json:"logger" toml:"logger"`
+	Session      SessionConfig      `json:"session" toml:"session"`
+	Verification VerificationConfig `json:"verification" toml:"verification"`
+	Security     SecurityConfig     `json:"security" toml:"security"`
+	EventBus     EventBusConfig     `json:"event_bus" toml:"event_bus"`
+	Plugins      PluginsConfig      `json:"plugins" toml:"plugins"`
 	// RouteMappings defines plugin-to-route mappings.
 	// Each route specifies which plugins should execute hooks for that endpoint.
 	// This enables fully declarative plugin routing in both standalone and library modes.
@@ -51,6 +52,11 @@ type SessionConfig struct {
 	Secure       bool          `json:"secure" toml:"secure"`
 	HttpOnly     bool          `json:"http_only" toml:"http_only"`
 	SameSite     string        `json:"same_site" toml:"same_site"`
+}
+
+type VerificationConfig struct {
+	AutoCleanup     bool          `json:"auto_cleanup" toml:"auto_cleanup"`
+	CleanupInterval time.Duration `json:"cleanup_interval" toml:"cleanup_interval"`
 }
 
 type SecurityConfig struct {

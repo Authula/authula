@@ -252,6 +252,7 @@ type MockVerificationService struct {
 	DeleteFn                func(ctx context.Context, id string) error
 	DeleteByUserIDAndTypeFn func(ctx context.Context, userID string, vType models.VerificationType) error
 	IsExpiredFn             func(verif *models.Verification) bool
+	DeleteExpiredFn         func(ctx context.Context) error
 }
 
 func NewMockVerificationService(t *testing.T) *MockVerificationService {
@@ -297,6 +298,14 @@ func (m *MockVerificationService) IsExpired(verif *models.Verification) bool {
 	}
 	failUnexpected(m.t, m.strict, "MockVerificationService.IsExpired")
 	return false
+}
+
+func (m *MockVerificationService) DeleteExpired(ctx context.Context) error {
+	if m.DeleteExpiredFn != nil {
+		return m.DeleteExpiredFn(ctx)
+	}
+	failUnexpected(m.t, m.strict, "MockVerificationService.DeleteExpired")
+	return nil
 }
 
 type MockTokenService struct {

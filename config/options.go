@@ -32,6 +32,10 @@ func NewConfig(options ...ConfigOption) *models.Config {
 			HttpOnly:   true,
 			SameSite:   "lax",
 		},
+		Verification: models.VerificationConfig{
+			AutoCleanup:     false,
+			CleanupInterval: time.Minute,
+		},
 		Security: models.SecurityConfig{
 			TrustedOrigins: []string{},
 			TrustedHeaders: []string{},
@@ -168,6 +172,15 @@ func WithSession(config models.SessionConfig) ConfigOption {
 		c.Session.HttpOnly = config.HttpOnly
 		if config.SameSite != "" {
 			c.Session.SameSite = config.SameSite
+		}
+	}
+}
+
+func WithVerification(config models.VerificationConfig) ConfigOption {
+	return func(c *models.Config) {
+		c.Verification.AutoCleanup = config.AutoCleanup
+		if config.CleanupInterval != 0 {
+			c.Verification.CleanupInterval = config.CleanupInterval
 		}
 	}
 }

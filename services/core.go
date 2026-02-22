@@ -44,6 +44,7 @@ type VerificationService interface {
 	Delete(ctx context.Context, id string) error
 	DeleteByUserIDAndType(ctx context.Context, userID string, vType models.VerificationType) error
 	IsExpired(verif *models.Verification) bool
+	DeleteExpired(ctx context.Context) error
 }
 
 type TokenService interface {

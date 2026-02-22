@@ -93,6 +93,9 @@ func runServer(logger gobetterauthmodels.Logger, auth *gobetterauth.Auth, restar
 		if err := auth.ClosePlugins(); err != nil {
 			logger.Error("Failed to close plugins", "error", err)
 		}
+		if err := auth.CloseSystems(); err != nil {
+			logger.Error("Failed to close core systems", "error", err)
+		}
 		return
 
 	case sig := <-shutdownChan:
@@ -104,6 +107,9 @@ func runServer(logger gobetterauthmodels.Logger, auth *gobetterauth.Auth, restar
 		}
 		if err := auth.ClosePlugins(); err != nil {
 			logger.Error("Failed to close plugins", "error", err)
+		}
+		if err := auth.CloseSystems(); err != nil {
+			logger.Error("Failed to close core systems", "error", err)
 		}
 		os.Exit(0)
 	}

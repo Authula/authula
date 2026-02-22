@@ -52,6 +52,7 @@ type VerificationRepository interface {
 	Create(ctx context.Context, verification *models.Verification) (*models.Verification, error)
 	Delete(ctx context.Context, id string) error
 	DeleteByUserIDAndType(ctx context.Context, userID string, vType models.VerificationType) error
+	DeleteExpired(ctx context.Context) error
 	WithTx(tx bun.IDB) VerificationRepository
 }
 

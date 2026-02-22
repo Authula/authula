@@ -50,6 +50,14 @@ http_only = true
 same_site = "lax"  # Options: "lax", "strict", "none"
 
 # -----------------------------------
+# - Verification Configuration
+# -----------------------------------
+
+[verification]
+auto_cleanup = false # Flag to automatically clean up expired verifications
+cleanup_interval = "1m" # Interval for automatic cleanup of expired verifications
+
+# -----------------------------------
 # - Security Configuration
 # -----------------------------------
 

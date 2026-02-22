@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
@@ -16,24 +15,19 @@ type WellKnownJWKSHandler struct {
 func (h *WellKnownJWKSHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
 
 		result, err := h.JWKSUseCase.GetJWKS(ctx)
 		if err != nil {
 			h.Logger.Error("failed to fetch JWKS", "error", err)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			if err := json.NewEncoder(w).Encode(map[string]string{
+			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]string{
 				"error": "failed to fetch JWKS",
-			}); err != nil {
-				h.Logger.Error("failed to encode error response", "error", err)
-			}
+			})
+			reqCtx.Handled = true
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
-		if err := json.NewEncoder(w).Encode(result.KeySet); err != nil {
-			h.Logger.Error("failed to encode JWKS", "error", err)
-		}
+		reqCtx.SetJSONResponse(http.StatusOK, result.KeySet)
 	}
 }

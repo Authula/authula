@@ -36,6 +36,7 @@ func Load(path string) (*gobetterauthmodels.Config, bool, error) {
 		gobetterauthconfig.WithLogger(loaded.Logger),
 		gobetterauthconfig.WithSecret(loaded.Secret),
 		gobetterauthconfig.WithSession(loaded.Session),
+		gobetterauthconfig.WithVerification(loaded.Verification),
 		gobetterauthconfig.WithSecurity(loaded.Security),
 		gobetterauthconfig.WithEventBus(loaded.EventBus),
 		gobetterauthconfig.WithPlugins(loaded.Plugins),

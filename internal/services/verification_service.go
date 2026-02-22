@@ -86,3 +86,7 @@ func (s *verificationService) DeleteByUserIDAndType(ctx context.Context, userID 
 func (s *verificationService) IsExpired(v *models.Verification) bool {
 	return time.Now().UTC().After(v.ExpiresAt)
 }
+
+func (s *verificationService) DeleteExpired(ctx context.Context) error {
+	return s.repo.DeleteExpired(ctx)
+}

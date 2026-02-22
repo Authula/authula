@@ -10,6 +10,7 @@ import (
 	internalrepositories "github.com/GoBetterAuth/go-better-auth/v2/internal/repositories"
 	internalsecurity "github.com/GoBetterAuth/go-better-auth/v2/internal/security"
 	internalservices "github.com/GoBetterAuth/go-better-auth/v2/internal/services"
+	internalsystems "github.com/GoBetterAuth/go-better-auth/v2/internal/systems"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	coreservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
@@ -86,5 +87,15 @@ func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.
 		SessionService:      sessionService,
 		VerificationService: verificationService,
 		TokenService:        tokenService,
+	}
+}
+
+func InitCoreSystems(logger models.Logger, config *models.Config, coreServices *coreservices.CoreServices) []models.CoreSystem {
+	return []models.CoreSystem{
+		internalsystems.NewVerificationSystem(
+			logger,
+			config.Verification,
+			coreServices.VerificationService,
+		),
 	}
 }

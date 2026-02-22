@@ -34,6 +34,7 @@ type Auth struct {
 	PluginRegistry   models.PluginRegistry
 	handlerOnce      sync.Once
 	coreServices     *coreservices.CoreServices
+	systems          []models.CoreSystem
 	Api              internal.CoreAPI
 }
 
@@ -60,8 +61,6 @@ func New(authConfig *AuthConfig) *Auth {
 	if err := migrationManager.RunCore(context.Background(), authConfig.Config.Database.Provider); err != nil {
 		panic(fmt.Errorf("failed to run core migrations: %w", err))
 	}
-
-	router := NewRouter(authConfig.Config, logger, nil)
 
 	eventBus, err := InitEventBus(authConfig.Config)
 	if err != nil {
@@ -115,6 +114,16 @@ func New(authConfig *AuthConfig) *Auth {
 
 	api := internal.NewCoreAPI(logger, coreServices.UserService, coreServices.SessionService)
 
+	systems := InitCoreSystems(logger, authConfig.Config, coreServices)
+	for _, system := range systems {
+		if err := system.Init(context.Background()); err != nil {
+			logger.Error("failed to initialize core system", "system", system.Name(), "error", err)
+			panic(err)
+		}
+	}
+
+	router := NewRouter(authConfig.Config, logger, nil)
+
 	auth := &Auth{
 		config:           authConfig.Config,
 		logger:           logger,
@@ -125,6 +134,7 @@ func New(authConfig *AuthConfig) *Auth {
 		ServiceRegistry:  serviceRegistry,
 		PluginRegistry:   pluginRegistry,
 		coreServices:     coreServices,
+		systems:          systems,
 		Api:              api,
 	}
 
@@ -306,5 +316,15 @@ func (auth *Auth) ClosePlugins() error {
 	}
 
 	auth.PluginRegistry.CloseAll()
+	return nil
+}
+
+func (auth *Auth) CloseSystems() error {
+	for _, system := range auth.systems {
+		if err := system.Close(); err != nil {
+			auth.logger.Error("failed to close core system", "system", system.Name(), "error", err)
+		}
+	}
+
 	return nil
 }
