@@ -52,7 +52,7 @@ func generateTestUUID() string {
 	return "test-uuid-" + string(rune(testUUIDCounter))
 }
 
-func TestBunSessionRepository_DeleteExpiredSessions(t *testing.T) {
+func TestBunSessionRepository_DeleteExpired(t *testing.T) {
 	db := newTestSessionDB(t)
 	repo := NewBunSessionRepository(db)
 	ctx := context.Background()
@@ -84,9 +84,9 @@ func TestBunSessionRepository_DeleteExpiredSessions(t *testing.T) {
 	}
 
 	// Delete expired sessions
-	err = repo.DeleteExpiredSessions(ctx)
+	err = repo.DeleteExpired(ctx)
 	if err != nil {
-		t.Fatalf("expected no error on DeleteExpiredSessions, got %v", err)
+		t.Fatalf("expected no error on DeleteExpired, got %v", err)
 	}
 
 	// Verify only 2 sessions remain (the active ones)
@@ -107,7 +107,7 @@ func TestBunSessionRepository_DeleteExpiredSessions(t *testing.T) {
 	}
 }
 
-func TestBunSessionRepository_DeleteExpiredSessions_NoExpired(t *testing.T) {
+func TestBunSessionRepository_DeleteExpired_NoExpired(t *testing.T) {
 	db := newTestSessionDB(t)
 	repo := NewBunSessionRepository(db)
 	ctx := context.Background()
@@ -127,9 +127,9 @@ func TestBunSessionRepository_DeleteExpiredSessions_NoExpired(t *testing.T) {
 	}
 
 	// Delete expired sessions (should delete none)
-	err := repo.DeleteExpiredSessions(ctx)
+	err := repo.DeleteExpired(ctx)
 	if err != nil {
-		t.Fatalf("expected no error on DeleteExpiredSessions, got %v", err)
+		t.Fatalf("expected no error on DeleteExpired, got %v", err)
 	}
 
 	// Verify all 2 sessions still exist
@@ -143,7 +143,7 @@ func TestBunSessionRepository_DeleteExpiredSessions_NoExpired(t *testing.T) {
 	}
 }
 
-func TestBunSessionRepository_DeleteExpiredSessions_AllExpired(t *testing.T) {
+func TestBunSessionRepository_DeleteExpired_AllExpired(t *testing.T) {
 	db := newTestSessionDB(t)
 	repo := NewBunSessionRepository(db)
 	ctx := context.Background()
@@ -164,9 +164,9 @@ func TestBunSessionRepository_DeleteExpiredSessions_AllExpired(t *testing.T) {
 	}
 
 	// Delete expired sessions (should delete all)
-	err := repo.DeleteExpiredSessions(ctx)
+	err := repo.DeleteExpired(ctx)
 	if err != nil {
-		t.Fatalf("expected no error on DeleteExpiredSessions, got %v", err)
+		t.Fatalf("expected no error on DeleteExpired, got %v", err)
 	}
 
 	// Verify no sessions remain
@@ -180,7 +180,7 @@ func TestBunSessionRepository_DeleteExpiredSessions_AllExpired(t *testing.T) {
 	}
 }
 
-func TestBunSessionRepository_DeleteOldestSessionsByUserID(t *testing.T) {
+func TestBunSessionRepository_DeleteOldestByUserID(t *testing.T) {
 	db := newTestSessionDB(t)
 	repo := NewBunSessionRepository(db)
 	ctx := context.Background()
@@ -220,9 +220,9 @@ func TestBunSessionRepository_DeleteOldestSessionsByUserID(t *testing.T) {
 	newestTwoCreated := [2]string{createdIDs[3], createdIDs[4]}
 
 	// Delete oldest 3, keep newest 2
-	err = repo.DeleteOldestSessionsByUserID(ctx, userID, 2)
+	err = repo.DeleteOldestByUserID(ctx, userID, 2)
 	if err != nil {
-		t.Fatalf("expected no error on DeleteOldestSessionsByUserID, got %v", err)
+		t.Fatalf("expected no error on DeleteOldestByUserID, got %v", err)
 	}
 
 	// Verify only 2 sessions remain
@@ -254,7 +254,7 @@ func TestBunSessionRepository_DeleteOldestSessionsByUserID(t *testing.T) {
 	}
 }
 
-func TestBunSessionRepository_DeleteOldestSessionsByUserID_KeepAllWhenBelowLimit(t *testing.T) {
+func TestBunSessionRepository_DeleteOldestByUserID_KeepAllWhenBelowLimit(t *testing.T) {
 	db := newTestSessionDB(t)
 	repo := NewBunSessionRepository(db)
 	ctx := context.Background()
@@ -276,9 +276,9 @@ func TestBunSessionRepository_DeleteOldestSessionsByUserID_KeepAllWhenBelowLimit
 	}
 
 	// Try to delete oldest, but keep 5 (more than exists)
-	err := repo.DeleteOldestSessionsByUserID(ctx, userID, 5)
+	err := repo.DeleteOldestByUserID(ctx, userID, 5)
 	if err != nil {
-		t.Fatalf("expected no error on DeleteOldestSessionsByUserID, got %v", err)
+		t.Fatalf("expected no error on DeleteOldestByUserID, got %v", err)
 	}
 
 	// Verify all 2 sessions still exist
@@ -292,7 +292,7 @@ func TestBunSessionRepository_DeleteOldestSessionsByUserID_KeepAllWhenBelowLimit
 	}
 }
 
-func TestBunSessionRepository_DeleteOldestSessionsByUserID_DeleteAllWhenKeepIsZero(t *testing.T) {
+func TestBunSessionRepository_DeleteOldestByUserID_DeleteAllWhenKeepIsZero(t *testing.T) {
 	db := newTestSessionDB(t)
 	repo := NewBunSessionRepository(db)
 	ctx := context.Background()
@@ -315,9 +315,9 @@ func TestBunSessionRepository_DeleteOldestSessionsByUserID_DeleteAllWhenKeepIsZe
 	}
 
 	// Delete all sessions (keep 0)
-	err := repo.DeleteOldestSessionsByUserID(ctx, userID, 0)
+	err := repo.DeleteOldestByUserID(ctx, userID, 0)
 	if err != nil {
-		t.Fatalf("expected no error on DeleteOldestSessionsByUserID, got %v", err)
+		t.Fatalf("expected no error on DeleteOldestByUserID, got %v", err)
 	}
 
 	// Verify no sessions remain for this user
@@ -331,7 +331,7 @@ func TestBunSessionRepository_DeleteOldestSessionsByUserID_DeleteAllWhenKeepIsZe
 	}
 }
 
-func TestBunSessionRepository_DeleteOldestSessionsByUserID_MultipleUsers(t *testing.T) {
+func TestBunSessionRepository_DeleteOldestByUserID_MultipleUsers(t *testing.T) {
 	db := newTestSessionDB(t)
 	repo := NewBunSessionRepository(db)
 	ctx := context.Background()
@@ -364,9 +364,9 @@ func TestBunSessionRepository_DeleteOldestSessionsByUserID_MultipleUsers(t *test
 	}
 
 	// Delete oldest for user1 only, keep 1
-	err := repo.DeleteOldestSessionsByUserID(ctx, user1ID, 1)
+	err := repo.DeleteOldestByUserID(ctx, user1ID, 1)
 	if err != nil {
-		t.Fatalf("expected no error on DeleteOldestSessionsByUserID, got %v", err)
+		t.Fatalf("expected no error on DeleteOldestByUserID, got %v", err)
 	}
 
 	// Verify user1 has only 1 session

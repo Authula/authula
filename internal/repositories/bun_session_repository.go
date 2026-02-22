@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -93,12 +94,12 @@ func (r *BunSessionRepository) DeleteByUserID(ctx context.Context, userID string
 	return err
 }
 
-func (r *BunSessionRepository) DeleteExpiredSessions(ctx context.Context) error {
-	_, err := r.db.NewDelete().Model(&models.Session{}).Where("expires_at < CURRENT_TIMESTAMP").Exec(ctx)
+func (r *BunSessionRepository) DeleteExpired(ctx context.Context) error {
+	_, err := r.db.NewDelete().Model(&models.Session{}).Where("expires_at < ?", time.Now().UTC()).Exec(ctx)
 	return err
 }
 
-func (r *BunSessionRepository) DeleteOldestSessionsByUserID(ctx context.Context, userID string, maxCount int) error {
+func (r *BunSessionRepository) DeleteOldestByUserID(ctx context.Context, userID string, maxCount int) error {
 	if maxCount <= 0 {
 		_, err := r.db.NewDelete().Model(&models.Session{}).Where("user_id = ?", userID).Exec(ctx)
 		return err

@@ -33,9 +33,9 @@ type SessionService interface {
 	Update(ctx context.Context, session *models.Session) (*models.Session, error)
 	Delete(ctx context.Context, ID string) error
 	DeleteAllByUserID(ctx context.Context, userID string) error
-	CleanupExpiredSessions(ctx context.Context) error
-	EnforceMaxSessionsPerUser(ctx context.Context, maxPerUser int) error
-	RunCleanup(ctx context.Context, maxPerUser int) error
+	DeleteAllExpired(ctx context.Context) error
+	GetDistinctUserIDs(ctx context.Context) ([]string, error)
+	DeleteOldestByUserID(ctx context.Context, userID string, maxCount int) error
 }
 
 type VerificationService interface {

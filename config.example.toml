@@ -48,6 +48,9 @@ cookie_max_age = "24h"
 secure = false
 http_only = true
 same_site = "lax"  # Options: "lax", "strict", "none"
+auto_cleanup = false # Flag to automatically clean up expired sessions and enforce max sessions per user
+cleanup_interval = "1m" # Interval for automatic cleanup of expired sessions
+max_sessions_per_user = 5 # Maximum number of concurrent sessions per user (0 = unlimited)
 
 # -----------------------------------
 # - Verification Configuration
@@ -281,9 +284,6 @@ request_email_change_expires_in = "1h"
 # stored in the session record for security audit trails and session management features.
 [plugins.session]
 enabled = true
-auto_cleanup = false # Flag to automatically clean up expired sessions
-cleanup_interval = "1m" # Interval for automatic cleanup of expired sessions
-max_sessions_per_user = 5 # Maximum concurrent sessions allowed per user (0 for unlimited)
 
 # --- JWT Plugin (use for SPAs and mobile apps) ---
 

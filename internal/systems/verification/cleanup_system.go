@@ -1,4 +1,4 @@
-package systems
+package verification
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
-type VerificationSystem struct {
+type VerificationCleanupSystem struct {
 	logger              models.Logger
 	config              models.VerificationConfig
 	verificationService services.VerificationService
@@ -16,12 +16,12 @@ type VerificationSystem struct {
 	done                chan struct{}
 }
 
-func NewVerificationSystem(
+func NewVerificationCleanupSystem(
 	logger models.Logger,
 	config models.VerificationConfig,
 	verificationService services.VerificationService,
-) *VerificationSystem {
-	return &VerificationSystem{
+) *VerificationCleanupSystem {
+	return &VerificationCleanupSystem{
 		verificationService: verificationService,
 		config:              config,
 		logger:              logger,
@@ -30,11 +30,11 @@ func NewVerificationSystem(
 	}
 }
 
-func (s *VerificationSystem) Name() string {
-	return "Verification"
+func (s *VerificationCleanupSystem) Name() string {
+	return "VerificationCleanupSystem"
 }
 
-func (s *VerificationSystem) Init(ctx context.Context) error {
+func (s *VerificationCleanupSystem) Init(ctx context.Context) error {
 	if !s.config.AutoCleanup {
 		return nil
 	}
@@ -49,7 +49,7 @@ func (s *VerificationSystem) Init(ctx context.Context) error {
 	return nil
 }
 
-func (s *VerificationSystem) Close() error {
+func (s *VerificationCleanupSystem) Close() error {
 	if !s.config.AutoCleanup {
 		return nil
 	}
@@ -59,7 +59,7 @@ func (s *VerificationSystem) Close() error {
 	return nil
 }
 
-func (s *VerificationSystem) runCleanupLoop(interval time.Duration) {
+func (s *VerificationCleanupSystem) runCleanupLoop(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	defer close(s.done)

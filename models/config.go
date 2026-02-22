@@ -45,13 +45,16 @@ type LoggerConfig struct {
 }
 
 type SessionConfig struct {
-	CookieName   string        `json:"cookie_name" toml:"cookie_name"`
-	ExpiresIn    time.Duration `json:"expires_in" toml:"expires_in"`         // Sliding window per activity
-	UpdateAge    time.Duration `json:"update_age" toml:"update_age"`         // How often to check/update
-	CookieMaxAge time.Duration `json:"cookie_max_age" toml:"cookie_max_age"` // Absolute max age of the cookie
-	Secure       bool          `json:"secure" toml:"secure"`
-	HttpOnly     bool          `json:"http_only" toml:"http_only"`
-	SameSite     string        `json:"same_site" toml:"same_site"`
+	CookieName         string        `json:"cookie_name" toml:"cookie_name"`
+	ExpiresIn          time.Duration `json:"expires_in" toml:"expires_in"`         // Sliding window per activity
+	UpdateAge          time.Duration `json:"update_age" toml:"update_age"`         // How often to check/update
+	CookieMaxAge       time.Duration `json:"cookie_max_age" toml:"cookie_max_age"` // Absolute max age of the cookie
+	Secure             bool          `json:"secure" toml:"secure"`
+	HttpOnly           bool          `json:"http_only" toml:"http_only"`
+	SameSite           string        `json:"same_site" toml:"same_site"`
+	AutoCleanup        bool          `json:"auto_cleanup" toml:"auto_cleanup"`
+	CleanupInterval    time.Duration `json:"cleanup_interval" toml:"cleanup_interval"`
+	MaxSessionsPerUser int           `json:"max_sessions_per_user" toml:"max_sessions_per_user"`
 }
 
 type VerificationConfig struct {

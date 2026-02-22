@@ -10,7 +10,8 @@ import (
 	internalrepositories "github.com/GoBetterAuth/go-better-auth/v2/internal/repositories"
 	internalsecurity "github.com/GoBetterAuth/go-better-auth/v2/internal/security"
 	internalservices "github.com/GoBetterAuth/go-better-auth/v2/internal/services"
-	internalsystems "github.com/GoBetterAuth/go-better-auth/v2/internal/systems"
+	internalsystemssession "github.com/GoBetterAuth/go-better-auth/v2/internal/systems/session"
+	internalsystemsverification "github.com/GoBetterAuth/go-better-auth/v2/internal/systems/verification"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	coreservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
@@ -37,7 +38,6 @@ func InitDatabase(config *models.Config, logger models.Logger, logLevel string) 
 
 // InitEventBus creates an event bus based on the configuration
 func InitEventBus(config *models.Config) (models.EventBus, error) {
-	// Default to gochannel if not specified
 	provider := config.EventBus.Provider
 	if provider == "" {
 		provider = events.ProviderGoChannel
@@ -92,7 +92,12 @@ func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.
 
 func InitCoreSystems(logger models.Logger, config *models.Config, coreServices *coreservices.CoreServices) []models.CoreSystem {
 	return []models.CoreSystem{
-		internalsystems.NewVerificationSystem(
+		internalsystemssession.NewSessionCleanupSystem(
+			logger,
+			config.Session,
+			coreServices.SessionService,
+		),
+		internalsystemsverification.NewVerificationCleanupSystem(
 			logger,
 			config.Verification,
 			coreServices.VerificationService,

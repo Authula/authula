@@ -25,12 +25,16 @@ func NewConfig(options ...ConfigOption) *models.Config {
 		BasePath: "/auth",
 		Secret:   defaultSecret,
 		Session: models.SessionConfig{
-			CookieName: "gobetterauth.session_token",
-			ExpiresIn:  time.Hour * 24 * 7, // 7 days by default
-			UpdateAge:  time.Hour * 24,     // 24 hours update interval
-			Secure:     false,
-			HttpOnly:   true,
-			SameSite:   "lax",
+			CookieName:         "gobetterauth.session_token",
+			ExpiresIn:          time.Hour * 24 * 7, // 7 days by default
+			UpdateAge:          time.Hour * 24,     // 24 hours update interval
+			Secure:             false,
+			HttpOnly:           true,
+			SameSite:           "lax",
+			CookieMaxAge:       24 * time.Hour,
+			AutoCleanup:        false,
+			CleanupInterval:    time.Minute,
+			MaxSessionsPerUser: 5,
 		},
 		Verification: models.VerificationConfig{
 			AutoCleanup:     false,
@@ -173,6 +177,11 @@ func WithSession(config models.SessionConfig) ConfigOption {
 		if config.SameSite != "" {
 			c.Session.SameSite = config.SameSite
 		}
+		c.Session.AutoCleanup = config.AutoCleanup
+		if config.CleanupInterval != 0 {
+			c.Session.CleanupInterval = config.CleanupInterval
+		}
+		c.Session.MaxSessionsPerUser = config.MaxSessionsPerUser
 	}
 }
 
