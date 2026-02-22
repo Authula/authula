@@ -6,7 +6,7 @@ import "context"
 type CoreSystem interface {
 	// Name returns the identifier for this core system
 	Name() string
-	// Init performs the core system's initialization logic (e.g. starting background loops)
+	// Init performs the core system's initialization logic (e.g. starting background jobs)
 	Init(ctx context.Context) error
 	// Close performs cleanup for the core system
 	Close() error
