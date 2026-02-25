@@ -150,6 +150,9 @@ type RouteMapping struct {
 	// Plugins is the list of plugin IDs that should execute for this route.
 	// Plugin IDs follow the format "{plugin_name}.{operation}" (e.g., "session.auth", "csrf.protect")
 	Plugins []string `json:"plugins" toml:"plugins"`
+	// Permissions is the list of permission keys required for this route.
+	// When a route includes an RBAC capability plugin (e.g., "admin.rbac"), this list is enforced by that plugin.
+	Permissions []string `json:"permissions" toml:"permissions"`
 }
 
 type CoreDatabaseHooksConfig struct {

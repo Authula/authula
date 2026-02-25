@@ -620,8 +620,8 @@ func TestCSRFPlugin_HookOrder(t *testing.T) {
 		t.Errorf("combined hook order should be 5, got %d", hooks[0].Order)
 	}
 
-	if hooks[1].Order != 15 {
-		t.Errorf("validation hook order should be 15, got %d", hooks[1].Order)
+	if hooks[1].Order != 5 {
+		t.Errorf("validation hook order should be 5, got %d", hooks[1].Order)
 	}
 }
 

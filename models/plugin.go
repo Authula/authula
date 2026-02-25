@@ -13,6 +13,7 @@ type PluginID string
 
 const (
 	PluginConfigManager    PluginID = "config_manager"
+	PluginAdmin            PluginID = "admin"
 	PluginSecondaryStorage PluginID = "secondary_storage"
 	PluginEmail            PluginID = "email"
 	PluginCSRF             PluginID = "csrf"

@@ -147,6 +147,12 @@ buffer_size = 100
 [plugins.config_manager]
 enabled = false
 
+# --- Admin Plugin (custom-role RBAC and admin operations) ---
+
+[plugins.admin]
+enabled = false
+impersonation_max_expires_in = "15m"
+
 # --- Secondary Storage Plugin (provides secondary storage backends for other plugins) ---
 
 [plugins.secondary_storage]
@@ -354,6 +360,13 @@ enabled = true
 # path = "/change-password"
 # method = "POST"
 # plugins = ["session.auth", "csrf.protect"]
+
+# Admin RBAC example
+# [[route_mappings]]
+# path = "/admin/users"
+# method = "GET"
+# plugins = ["admin.rbac"]
+# permissions = ["users.read"]
 
 # [[route_mappings]]
 # path = "/sign-out"

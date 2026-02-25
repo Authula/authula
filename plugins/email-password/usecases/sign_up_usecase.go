@@ -30,6 +30,7 @@ func (uc *SignUpUseCase) SignUp(
 	email string,
 	password string,
 	image *string,
+	metadata json.RawMessage,
 	callbackURL *string,
 	ipAddress *string,
 	userAgent *string,
@@ -53,7 +54,7 @@ func (uc *SignUpUseCase) SignUp(
 		return nil, err
 	}
 
-	user, err := uc.UserService.Create(ctx, name, email, !uc.PluginConfig.RequireEmailVerification, image)
+	user, err := uc.UserService.Create(ctx, name, email, !uc.PluginConfig.RequireEmailVerification, image, metadata)
 	if err != nil {
 		return nil, err
 	}

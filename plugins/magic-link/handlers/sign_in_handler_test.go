@@ -20,6 +20,10 @@ import (
 
 type mockUserServiceWithError struct{}
 
+func (m *mockUserServiceWithError) GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error) {
+	return nil, nil, errors.New("database error")
+}
+
 func (m *mockUserServiceWithError) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	return nil, errors.New("database error")
 }
@@ -28,7 +32,7 @@ func (m *mockUserServiceWithError) GetByID(ctx context.Context, id string) (*mod
 	return &models.User{ID: id, Email: "test@example.com"}, nil
 }
 
-func (m *mockUserServiceWithError) Create(ctx context.Context, name string, email string, emailVerified bool, image *string) (*models.User, error) {
+func (m *mockUserServiceWithError) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata json.RawMessage) (*models.User, error) {
 	return nil, errors.New("database error")
 }
 
@@ -37,6 +41,10 @@ func (m *mockUserServiceWithError) Update(ctx context.Context, user *models.User
 }
 
 func (m *mockUserServiceWithError) UpdateFields(ctx context.Context, id string, fields map[string]any) error {
+	return nil
+}
+
+func (m *mockUserServiceWithError) Delete(ctx context.Context, id string) error {
 	return nil
 }
 

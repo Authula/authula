@@ -12,9 +12,7 @@ import (
 
 type JWTHookID string
 
-// Constants for jwt plugin hook IDs and metadata
 const (
-	// Responds with JWT tokens in HTTP Response after issuance
 	HookIDJWTRespondJSON JWTHookID = "jwt.respond_json"
 )
 
@@ -22,8 +20,6 @@ func (id JWTHookID) String() string {
 	return string(id)
 }
 
-// issueTokensHook generates and stores JWT tokens for authenticated users
-// This hook runs at HookAfter stage.
 func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
 	if reqCtx.UserID == nil {
 		return nil
@@ -41,7 +37,6 @@ func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
 	tokenPair, err := p.jwtService.GenerateTokens(context.Background(), *reqCtx.UserID, sessionID)
 	if err != nil {
 		p.Logger.Error("failed to generate JWT tokens", "user_id", *reqCtx.UserID, "session_id", sessionID, "error", err)
-		// Return error to fail the request - JWT generation should not silently fail
 		return fmt.Errorf("failed to generate authentication tokens: %w", err)
 	}
 
@@ -51,14 +46,12 @@ func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
 		return fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
-	// Store tokens in context for other hooks to handle sending response
 	reqCtx.Values[types.JWTTokenTypeAccess.String()] = tokenPair.AccessToken
 	reqCtx.Values[types.JWTTokenTypeRefresh.String()] = tokenPair.RefreshToken
 
 	return nil
 }
 
-// respondHook hook sends the generated JWT tokens in the response
 func (p *JWTPlugin) respondHook(reqCtx *models.RequestContext) error {
 	if reqCtx.UserID == nil {
 		return nil
@@ -79,10 +72,8 @@ func (p *JWTPlugin) respondHook(reqCtx *models.RequestContext) error {
 	return nil
 }
 
-// buildHooks returns the configured hooks for this plugin
 func (p *JWTPlugin) buildHooks() []models.Hook {
 	return []models.Hook{
-		// JWT issuance hook: generates access and refresh tokens after authentication
 		{
 			Stage: models.HookAfter,
 			Matcher: func(reqCtx *models.RequestContext) bool {
@@ -90,9 +81,8 @@ func (p *JWTPlugin) buildHooks() []models.Hook {
 				return ok && authSuccess
 			},
 			Handler: p.issueTokensHook,
-			Order:   10,
+			Order:   15,
 		},
-		// JWT response hook: sends generated tokens in response
 		{
 			Stage:    models.HookOnResponse,
 			PluginID: HookIDJWTRespondJSON.String(),

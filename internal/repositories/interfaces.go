@@ -3,21 +3,24 @@ package repositories
 import (
 	"context"
 
-	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/uptrace/bun"
+
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 // Transaction represents a database transaction interface
-type Transaction interface{}
+type Transaction any
 
 // Repository interfaces for data access - these will be implemented by plugins
 
 type UserRepository interface {
+	GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error)
 	GetByID(ctx context.Context, id string) (*models.User, error)
 	GetByEmail(ctx context.Context, email string) (*models.User, error)
 	Create(ctx context.Context, user *models.User) (*models.User, error)
 	Update(ctx context.Context, user *models.User) (*models.User, error)
 	UpdateFields(ctx context.Context, id string, fields map[string]any) error
+	Delete(ctx context.Context, id string) error
 	WithTx(tx bun.IDB) UserRepository
 }
 

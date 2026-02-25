@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
@@ -419,49 +420,46 @@ func TestRouterPanicRecovery(t *testing.T) {
 
 // TestAsyncHookTimeout verifies that async hooks timeout correctly
 func TestAsyncHookTimeout(t *testing.T) {
-	opts := &RouterOptions{
-		AsyncHookTimeout: 100 * time.Millisecond, // Very short timeout
-	}
-	config := &models.Config{
-		BasePath: "/api/auth",
-	}
-	logger := &mockLogger{}
-	router := NewRouter(config, logger, opts)
+	synctest.Test(t, func(t *testing.T) {
+		opts := &RouterOptions{
+			AsyncHookTimeout: 100 * time.Millisecond,
+		}
+		config := &models.Config{
+			BasePath: "/api/auth",
+		}
+		logger := &mockLogger{}
+		router := NewRouter(config, logger, opts)
 
-	router.RegisterHook(models.Hook{
-		Stage: models.HookOnResponse,
-		Async: true,
-		Handler: func(ctx *models.RequestContext) error {
-			// Sleep longer than timeout
-			select {
-			case <-ctx.Request.Context().Done():
-				// Context was cancelled (timeout)
-				return nil
-			case <-time.After(500 * time.Millisecond):
-				// Timeout didn't cancel us
-				return nil
-			}
-		},
-		Order: 0,
+		router.RegisterHook(models.Hook{
+			Stage: models.HookOnResponse,
+			Async: true,
+			Handler: func(ctx *models.RequestContext) error {
+				select {
+				case <-ctx.Request.Context().Done():
+					return nil
+				case <-time.After(500 * time.Millisecond):
+					return nil
+				}
+			},
+			Order: 0,
+		})
+
+		router.RegisterRoute(models.Route{
+			Method:  "GET",
+			Path:    "/test",
+			Handler: &testHandler{statusCode: 200, body: "OK"},
+		})
+
+		req := httptest.NewRequest("GET", "/api/auth/test", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		time.Sleep(600 * time.Millisecond)
+		synctest.Wait()
+
+		if w.Code != 200 {
+			t.Errorf("Expected status 200, got %d", w.Code)
+		}
 	})
-
-	router.RegisterRoute(models.Route{
-		Method:  "GET",
-		Path:    "/test",
-		Handler: &testHandler{statusCode: 200, body: "OK"},
-	})
-
-	req := httptest.NewRequest("GET", "/api/auth/test", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	// Give async hook time to complete
-	time.Sleep(600 * time.Millisecond)
-
-	// Request should complete successfully
-	if w.Code != 200 {
-		t.Errorf("Expected status 200, got %d", w.Code)
-	}
 }
 
 // TestHookErrorModeFailFast verifies that fail-fast mode skips remaining hooks on error

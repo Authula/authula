@@ -20,6 +20,7 @@ import (
 type AuthConfig struct {
 	Config  *models.Config
 	Plugins []models.Plugin
+	DB      bun.IDB
 }
 
 // Auth is a composition root and entry point for the authentication framework.
@@ -42,13 +43,21 @@ type Auth struct {
 // Handles plugin registration, migrations, and initialization in unified way.
 // Works identically whether plugins are manually instantiated or built from config.
 func New(authConfig *AuthConfig) *Auth {
+	if authConfig == nil || authConfig.Config == nil {
+		panic("auth config and auth config config must not be nil")
+	}
+
 	util.InitValidator()
 
 	logger := InitLogger(authConfig.Config)
 
-	db, err := InitDatabase(authConfig.Config, logger, authConfig.Config.Logger.Level)
-	if err != nil {
-		panic(fmt.Errorf("failed to initialize database: %w", err))
+	db := authConfig.DB
+	if db == nil {
+		initializedDB, err := InitDatabase(authConfig.Config, logger, authConfig.Config.Logger.Level)
+		if err != nil {
+			panic(fmt.Errorf("failed to initialize database: %w", err))
+		}
+		db = initializedDB
 	}
 
 	migrator, err := migrations.NewMigrator(db, logger)
@@ -327,4 +336,39 @@ func (auth *Auth) CloseSystems() error {
 	}
 
 	return nil
+}
+
+func (auth *Auth) DB() bun.IDB {
+	if auth == nil {
+		return nil
+	}
+	return auth.db
+}
+
+func (auth *Auth) Router() *Router {
+	if auth == nil {
+		return nil
+	}
+	return auth.router
+}
+
+func (auth *Auth) Migrator() *migrations.Migrator {
+	if auth == nil {
+		return nil
+	}
+	return auth.migrator
+}
+
+func (auth *Auth) MigrationManager() *migrationmanager.Manager {
+	if auth == nil {
+		return nil
+	}
+	return auth.migrationManager
+}
+
+func (auth *Auth) CoreServices() *coreservices.CoreServices {
+	if auth == nil {
+		return nil
+	}
+	return auth.coreServices
 }

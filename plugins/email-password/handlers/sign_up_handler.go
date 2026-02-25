@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -12,11 +13,12 @@ import (
 )
 
 type SignUpRequestPayload struct {
-	Name        string `json:"name"`
-	Email       string `json:"email"`
-	Password    string `json:"password"`
-	Image       string `json:"image,omitempty"`
-	CallbackURL string `json:"callback_url,omitempty"`
+	Name        string          `json:"name"`
+	Email       string          `json:"email"`
+	Password    string          `json:"password"`
+	Image       string          `json:"image,omitempty"`
+	Metadata    json.RawMessage `json:"metadata,omitempty"`
+	CallbackURL string          `json:"callback_url,omitempty"`
 }
 
 type SignUpHandler struct {
@@ -48,6 +50,7 @@ func (h *SignUpHandler) Handler() http.HandlerFunc {
 			payload.Email,
 			payload.Password,
 			&payload.Image,
+			payload.Metadata,
 			&payload.CallbackURL,
 			&reqCtx.ClientIP,
 			&userAgent,

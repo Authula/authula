@@ -47,3 +47,7 @@
 - Implement proper authentication and authorization mechanisms to protect sensitive data and resources.
 - Take into account the principle of least privilege when designing access controls.
 - Always take into consideration edge cases and loopholes that could be exploited by attackers and implement safeguards against them.
+
+### Final Notes
+
+Always follow the Agent Skills located in the folder `.github/skills/` as it contains all the skills and playbooks you need to follow to make sure you are adhering to the project guidelines and best practices.

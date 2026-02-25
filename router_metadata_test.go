@@ -197,9 +197,10 @@ func TestPluginIDBasedHookExecution(t *testing.T) {
 func TestRouteMetadataConversion(t *testing.T) {
 	routes := []models.RouteMapping{
 		{
-			Path:    "/auth/me",
-			Method:  "GET",
-			Plugins: []string{"session.auth", "bearer.auth"},
+			Path:        "/auth/me",
+			Method:      "GET",
+			Plugins:     []string{"session.auth", "bearer.auth"},
+			Permissions: []string{"admin.read", "admin.write"},
 		},
 		{
 			Path:    "/auth/sign-in",
@@ -207,9 +208,10 @@ func TestRouteMetadataConversion(t *testing.T) {
 			Plugins: []string{"email_password.issuance"},
 		},
 		{
-			Path:    "/auth/change-password",
-			Method:  "POST",
-			Plugins: []string{"session.auth", "csrf.protect"},
+			Path:        "/auth/change-password",
+			Method:      "POST",
+			Plugins:     []string{"session.auth", "csrf.protect"},
+			Permissions: []string{"users.write"},
 		},
 	}
 
@@ -231,6 +233,15 @@ func TestRouteMetadataConversion(t *testing.T) {
 
 	if len(pluginIDs) != 2 || pluginIDs[0] != "session.auth" || pluginIDs[1] != "bearer.auth" {
 		t.Errorf("unexpected plugins for %s: %v", key, pluginIDs)
+	}
+
+	permissions, ok := metadata[key]["permissions"].([]string)
+	if !ok {
+		t.Fatalf("permissions not found or wrong type for %s", key)
+	}
+
+	if len(permissions) != 2 || permissions[0] != "admin.read" || permissions[1] != "admin.write" {
+		t.Errorf("unexpected permissions for %s: %v", key, permissions)
 	}
 
 	// Test 2: Verify POST:/auth/sign-in
@@ -261,6 +272,68 @@ func TestRouteMetadataConversion(t *testing.T) {
 
 	if len(pluginIDs) != 2 || pluginIDs[0] != "session.auth" || pluginIDs[1] != "csrf.protect" {
 		t.Errorf("unexpected plugins for %s: %v", key, pluginIDs)
+	}
+
+	permissions, ok = metadata[key]["permissions"].([]string)
+	if !ok {
+		t.Fatalf("permissions not found or wrong type for %s", key)
+	}
+
+	if len(permissions) != 1 || permissions[0] != "users.write" {
+		t.Errorf("unexpected permissions for %s: %v", key, permissions)
+	}
+}
+
+func TestRouteMetadataFromConfigMergesWithRouteMetadata(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/auth",
+	}
+	logger := &testLogger{}
+	router := NewRouter(config, logger, nil)
+
+	router.SetRouteMetadataFromConfig(map[string]map[string]any{
+		"GET:/admin/users": {
+			"plugins":     []string{"session.auth"},
+			"permissions": []string{"admin.read"},
+		},
+	})
+
+	router.RegisterRoute(models.Route{
+		Method: http.MethodGet,
+		Path:   "/admin/users",
+		Metadata: map[string]any{
+			"plugins": []string{"admin.rbac"},
+		},
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	})
+
+	var capturedCtx *models.RequestContext
+	router.RegisterHook(models.Hook{
+		Stage: models.HookOnRequest,
+		Handler: func(ctx *models.RequestContext) error {
+			capturedCtx = ctx
+			return nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/admin/users", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if capturedCtx == nil || capturedCtx.Route == nil {
+		t.Fatalf("expected captured route metadata")
+	}
+
+	plugins, ok := capturedCtx.Route.Metadata["plugins"].([]string)
+	if !ok || len(plugins) != 2 || plugins[0] != "session.auth" || plugins[1] != "admin.rbac" {
+		t.Fatalf("expected merged plugins metadata, got %v", capturedCtx.Route.Metadata["plugins"])
+	}
+
+	permissions, ok := capturedCtx.Route.Metadata["permissions"].([]string)
+	if !ok || len(permissions) != 1 || permissions[0] != "admin.read" {
+		t.Fatalf("expected merged permissions metadata, got %v", capturedCtx.Route.Metadata["permissions"])
 	}
 }
 

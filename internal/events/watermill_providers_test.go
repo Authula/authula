@@ -203,6 +203,10 @@ func TestInitWatermillProvider_Postgres_NilConfig(t *testing.T) {
 }
 
 func TestInitWatermillProvider_SQLite_DefaultPath(t *testing.T) {
+	if os.Getenv("GO_BETTER_AUTH_TEST_DB") != "" && os.Getenv("GO_BETTER_AUTH_TEST_DB") != "sqlite" {
+		t.Skip("skipping SQLite test when GO_BETTER_AUTH_TEST_DB is set to a different provider")
+	}
+
 	logger := watermill.NewStdLogger(false, false)
 
 	config := &models.EventBusConfig{
@@ -237,6 +241,10 @@ func TestInitWatermillProvider_SQLite_DefaultPath(t *testing.T) {
 }
 
 func TestInitWatermillProvider_SQLite_EmptyPath(t *testing.T) {
+	if os.Getenv("GO_BETTER_AUTH_TEST_DB") != "" && os.Getenv("GO_BETTER_AUTH_TEST_DB") != "sqlite" {
+		t.Skip("skipping SQLite test when GO_BETTER_AUTH_TEST_DB is set to a different provider")
+	}
+
 	logger := watermill.NewStdLogger(false, false)
 
 	config := &models.EventBusConfig{
@@ -271,6 +279,10 @@ func TestInitWatermillProvider_SQLite_EmptyPath(t *testing.T) {
 }
 
 func TestInitWatermillProvider_SQLite_CustomPath(t *testing.T) {
+	if os.Getenv("GO_BETTER_AUTH_TEST_DB") != "" && os.Getenv("GO_BETTER_AUTH_TEST_DB") != "sqlite" {
+		t.Skip("skipping SQLite test when GO_BETTER_AUTH_TEST_DB is set to a different provider")
+	}
+
 	logger := watermill.NewStdLogger(false, false)
 
 	config := &models.EventBusConfig{

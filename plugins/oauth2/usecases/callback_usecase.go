@@ -72,7 +72,7 @@ func (uc *CallbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 	}
 
 	if user == nil {
-		user, err = uc.UserService.Create(ctx, userInfo.Name, userInfo.Email, true, &userInfo.Picture)
+		user, err = uc.UserService.Create(ctx, userInfo.Name, userInfo.Email, true, &userInfo.Picture, nil)
 		if err != nil {
 			uc.Logger.Error(fmt.Sprintf("Failed to create user: %v", err))
 			return nil, fmt.Errorf("failed to create user: %w", err)

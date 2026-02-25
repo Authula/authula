@@ -46,7 +46,7 @@ func (uc *SignInUseCaseImpl) SignIn(
 			name = &emptyName
 		}
 
-		newUser, err := uc.UserService.Create(ctx, *name, email, false, nil)
+		newUser, err := uc.UserService.Create(ctx, *name, email, false, nil, nil)
 		if err != nil {
 			return nil, err
 		}

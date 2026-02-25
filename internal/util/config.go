@@ -108,6 +108,7 @@ func ConvertRouteMetadata(routes []models.RouteMapping) (map[string]map[string]a
 		key := route.Method + ":" + route.Path
 		metadata := make(map[string]any)
 		metadata["plugins"] = route.Plugins
+		metadata["permissions"] = route.Permissions
 		result[key] = metadata
 	}
 

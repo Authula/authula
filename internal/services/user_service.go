@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/repositories"
@@ -19,7 +20,11 @@ func NewUserService(repo repositories.UserRepository, dbHooks *models.CoreDataba
 	return &userService{repo: repo, dbHooks: dbHooks}
 }
 
-func (s *userService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string) (*models.User, error) {
+func (s *userService) GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error) {
+	return s.repo.GetAll(ctx, cursor, limit)
+}
+
+func (s *userService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata json.RawMessage) (*models.User, error) {
 	existing, _ := s.repo.GetByEmail(ctx, email)
 	if existing != nil {
 		return nil, errors.New("email already in use")
@@ -31,6 +36,7 @@ func (s *userService) Create(ctx context.Context, name string, email string, ema
 		Email:         email,
 		EmailVerified: emailVerified,
 		Image:         image,
+		Metadata:      metadata,
 	}
 
 	if s.dbHooks != nil && s.dbHooks.Users != nil && s.dbHooks.Users.BeforeCreate != nil {
@@ -84,4 +90,8 @@ func (s *userService) Update(ctx context.Context, user *models.User) (*models.Us
 
 func (s *userService) UpdateFields(ctx context.Context, id string, fields map[string]any) error {
 	return s.repo.UpdateFields(ctx, id, fields)
+}
+
+func (s *userService) Delete(ctx context.Context, id string) error {
+	return s.repo.Delete(ctx, id)
 }

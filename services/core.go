@@ -2,17 +2,20 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 type UserService interface {
-	Create(ctx context.Context, name string, email string, emailVerified bool, image *string) (*models.User, error)
+	GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error)
+	Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata json.RawMessage) (*models.User, error)
 	GetByID(ctx context.Context, id string) (*models.User, error)
 	GetByEmail(ctx context.Context, email string) (*models.User, error)
 	Update(ctx context.Context, user *models.User) (*models.User, error)
 	UpdateFields(ctx context.Context, id string, fields map[string]any) error
+	Delete(ctx context.Context, id string) error
 }
 
 type AccountService interface {

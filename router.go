@@ -141,42 +141,12 @@ func (r *Router) RegisterCustomRouteGroup(group models.RouteGroup) {
 	for _, route := range group.Routes {
 		if route.Metadata != nil {
 			newMetadata := maps.Clone(group.Metadata)
-
-			for key, value := range route.Metadata {
-				if key == "plugins" {
-					groupPlugins, ok := newMetadata["plugins"].([]string)
-					if !ok {
-						continue
-					}
-
-					routePlugins, ok := value.([]string)
-					if !ok {
-						continue
-					}
-
-					pluginsSeen := make(map[string]bool)
-					combinedPlugins := make([]string, 0, len(groupPlugins)+len(routePlugins))
-
-					// Add all group plugins
-					for _, plugin := range groupPlugins {
-						combinedPlugins = append(combinedPlugins, plugin)
-						pluginsSeen[plugin] = true
-					}
-
-					// Add route plugins only if not already seen
-					for _, plugin := range routePlugins {
-						if !pluginsSeen[plugin] {
-							combinedPlugins = append(combinedPlugins, plugin)
-							pluginsSeen[plugin] = true
-						}
-					}
-
-					newMetadata["plugins"] = combinedPlugins
-				} else {
-					newMetadata[key] = value
-				}
-			}
-
+			maps.Copy(newMetadata, route.Metadata)
+			setMergedPlugins(
+				newMetadata,
+				metadataStringSlice(group.Metadata, "plugins"),
+				metadataStringSlice(route.Metadata, "plugins"),
+			)
 			route.Metadata = newMetadata
 		} else {
 			route.Metadata = group.Metadata
@@ -237,7 +207,10 @@ func (r *Router) SetRouteMetadataFromConfig(routeMetadata map[string]map[string]
 		fullKey := method + ":" + path
 
 		if existing, ok := r.routeMetadata[fullKey]; ok {
+			existingPlugins := metadataStringSlice(existing, "plugins")
+			incomingPlugins := metadataStringSlice(metadata, "plugins")
 			maps.Copy(existing, metadata)
+			setMergedPlugins(existing, existingPlugins, incomingPlugins)
 			r.routeMetadata[fullKey] = existing
 		} else {
 			r.routeMetadata[fullKey] = metadata
@@ -266,7 +239,15 @@ func (r *Router) registerRouteWithPrefix(basePath string, route models.Route) {
 	// Store route metadata if provided (will be assigned to ctx.Route during request handling)
 	if route.Metadata != nil {
 		metadataKey := route.Method + ":" + path
-		r.routeMetadata[metadataKey] = route.Metadata
+		if existing, ok := r.routeMetadata[metadataKey]; ok {
+			existingPlugins := metadataStringSlice(existing, "plugins")
+			incomingPlugins := metadataStringSlice(route.Metadata, "plugins")
+			maps.Copy(existing, route.Metadata)
+			setMergedPlugins(existing, existingPlugins, incomingPlugins)
+			r.routeMetadata[metadataKey] = existing
+		} else {
+			r.routeMetadata[metadataKey] = route.Metadata
+		}
 	}
 
 	// Register with Chi
@@ -338,7 +319,7 @@ func (r *Router) runHooks(stage models.HookStage, ctx *models.RequestContext) {
 			}
 
 			pluginIDs, ok := ctx.Route.Metadata["plugins"].([]string)
-			if !ok || !contains(pluginIDs, hook.PluginID) {
+			if !ok || !slices.Contains(pluginIDs, hook.PluginID) {
 				continue
 			}
 		}
@@ -423,8 +404,58 @@ func (r *Router) handleHookError(pluginID string, stage models.HookStage, err er
 	}
 }
 
-func contains(slice []string, value string) bool {
-	return slices.Contains(slice, value)
+func setMergedPlugins(target map[string]any, values ...[]string) {
+	if target == nil {
+		return
+	}
+
+	merged := make([]string, 0)
+	seen := make(map[string]struct{})
+
+	appendUnique := func(items []string) {
+		for _, plugin := range items {
+			trimmed := strings.TrimSpace(plugin)
+			if trimmed == "" {
+				continue
+			}
+			if _, exists := seen[trimmed]; exists {
+				continue
+			}
+			seen[trimmed] = struct{}{}
+			merged = append(merged, trimmed)
+		}
+	}
+
+	for _, items := range values {
+		appendUnique(items)
+	}
+
+	if len(merged) == 0 {
+		delete(target, "plugins")
+		return
+	}
+
+	target["plugins"] = merged
+}
+
+func metadataStringSlice(metadata map[string]any, key string) []string {
+	if metadata == nil {
+		return nil
+	}
+
+	raw, ok := metadata[key]
+	if !ok || raw == nil {
+		return nil
+	}
+
+	values, ok := raw.([]string)
+	if !ok {
+		return nil
+	}
+
+	cloned := make([]string, len(values))
+	copy(cloned, values)
+	return cloned
 }
 
 func matchRoutePath(requestPath, pattern string) bool {
@@ -660,7 +691,6 @@ func (r *Router) applyCORS(
 		return
 	}
 
-	// ---- Allowed origin ----
 	w.Header().Set("Access-Control-Allow-Origin", origin)
 
 	if corsConfig.AllowCredentials {

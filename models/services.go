@@ -19,6 +19,7 @@ const (
 
 	// CONFIG
 	ServiceConfigManager ServiceID = "config_manager_service"
+	ServiceAdmin         ServiceID = "admin_service"
 
 	// STORAGE
 	ServiceSecondaryStorage ServiceID = "secondary_storage_service"

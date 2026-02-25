@@ -5,6 +5,8 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	adminplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/admin"
+	adminplugintypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 	bearerplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/bearer"
 	configmanagerplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager"
 	configmanagerplugintypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/config-manager/types"
@@ -34,6 +36,22 @@ type PluginFactory struct {
 
 // pluginFactories is an ordered list of registered plugin factories.
 var pluginFactories = []PluginFactory{
+	{
+		ID:                models.PluginAdmin.String(),
+		RequiredByDefault: false,
+		ConfigParser: func(rawConfig any) (any, error) {
+			config := adminplugintypes.AdminPluginConfig{}
+			if rawConfig != nil {
+				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
+					return nil, fmt.Errorf("failed to parse admin plugin config: %w", err)
+				}
+			}
+			return config, nil
+		},
+		Constructor: func(typedConfig any) models.Plugin {
+			return adminplugin.New(typedConfig.(adminplugintypes.AdminPluginConfig))
+		},
+	},
 	{
 		ID:                models.PluginConfigManager.String(),
 		RequiredByDefault: false,

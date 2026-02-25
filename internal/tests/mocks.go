@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -19,11 +20,13 @@ func failUnexpected(t *testing.T, strict bool, method string) {
 type MockUserService struct {
 	t              *testing.T
 	strict         bool
+	GetAllFn       func(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error)
 	GetByEmailFn   func(ctx context.Context, email string) (*models.User, error)
 	GetByIDFn      func(ctx context.Context, id string) (*models.User, error)
 	CreateFn       func(ctx context.Context, name, email string, emailVerified bool, image *string) (*models.User, error)
 	UpdateFn       func(ctx context.Context, user *models.User) (*models.User, error)
 	UpdateFieldsFn func(ctx context.Context, id string, fields map[string]any) error
+	DeleteFn       func(ctx context.Context, id string) error
 }
 
 func NewMockUserService(t *testing.T) *MockUserService {
@@ -31,12 +34,20 @@ func NewMockUserService(t *testing.T) *MockUserService {
 	return &MockUserService{t: t, strict: true}
 }
 
-func (m *MockUserService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string) (*models.User, error) {
+func (m *MockUserService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata json.RawMessage) (*models.User, error) {
 	if m.CreateFn != nil {
 		return m.CreateFn(ctx, name, email, emailVerified, image)
 	}
 	failUnexpected(m.t, m.strict, "MockUserService.Create")
 	return &models.User{ID: "user-1", Name: name, Email: email, EmailVerified: emailVerified, Image: image}, nil
+}
+
+func (m *MockUserService) GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error) {
+	if m.GetAllFn != nil {
+		return m.GetAllFn(ctx, cursor, limit)
+	}
+	failUnexpected(m.t, m.strict, "MockUserService.GetAll")
+	return []models.User{}, nil, nil
 }
 
 func (m *MockUserService) GetByID(ctx context.Context, id string) (*models.User, error) {
@@ -68,6 +79,14 @@ func (m *MockUserService) UpdateFields(ctx context.Context, id string, fields ma
 		return m.UpdateFieldsFn(ctx, id, fields)
 	}
 	failUnexpected(m.t, m.strict, "MockUserService.UpdateFields")
+	return nil
+}
+
+func (m *MockUserService) Delete(ctx context.Context, id string) error {
+	if m.DeleteFn != nil {
+		return m.DeleteFn(ctx, id)
+	}
+	failUnexpected(m.t, m.strict, "MockUserService.Delete")
 	return nil
 }
 

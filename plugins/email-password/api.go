@@ -2,6 +2,7 @@ package email_password
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
@@ -20,11 +21,12 @@ func (a *API) SignUp(
 	email string,
 	password string,
 	image *string,
+	metadata json.RawMessage,
 	callbackURL *string,
 	ipAddress *string,
 	userAgent *string,
 ) (*types.SignUpResult, error) {
-	return a.useCases.SignUpUseCase.SignUp(ctx, name, email, password, image, callbackURL, ipAddress, userAgent)
+	return a.useCases.SignUpUseCase.SignUp(ctx, name, email, password, image, metadata, callbackURL, ipAddress, userAgent)
 }
 
 func (a *API) SignIn(
