@@ -3,19 +3,19 @@ package fiber
 import (
 	"net/http"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // fiberResponseWriter adapts a Fiber context to http.ResponseWriter so that
 // a standard net/http handler can write its response through Fiber.
 type fiberResponseWriter struct {
-	ctx           *fiber.Ctx
+	ctx           fiber.Ctx
 	header        http.Header
 	statusCode    int
 	headerWritten bool
 }
 
-func newFiberResponseWriter(ctx *fiber.Ctx) *fiberResponseWriter {
+func newFiberResponseWriter(ctx fiber.Ctx) *fiberResponseWriter {
 	return &fiberResponseWriter{ctx: ctx}
 }
 

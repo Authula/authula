@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/logger"
 
 	gobetterauth "github.com/GoBetterAuth/go-better-auth/v2"
 	"github.com/GoBetterAuth/go-better-auth/v2/config"
@@ -76,7 +76,7 @@ func main() {
 	}))
 
 	// Example: a public route.
-	app.Get("/", func(c *fiber.Ctx) error {
+	app.Get("/", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{"message": "Welcome! Auth is at /api/auth"})
 	})
 

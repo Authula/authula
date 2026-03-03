@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // Config defines the config for the go-better-auth Fiber adapter middleware.
@@ -32,7 +32,7 @@ type Config struct {
 
 	// Next defines a function to skip this middleware when returning true.
 	// Optional. Default: nil (never skip).
-	Next func(c *fiber.Ctx) bool `json:"-" toml:"-"`
+	Next func(c fiber.Ctx) bool `json:"-" toml:"-"`
 
 	// ErrorHandler is called when the adapter encounters an internal error
 	// (e.g., a malformed request URL). Optional. Default: returns 500 JSON.
@@ -41,7 +41,7 @@ type Config struct {
 
 func configDefault(config Config) Config {
 	if config.ErrorHandler == nil {
-		config.ErrorHandler = func(c *fiber.Ctx, err error) error {
+		config.ErrorHandler = func(c fiber.Ctx, err error) error {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "internal adapter error",
 			})
@@ -59,7 +59,7 @@ func New(config Config) fiber.Handler {
 	}
 	cfg := configDefault(config)
 
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if cfg.Next != nil && cfg.Next(c) {
 			return c.Next()
 		}
@@ -86,11 +86,11 @@ func New(config Config) fiber.Handler {
 			RemoteAddr:    c.IP() + ":0",
 		}
 
-		c.Request().Header.VisitAll(func(key, value []byte) {
+		for key, value := range c.Request().Header.All() {
 			req.Header.Add(string(key), string(value))
-		})
+		}
 
-		if addr := c.Context().RemoteAddr(); addr != nil {
+		if addr := c.RequestCtx().RemoteAddr(); addr != nil {
 			req.RemoteAddr = addr.String()
 		}
 

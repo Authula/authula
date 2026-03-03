@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	gofiber "github.com/gofiber/fiber/v2"
+	gofiber "github.com/gofiber/fiber/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -202,11 +202,11 @@ func TestNextSkipsMiddleware(t *testing.T) {
 	app := gofiber.New()
 	app.Use("/api/auth", New(Config{
 		Handler: h,
-		Next: func(c *gofiber.Ctx) bool {
+		Next: func(c gofiber.Ctx) bool {
 			return c.Path() == "/api/auth/skip"
 		},
 	}))
-	app.Get("/api/auth/skip", func(c *gofiber.Ctx) error {
+	app.Get("/api/auth/skip", func(c gofiber.Ctx) error {
 		return c.SendString("skipped")
 	})
 
@@ -230,7 +230,7 @@ func TestErrorHandlerCalled(t *testing.T) {
 	app := gofiber.New()
 	app.Use(New(Config{
 		Handler: handler,
-		ErrorHandler: func(c *gofiber.Ctx, err error) error {
+		ErrorHandler: func(c gofiber.Ctx, err error) error {
 			calledErr = err
 			return c.Status(gofiber.StatusBadRequest).JSON(gofiber.Map{
 				"error": "bad request",

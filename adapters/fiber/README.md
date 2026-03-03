@@ -22,7 +22,7 @@ package main
 import (
 	"log"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	gobetterauth "github.com/GoBetterAuth/go-better-auth/v2"
 	gobetterauthconfig "github.com/GoBetterAuth/go-better-auth/v2/config"
@@ -49,7 +49,7 @@ func main() {
 	}))
 
 	// 4. Your app routes
-	app.Get("/", func(c *fiber.Ctx) error {
+	app.Get("/", func(c fiber.Ctx) error {
 		return c.SendString("Hello!")
 	})
 
@@ -62,7 +62,7 @@ func main() {
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `Handler` | `http.Handler` | Yes | — | The go-better-auth handler from `auth.Handler()` |
-| `Next` | `func(*fiber.Ctx) bool` | No | `nil` | Skip middleware when returning `true` |
+| `Next` | `func(fiber.Ctx) bool` | No | `nil` | Skip middleware when returning `true` |
 | `ErrorHandler` | `fiber.ErrorHandler` | No | 500 JSON | Called on internal adapter errors |
 
 ## How It Works
