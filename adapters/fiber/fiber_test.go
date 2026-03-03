@@ -1,9 +1,113 @@
 package fiber
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	gofiber "github.com/gofiber/fiber/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestPlaceholder(t *testing.T) {
-	t.Log("placeholder — tests coming next")
+// testHandler records the received request for assertions.
+type testHandler struct {
+	method     string
+	path       string
+	body       string
+	headers    http.Header
+	host       string
+	remoteAddr string
+	query      string
+	response   string
+	statusCode int
+}
+
+func (h *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.method = r.Method
+	h.path = r.URL.Path
+	h.query = r.URL.RawQuery
+	h.headers = r.Header
+	h.host = r.Host
+	h.remoteAddr = r.RemoteAddr
+	if r.Body != nil {
+		b, _ := io.ReadAll(r.Body)
+		h.body = string(b)
+	}
+
+	status := h.statusCode
+	if status == 0 {
+		status = http.StatusOK
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if h.response != "" {
+		w.Write([]byte(h.response))
+	}
+}
+
+func newTestApp(handler *testHandler) *gofiber.App {
+	app := gofiber.New()
+	app.Use("/api/auth", New(Config{Handler: handler}))
+	return app
+}
+
+func TestGetRequestProxied(t *testing.T) {
+	h := &testHandler{response: `{"ok":true}`}
+	app := newTestApp(h)
+
+	req := httptest.NewRequest("GET", "/api/auth/me", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "GET", h.method)
+	assert.Equal(t, "/api/auth/me", h.path)
+
+	body, _ := io.ReadAll(resp.Body)
+	assert.Equal(t, `{"ok":true}`, string(body))
+}
+
+func TestPostBodyPreserved(t *testing.T) {
+	h := &testHandler{response: `{"created":true}`}
+	app := newTestApp(h)
+
+	payload := `{"email":"test@example.com","password":"secret123"}`
+	req := httptest.NewRequest("POST", "/api/auth/sign-up", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "POST", h.method)
+	assert.Equal(t, payload, h.body)
+}
+
+func TestQueryStringPreserved(t *testing.T) {
+	h := &testHandler{response: `{"ok":true}`}
+	app := newTestApp(h)
+
+	req := httptest.NewRequest("GET", "/api/auth/users?page=2&limit=10", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "page=2&limit=10", h.query)
+}
+
+func TestRequestHeadersForwarded(t *testing.T) {
+	h := &testHandler{response: `{"ok":true}`}
+	app := newTestApp(h)
+
+	req := httptest.NewRequest("GET", "/api/auth/me", nil)
+	req.Header.Set("Authorization", "Bearer tok_abc123")
+	req.Header.Set("X-Custom-Header", "custom-value")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "Bearer tok_abc123", h.headers.Get("Authorization"))
+	assert.Equal(t, "custom-value", h.headers.Get("X-Custom-Header"))
 }
