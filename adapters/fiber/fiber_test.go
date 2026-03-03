@@ -111,3 +111,82 @@ func TestRequestHeadersForwarded(t *testing.T) {
 	assert.Equal(t, "Bearer tok_abc123", h.headers.Get("Authorization"))
 	assert.Equal(t, "custom-value", h.headers.Get("X-Custom-Header"))
 }
+
+func TestMultiValueSetCookieHeaders(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Set-Cookie", "session=abc; Path=/; HttpOnly")
+		w.Header().Add("Set-Cookie", "csrf=xyz; Path=/")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"ok":true}`))
+	})
+
+	app := gofiber.New()
+	app.Use("/api/auth", New(Config{Handler: handler}))
+
+	req := httptest.NewRequest("GET", "/api/auth/sign-in", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	cookies := resp.Header.Values("Set-Cookie")
+	assert.Len(t, cookies, 2)
+	assert.Contains(t, cookies[0], "session=abc")
+	assert.Contains(t, cookies[1], "csrf=xyz")
+}
+
+func TestResponseStatusCodeForwarded(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":"unauthorized"}`))
+	})
+
+	app := gofiber.New()
+	app.Use("/api/auth", New(Config{Handler: handler}))
+
+	req := httptest.NewRequest("POST", "/api/auth/sign-in", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	body, _ := io.ReadAll(resp.Body)
+	assert.Equal(t, `{"error":"unauthorized"}`, string(body))
+}
+
+func TestDefaultStatusOK(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"ok":true}`))
+	})
+
+	app := gofiber.New()
+	app.Use("/api/auth", New(Config{Handler: handler}))
+
+	req := httptest.NewRequest("GET", "/api/auth/me", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestWriteHeaderIdempotent(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-First", "one")
+		w.WriteHeader(http.StatusCreated)
+		// Second call should be ignored
+		w.Header().Set("X-Second", "two")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"ok":true}`))
+	})
+
+	app := gofiber.New()
+	app.Use("/api/auth", New(Config{Handler: handler}))
+
+	req := httptest.NewRequest("POST", "/api/auth/sign-up", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	assert.Equal(t, "one", resp.Header.Get("X-First"))
+	// X-Second should NOT be present because it was set after WriteHeader
+	assert.Empty(t, resp.Header.Get("X-Second"))
+}
