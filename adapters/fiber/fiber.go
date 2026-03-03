@@ -75,19 +75,19 @@ func New(config Config) fiber.Handler {
 		req := &http.Request{
 			Method:        c.Method(),
 			URL:           parsedURL,
-			RequestURI:    path,
+			RequestURI:    parsedURL.RequestURI(),
 			Proto:         "HTTP/1.1",
 			ProtoMajor:    1,
 			ProtoMinor:    1,
 			Header:        make(http.Header),
 			Body:          io.NopCloser(bytes.NewReader(body)),
 			ContentLength: int64(len(body)),
-			Host:          c.Hostname(),
+			Host:          string(c.Request().Header.Peek("Host")),
 			RemoteAddr:    c.IP() + ":0",
 		}
 
 		c.Request().Header.VisitAll(func(key, value []byte) {
-			req.Header.Set(string(key), string(value))
+			req.Header.Add(string(key), string(value))
 		})
 
 		if addr := c.Context().RemoteAddr(); addr != nil {
