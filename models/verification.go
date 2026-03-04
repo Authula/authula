@@ -14,6 +14,7 @@ const (
 	TypeEmailResetRequest      VerificationType = "email_reset_request"
 	TypeMagicLinkSignInRequest VerificationType = "magic_link_sign_in_request"
 	TypeMagicLinkExchangeCode  VerificationType = "magic_link_exchange_code"
+	TypeTwoFactorPendingAuth   VerificationType = "two_factor_pending_auth"
 )
 
 func (vt VerificationType) String() string {

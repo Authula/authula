@@ -15,7 +15,8 @@ type User struct {
 	Name          string          `json:"name" bun:"column:name"`
 	Email         string          `json:"email" bun:"column:email"`
 	EmailVerified bool            `json:"email_verified" bun:"column:email_verified"`
-	Image         *string         `json:"image" bun:"column:image"`
+	Image            *string         `json:"image" bun:"column:image"`
+	TwoFactorEnabled *bool           `json:"two_factor_enabled" bun:"column:two_factor_enabled"`
 	Metadata      json.RawMessage `json:"metadata" bun:"column:metadata"`
 	CreatedAt     time.Time       `json:"created_at" bun:"column:created_at,default:current_timestamp"`
 	UpdatedAt     time.Time       `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
