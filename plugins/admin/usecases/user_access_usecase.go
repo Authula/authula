@@ -5,68 +5,37 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/repositories"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 )
 
 type userRolesUseCase struct {
-	service *services.UserAccessService
+	userAccessRepo repositories.UserAccessRepository
 }
 
-func NewUserRolesUseCase(service *services.UserAccessService) UserRolesUseCase {
-	return &userRolesUseCase{service: service}
+func NewUserRolesUseCase(repo repositories.UserAccessRepository) UserRolesUseCase {
+	return &userRolesUseCase{userAccessRepo: repo}
 }
 
 func (u *userRolesUseCase) GetUserRoles(ctx context.Context, userID string) ([]types.UserRoleInfo, error) {
 	if strings.TrimSpace(userID) == "" {
 		return nil, errors.New("user_id is required")
 	}
-	return u.service.GetUserRoles(ctx, userID)
-}
-
-func (u *userRolesUseCase) GetUserEffectivePermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
-	if strings.TrimSpace(userID) == "" {
-		return nil, errors.New("user_id is required")
-	}
-	return u.service.GetUserEffectivePermissions(ctx, userID)
-}
-
-func (u *userRolesUseCase) HasPermissions(ctx context.Context, userID string, requiredPermissions []string) (bool, error) {
-	permissions, err := u.GetUserEffectivePermissions(ctx, userID)
-	if err != nil {
-		return false, err
-	}
-
-	granted := make(map[string]struct{}, len(permissions))
-	for _, permission := range permissions {
-		granted[permission.PermissionKey] = struct{}{}
-	}
-
-	for _, required := range requiredPermissions {
-		required = strings.TrimSpace(required)
-		if required == "" {
-			continue
-		}
-		if _, ok := granted[required]; ok {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return u.userAccessRepo.GetUserRoles(ctx, userID)
 }
 
 func (u *userRolesUseCase) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
 	if strings.TrimSpace(userID) == "" {
 		return nil, errors.New("user_id is required")
 	}
-	return u.service.GetUserWithRolesByID(ctx, userID)
+	return u.userAccessRepo.GetUserWithRolesByID(ctx, userID)
 }
 
 func (u *userRolesUseCase) GetUserWithPermissionsByID(ctx context.Context, userID string) (*types.UserWithPermissions, error) {
 	if strings.TrimSpace(userID) == "" {
 		return nil, errors.New("user_id is required")
 	}
-	return u.service.GetUserWithPermissionsByID(ctx, userID)
+	return u.userAccessRepo.GetUserWithPermissionsByID(ctx, userID)
 }
 
 func (u *userRolesUseCase) GetUserAuthorizationProfile(ctx context.Context, userID string) (*types.UserAuthorizationProfile, error) {
@@ -92,4 +61,35 @@ func (u *userRolesUseCase) GetUserAuthorizationProfile(ctx context.Context, user
 	}
 
 	return profile, nil
+}
+
+func (u *userRolesUseCase) GetUserEffectivePermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
+	if strings.TrimSpace(userID) == "" {
+		return nil, errors.New("user_id is required")
+	}
+	return u.userAccessRepo.GetUserEffectivePermissions(ctx, userID)
+}
+
+func (u *userRolesUseCase) HasPermissions(ctx context.Context, userID string, requiredPermissions []string) (bool, error) {
+	permissions, err := u.GetUserEffectivePermissions(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+
+	granted := make(map[string]struct{}, len(permissions))
+	for _, permission := range permissions {
+		granted[permission.PermissionKey] = struct{}{}
+	}
+
+	for _, required := range requiredPermissions {
+		required = strings.TrimSpace(required)
+		if required == "" {
+			continue
+		}
+		if _, ok := granted[required]; ok {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

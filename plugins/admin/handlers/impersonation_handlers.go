@@ -30,7 +30,7 @@ func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 
 		var payload types.StartImpersonationRequest
 		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
 			reqCtx.Handled = true
 			return
 		}

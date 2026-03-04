@@ -9,12 +9,28 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/magic-link/types"
 )
 
+type mockVerifyUseCase struct {
+	mock.Mock
+}
+
+func (m *mockVerifyUseCase) Verify(ctx context.Context, token string, ipAddress *string, userAgent *string) (string, error) {
+	args := m.Called(ctx, token, ipAddress, userAgent)
+	if args.Get(0) == nil {
+		return "", args.Error(1)
+	}
+	return args.String(0), args.Error(1)
+}
+
 func TestVerifyHandler_RedirectsWithCode(t *testing.T) {
-	useCase := &stubVerifyUseCase{token: "token-123"}
+	useCase := &mockVerifyUseCase{}
+	useCase.On("Verify", mock.Anything, "token-123", mock.Anything, mock.Anything).Return("token-123", nil).Once()
+
 	handler := &VerifyHandler{
 		UseCase:        useCase,
 		TrustedOrigins: []string{"https://app.example.com"},
@@ -36,13 +52,13 @@ func TestVerifyHandler_RedirectsWithCode(t *testing.T) {
 	if !reqCtx.Handled {
 		t.Fatal("expected request to be handled after redirect")
 	}
-	if useCase.lastToken != "token-123" {
-		t.Fatalf("expected token to be passed to use case, got %s", useCase.lastToken)
-	}
+	useCase.AssertExpectations(t)
 }
 
 func TestVerifyHandler_ReturnsJSONCode(t *testing.T) {
-	useCase := &stubVerifyUseCase{token: "token-123"}
+	useCase := &mockVerifyUseCase{}
+	useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("token-123", nil).Once()
+
 	handler := &VerifyHandler{UseCase: useCase}
 	req, reqCtx, w := newCallbackRequest(t, "/magic-link/verify?token=abc")
 
@@ -59,10 +75,11 @@ func TestVerifyHandler_ReturnsJSONCode(t *testing.T) {
 	if resp.Token != "token-123" {
 		t.Fatalf("expected token 'token-123', got %q", resp.Token)
 	}
+	useCase.AssertExpectations(t)
 }
 
 func TestVerifyHandler_MissingToken(t *testing.T) {
-	handler := &VerifyHandler{UseCase: &stubVerifyUseCase{}}
+	handler := &VerifyHandler{UseCase: &mockVerifyUseCase{}}
 	req, reqCtx, w := newCallbackRequest(t, "/magic-link/verify")
 
 	handler.Handler()(w, req)
@@ -71,7 +88,8 @@ func TestVerifyHandler_MissingToken(t *testing.T) {
 }
 
 func TestVerifyHandler_InvalidCallbackURL(t *testing.T) {
-	useCase := &stubVerifyUseCase{token: "token-123"}
+	useCase := &mockVerifyUseCase{}
+	useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("token-123", nil).Once()
 	handler := &VerifyHandler{UseCase: useCase}
 	params := url.Values{}
 	params.Set("token", "abc")
@@ -81,10 +99,12 @@ func TestVerifyHandler_InvalidCallbackURL(t *testing.T) {
 	handler.Handler()(w, req)
 
 	assertErrorResponse(t, reqCtx, http.StatusBadRequest, "invalid callback_url")
+	useCase.AssertExpectations(t)
 }
 
 func TestVerifyHandler_UntrustedCallbackURL(t *testing.T) {
-	useCase := &stubVerifyUseCase{token: "token-123"}
+	useCase := &mockVerifyUseCase{}
+	useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("token-123", nil).Once()
 	handler := &VerifyHandler{
 		UseCase:        useCase,
 		TrustedOrigins: []string{"https://trusted.com"},
@@ -94,16 +114,20 @@ func TestVerifyHandler_UntrustedCallbackURL(t *testing.T) {
 	handler.Handler()(w, req)
 
 	assertErrorResponse(t, reqCtx, http.StatusBadRequest, "callback_url is not a trusted origin")
+	useCase.AssertExpectations(t)
 }
 
 func TestVerifyHandler_UseCaseError(t *testing.T) {
-	useCase := &stubVerifyUseCase{err: errors.New("boom")}
+	useCase := &mockVerifyUseCase{}
+	useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("", errors.New("boom")).Once()
+
 	handler := &VerifyHandler{UseCase: useCase}
 	req, reqCtx, w := newCallbackRequest(t, "/magic-link/verify?token=abc")
 
 	handler.Handler()(w, req)
 
 	assertErrorResponse(t, reqCtx, http.StatusBadRequest, "boom")
+	useCase.AssertExpectations(t)
 }
 
 func newCallbackRequest(t *testing.T, target string) (*http.Request, *models.RequestContext, *httptest.ResponseRecorder) {
@@ -140,21 +164,4 @@ func assertErrorResponse(t *testing.T, reqCtx *models.RequestContext, status int
 	if body["message"] != message {
 		t.Fatalf("expected message %q, got %v", message, body["message"])
 	}
-}
-
-type stubVerifyUseCase struct {
-	token     string
-	err       error
-	lastToken string
-}
-
-func (s *stubVerifyUseCase) Verify(ctx context.Context, token string, ipAddress *string, userAgent *string) (string, error) {
-	s.lastToken = token
-	if s.err != nil {
-		return "", s.err
-	}
-	if s.token == "" {
-		s.token = "default-code"
-	}
-	return s.token, nil
 }

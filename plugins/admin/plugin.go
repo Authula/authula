@@ -3,11 +3,11 @@ package admin
 import (
 	"fmt"
 
+	coreinternalrepos "github.com/GoBetterAuth/go-better-auth/v2/internal/repositories"
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/migrations"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/repositories"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/services"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/usecases"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
@@ -45,13 +45,13 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 		return err
 	}
 
-	repos := repositories.NewAdminRepositories(ctx.DB)
-	adminServices := services.NewAdminServices(repos)
+	rolePermissionRepo := repositories.NewBunRolePermissionRepository(ctx.DB)
+	userAccessRepo := repositories.NewBunUserAccessRepository(ctx.DB)
+	impersonationRepo := repositories.NewBunImpersonationRepository(ctx.DB)
+	userStateRepo := repositories.NewBunUserStateRepository(ctx.DB)
+	sessionStateRepo := repositories.NewBunSessionStateRepository(ctx.DB)
 
-	userService, ok := ctx.ServiceRegistry.Get(models.ServiceUser.String()).(rootservices.UserService)
-	if !ok {
-		return fmt.Errorf("required service %s is not registered", models.ServiceUser.String())
-	}
+	coreUserRepo := coreinternalrepos.NewBunUserRepository(ctx.DB)
 
 	sessionService, ok := ctx.ServiceRegistry.Get(models.ServiceSession.String()).(rootservices.SessionService)
 	if !ok {
@@ -64,14 +64,25 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 	}
 
 	adminUseCases := usecases.NewAdminUseCases(
-		adminServices,
-		userService,
 		p.config,
+		rolePermissionRepo,
+		userAccessRepo,
+		impersonationRepo,
+		userStateRepo,
+		sessionStateRepo,
+		coreUserRepo,
 		sessionService,
 		tokenService,
 		ctx.GetConfig().Session.ExpiresIn,
 	)
-	p.Api = NewAPI(adminUseCases)
+	p.Api = NewAPI(
+		adminUseCases,
+		rolePermissionRepo,
+		userAccessRepo,
+		impersonationRepo,
+		userStateRepo,
+		sessionStateRepo,
+	)
 	ctx.ServiceRegistry.Register(models.ServiceAdmin.String(), p.Api)
 
 	return nil

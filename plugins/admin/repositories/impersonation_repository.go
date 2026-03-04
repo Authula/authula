@@ -11,15 +11,15 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 )
 
-type ImpersonationRepository struct {
+type BunImpersonationRepository struct {
 	db bun.IDB
 }
 
-func NewImpersonationRepository(db bun.IDB) *ImpersonationRepository {
-	return &ImpersonationRepository{db: db}
+func NewBunImpersonationRepository(db bun.IDB) *BunImpersonationRepository {
+	return &BunImpersonationRepository{db: db}
 }
 
-func (r *ImpersonationRepository) UserExists(ctx context.Context, userID string) (bool, error) {
+func (r *BunImpersonationRepository) UserExists(ctx context.Context, userID string) (bool, error) {
 	count, err := r.db.NewSelect().Table("users").Where("id = ?", userID).Count(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to check user existence: %w", err)
@@ -27,7 +27,7 @@ func (r *ImpersonationRepository) UserExists(ctx context.Context, userID string)
 	return count > 0, nil
 }
 
-func (r *ImpersonationRepository) CreateImpersonation(ctx context.Context, impersonation *types.Impersonation) error {
+func (r *BunImpersonationRepository) CreateImpersonation(ctx context.Context, impersonation *types.Impersonation) error {
 	_, err := r.db.NewInsert().Model(impersonation).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create impersonation: %w", err)
@@ -35,7 +35,7 @@ func (r *ImpersonationRepository) CreateImpersonation(ctx context.Context, imper
 	return nil
 }
 
-func (r *ImpersonationRepository) GetActiveImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error) {
+func (r *BunImpersonationRepository) GetActiveImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error) {
 	row := &types.Impersonation{}
 	err := r.db.NewSelect().
 		Model(row).
@@ -52,7 +52,7 @@ func (r *ImpersonationRepository) GetActiveImpersonationByID(ctx context.Context
 	return row, nil
 }
 
-func (r *ImpersonationRepository) GetLatestActiveImpersonationByActor(ctx context.Context, actorUserID string) (*types.Impersonation, error) {
+func (r *BunImpersonationRepository) GetLatestActiveImpersonationByActor(ctx context.Context, actorUserID string) (*types.Impersonation, error) {
 	row := &types.Impersonation{}
 	err := r.db.NewSelect().
 		Model(row).
@@ -71,7 +71,7 @@ func (r *ImpersonationRepository) GetLatestActiveImpersonationByActor(ctx contex
 	return row, nil
 }
 
-func (r *ImpersonationRepository) EndImpersonation(ctx context.Context, impersonationID string, endedByUserID *string) error {
+func (r *BunImpersonationRepository) EndImpersonation(ctx context.Context, impersonationID string, endedByUserID *string) error {
 	now := time.Now().UTC()
 	_, err := r.db.NewUpdate().
 		Model((*types.Impersonation)(nil)).
@@ -86,7 +86,7 @@ func (r *ImpersonationRepository) EndImpersonation(ctx context.Context, imperson
 	return nil
 }
 
-func (r *ImpersonationRepository) GetAllImpersonations(ctx context.Context) ([]types.Impersonation, error) {
+func (r *BunImpersonationRepository) GetAllImpersonations(ctx context.Context) ([]types.Impersonation, error) {
 	var rows []types.Impersonation
 	err := r.db.NewSelect().
 		Model(&rows).
@@ -99,7 +99,7 @@ func (r *ImpersonationRepository) GetAllImpersonations(ctx context.Context) ([]t
 	return rows, nil
 }
 
-func (r *ImpersonationRepository) GetImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error) {
+func (r *BunImpersonationRepository) GetImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error) {
 	row := &types.Impersonation{}
 	err := r.db.NewSelect().
 		Model(row).

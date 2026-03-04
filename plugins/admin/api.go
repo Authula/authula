@@ -4,16 +4,56 @@ import (
 	"context"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/repositories"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/usecases"
 )
 
 type API struct {
-	useCases *usecases.AdminUseCases
+	useCases           *usecases.AdminUseCases
+	rolePermissionRepo repositories.RolePermissionRepository
+	userAccessRepo     repositories.UserAccessRepository
+	impersonationRepo  repositories.ImpersonationRepository
+	userStateRepo      repositories.UserStateRepository
+	sessionStateRepo   repositories.SessionStateRepository
 }
 
-func NewAPI(useCases *usecases.AdminUseCases) *API {
-	return &API{useCases: useCases}
+func NewAPI(
+	useCases *usecases.AdminUseCases,
+	rolePermissionRepo repositories.RolePermissionRepository,
+	userAccessRepo repositories.UserAccessRepository,
+	impersonationRepo repositories.ImpersonationRepository,
+	userStateRepo repositories.UserStateRepository,
+	sessionStateRepo repositories.SessionStateRepository,
+) *API {
+	return &API{
+		useCases:           useCases,
+		rolePermissionRepo: rolePermissionRepo,
+		userAccessRepo:     userAccessRepo,
+		impersonationRepo:  impersonationRepo,
+		userStateRepo:      userStateRepo,
+		sessionStateRepo:   sessionStateRepo,
+	}
+}
+
+func (a *API) RolePermissionRepository() repositories.RolePermissionRepository {
+	return a.rolePermissionRepo
+}
+
+func (a *API) UserAccessRepository() repositories.UserAccessRepository {
+	return a.userAccessRepo
+}
+
+func (a *API) ImpersonationRepository() repositories.ImpersonationRepository {
+	return a.impersonationRepo
+}
+
+func (a *API) UserStateRepository() repositories.UserStateRepository {
+	return a.userStateRepo
+}
+
+func (a *API) SessionStateRepository() repositories.SessionStateRepository {
+	return a.sessionStateRepo
 }
 
 // User management

@@ -11,15 +11,15 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 )
 
-type UserStateRepository struct {
+type BunUserStateRepository struct {
 	db bun.IDB
 }
 
-func NewUserStateRepository(db bun.IDB) *UserStateRepository {
-	return &UserStateRepository{db: db}
+func NewBunUserStateRepository(db bun.IDB) *BunUserStateRepository {
+	return &BunUserStateRepository{db: db}
 }
 
-func (r *UserStateRepository) GetByUserID(ctx context.Context, userID string) (*types.AdminUserState, error) {
+func (r *BunUserStateRepository) GetByUserID(ctx context.Context, userID string) (*types.AdminUserState, error) {
 	row := &types.AdminUserState{}
 	err := r.db.NewSelect().Model(row).Where("user_id = ?", userID).Scan(ctx)
 	if err != nil {
@@ -31,7 +31,7 @@ func (r *UserStateRepository) GetByUserID(ctx context.Context, userID string) (*
 	return row, nil
 }
 
-func (r *UserStateRepository) Upsert(ctx context.Context, state *types.AdminUserState) error {
+func (r *BunUserStateRepository) Upsert(ctx context.Context, state *types.AdminUserState) error {
 	now := time.Now().UTC()
 	_, err := r.db.NewInsert().
 		Model(state).
@@ -49,7 +49,7 @@ func (r *UserStateRepository) Upsert(ctx context.Context, state *types.AdminUser
 	return nil
 }
 
-func (r *UserStateRepository) Delete(ctx context.Context, userID string) error {
+func (r *BunUserStateRepository) Delete(ctx context.Context, userID string) error {
 	_, err := r.db.NewDelete().Model((*types.AdminUserState)(nil)).Where("user_id = ?", userID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to delete user state: %w", err)
@@ -57,7 +57,7 @@ func (r *UserStateRepository) Delete(ctx context.Context, userID string) error {
 	return nil
 }
 
-func (r *UserStateRepository) GetBanned(ctx context.Context) ([]types.AdminUserState, error) {
+func (r *BunUserStateRepository) GetBanned(ctx context.Context) ([]types.AdminUserState, error) {
 	var rows []types.AdminUserState
 	err := r.db.NewSelect().
 		Model(&rows).

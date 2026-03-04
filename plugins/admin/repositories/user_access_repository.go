@@ -12,15 +12,15 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 )
 
-type UserAccessRepository struct {
+type BunUserAccessRepository struct {
 	db bun.IDB
 }
 
-func NewUserAccessRepository(db bun.IDB) *UserAccessRepository {
-	return &UserAccessRepository{db: db}
+func NewBunUserAccessRepository(db bun.IDB) *BunUserAccessRepository {
+	return &BunUserAccessRepository{db: db}
 }
 
-func (r *UserAccessRepository) GetUserRoles(ctx context.Context, userID string) ([]types.UserRoleInfo, error) {
+func (r *BunUserAccessRepository) GetUserRoles(ctx context.Context, userID string) ([]types.UserRoleInfo, error) {
 	var rows []types.UserRoleInfo
 	err := r.db.NewSelect().
 		TableExpr("admin_user_roles aur").
@@ -38,17 +38,17 @@ func (r *UserAccessRepository) GetUserRoles(ctx context.Context, userID string) 
 	return rows, nil
 }
 
-func (r *UserAccessRepository) GetUserEffectivePermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
+func (r *BunUserAccessRepository) GetUserEffectivePermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
 	var rows []types.UserPermissionInfo
 	err := r.db.NewSelect().
 		TableExpr("admin_user_roles aur").
 		ColumnExpr("DISTINCT ap.id AS permission_id").
-		ColumnExpr("ap.permission_key AS permission_key").
+		ColumnExpr("ap.key AS permission_key").
 		Join("JOIN admin_role_permissions arp ON arp.role_id = aur.role_id").
 		Join("JOIN admin_permissions ap ON ap.id = arp.permission_id").
 		Where("aur.user_id = ?", userID).
 		Where("aur.expires_at IS NULL OR aur.expires_at > ?", time.Now().UTC()).
-		OrderExpr("ap.permission_key ASC").
+		OrderExpr("ap.key ASC").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user effective permissions: %w", err)
@@ -69,7 +69,7 @@ type userWithRoleRow struct {
 	RoleName      *string   `bun:"role_name"`
 }
 
-func (r *UserAccessRepository) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
+func (r *BunUserAccessRepository) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
 	var rows []userWithRoleRow
 	err := r.db.NewSelect().
 		TableExpr("users u").
@@ -134,7 +134,7 @@ type userWithPermissionRow struct {
 	PermissionKey *string   `bun:"permission_key"`
 }
 
-func (r *UserAccessRepository) GetUserWithPermissionsByID(ctx context.Context, userID string) (*types.UserWithPermissions, error) {
+func (r *BunUserAccessRepository) GetUserWithPermissionsByID(ctx context.Context, userID string) (*types.UserWithPermissions, error) {
 	var rows []userWithPermissionRow
 	err := r.db.NewSelect().
 		TableExpr("users u").
@@ -147,12 +147,12 @@ func (r *UserAccessRepository) GetUserWithPermissionsByID(ctx context.Context, u
 		ColumnExpr("u.created_at AS created_at").
 		ColumnExpr("u.updated_at AS updated_at").
 		ColumnExpr("ap.id AS permission_id").
-		ColumnExpr("ap.permission_key AS permission_key").
+		ColumnExpr("ap.key AS permission_key").
 		Join("LEFT JOIN admin_user_roles aur ON aur.user_id = u.id AND (aur.expires_at IS NULL OR aur.expires_at > ?)", time.Now().UTC()).
 		Join("LEFT JOIN admin_role_permissions arp ON arp.role_id = aur.role_id").
 		Join("LEFT JOIN admin_permissions ap ON ap.id = arp.permission_id").
 		Where("u.id = ?", userID).
-		OrderExpr("ap.permission_key ASC").
+		OrderExpr("ap.key ASC").
 		Scan(ctx, &rows)
 	if err != nil {
 		if err == sql.ErrNoRows {

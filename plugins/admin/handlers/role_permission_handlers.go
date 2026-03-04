@@ -10,113 +10,6 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/usecases"
 )
 
-type GetAllPermissionsHandler struct {
-	useCase usecases.RolePermissionUseCase
-}
-
-func NewGetAllPermissionsHandler(useCase usecases.RolePermissionUseCase) *GetAllPermissionsHandler {
-	return &GetAllPermissionsHandler{useCase: useCase}
-}
-
-func (h *GetAllPermissionsHandler) Handler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
-
-		permissions, err := h.useCase.GetAllPermissions(r.Context())
-		if err != nil {
-			respondRolePermissionError(reqCtx, err)
-			return
-		}
-
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": permissions})
-	}
-}
-
-type CreatePermissionHandler struct {
-	useCase usecases.RolePermissionUseCase
-}
-
-func NewCreatePermissionHandler(useCase usecases.RolePermissionUseCase) *CreatePermissionHandler {
-	return &CreatePermissionHandler{useCase: useCase}
-}
-
-func (h *CreatePermissionHandler) Handler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
-
-		var payload types.CreatePermissionRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
-			reqCtx.Handled = true
-			return
-		}
-
-		permission, err := h.useCase.CreatePermission(r.Context(), payload)
-		if err != nil {
-			respondRolePermissionError(reqCtx, err)
-			return
-		}
-
-		reqCtx.SetJSONResponse(http.StatusCreated, map[string]any{"message": "permission created", "data": permission})
-	}
-}
-
-type UpdatePermissionHandler struct {
-	useCase usecases.RolePermissionUseCase
-}
-
-func NewUpdatePermissionHandler(useCase usecases.RolePermissionUseCase) *UpdatePermissionHandler {
-	return &UpdatePermissionHandler{useCase: useCase}
-}
-
-func (h *UpdatePermissionHandler) Handler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
-		permissionID := r.PathValue("permission_id")
-
-		var payload types.UpdatePermissionRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{"message": "invalid request body"})
-			reqCtx.Handled = true
-			return
-		}
-
-		permission, err := h.useCase.UpdatePermission(r.Context(), permissionID, payload)
-		if err != nil {
-			respondRolePermissionError(reqCtx, err)
-			return
-		}
-
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"message": "permission updated", "data": permission})
-	}
-}
-
-type DeletePermissionHandler struct {
-	useCase usecases.RolePermissionUseCase
-}
-
-func NewDeletePermissionHandler(useCase usecases.RolePermissionUseCase) *DeletePermissionHandler {
-	return &DeletePermissionHandler{useCase: useCase}
-}
-
-func (h *DeletePermissionHandler) Handler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
-		permissionID := r.PathValue("permission_id")
-
-		if err := h.useCase.DeletePermission(r.Context(), permissionID); err != nil {
-			respondRolePermissionError(reqCtx, err)
-			return
-		}
-
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"message": "permission deleted"})
-	}
-}
-
 type GetAllRolesHandler struct {
 	useCase usecases.RolePermissionUseCase
 }
@@ -136,7 +29,9 @@ func (h *GetAllRolesHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": roles})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.GetAllRolesResponse{
+			Roles: roles,
+		})
 	}
 }
 
@@ -248,33 +143,110 @@ func (h *DeleteRoleHandler) Handler() http.HandlerFunc {
 	}
 }
 
-type ReplaceRolePermissionsHandler struct {
+type GetAllPermissionsHandler struct {
 	useCase usecases.RolePermissionUseCase
 }
 
-func NewReplaceRolePermissionsHandler(useCase usecases.RolePermissionUseCase) *ReplaceRolePermissionsHandler {
-	return &ReplaceRolePermissionsHandler{useCase: useCase}
+func NewGetAllPermissionsHandler(useCase usecases.RolePermissionUseCase) *GetAllPermissionsHandler {
+	return &GetAllPermissionsHandler{useCase: useCase}
 }
 
-func (h *ReplaceRolePermissionsHandler) Handler() http.HandlerFunc {
+func (h *GetAllPermissionsHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-		roleID := r.PathValue("role_id")
 
-		var payload types.ReplaceRolePermissionsRequest
+		permissions, err := h.useCase.GetAllPermissions(r.Context())
+		if err != nil {
+			respondRolePermissionError(reqCtx, err)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": permissions})
+	}
+}
+
+type CreatePermissionHandler struct {
+	useCase usecases.RolePermissionUseCase
+}
+
+func NewCreatePermissionHandler(useCase usecases.RolePermissionUseCase) *CreatePermissionHandler {
+	return &CreatePermissionHandler{useCase: useCase}
+}
+
+func (h *CreatePermissionHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
+
+		var payload types.CreatePermissionRequest
+		if err := util.ParseJSON(r, &payload); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.Handled = true
+			return
+		}
+
+		permission, err := h.useCase.CreatePermission(r.Context(), payload)
+		if err != nil {
+			respondRolePermissionError(reqCtx, err)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusCreated, map[string]any{"data": permission})
+	}
+}
+
+type UpdatePermissionHandler struct {
+	useCase usecases.RolePermissionUseCase
+}
+
+func NewUpdatePermissionHandler(useCase usecases.RolePermissionUseCase) *UpdatePermissionHandler {
+	return &UpdatePermissionHandler{useCase: useCase}
+}
+
+func (h *UpdatePermissionHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
+		permissionID := r.PathValue("permission_id")
+
+		var payload types.UpdatePermissionRequest
 		if err := util.ParseJSON(r, &payload); err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{"message": "invalid request body"})
 			reqCtx.Handled = true
 			return
 		}
 
-		if err := h.useCase.ReplaceRolePermissions(r.Context(), roleID, payload.PermissionIDs, rolePermissionActorUserID(reqCtx)); err != nil {
+		permission, err := h.useCase.UpdatePermission(r.Context(), permissionID, payload)
+		if err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"message": "role permissions replaced"})
+		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"message": "permission updated", "data": permission})
+	}
+}
+
+type DeletePermissionHandler struct {
+	useCase usecases.RolePermissionUseCase
+}
+
+func NewDeletePermissionHandler(useCase usecases.RolePermissionUseCase) *DeletePermissionHandler {
+	return &DeletePermissionHandler{useCase: useCase}
+}
+
+func (h *DeletePermissionHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
+		permissionID := r.PathValue("permission_id")
+
+		if err := h.useCase.DeletePermission(r.Context(), permissionID); err != nil {
+			respondRolePermissionError(reqCtx, err)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"message": "permission deleted"})
 	}
 }
 
@@ -308,6 +280,36 @@ func (h *AddRolePermissionHandler) Handler() http.HandlerFunc {
 		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"message": "permission assigned to role"})
+	}
+}
+
+type ReplaceRolePermissionsHandler struct {
+	useCase usecases.RolePermissionUseCase
+}
+
+func NewReplaceRolePermissionsHandler(useCase usecases.RolePermissionUseCase) *ReplaceRolePermissionsHandler {
+	return &ReplaceRolePermissionsHandler{useCase: useCase}
+}
+
+func (h *ReplaceRolePermissionsHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
+		roleID := r.PathValue("role_id")
+
+		var payload types.ReplaceRolePermissionsRequest
+		if err := util.ParseJSON(r, &payload); err != nil {
+			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{"message": "invalid request body"})
+			reqCtx.Handled = true
+			return
+		}
+
+		if err := h.useCase.ReplaceRolePermissions(r.Context(), roleID, payload.PermissionIDs, rolePermissionActorUserID(reqCtx)); err != nil {
+			respondRolePermissionError(reqCtx, err)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"message": "role permissions replaced"})
 	}
 }
 

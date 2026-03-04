@@ -4,8 +4,9 @@ import (
 	"context"
 	"time"
 
+	corerepositories "github.com/GoBetterAuth/go-better-auth/v2/internal/repositories"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/repositories"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
@@ -19,28 +20,30 @@ type AdminUseCases struct {
 }
 
 func NewAdminUseCases(
-	adminServices *services.AdminServices,
-	userService rootservices.UserService,
 	config types.AdminPluginConfig,
+	rolePermissionRepo repositories.RolePermissionRepository,
+	userAccessRepo repositories.UserAccessRepository,
+	impersonationRepo repositories.ImpersonationRepository,
+	userStateRepo repositories.UserStateRepository,
+	sessionStateRepo repositories.SessionStateRepository,
+	userRepo corerepositories.UserRepository,
 	sessionService rootservices.SessionService,
 	tokenService rootservices.TokenService,
 	sessionExpiresIn time.Duration,
 ) *AdminUseCases {
-	config.ApplyDefaults()
-
 	return &AdminUseCases{
-		rolePermission: NewRolePermissionUseCase(adminServices.RolePermissionService()),
-		userAccess:     NewUserRolesUseCase(adminServices.UserAccessService()),
-		users:          NewUsersUseCase(userService),
+		rolePermission: NewRolePermissionUseCase(rolePermissionRepo),
+		userAccess:     NewUserRolesUseCase(userAccessRepo),
+		users:          NewUsersUseCase(userRepo),
 		impersonation: NewImpersonationUseCase(
-			adminServices.ImpersonationService(),
-			adminServices.SessionStateService(),
+			impersonationRepo,
+			sessionStateRepo,
 			sessionService,
 			tokenService,
 			sessionExpiresIn,
 			config.ImpersonationMaxExpiresIn,
 		),
-		state: NewStateUseCase(adminServices.UserStateService(), adminServices.SessionStateService(), adminServices.ImpersonationService()),
+		state: NewStateUseCase(userStateRepo, sessionStateRepo, impersonationRepo),
 	}
 }
 

@@ -10,23 +10,41 @@ import (
 	"github.com/uptrace/bun"
 
 	coreinternalrepos "github.com/GoBetterAuth/go-better-auth/v2/internal/repositories"
-	coreinternalservices "github.com/GoBetterAuth/go-better-auth/v2/internal/services"
 	internaltests "github.com/GoBetterAuth/go-better-auth/v2/internal/tests"
 	migrationsmodule "github.com/GoBetterAuth/go-better-auth/v2/migrations"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/repositories"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/services"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/usecases"
 )
 
 func newTestAPI(db bun.IDB) *API {
-	repos := repositories.NewAdminRepositories(db)
-	adminServices := services.NewAdminServices(repos)
+	rolePermissionRepo := repositories.NewBunRolePermissionRepository(db)
+	userAccessRepo := repositories.NewBunUserAccessRepository(db)
+	impersonationRepo := repositories.NewBunImpersonationRepository(db)
+	userStateRepo := repositories.NewBunUserStateRepository(db)
+	sessionStateRepo := repositories.NewBunSessionStateRepository(db)
 	coreUserRepo := coreinternalrepos.NewBunUserRepository(db)
-	coreUserService := coreinternalservices.NewUserService(coreUserRepo, nil)
-	useCases := usecases.NewAdminUseCases(adminServices, coreUserService, types.AdminPluginConfig{}, nil, nil, 0)
-	return NewAPI(useCases)
+	useCases := usecases.NewAdminUseCases(
+		types.AdminPluginConfig{},
+		rolePermissionRepo,
+		userAccessRepo,
+		impersonationRepo,
+		userStateRepo,
+		sessionStateRepo,
+		coreUserRepo,
+		nil,
+		nil,
+		0,
+	)
+	return NewAPI(
+		useCases,
+		rolePermissionRepo,
+		userAccessRepo,
+		impersonationRepo,
+		userStateRepo,
+		sessionStateRepo,
+	)
 }
 
 type adminTestLogger struct{}

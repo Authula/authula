@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/tests"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 )
 
@@ -59,7 +58,7 @@ func TestCreateRole(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("CreateRole", mock.Anything, mock.Anything).Return(tt.mockErr).Maybe()
 
 			uc := NewRolePermissionUseCase(mockService)
@@ -109,7 +108,7 @@ func TestGetAllRoles(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("GetAllRoles", mock.Anything).Return(tt.mockResult, tt.mockErr).Maybe()
 
 			uc := NewRolePermissionUseCase(mockService)
@@ -188,7 +187,7 @@ func TestGetRoleByID(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("GetRoleByID", mock.Anything, mock.Anything).Return(tt.mockRoleResult, tt.mockRoleErr).Maybe()
 			mockService.On("GetRolePermissions", mock.Anything, mock.Anything).Return(tt.mockPermissions, tt.mockPermErr).Maybe()
 
@@ -314,7 +313,7 @@ func TestUpdateRole(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("GetRoleByID", mock.Anything, mock.Anything).Return(tt.mockRole, tt.mockGetErr).Maybe()
 			mockService.On("UpdateRole", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(true, tt.mockUpdateErr).Maybe()
 
@@ -410,7 +409,7 @@ func TestDeleteRole(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("GetRoleByID", mock.Anything, mock.Anything).Return(tt.mockRole, tt.mockGetErr).Maybe()
 			mockService.On("CountUserAssignmentsByRoleID", mock.Anything, mock.Anything).Return(tt.mockCountResult, tt.mockCountErr).Maybe()
 			mockService.On("DeleteRole", mock.Anything, mock.Anything).Return(true, tt.mockDeleteErr).Maybe()
@@ -474,7 +473,7 @@ func TestCreatePermission(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("CreatePermission", mock.Anything, mock.Anything).Return(tt.mockErr).Maybe()
 
 			uc := NewRolePermissionUseCase(mockService)
@@ -525,7 +524,7 @@ func TestGetAllPermissions(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("GetAllPermissions", mock.Anything).Return(tt.mockResult, tt.mockErr).Maybe()
 
 			uc := NewRolePermissionUseCase(mockService)
@@ -629,7 +628,7 @@ func TestUpdatePermission(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("GetPermissionByID", mock.Anything, mock.Anything).Return(tt.mockPerm, tt.mockGetErr).Maybe()
 			mockService.On("UpdatePermissionDescription", mock.Anything, mock.Anything, mock.Anything).Return(true, tt.mockUpdateErr).Maybe()
 
@@ -725,7 +724,7 @@ func TestDeletePermission(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("GetPermissionByID", mock.Anything, mock.Anything).Return(tt.mockPerm, tt.mockGetErr).Maybe()
 			mockService.On("CountRoleAssignmentsByPermissionID", mock.Anything, mock.Anything).Return(tt.mockCountResult, tt.mockCountErr).Maybe()
 			mockService.On("DeletePermission", mock.Anything, mock.Anything).Return(true, tt.mockDeleteErr).Maybe()
@@ -836,7 +835,7 @@ func TestAddPermissionToRole(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("GetRoleByID", mock.Anything, mock.Anything).Return(tt.mockRole, tt.mockRoleErr).Maybe()
 			mockService.On("GetPermissionByID", mock.Anything, mock.Anything).Return(tt.mockPerm, tt.mockPermErr).Maybe()
 			mockService.On("AddRolePermission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tt.mockAddErr).Maybe()
@@ -920,7 +919,7 @@ func TestRemovePermissionFromRole(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("GetRoleByID", mock.Anything, mock.Anything).Return(tt.mockRole, tt.mockRoleErr).Maybe()
 			mockService.On("GetPermissionByID", mock.Anything, mock.Anything).Return(tt.mockPerm, tt.mockPermErr).Maybe()
 			mockService.On("RemoveRolePermission", mock.Anything, mock.Anything, mock.Anything).Return(tt.mockRemoveErr).Maybe()
@@ -998,7 +997,7 @@ func TestReplaceRolePermissions(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("ReplaceRolePermissions", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tt.mockReplaceErr).Maybe()
 
 			uc := NewRolePermissionUseCase(mockService)
@@ -1074,7 +1073,7 @@ func TestReplaceUserRoles(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("ReplaceUserRoles", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tt.mockReplaceErr).Maybe()
 
 			uc := NewRolePermissionUseCase(mockService)
@@ -1165,7 +1164,7 @@ func TestAssignRoleToUser(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("AssignUserRole", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tt.mockAssignErr).Maybe()
 
 			uc := NewRolePermissionUseCase(mockService)
@@ -1235,7 +1234,7 @@ func TestRemoveRoleFromUser(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &tests.MockRolePermissionService{}
+			mockService := &MockRolePermissionService{}
 			mockService.On("RemoveUserRole", mock.Anything, mock.Anything, mock.Anything).Return(tt.mockRemoveErr).Maybe()
 
 			uc := NewRolePermissionUseCase(mockService)

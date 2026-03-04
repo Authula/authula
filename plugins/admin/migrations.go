@@ -24,99 +24,107 @@ func adminSQLiteInitial() migrations.Migration {
 				ctx,
 				tx,
 				`PRAGMA foreign_keys = ON;`,
-				`CREATE TABLE IF NOT EXISTS admin_permissions (
-  id TEXT PRIMARY KEY,
-  permission_key VARCHAR(255) NOT NULL UNIQUE,
-  description TEXT,
-  is_system BOOLEAN NOT NULL DEFAULT 0,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_roles (
-  id TEXT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL UNIQUE,
-  description TEXT,
-  is_system BOOLEAN NOT NULL DEFAULT 0,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);`,
+          id TEXT PRIMARY KEY,
+          name VARCHAR(255) NOT NULL UNIQUE,
+          description TEXT,
+          is_system BOOLEAN NOT NULL DEFAULT 0,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );`,
+				// ----------------------
+				`CREATE TABLE IF NOT EXISTS admin_permissions (
+          id TEXT PRIMARY KEY,
+          key VARCHAR(255) NOT NULL UNIQUE,
+          description TEXT,
+          is_system BOOLEAN NOT NULL DEFAULT 0,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_role_permissions (
-  role_id TEXT NOT NULL,
-  permission_id TEXT NOT NULL,
-  granted_by_user_id TEXT,
-  granted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (role_id, permission_id),
-  FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
-  FOREIGN KEY (permission_id) REFERENCES admin_permissions(id) ON DELETE CASCADE,
-  FOREIGN KEY (granted_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-);`,
+          role_id TEXT NOT NULL,
+          permission_id TEXT NOT NULL,
+          granted_by_user_id TEXT,
+          granted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (role_id, permission_id),
+          FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
+          FOREIGN KEY (permission_id) REFERENCES admin_permissions(id) ON DELETE CASCADE,
+          FOREIGN KEY (granted_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+        );`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_role_permissions_role_id ON admin_role_permissions(role_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_role_permissions_permission_id ON admin_role_permissions(permission_id);`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_user_roles (
-  user_id TEXT NOT NULL,
-  role_id TEXT NOT NULL,
-  assigned_by_user_id TEXT,
-  assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  expires_at TIMESTAMP,
-  PRIMARY KEY (user_id, role_id),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
-  FOREIGN KEY (assigned_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-);`,
+          user_id TEXT NOT NULL,
+          role_id TEXT NOT NULL,
+          assigned_by_user_id TEXT,
+          assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          expires_at TIMESTAMP,
+          PRIMARY KEY (user_id, role_id),
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
+          FOREIGN KEY (assigned_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+        );`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_user_roles_role_id ON admin_user_roles(role_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_user_roles_expires_at ON admin_user_roles(expires_at);`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_impersonations (
-  id TEXT PRIMARY KEY,
-  actor_user_id TEXT NOT NULL,
-  target_user_id TEXT NOT NULL,
-  actor_session_id TEXT,
-  impersonation_session_id TEXT,
-  reason TEXT NOT NULL,
-  started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  expires_at TIMESTAMP NOT NULL,
-  ended_at TIMESTAMP,
-  ended_by_user_id TEXT,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (ended_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  FOREIGN KEY (actor_session_id) REFERENCES sessions(id) ON DELETE SET NULL,
-  FOREIGN KEY (impersonation_session_id) REFERENCES sessions(id) ON DELETE SET NULL,
-  CHECK (actor_user_id != target_user_id)
-);`,
+          id TEXT PRIMARY KEY,
+          actor_user_id TEXT NOT NULL,
+          target_user_id TEXT NOT NULL,
+          actor_session_id TEXT,
+          impersonation_session_id TEXT,
+          reason TEXT NOT NULL,
+          started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          expires_at TIMESTAMP NOT NULL,
+          ended_at TIMESTAMP,
+          ended_by_user_id TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (ended_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+          FOREIGN KEY (actor_session_id) REFERENCES sessions(id) ON DELETE SET NULL,
+          FOREIGN KEY (impersonation_session_id) REFERENCES sessions(id) ON DELETE SET NULL,
+          CHECK (actor_user_id != target_user_id)
+        );`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_impersonations_actor_user_id ON admin_impersonations(actor_user_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_impersonations_target_user_id ON admin_impersonations(target_user_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_impersonations_expires_at_ended_at ON admin_impersonations(expires_at, ended_at);`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_user_states (
-  user_id TEXT PRIMARY KEY,
-  is_banned BOOLEAN NOT NULL DEFAULT 0,
-  banned_at TIMESTAMP,
-  banned_until TIMESTAMP,
-  banned_reason TEXT,
-  banned_by_user_id TEXT,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (banned_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-);`,
+          user_id TEXT PRIMARY KEY,
+          is_banned BOOLEAN NOT NULL DEFAULT 0,
+          banned_at TIMESTAMP,
+          banned_until TIMESTAMP,
+          banned_reason TEXT,
+          banned_by_user_id TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (banned_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+        );`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_user_states_is_banned_banned_until ON admin_user_states(is_banned, banned_until);`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_session_states (
-  session_id TEXT PRIMARY KEY,
-  revoked_at TIMESTAMP,
-  revoked_reason TEXT,
-  revoked_by_user_id TEXT,
-  impersonator_user_id TEXT,
-  impersonation_reason TEXT,
-  impersonation_expires_at TIMESTAMP,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
-  FOREIGN KEY (revoked_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  FOREIGN KEY (impersonator_user_id) REFERENCES users(id) ON DELETE SET NULL
-);`,
+          session_id TEXT PRIMARY KEY,
+          revoked_at TIMESTAMP,
+          revoked_reason TEXT,
+          revoked_by_user_id TEXT,
+          impersonator_user_id TEXT,
+          impersonation_reason TEXT,
+          impersonation_expires_at TIMESTAMP,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+          FOREIGN KEY (revoked_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+          FOREIGN KEY (impersonator_user_id) REFERENCES users(id) ON DELETE SET NULL
+        );`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_session_states_revoked_at_impersonation_expires_at ON admin_session_states(revoked_at, impersonation_expires_at);`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_session_states_impersonator_user_id ON admin_session_states(impersonator_user_id);`,
+				// ----------------------
 			)
 		},
 		Down: func(ctx context.Context, tx bun.Tx) error {
@@ -142,128 +150,136 @@ func adminPostgresInitial() migrations.Migration {
 			return migrations.ExecStatements(
 				ctx,
 				tx,
+				// ----------------------
 				`CREATE OR REPLACE FUNCTION admin_set_updated_at_fn() RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;`,
+          BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+          END;
+        $$ LANGUAGE plpgsql;`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_permissions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  permission_key VARCHAR(255) NOT NULL UNIQUE,
-  description TEXT,
-  is_system BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);`,
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          key VARCHAR(255) NOT NULL UNIQUE,
+          description TEXT,
+          is_system BOOLEAN NOT NULL DEFAULT FALSE,
+          created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );`,
 				`DROP TRIGGER IF EXISTS update_admin_permissions_updated_at_trigger ON admin_permissions;`,
 				`CREATE TRIGGER update_admin_permissions_updated_at_trigger
-  BEFORE UPDATE ON admin_permissions
-  FOR EACH ROW
-  EXECUTE FUNCTION admin_set_updated_at_fn();`,
+        BEFORE UPDATE ON admin_permissions
+        FOR EACH ROW
+        EXECUTE FUNCTION admin_set_updated_at_fn();`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_roles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL UNIQUE,
-  description TEXT,
-  is_system BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);`,
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name VARCHAR(255) NOT NULL UNIQUE,
+          description TEXT,
+          is_system BOOLEAN NOT NULL DEFAULT FALSE,
+          created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );`,
 				`DROP TRIGGER IF EXISTS update_admin_roles_updated_at_trigger ON admin_roles;`,
 				`CREATE TRIGGER update_admin_roles_updated_at_trigger
-  BEFORE UPDATE ON admin_roles
-  FOR EACH ROW
-  EXECUTE FUNCTION admin_set_updated_at_fn();`,
+        BEFORE UPDATE ON admin_roles
+        FOR EACH ROW
+        EXECUTE FUNCTION admin_set_updated_at_fn();`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_role_permissions (
-  role_id UUID NOT NULL,
-  permission_id UUID NOT NULL,
-  granted_by_user_id UUID,
-  granted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (role_id, permission_id),
-  CONSTRAINT fk_admin_role_permissions_role FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_role_permissions_permission FOREIGN KEY (permission_id) REFERENCES admin_permissions(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_role_permissions_granted_by FOREIGN KEY (granted_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-);`,
+          role_id UUID NOT NULL,
+          permission_id UUID NOT NULL,
+          granted_by_user_id UUID,
+          granted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (role_id, permission_id),
+          CONSTRAINT fk_admin_role_permissions_role FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_role_permissions_permission FOREIGN KEY (permission_id) REFERENCES admin_permissions(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_role_permissions_granted_by FOREIGN KEY (granted_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+        );`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_role_permissions_role_id ON admin_role_permissions(role_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_role_permissions_permission_id ON admin_role_permissions(permission_id);`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_user_roles (
-  user_id UUID NOT NULL,
-  role_id UUID NOT NULL,
-  assigned_by_user_id UUID,
-  assigned_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  expires_at TIMESTAMP WITH TIME ZONE,
-  PRIMARY KEY (user_id, role_id),
-  CONSTRAINT fk_admin_user_roles_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_user_roles_role FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_user_roles_assigned_by FOREIGN KEY (assigned_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-);`,
+          user_id UUID NOT NULL,
+          role_id UUID NOT NULL,
+          assigned_by_user_id UUID,
+          assigned_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          expires_at TIMESTAMP WITH TIME ZONE,
+          PRIMARY KEY (user_id, role_id),
+          CONSTRAINT fk_admin_user_roles_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_user_roles_role FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_user_roles_assigned_by FOREIGN KEY (assigned_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+        );`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_user_roles_role_id ON admin_user_roles(role_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_user_roles_expires_at ON admin_user_roles(expires_at);`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_impersonations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  actor_user_id UUID NOT NULL,
-  target_user_id UUID NOT NULL,
-  actor_session_id UUID,
-  impersonation_session_id UUID,
-  reason TEXT NOT NULL,
-  started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-  ended_at TIMESTAMP WITH TIME ZONE,
-  ended_by_user_id UUID,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  CONSTRAINT fk_admin_impersonations_actor_user FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_impersonations_target_user FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_impersonations_ended_by_user FOREIGN KEY (ended_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  CONSTRAINT fk_admin_impersonations_actor_session FOREIGN KEY (actor_session_id) REFERENCES sessions(id) ON DELETE SET NULL,
-  CONSTRAINT fk_admin_impersonations_impersonation_session FOREIGN KEY (impersonation_session_id) REFERENCES sessions(id) ON DELETE SET NULL,
-  CONSTRAINT chk_admin_impersonation_actor_target CHECK (actor_user_id <> target_user_id)
-);`,
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          actor_user_id UUID NOT NULL,
+          target_user_id UUID NOT NULL,
+          actor_session_id UUID,
+          impersonation_session_id UUID,
+          reason TEXT NOT NULL,
+          started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+          ended_at TIMESTAMP WITH TIME ZONE,
+          ended_by_user_id UUID,
+          created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          CONSTRAINT fk_admin_impersonations_actor_user FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_impersonations_target_user FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_impersonations_ended_by_user FOREIGN KEY (ended_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+          CONSTRAINT fk_admin_impersonations_actor_session FOREIGN KEY (actor_session_id) REFERENCES sessions(id) ON DELETE SET NULL,
+          CONSTRAINT fk_admin_impersonations_impersonation_session FOREIGN KEY (impersonation_session_id) REFERENCES sessions(id) ON DELETE SET NULL,
+          CONSTRAINT chk_admin_impersonation_actor_target CHECK (actor_user_id <> target_user_id)
+        );`,
 				`DROP TRIGGER IF EXISTS update_admin_impersonations_updated_at_trigger ON admin_impersonations;`,
 				`CREATE TRIGGER update_admin_impersonations_updated_at_trigger
-  BEFORE UPDATE ON admin_impersonations
-  FOR EACH ROW
-  EXECUTE FUNCTION admin_set_updated_at_fn();`,
+        BEFORE UPDATE ON admin_impersonations
+        FOR EACH ROW
+        EXECUTE FUNCTION admin_set_updated_at_fn();`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_impersonations_actor_user_id ON admin_impersonations(actor_user_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_impersonations_target_user_id ON admin_impersonations(target_user_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_impersonations_expires_at_ended_at ON admin_impersonations(expires_at, ended_at);`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_user_states (
-  user_id UUID PRIMARY KEY,
-  is_banned BOOLEAN NOT NULL DEFAULT FALSE,
-  banned_at TIMESTAMP WITH TIME ZONE,
-  banned_until TIMESTAMP WITH TIME ZONE,
-  banned_reason TEXT,
-  banned_by_user_id UUID,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  CONSTRAINT fk_admin_user_states_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_user_states_banned_by FOREIGN KEY (banned_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-);`,
+          user_id UUID PRIMARY KEY,
+          is_banned BOOLEAN NOT NULL DEFAULT FALSE,
+          banned_at TIMESTAMP WITH TIME ZONE,
+          banned_until TIMESTAMP WITH TIME ZONE,
+          banned_reason TEXT,
+          banned_by_user_id UUID,
+          created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          CONSTRAINT fk_admin_user_states_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_user_states_banned_by FOREIGN KEY (banned_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+        );`,
 				`DROP TRIGGER IF EXISTS update_admin_user_states_updated_at_trigger ON admin_user_states;`,
 				`CREATE TRIGGER update_admin_user_states_updated_at_trigger
-  BEFORE UPDATE ON admin_user_states
-  FOR EACH ROW
-  EXECUTE FUNCTION admin_set_updated_at_fn();`,
+        BEFORE UPDATE ON admin_user_states
+        FOR EACH ROW
+        EXECUTE FUNCTION admin_set_updated_at_fn();`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_user_states_is_banned_banned_until ON admin_user_states(is_banned, banned_until);`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_session_states (
-  session_id UUID PRIMARY KEY,
-  revoked_at TIMESTAMP WITH TIME ZONE,
-  revoked_reason TEXT,
-  revoked_by_user_id UUID,
-  impersonator_user_id UUID,
-  impersonation_reason TEXT,
-  impersonation_expires_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  CONSTRAINT fk_admin_session_states_session FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_session_states_revoked_by FOREIGN KEY (revoked_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  CONSTRAINT fk_admin_session_states_impersonator FOREIGN KEY (impersonator_user_id) REFERENCES users(id) ON DELETE SET NULL
-);`,
+          session_id UUID PRIMARY KEY,
+          revoked_at TIMESTAMP WITH TIME ZONE,
+          revoked_reason TEXT,
+          revoked_by_user_id UUID,
+          impersonator_user_id UUID,
+          impersonation_reason TEXT,
+          impersonation_expires_at TIMESTAMP WITH TIME ZONE,
+          created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          CONSTRAINT fk_admin_session_states_session FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_session_states_revoked_by FOREIGN KEY (revoked_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+          CONSTRAINT fk_admin_session_states_impersonator FOREIGN KEY (impersonator_user_id) REFERENCES users(id) ON DELETE SET NULL
+        );`,
 				`DROP TRIGGER IF EXISTS update_admin_session_states_updated_at_trigger ON admin_session_states;`,
 				`CREATE TRIGGER update_admin_session_states_updated_at_trigger
-  BEFORE UPDATE ON admin_session_states
-  FOR EACH ROW
-  EXECUTE FUNCTION admin_set_updated_at_fn();`,
+        BEFORE UPDATE ON admin_session_states
+        FOR EACH ROW
+        EXECUTE FUNCTION admin_set_updated_at_fn();`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_session_states_revoked_at_impersonation_expires_at ON admin_session_states(revoked_at, impersonation_expires_at);`,
 				`CREATE INDEX IF NOT EXISTS idx_admin_session_states_impersonator_user_id ON admin_session_states(impersonator_user_id);`,
 			)
@@ -297,112 +313,120 @@ func adminMySQLInitial() migrations.Migration {
 			return migrations.ExecStatements(
 				ctx,
 				tx,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_permissions (
-  id BINARY(16) NOT NULL PRIMARY KEY,
-  permission_key VARCHAR(255) NOT NULL UNIQUE,
-  description TEXT,
-  is_system TINYINT(1) NOT NULL DEFAULT 0,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+          id BINARY(16) NOT NULL PRIMARY KEY,
+          key VARCHAR(255) NOT NULL UNIQUE,
+          description TEXT,
+          is_system TINYINT(1) NOT NULL DEFAULT 0,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_roles (
-  id BINARY(16) NOT NULL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL UNIQUE,
-  description TEXT,
-  is_system TINYINT(1) NOT NULL DEFAULT 0,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+          id BINARY(16) NOT NULL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL UNIQUE,
+          description TEXT,
+          is_system TINYINT(1) NOT NULL DEFAULT 0,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_role_permissions (
-  role_id BINARY(16) NOT NULL,
-  permission_id BINARY(16) NOT NULL,
-  granted_by_user_id BINARY(16) NULL,
-  granted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (role_id, permission_id),
-  CONSTRAINT fk_admin_role_permissions_role FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_role_permissions_permission FOREIGN KEY (permission_id) REFERENCES admin_permissions(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_role_permissions_granted_by FOREIGN KEY (granted_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  INDEX idx_admin_role_permissions_role_id (role_id),
-  INDEX idx_admin_role_permissions_permission_id (permission_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+          role_id BINARY(16) NOT NULL,
+          permission_id BINARY(16) NOT NULL,
+          granted_by_user_id BINARY(16) NULL,
+          granted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (role_id, permission_id),
+          CONSTRAINT fk_admin_role_permissions_role FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_role_permissions_permission FOREIGN KEY (permission_id) REFERENCES admin_permissions(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_role_permissions_granted_by FOREIGN KEY (granted_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+          INDEX idx_admin_role_permissions_role_id (role_id),
+          INDEX idx_admin_role_permissions_permission_id (permission_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_user_roles (
-  user_id BINARY(16) NOT NULL,
-  role_id BINARY(16) NOT NULL,
-  assigned_by_user_id BINARY(16) NULL,
-  assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  expires_at TIMESTAMP NULL,
-  PRIMARY KEY (user_id, role_id),
-  CONSTRAINT fk_admin_user_roles_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_user_roles_role FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_user_roles_assigned_by FOREIGN KEY (assigned_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  INDEX idx_admin_user_roles_role_id (role_id),
-  INDEX idx_admin_user_roles_expires_at (expires_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+          user_id BINARY(16) NOT NULL,
+          role_id BINARY(16) NOT NULL,
+          assigned_by_user_id BINARY(16) NULL,
+          assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          expires_at TIMESTAMP NULL,
+          PRIMARY KEY (user_id, role_id),
+          CONSTRAINT fk_admin_user_roles_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_user_roles_role FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_user_roles_assigned_by FOREIGN KEY (assigned_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+          INDEX idx_admin_user_roles_role_id (role_id),
+          INDEX idx_admin_user_roles_expires_at (expires_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_impersonations (
-  id BINARY(16) NOT NULL PRIMARY KEY,
-  actor_user_id BINARY(16) NOT NULL,
-  target_user_id BINARY(16) NOT NULL,
-  actor_session_id BINARY(16) NULL,
-  impersonation_session_id BINARY(16) NULL,
-  reason TEXT NOT NULL,
-  started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  expires_at TIMESTAMP NOT NULL,
-  ended_at TIMESTAMP NULL,
-  ended_by_user_id BINARY(16) NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_admin_impersonations_actor_user FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_impersonations_target_user FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_impersonations_actor_session FOREIGN KEY (actor_session_id) REFERENCES sessions(id) ON DELETE SET NULL,
-  CONSTRAINT fk_admin_impersonations_impersonation_session FOREIGN KEY (impersonation_session_id) REFERENCES sessions(id) ON DELETE SET NULL,
-  CONSTRAINT fk_admin_impersonations_ended_by_user FOREIGN KEY (ended_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  CONSTRAINT chk_admin_impersonation_actor_target CHECK (actor_user_id <> target_user_id),
-  INDEX idx_admin_impersonations_actor_user_id (actor_user_id),
-  INDEX idx_admin_impersonations_target_user_id (target_user_id),
-  INDEX idx_admin_impersonations_expires_at_ended_at (expires_at, ended_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+          id BINARY(16) NOT NULL PRIMARY KEY,
+          actor_user_id BINARY(16) NOT NULL,
+          target_user_id BINARY(16) NOT NULL,
+          actor_session_id BINARY(16) NULL,
+          impersonation_session_id BINARY(16) NULL,
+          reason TEXT NOT NULL,
+          started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          expires_at TIMESTAMP NOT NULL,
+          ended_at TIMESTAMP NULL,
+          ended_by_user_id BINARY(16) NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          CONSTRAINT fk_admin_impersonations_actor_user FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_impersonations_target_user FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_impersonations_actor_session FOREIGN KEY (actor_session_id) REFERENCES sessions(id) ON DELETE SET NULL,
+          CONSTRAINT fk_admin_impersonations_impersonation_session FOREIGN KEY (impersonation_session_id) REFERENCES sessions(id) ON DELETE SET NULL,
+          CONSTRAINT fk_admin_impersonations_ended_by_user FOREIGN KEY (ended_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+          CONSTRAINT chk_admin_impersonation_actor_target CHECK (actor_user_id <> target_user_id),
+          INDEX idx_admin_impersonations_actor_user_id (actor_user_id),
+          INDEX idx_admin_impersonations_target_user_id (target_user_id),
+          INDEX idx_admin_impersonations_expires_at_ended_at (expires_at, ended_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_user_states (
-  user_id BINARY(16) NOT NULL PRIMARY KEY,
-  is_banned TINYINT(1) NOT NULL DEFAULT 0,
-  banned_at TIMESTAMP NULL,
-  banned_until TIMESTAMP NULL,
-  banned_reason TEXT NULL,
-  banned_by_user_id BINARY(16) NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_admin_user_states_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_user_states_banned_by FOREIGN KEY (banned_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  INDEX idx_admin_user_states_is_banned_banned_until (is_banned, banned_until)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+          user_id BINARY(16) NOT NULL PRIMARY KEY,
+          is_banned TINYINT(1) NOT NULL DEFAULT 0,
+          banned_at TIMESTAMP NULL,
+          banned_until TIMESTAMP NULL,
+          banned_reason TEXT NULL,
+          banned_by_user_id BINARY(16) NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          CONSTRAINT fk_admin_user_states_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_user_states_banned_by FOREIGN KEY (banned_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+          INDEX idx_admin_user_states_is_banned_banned_until (is_banned, banned_until)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+				// ----------------------
 				`CREATE TABLE IF NOT EXISTS admin_session_states (
-  session_id BINARY(16) NOT NULL PRIMARY KEY,
-  revoked_at TIMESTAMP NULL,
-  revoked_reason TEXT NULL,
-  revoked_by_user_id BINARY(16) NULL,
-  impersonator_user_id BINARY(16) NULL,
-  impersonation_reason TEXT NULL,
-  impersonation_expires_at TIMESTAMP NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_admin_session_states_session FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
-  CONSTRAINT fk_admin_session_states_revoked_by FOREIGN KEY (revoked_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  CONSTRAINT fk_admin_session_states_impersonator FOREIGN KEY (impersonator_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  INDEX idx_admin_session_states_revoked_at_impersonation_expires_at (revoked_at, impersonation_expires_at),
-  INDEX idx_admin_session_states_impersonator_user_id (impersonator_user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+          session_id BINARY(16) NOT NULL PRIMARY KEY,
+          revoked_at TIMESTAMP NULL,
+          revoked_reason TEXT NULL,
+          revoked_by_user_id BINARY(16) NULL,
+          impersonator_user_id BINARY(16) NULL,
+          impersonation_reason TEXT NULL,
+          impersonation_expires_at TIMESTAMP NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          CONSTRAINT fk_admin_session_states_session FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+          CONSTRAINT fk_admin_session_states_revoked_by FOREIGN KEY (revoked_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+          CONSTRAINT fk_admin_session_states_impersonator FOREIGN KEY (impersonator_user_id) REFERENCES users(id) ON DELETE SET NULL,
+          INDEX idx_admin_session_states_revoked_at_impersonation_expires_at (revoked_at, impersonation_expires_at),
+          INDEX idx_admin_session_states_impersonator_user_id (impersonator_user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+				// ----------------------
 			)
 		},
 		Down: func(ctx context.Context, tx bun.Tx) error {
 			return migrations.ExecStatements(
 				ctx,
 				tx,
-				`DROP TABLE IF EXISTS admin_session_states;`,
-				`DROP TABLE IF EXISTS admin_user_states;`,
-				`DROP TABLE IF EXISTS admin_impersonations;`,
-				`DROP TABLE IF EXISTS admin_user_roles;`,
-				`DROP TABLE IF EXISTS admin_role_permissions;`,
 				`DROP TABLE IF EXISTS admin_roles;`,
 				`DROP TABLE IF EXISTS admin_permissions;`,
+				`DROP TABLE IF EXISTS admin_user_roles;`,
+				`DROP TABLE IF EXISTS admin_role_permissions;`,
+				`DROP TABLE IF EXISTS admin_user_states;`,
+				`DROP TABLE IF EXISTS admin_session_states;`,
+				`DROP TABLE IF EXISTS admin_impersonations;`,
 			)
 		},
 	}

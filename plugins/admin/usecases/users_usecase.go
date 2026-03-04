@@ -5,17 +5,56 @@ import (
 	"errors"
 	"strings"
 
+	repositories "github.com/GoBetterAuth/go-better-auth/v2/internal/repositories"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
-	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 type usersUseCase struct {
-	service rootservices.UserService
+	userRepo repositories.UserRepository
 }
 
-func NewUsersUseCase(service rootservices.UserService) UsersUseCase {
-	return &usersUseCase{service: service}
+func NewUsersUseCase(userRepo repositories.UserRepository) UsersUseCase {
+	return &usersUseCase{userRepo: userRepo}
+}
+
+func (u *usersUseCase) Create(ctx context.Context, request types.CreateUserRequest) (*models.User, error) {
+	name := strings.TrimSpace(request.Name)
+	email := strings.TrimSpace(strings.ToLower(request.Email))
+
+	if name == "" {
+		return nil, errors.New("name is required")
+	}
+	if email == "" {
+		return nil, errors.New("email is required")
+	}
+
+	existing, err := u.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return nil, errors.New("user already exists")
+	}
+
+	emailVerified := false
+	if request.EmailVerified != nil {
+		emailVerified = *request.EmailVerified
+	}
+
+	userToCreate := &models.User{
+		Name:          name,
+		Email:         email,
+		EmailVerified: emailVerified,
+		Image:         request.Image,
+		Metadata:      request.Metadata,
+	}
+	newUser, err := u.userRepo.Create(ctx, userToCreate)
+	if err != nil {
+		return nil, err
+	}
+
+	return newUser, nil
 }
 
 func (u *usersUseCase) GetAll(ctx context.Context, cursor *string, limit int) (*types.UsersPage, error) {
@@ -31,44 +70,12 @@ func (u *usersUseCase) GetAll(ctx context.Context, cursor *string, limit int) (*
 		cursor = &trimmed
 	}
 
-	users, nextCursor, err := u.service.GetAll(ctx, cursor, limit)
+	users, nextCursor, err := u.userRepo.GetAll(ctx, cursor, limit)
 	if err != nil {
 		return nil, err
 	}
 
 	return &types.UsersPage{Users: users, NextCursor: nextCursor}, nil
-}
-
-func (u *usersUseCase) Create(ctx context.Context, request types.CreateUserRequest) (*models.User, error) {
-	name := strings.TrimSpace(request.Name)
-	email := strings.TrimSpace(strings.ToLower(request.Email))
-
-	if name == "" {
-		return nil, errors.New("name is required")
-	}
-	if email == "" {
-		return nil, errors.New("email is required")
-	}
-
-	existing, err := u.service.GetByEmail(ctx, email)
-	if err != nil {
-		return nil, err
-	}
-	if existing != nil {
-		return nil, errors.New("user already exists")
-	}
-
-	emailVerified := false
-	if request.EmailVerified != nil {
-		emailVerified = *request.EmailVerified
-	}
-
-	created, err := u.service.Create(ctx, name, email, emailVerified, request.Image, request.Metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	return created, nil
 }
 
 func (u *usersUseCase) GetByID(ctx context.Context, userID string) (*models.User, error) {
@@ -77,7 +84,7 @@ func (u *usersUseCase) GetByID(ctx context.Context, userID string) (*models.User
 		return nil, errors.New("user_id is required")
 	}
 
-	return u.service.GetByID(ctx, userID)
+	return u.userRepo.GetByID(ctx, userID)
 }
 
 func (u *usersUseCase) Update(ctx context.Context, userID string, request types.UpdateUserRequest) (*models.User, error) {
@@ -89,7 +96,7 @@ func (u *usersUseCase) Update(ctx context.Context, userID string, request types.
 		return nil, errors.New("at least one field is required for update")
 	}
 
-	user, err := u.service.GetByID(ctx, userID)
+	user, err := u.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -113,10 +120,11 @@ func (u *usersUseCase) Update(ctx context.Context, userID string, request types.
 		user.Metadata = request.Metadata
 	}
 
-	updated, err := u.service.Update(ctx, user)
+	updated, err := u.userRepo.Update(ctx, user)
 	if err != nil {
 		return nil, err
 	}
+
 	return updated, nil
 }
 
@@ -126,7 +134,7 @@ func (u *usersUseCase) Delete(ctx context.Context, userID string) error {
 		return errors.New("user_id is required")
 	}
 
-	existing, err := u.service.GetByID(ctx, userID)
+	existing, err := u.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return err
 	}
@@ -134,7 +142,7 @@ func (u *usersUseCase) Delete(ctx context.Context, userID string) error {
 		return errors.New("user not found")
 	}
 
-	err = u.service.Delete(ctx, userID)
+	err = u.userRepo.Delete(ctx, userID)
 	if err != nil {
 		return err
 	}

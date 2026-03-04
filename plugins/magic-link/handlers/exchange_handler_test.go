@@ -9,20 +9,30 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/magic-link/types"
 )
 
+type mockExchangeUseCase struct {
+	mock.Mock
+}
+
+func (m *mockExchangeUseCase) Exchange(ctx context.Context, token string, ipAddress *string, userAgent *string) (*types.ExchangeResult, error) {
+	args := m.Called(ctx, token, ipAddress, userAgent)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*types.ExchangeResult), args.Error(1)
+}
+
 func TestExchangeHandler_SuccessSetsSessionContext(t *testing.T) {
 	user := &models.User{ID: "user-123", Email: "user@example.com"}
 	session := &models.Session{ID: "sess-456", UserID: "user-123"}
-	useCase := &stubExchangeUseCase{
-		result: &types.ExchangeResult{
-			User:         user,
-			Session:      session,
-			SessionToken: "session-token",
-		},
-	}
+	useCase := &mockExchangeUseCase{}
+	useCase.On("Exchange", mock.Anything, "token-123", mock.Anything, mock.Anything).
+		Return(&types.ExchangeResult{User: user, Session: session, SessionToken: "session-token"}, nil).Once()
 
 	handler := &ExchangeHandler{UseCase: useCase}
 	body := bytes.NewBufferString(`{"token":"token-123"}`)
@@ -56,13 +66,11 @@ func TestExchangeHandler_SuccessSetsSessionContext(t *testing.T) {
 	if resp.Session == nil || resp.Session.ID != session.ID {
 		t.Fatalf("expected session in response, got %v", resp.Session)
 	}
-	if useCase.lastToken != "token-123" {
-		t.Fatalf("expected token to be passed to use case, got %s", useCase.lastToken)
-	}
+	useCase.AssertExpectations(t)
 }
 
 func TestExchangeHandler_MissingToken(t *testing.T) {
-	handler := &ExchangeHandler{UseCase: &stubExchangeUseCase{}}
+	handler := &ExchangeHandler{UseCase: &mockExchangeUseCase{}}
 	req, reqCtx, w := newExchangeRequest(t, bytes.NewBufferString("{}"))
 
 	handler.Handler()(w, req)
@@ -71,7 +79,7 @@ func TestExchangeHandler_MissingToken(t *testing.T) {
 }
 
 func TestExchangeHandler_InvalidJSON(t *testing.T) {
-	handler := &ExchangeHandler{UseCase: &stubExchangeUseCase{}}
+	handler := &ExchangeHandler{UseCase: &mockExchangeUseCase{}}
 	req, reqCtx, w := newExchangeRequest(t, bytes.NewBufferString("{invalid"))
 
 	handler.Handler()(w, req)
@@ -80,20 +88,35 @@ func TestExchangeHandler_InvalidJSON(t *testing.T) {
 }
 
 func TestExchangeHandler_UseCaseError(t *testing.T) {
-	handler := &ExchangeHandler{UseCase: &stubExchangeUseCase{err: errors.New("exchange failed")}}
+	useCase := &mockExchangeUseCase{}
+	useCase.On("Exchange", mock.Anything, "token-123", mock.Anything, mock.Anything).
+		Return(nil, errors.New("exchange failed")).Once()
+
+	handler := &ExchangeHandler{UseCase: useCase}
 	req, reqCtx, w := newExchangeRequest(t, bytes.NewBufferString(`{"token":"token-123"}`))
 
 	handler.Handler()(w, req)
 
 	assertErrorResponse(t, reqCtx, http.StatusBadRequest, "exchange failed")
+	useCase.AssertExpectations(t)
 }
 
 func TestExchangeHandler_PassesRequestMetadataToUseCase(t *testing.T) {
 	user := &models.User{ID: "user-123", Email: "user@example.com"}
 	session := &models.Session{ID: "sess-456", UserID: "user-123"}
-	useCase := &stubExchangeUseCase{
-		result: &types.ExchangeResult{User: user, Session: session, SessionToken: "session-token"},
-	}
+	useCase := &mockExchangeUseCase{}
+	useCase.On("Exchange", mock.Anything, "token-123", mock.AnythingOfType("*string"), mock.AnythingOfType("*string")).
+		Run(func(args mock.Arguments) {
+			ip := args.Get(2).(*string)
+			userAgent := args.Get(3).(*string)
+			if ip == nil || *ip != "127.0.0.1" {
+				t.Fatalf("expected IP metadata to be forwarded, got %v", ip)
+			}
+			if userAgent == nil || *userAgent != "TestAgent/1.0" {
+				t.Fatalf("expected user agent metadata, got %v", userAgent)
+			}
+		}).
+		Return(&types.ExchangeResult{User: user, Session: session, SessionToken: "session-token"}, nil).Once()
 
 	handler := &ExchangeHandler{UseCase: useCase}
 	body := bytes.NewBufferString(`{"token":"token-123"}`)
@@ -102,13 +125,7 @@ func TestExchangeHandler_PassesRequestMetadataToUseCase(t *testing.T) {
 	reqCtx.ClientIP = "127.0.0.1"
 
 	handler.Handler()(w, req)
-
-	if useCase.lastIP == nil || *useCase.lastIP != "127.0.0.1" {
-		t.Fatalf("expected IP metadata to be forwarded, got %v", useCase.lastIP)
-	}
-	if useCase.lastUserAgent == nil || *useCase.lastUserAgent != "TestAgent/1.0" {
-		t.Fatalf("expected user agent metadata, got %v", useCase.lastUserAgent)
-	}
+	useCase.AssertExpectations(t)
 }
 
 func newExchangeRequest(t *testing.T, body *bytes.Buffer) (*http.Request, *models.RequestContext, *httptest.ResponseRecorder) {
@@ -128,25 +145,4 @@ func newExchangeRequest(t *testing.T, body *bytes.Buffer) (*http.Request, *model
 	req = req.WithContext(ctx)
 	reqCtx.Request = req
 	return req, reqCtx, w
-}
-
-type stubExchangeUseCase struct {
-	result        *types.ExchangeResult
-	err           error
-	lastToken     string
-	lastIP        *string
-	lastUserAgent *string
-}
-
-func (s *stubExchangeUseCase) Exchange(ctx context.Context, token string, ipAddress *string, userAgent *string) (*types.ExchangeResult, error) {
-	s.lastToken = token
-	s.lastIP = ipAddress
-	s.lastUserAgent = userAgent
-	if s.err != nil {
-		return nil, s.err
-	}
-	if s.result == nil {
-		return nil, nil
-	}
-	return s.result, nil
 }

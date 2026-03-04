@@ -46,7 +46,38 @@ func (h *GetAllUsersHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": page.Users, "next_cursor": page.NextCursor})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.UsersPage{
+			Users:      page.Users,
+			NextCursor: page.NextCursor,
+		})
+	}
+}
+
+type GetUserByIDHandler struct {
+	useCase usecases.UsersUseCase
+}
+
+func NewGetUserByIDHandler(useCase usecases.UsersUseCase) *GetUserByIDHandler {
+	return &GetUserByIDHandler{useCase: useCase}
+}
+
+func (h *GetUserByIDHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		reqCtx, _ := models.GetRequestContext(r.Context())
+		userID := r.PathValue("user_id")
+
+		user, err := h.useCase.GetByID(r.Context(), userID)
+		if err != nil {
+			respondUsersError(reqCtx, err)
+			return
+		}
+		if user == nil {
+			reqCtx.SetJSONResponse(http.StatusNotFound, map[string]any{"message": "user not found"})
+			reqCtx.Handled = true
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"user": user})
 	}
 }
 
@@ -76,34 +107,6 @@ func (h *CreateUserHandler) Handler() http.HandlerFunc {
 		}
 
 		reqCtx.SetJSONResponse(http.StatusCreated, map[string]any{"user": user})
-	}
-}
-
-type GetUserByIDHandler struct {
-	useCase usecases.UsersUseCase
-}
-
-func NewGetUserByIDHandler(useCase usecases.UsersUseCase) *GetUserByIDHandler {
-	return &GetUserByIDHandler{useCase: useCase}
-}
-
-func (h *GetUserByIDHandler) Handler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		reqCtx, _ := models.GetRequestContext(r.Context())
-		userID := r.PathValue("user_id")
-
-		user, err := h.useCase.GetByID(r.Context(), userID)
-		if err != nil {
-			respondUsersError(reqCtx, err)
-			return
-		}
-		if user == nil {
-			reqCtx.SetJSONResponse(http.StatusNotFound, map[string]any{"message": "user not found"})
-			reqCtx.Handled = true
-			return
-		}
-
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"user": user})
 	}
 }
 

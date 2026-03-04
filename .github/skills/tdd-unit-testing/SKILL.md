@@ -18,7 +18,7 @@ description: Write unit tests in Go following strict Red-Green-Refactor TDD disc
    - Make it obvious why it fails.
    - Run `go test ./... -v` to confirm failure.
 
-2. **Green**: Write the *minimum* production code to make the test pass.
+2. **Green**: Write the _minimum_ production code to make the test pass.
    - No refactoring yet; just make it green.
    - Run `go test ./...` to confirm it passes.
 
@@ -40,6 +40,18 @@ description: Write unit tests in Go following strict Red-Green-Refactor TDD disc
 - **Test edge cases** and error conditions, not just happy paths.
 - **Minimal tests**: Keep tests focused on one behavior per test function. Avoid testing multiple things in one test. Keep tests small and focused.
 
+# Handler Layer Testing (Request-Response Integration Pattern)
+
+For testing **handler functions** that receive `*models.RequestContext`, use the **Handler Layer Pattern**. This pattern tests HTTP request parsing, validation, and response handling without requiring a full database fixture.
+
+- **File Organization**: Create `test_helpers_test.go` for shared helpers + mock use cases; use separate `*_handlers_test.go` files for handler tests.
+- **Shared Utilities**: Provide `mustJSON()`, `newSomeHandlerRequest()`, `decodeResponseJSON()`, `assertErrorMessage()` for all tests.
+- **Mock Use Cases**: Create `testify/mock`-based mocks for each use case interface; configure expectations with `.On(...).Return(...).Once()` and verify with `.AssertExpectations(t)`.
+- **Context Mutations**: Test that handlers correctly update `UserID`, `SessionID`, `AuthSuccess` in the request context.
+- **Error Mapping**: Test that handlers map use case errors to correct HTTP status codes (NotFound → 404, Forbidden → 403, etc.).
+
+See [references/handler_layer_testing.md](references/handler_layer_testing.md) for details and code examples.
+
 # Plugin Integration Testing (Integration Fixture Pattern)
 
 For testing plugins, follow the **Integration Fixture Pattern**. This pattern exercises the full HTTP lifecycle including routes, hooks, and database persistence.
@@ -57,9 +69,11 @@ See [references/integration_testing_conventions.md](references/integration_testi
 Follow `examples/user_service_test.go` exactly for new tests.
 
 ## Mocking repositories/services
+
 Use `testify/mock` for interface dependencies.
 
 ## Error cases
+
 Test both happy path and every error condition.
 
 # Instructions for the agent
@@ -97,4 +111,3 @@ Refactor: Clean implementation
 ```
 
 `go test` output showing 100% coverage
-

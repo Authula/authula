@@ -9,6 +9,8 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
+// Models
+
 type Role struct {
 	bun.BaseModel `bun:"table:admin_roles"`
 
@@ -24,7 +26,7 @@ type Permission struct {
 	bun.BaseModel `bun:"table:admin_permissions"`
 
 	ID          string    `json:"id" bun:"column:id,pk"`
-	Key         string    `json:"key" bun:"column:permission_key"`
+	Key         string    `json:"key" bun:"column:key"`
 	Description *string   `json:"description" bun:"column:description"`
 	IsSystem    bool      `json:"is_system" bun:"column:is_system"`
 	CreatedAt   time.Time `json:"created_at" bun:"column:created_at,default:current_timestamp"`
@@ -50,14 +52,54 @@ type UserRole struct {
 	ExpiresAt        *time.Time `json:"expires_at" bun:"column:expires_at"`
 }
 
-type CreatePermissionRequest struct {
-	Key         string  `json:"key"`
-	Description *string `json:"description,omitempty"`
-	IsSystem    bool    `json:"is_system"`
+type Impersonation struct {
+	bun.BaseModel `bun:"table:admin_impersonations"`
+
+	ID                     string     `json:"id" bun:"column:id,pk"`
+	ActorUserID            string     `json:"actor_user_id" bun:"column:actor_user_id"`
+	TargetUserID           string     `json:"target_user_id" bun:"column:target_user_id"`
+	ActorSessionID         *string    `json:"actor_session_id" bun:"column:actor_session_id"`
+	ImpersonationSessionID *string    `json:"impersonation_session_id" bun:"column:impersonation_session_id"`
+	Reason                 string     `json:"reason" bun:"column:reason"`
+	StartedAt              time.Time  `json:"started_at" bun:"column:started_at"`
+	ExpiresAt              time.Time  `json:"expires_at" bun:"column:expires_at"`
+	EndedAt                *time.Time `json:"ended_at" bun:"column:ended_at"`
+	EndedByUserID          *string    `json:"ended_by_user_id" bun:"column:ended_by_user_id"`
+	CreatedAt              time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp"`
+	UpdatedAt              time.Time  `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
 }
 
-type UpdatePermissionRequest struct {
-	Description *string `json:"description"`
+type AdminUserState struct {
+	bun.BaseModel `bun:"table:admin_user_states"`
+
+	UserID         string     `json:"user_id" bun:"column:user_id,pk"`
+	IsBanned       bool       `json:"is_banned" bun:"column:is_banned"`
+	BannedAt       *time.Time `json:"banned_at" bun:"column:banned_at"`
+	BannedUntil    *time.Time `json:"banned_until" bun:"column:banned_until"`
+	BannedReason   *string    `json:"banned_reason" bun:"column:banned_reason"`
+	BannedByUserID *string    `json:"banned_by_user_id" bun:"column:banned_by_user_id"`
+	CreatedAt      time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp"`
+	UpdatedAt      time.Time  `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
+}
+
+type AdminSessionState struct {
+	bun.BaseModel `bun:"table:admin_session_states"`
+
+	SessionID              string     `json:"session_id" bun:"column:session_id,pk"`
+	RevokedAt              *time.Time `json:"revoked_at" bun:"column:revoked_at"`
+	RevokedReason          *string    `json:"revoked_reason" bun:"column:revoked_reason"`
+	RevokedByUserID        *string    `json:"revoked_by_user_id" bun:"column:revoked_by_user_id"`
+	ImpersonatorUserID     *string    `json:"impersonator_user_id" bun:"column:impersonator_user_id"`
+	ImpersonationReason    *string    `json:"impersonation_reason" bun:"column:impersonation_reason"`
+	ImpersonationExpiresAt *time.Time `json:"impersonation_expires_at" bun:"column:impersonation_expires_at"`
+	CreatedAt              time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp"`
+	UpdatedAt              time.Time  `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
+}
+
+// Types
+
+type GetAllRolesResponse struct {
+	Roles []Role `json:"roles"`
 }
 
 type CreateRoleRequest struct {
@@ -68,7 +110,17 @@ type CreateRoleRequest struct {
 
 type UpdateRoleRequest struct {
 	Name        *string `json:"name,omitempty"`
-	Description *string `json:"description"`
+	Description *string `json:"description,omitempty"`
+}
+
+type CreatePermissionRequest struct {
+	Key         string  `json:"key"`
+	Description *string `json:"description,omitempty"`
+	IsSystem    bool    `json:"is_system"`
+}
+
+type UpdatePermissionRequest struct {
+	Description *string `json:"description,omitempty"`
 }
 
 type AddRolePermissionRequest struct {
@@ -115,23 +167,6 @@ type UserAuthorizationProfile struct {
 	Permissions []UserPermissionInfo `json:"permissions"`
 }
 
-type Impersonation struct {
-	bun.BaseModel `bun:"table:admin_impersonations"`
-
-	ID                     string     `json:"id" bun:"column:id,pk"`
-	ActorUserID            string     `json:"actor_user_id" bun:"column:actor_user_id"`
-	TargetUserID           string     `json:"target_user_id" bun:"column:target_user_id"`
-	ActorSessionID         *string    `json:"actor_session_id" bun:"column:actor_session_id"`
-	ImpersonationSessionID *string    `json:"impersonation_session_id" bun:"column:impersonation_session_id"`
-	Reason                 string     `json:"reason" bun:"column:reason"`
-	StartedAt              time.Time  `json:"started_at" bun:"column:started_at"`
-	ExpiresAt              time.Time  `json:"expires_at" bun:"column:expires_at"`
-	EndedAt                *time.Time `json:"ended_at" bun:"column:ended_at"`
-	EndedByUserID          *string    `json:"ended_by_user_id" bun:"column:ended_by_user_id"`
-	CreatedAt              time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp"`
-	UpdatedAt              time.Time  `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
-}
-
 type StartImpersonationRequest struct {
 	TargetUserID     string `json:"target_user_id"`
 	Reason           string `json:"reason"`
@@ -159,33 +194,6 @@ type RoleDetails struct {
 type AdminUserSession struct {
 	Session models.Session     `json:"session"`
 	State   *AdminSessionState `json:"state,omitempty"`
-}
-
-type AdminUserState struct {
-	bun.BaseModel `bun:"table:admin_user_states"`
-
-	UserID         string     `json:"user_id" bun:"column:user_id,pk"`
-	IsBanned       bool       `json:"is_banned" bun:"column:is_banned"`
-	BannedAt       *time.Time `json:"banned_at" bun:"column:banned_at"`
-	BannedUntil    *time.Time `json:"banned_until" bun:"column:banned_until"`
-	BannedReason   *string    `json:"banned_reason" bun:"column:banned_reason"`
-	BannedByUserID *string    `json:"banned_by_user_id" bun:"column:banned_by_user_id"`
-	CreatedAt      time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp"`
-	UpdatedAt      time.Time  `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
-}
-
-type AdminSessionState struct {
-	bun.BaseModel `bun:"table:admin_session_states"`
-
-	SessionID              string     `json:"session_id" bun:"column:session_id,pk"`
-	RevokedAt              *time.Time `json:"revoked_at" bun:"column:revoked_at"`
-	RevokedReason          *string    `json:"revoked_reason" bun:"column:revoked_reason"`
-	RevokedByUserID        *string    `json:"revoked_by_user_id" bun:"column:revoked_by_user_id"`
-	ImpersonatorUserID     *string    `json:"impersonator_user_id" bun:"column:impersonator_user_id"`
-	ImpersonationReason    *string    `json:"impersonation_reason" bun:"column:impersonation_reason"`
-	ImpersonationExpiresAt *time.Time `json:"impersonation_expires_at" bun:"column:impersonation_expires_at"`
-	CreatedAt              time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp"`
-	UpdatedAt              time.Time  `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
 }
 
 type UpsertUserStateRequest struct {

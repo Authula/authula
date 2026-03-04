@@ -7,23 +7,23 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/repositories"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
 type impersonationUseCase struct {
-	service             *services.ImpersonationService
-	sessionStateService *services.SessionStateService
-	sessionService      rootservices.SessionService
-	tokenService        rootservices.TokenService
-	sessionExpiresIn    time.Duration
-	maxExpires          time.Duration
+	impersonationRepo repositories.ImpersonationRepository
+	sessionStateRepo  repositories.SessionStateRepository
+	sessionService    rootservices.SessionService
+	tokenService      rootservices.TokenService
+	sessionExpiresIn  time.Duration
+	maxExpires        time.Duration
 }
 
 func NewImpersonationUseCase(
-	service *services.ImpersonationService,
-	sessionStateService *services.SessionStateService,
+	impersonationRepo repositories.ImpersonationRepository,
+	sessionStateRepo repositories.SessionStateRepository,
 	sessionService rootservices.SessionService,
 	tokenService rootservices.TokenService,
 	sessionExpiresIn time.Duration,
@@ -37,12 +37,12 @@ func NewImpersonationUseCase(
 	}
 
 	return &impersonationUseCase{
-		service:             service,
-		sessionStateService: sessionStateService,
-		sessionService:      sessionService,
-		tokenService:        tokenService,
-		sessionExpiresIn:    sessionExpiresIn,
-		maxExpires:          maxExpires,
+		impersonationRepo: impersonationRepo,
+		sessionStateRepo:  sessionStateRepo,
+		sessionService:    sessionService,
+		tokenService:      tokenService,
+		sessionExpiresIn:  sessionExpiresIn,
+		maxExpires:        maxExpires,
 	}
 }
 
@@ -64,7 +64,7 @@ func (u *impersonationUseCase) StartImpersonation(ctx context.Context, actorUser
 		return nil, errors.New("reason is required")
 	}
 
-	actorExists, err := u.service.UserExists(ctx, actorUserID)
+	actorExists, err := u.impersonationRepo.UserExists(ctx, actorUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (u *impersonationUseCase) StartImpersonation(ctx context.Context, actorUser
 		return nil, errors.New("actor user not found")
 	}
 
-	targetExists, err := u.service.UserExists(ctx, targetUserID)
+	targetExists, err := u.impersonationRepo.UserExists(ctx, targetUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -132,18 +132,18 @@ func (u *impersonationUseCase) StartImpersonation(ctx context.Context, actorUser
 		ExpiresAt:              expiresAt,
 	}
 
-	if err := u.service.CreateImpersonation(ctx, impersonation); err != nil {
+	if err := u.impersonationRepo.CreateImpersonation(ctx, impersonation); err != nil {
 		return nil, err
 	}
 
-	if impersonationSessionID != nil && u.sessionStateService != nil {
+	if impersonationSessionID != nil && u.sessionStateRepo != nil {
 		state := &types.AdminSessionState{
 			SessionID:              *impersonationSessionID,
 			ImpersonatorUserID:     &actorUserID,
 			ImpersonationReason:    &reason,
 			ImpersonationExpiresAt: &expiresAt,
 		}
-		if err := u.sessionStateService.Upsert(ctx, state); err != nil {
+		if err := u.sessionStateRepo.Upsert(ctx, state); err != nil {
 			return nil, err
 		}
 	}
@@ -164,7 +164,7 @@ func (u *impersonationUseCase) StopImpersonation(ctx context.Context, actorUserI
 	var target *types.Impersonation
 	var err error
 	if request.ImpersonationID != nil && strings.TrimSpace(*request.ImpersonationID) != "" {
-		target, err = u.service.GetActiveImpersonationByID(ctx, strings.TrimSpace(*request.ImpersonationID))
+		target, err = u.impersonationRepo.GetActiveImpersonationByID(ctx, strings.TrimSpace(*request.ImpersonationID))
 		if err != nil {
 			return err
 		}
@@ -172,7 +172,7 @@ func (u *impersonationUseCase) StopImpersonation(ctx context.Context, actorUserI
 			return errors.New("active impersonation not found")
 		}
 	} else {
-		target, err = u.service.GetLatestActiveImpersonationByActor(ctx, actorUserID)
+		target, err = u.impersonationRepo.GetLatestActiveImpersonationByActor(ctx, actorUserID)
 		if err != nil {
 			return err
 		}
@@ -185,7 +185,7 @@ func (u *impersonationUseCase) StopImpersonation(ctx context.Context, actorUserI
 		return errors.New("you can only stop your own impersonation sessions")
 	}
 
-	if target.ImpersonationSessionID != nil && u.sessionStateService != nil {
+	if target.ImpersonationSessionID != nil && u.sessionStateRepo != nil {
 		now := time.Now().UTC()
 		reason := "impersonation ended"
 		state := &types.AdminSessionState{
@@ -197,7 +197,7 @@ func (u *impersonationUseCase) StopImpersonation(ctx context.Context, actorUserI
 			ImpersonationReason:    &target.Reason,
 			ImpersonationExpiresAt: &target.ExpiresAt,
 		}
-		if err := u.sessionStateService.Upsert(ctx, state); err != nil {
+		if err := u.sessionStateRepo.Upsert(ctx, state); err != nil {
 			return err
 		}
 	}
@@ -209,11 +209,11 @@ func (u *impersonationUseCase) StopImpersonation(ctx context.Context, actorUserI
 	}
 
 	endedBy := actorUserID
-	return u.service.EndImpersonation(ctx, target.ID, &endedBy)
+	return u.impersonationRepo.EndImpersonation(ctx, target.ID, &endedBy)
 }
 
 func (u *impersonationUseCase) GetAllImpersonations(ctx context.Context) ([]types.Impersonation, error) {
-	return u.service.GetImpersonations(ctx)
+	return u.impersonationRepo.GetAllImpersonations(ctx)
 }
 
 func (u *impersonationUseCase) GetImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error) {
@@ -222,7 +222,7 @@ func (u *impersonationUseCase) GetImpersonationByID(ctx context.Context, imperso
 		return nil, errors.New("impersonation_id is required")
 	}
 
-	row, err := u.service.GetImpersonationByID(ctx, impersonationID)
+	row, err := u.impersonationRepo.GetImpersonationByID(ctx, impersonationID)
 	if err != nil {
 		return nil, err
 	}

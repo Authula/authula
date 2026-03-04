@@ -5,247 +5,161 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/magic-link/types"
 )
 
-func TestSignInUseCase_SignIn(t *testing.T) {
-	userCreated := false
-	accountCreated := false
-	capturedEmail := ""
-	capturedName := "__unset__"
+func TestSignInUseCase_SignIn_ExistingUser(t *testing.T) {
+	uc, userSvc, _, tokenSvc, verificationSvc, _ := newSignInTestUseCase()
+	uc.PluginConfig.SendMagicLinkVerificationEmail = func(email, verificationURL, token string) error { return nil }
 
-	tests := []struct {
-		name        string
-		email       string
-		inputName   *string
-		wantErr     bool
-		errContains string
-		setup       func(
-			t *testing.T,
-			uc *SignInUseCaseImpl,
-			userSvc *mockUserService,
-			accountSvc *mockAccountService,
-			tokenSvc *mockTokenService,
-			verificationSvc *mockVerificationService,
-		)
-		assert func(t *testing.T, result *types.SignInResult)
-	}{
-		{
-			name:  "existing user",
-			email: "test@example.com",
-		},
-		{
-			name:      "new user sign up",
-			email:     "newuser@example.com",
-			inputName: strPtr("John Doe"),
-			setup: func(
-				t *testing.T,
-				_ *SignInUseCaseImpl,
-				userSvc *mockUserService,
-				accountSvc *mockAccountService,
-				_ *mockTokenService,
-				_ *mockVerificationService,
-			) {
-				t.Helper()
-				userCreated = false
-				accountCreated = false
-				userSvc.GetByEmailFn = func(ctx context.Context, email string) (*models.User, error) {
-					return nil, nil
-				}
-				userSvc.CreateFn = func(ctx context.Context, name, email string, emailVerified bool, image *string) (*models.User, error) {
-					userCreated = true
-					return &models.User{ID: "user-1", Name: name, Email: email}, nil
-				}
-				accountSvc.CreateFn = func(ctx context.Context, userID, accountID, providerID string, password *string) (*models.Account, error) {
-					accountCreated = true
-					return &models.Account{ID: "account-1", UserID: userID}, nil
-				}
-			},
-			assert: func(t *testing.T, _ *types.SignInResult) {
-				t.Helper()
-				if !userCreated {
-					t.Fatal("expected user to be created")
-				}
-				if !accountCreated {
-					t.Fatal("expected account to be created")
-				}
-			},
-		},
-		{
-			name:        "new user sign up disabled",
-			email:       "newuser@example.com",
-			wantErr:     true,
-			errContains: "disabled",
-			setup: func(
-				t *testing.T,
-				uc *SignInUseCaseImpl,
-				userSvc *mockUserService,
-				_ *mockAccountService,
-				_ *mockTokenService,
-				_ *mockVerificationService,
-			) {
-				t.Helper()
-				uc.PluginConfig.DisableSignUp = true
-				userSvc.GetByEmailFn = func(ctx context.Context, email string) (*models.User, error) {
-					return nil, nil
-				}
-			},
-		},
-		{
-			name:  "email normalization",
-			email: "TEST@EXAMPLE.COM",
-			setup: func(
-				t *testing.T,
-				_ *SignInUseCaseImpl,
-				userSvc *mockUserService,
-				_ *mockAccountService,
-				_ *mockTokenService,
-				_ *mockVerificationService,
-			) {
-				t.Helper()
-				capturedEmail = ""
-				userSvc.GetByEmailFn = func(ctx context.Context, email string) (*models.User, error) {
-					capturedEmail = email
-					return nil, nil
-				}
-				userSvc.CreateFn = func(ctx context.Context, name, email string, emailVerified bool, image *string) (*models.User, error) {
-					return &models.User{ID: "user-1", Email: email}, nil
-				}
-			},
-			assert: func(t *testing.T, _ *types.SignInResult) {
-				t.Helper()
-				if capturedEmail != "test@example.com" {
-					t.Fatalf("expected normalized email, got %s", capturedEmail)
-				}
-			},
-		},
-		{
-			name:        "user service error",
-			email:       "test@example.com",
-			wantErr:     true,
-			errContains: "database error",
-			setup: func(
-				t *testing.T,
-				_ *SignInUseCaseImpl,
-				userSvc *mockUserService,
-				_ *mockAccountService,
-				_ *mockTokenService,
-				_ *mockVerificationService,
-			) {
-				t.Helper()
-				userSvc.GetByEmailFn = func(ctx context.Context, email string) (*models.User, error) {
-					return nil, errors.New("database error")
-				}
-			},
-		},
-		{
-			name:        "token generation error",
-			email:       "test@example.com",
-			wantErr:     true,
-			errContains: "token generation failed",
-			setup: func(
-				t *testing.T,
-				_ *SignInUseCaseImpl,
-				_ *mockUserService,
-				_ *mockAccountService,
-				tokenSvc *mockTokenService,
-				_ *mockVerificationService,
-			) {
-				t.Helper()
-				tokenSvc.GenerateFn = func() (string, error) {
-					return "", errors.New("token generation failed")
-				}
-			},
-		},
-		{
-			name:        "verification creation error",
-			email:       "test@example.com",
-			wantErr:     true,
-			errContains: "verification creation failed",
-			setup: func(
-				t *testing.T,
-				_ *SignInUseCaseImpl,
-				_ *mockUserService,
-				_ *mockAccountService,
-				_ *mockTokenService,
-				verificationSvc *mockVerificationService,
-			) {
-				t.Helper()
-				verificationSvc.CreateFn = func(ctx context.Context, userID, hashedToken string, vType models.VerificationType, value string, expiry time.Duration) (*models.Verification, error) {
-					return nil, errors.New("verification creation failed")
-				}
-			},
-		},
-		{
-			name:  "new user without name",
-			email: "test@example.com",
-			setup: func(
-				t *testing.T,
-				_ *SignInUseCaseImpl,
-				userSvc *mockUserService,
-				_ *mockAccountService,
-				_ *mockTokenService,
-				_ *mockVerificationService,
-			) {
-				t.Helper()
-				capturedName = "__unset__"
-				userSvc.GetByEmailFn = func(ctx context.Context, email string) (*models.User, error) {
-					return nil, nil
-				}
-				userSvc.CreateFn = func(ctx context.Context, name, email string, emailVerified bool, image *string) (*models.User, error) {
-					capturedName = name
-					return &models.User{ID: "user-1", Name: name, Email: email}, nil
-				}
-			},
-			assert: func(t *testing.T, _ *types.SignInResult) {
-				t.Helper()
-				if capturedName != "" {
-					t.Fatalf("expected empty name for user without name, got: %s", capturedName)
-				}
-			},
-		},
-	}
+	userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+	tokenSvc.On("Generate").Return("token-123", nil).Once()
+	tokenSvc.On("Hash", "token-123").Return("hashed-token-123").Once()
+	verificationSvc.On("Create", mock.Anything, "user-1", "hashed-token-123", models.TypeMagicLinkSignInRequest, "test@example.com", uc.PluginConfig.ExpiresIn).
+		Return(&models.Verification{ID: "verif-1"}, nil).Once()
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			uc, userSvc, accountSvc, tokenSvc, verificationSvc, _ := newSignInTestUseCase(t)
-			if tt.setup != nil {
-				tt.setup(t, uc, userSvc, accountSvc, tokenSvc, verificationSvc)
-			}
+	result, err := uc.SignIn(context.Background(), nil, "test@example.com", nil)
 
-			result, err := uc.SignIn(context.Background(), tt.inputName, tt.email, nil)
-
-			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("expected error")
-				}
-				if result != nil {
-					t.Fatalf("expected nil result")
-				}
-				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Fatalf("expected error to contain %q, got %v", tt.errContains, err)
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("expected no error, got %v", err)
-			}
-			if result == nil || result.Token == "" {
-				t.Fatalf("expected token in result")
-			}
-
-			if tt.assert != nil {
-				tt.assert(t, result)
-			}
-		})
-	}
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, "token-123", result.Token)
+	userSvc.AssertExpectations(t)
+	tokenSvc.AssertExpectations(t)
+	verificationSvc.AssertExpectations(t)
 }
 
-func strPtr(value string) *string {
-	return &value
+func TestSignInUseCase_SignIn_NewUserSignUp(t *testing.T) {
+	uc, userSvc, accountSvc, tokenSvc, verificationSvc, _ := newSignInTestUseCase()
+	uc.PluginConfig.SendMagicLinkVerificationEmail = func(email, verificationURL, token string) error { return nil }
+
+	name := "John Doe"
+	userSvc.On("GetByEmail", mock.Anything, "newuser@example.com").Return(nil, nil).Once()
+	userSvc.On("Create", mock.Anything, "John Doe", "newuser@example.com", false, (*string)(nil), mock.Anything).
+		Return(&models.User{ID: "user-1", Name: "John Doe", Email: "newuser@example.com"}, nil).Once()
+	accountSvc.On("Create", mock.Anything, "user-1", "newuser@example.com", models.AuthProviderMagicLink.String(), (*string)(nil)).
+		Return(&models.Account{ID: "account-1", UserID: "user-1"}, nil).Once()
+	tokenSvc.On("Generate").Return("token-123", nil).Once()
+	tokenSvc.On("Hash", "token-123").Return("hashed-token-123").Once()
+	verificationSvc.On("Create", mock.Anything, "user-1", "hashed-token-123", models.TypeMagicLinkSignInRequest, "newuser@example.com", uc.PluginConfig.ExpiresIn).
+		Return(&models.Verification{ID: "verif-1"}, nil).Once()
+
+	result, err := uc.SignIn(context.Background(), &name, "newuser@example.com", nil)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, "token-123", result.Token)
+	userSvc.AssertExpectations(t)
+	accountSvc.AssertExpectations(t)
+	tokenSvc.AssertExpectations(t)
+	verificationSvc.AssertExpectations(t)
+}
+
+func TestSignInUseCase_SignIn_NewUserSignUpDisabled(t *testing.T) {
+	uc, userSvc, _, _, _, _ := newSignInTestUseCase()
+	uc.PluginConfig.DisableSignUp = true
+
+	userSvc.On("GetByEmail", mock.Anything, "newuser@example.com").Return(nil, nil).Once()
+
+	result, err := uc.SignIn(context.Background(), nil, "newuser@example.com", nil)
+
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "disabled")
+	userSvc.AssertExpectations(t)
+}
+
+func TestSignInUseCase_SignIn_EmailNormalization(t *testing.T) {
+	uc, userSvc, accountSvc, tokenSvc, verificationSvc, _ := newSignInTestUseCase()
+	uc.PluginConfig.SendMagicLinkVerificationEmail = func(email, verificationURL, token string) error { return nil }
+
+	capturedEmail := ""
+	userSvc.On("GetByEmail", mock.Anything, "test@example.com").Run(func(args mock.Arguments) {
+		capturedEmail = args.String(1)
+	}).Return(nil, nil).Once()
+	userSvc.On("Create", mock.Anything, "", "test@example.com", false, (*string)(nil), mock.Anything).
+		Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+	accountSvc.On("Create", mock.Anything, "user-1", "test@example.com", models.AuthProviderMagicLink.String(), (*string)(nil)).
+		Return(&models.Account{ID: "account-1", UserID: "user-1"}, nil).Once()
+	tokenSvc.On("Generate").Return("token-123", nil).Once()
+	tokenSvc.On("Hash", "token-123").Return("hashed-token-123").Once()
+	verificationSvc.On("Create", mock.Anything, "user-1", "hashed-token-123", models.TypeMagicLinkSignInRequest, "test@example.com", uc.PluginConfig.ExpiresIn).
+		Return(&models.Verification{ID: "verif-1"}, nil).Once()
+
+	result, err := uc.SignIn(context.Background(), nil, "TEST@EXAMPLE.COM", nil)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, "test@example.com", capturedEmail)
+}
+
+func TestSignInUseCase_SignIn_GetByEmailError(t *testing.T) {
+	uc, userSvc, _, _, _, _ := newSignInTestUseCase()
+
+	userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(nil, errors.New("database error")).Once()
+
+	result, err := uc.SignIn(context.Background(), nil, "test@example.com", nil)
+
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "database error")
+}
+
+func TestSignInUseCase_SignIn_TokenGenerationError(t *testing.T) {
+	uc, userSvc, _, tokenSvc, _, _ := newSignInTestUseCase()
+	uc.PluginConfig.SendMagicLinkVerificationEmail = func(email, verificationURL, token string) error { return nil }
+
+	userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+	tokenSvc.On("Generate").Return("", errors.New("token generation failed")).Once()
+
+	result, err := uc.SignIn(context.Background(), nil, "test@example.com", nil)
+
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "token generation failed")
+}
+
+func TestSignInUseCase_SignIn_VerificationCreationError(t *testing.T) {
+	uc, userSvc, _, tokenSvc, verificationSvc, _ := newSignInTestUseCase()
+	uc.PluginConfig.SendMagicLinkVerificationEmail = func(email, verificationURL, token string) error { return nil }
+
+	userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+	tokenSvc.On("Generate").Return("token-123", nil).Once()
+	tokenSvc.On("Hash", "token-123").Return("hashed-token-123").Once()
+	verificationSvc.On("Create", mock.Anything, "user-1", "hashed-token-123", models.TypeMagicLinkSignInRequest, "test@example.com", uc.PluginConfig.ExpiresIn).
+		Return(nil, errors.New("verification creation failed")).Once()
+
+	result, err := uc.SignIn(context.Background(), nil, "test@example.com", nil)
+
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "verification creation failed")
+}
+
+func TestSignInUseCase_SignIn_NewUserWithoutNameUsesEmptyString(t *testing.T) {
+	uc, userSvc, accountSvc, tokenSvc, verificationSvc, _ := newSignInTestUseCase()
+	uc.PluginConfig.SendMagicLinkVerificationEmail = func(email, verificationURL, token string) error { return nil }
+
+	capturedName := "__unset__"
+	userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(nil, nil).Once()
+	userSvc.On("Create", mock.Anything, mock.AnythingOfType("string"), "test@example.com", false, (*string)(nil), mock.Anything).
+		Run(func(args mock.Arguments) {
+			capturedName = args.String(1)
+		}).
+		Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+	accountSvc.On("Create", mock.Anything, "user-1", "test@example.com", models.AuthProviderMagicLink.String(), (*string)(nil)).
+		Return(&models.Account{ID: "account-1", UserID: "user-1"}, nil).Once()
+	tokenSvc.On("Generate").Return("token-123", nil).Once()
+	tokenSvc.On("Hash", "token-123").Return("hashed-token-123").Once()
+	verificationSvc.On("Create", mock.Anything, "user-1", "hashed-token-123", models.TypeMagicLinkSignInRequest, "test@example.com", uc.PluginConfig.ExpiresIn).
+		Return(&models.Verification{ID: "verif-1"}, nil).Once()
+
+	result, err := uc.SignIn(context.Background(), nil, strings.ToUpper("test@example.com"), nil)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, "", capturedName)
 }

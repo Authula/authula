@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
@@ -17,80 +19,72 @@ func failUnexpected(t *testing.T, strict bool, method string) {
 	t.Fatalf("unexpected call to %s", method)
 }
 
-type MockUserService struct {
-	t              *testing.T
-	strict         bool
-	GetAllFn       func(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error)
-	GetByEmailFn   func(ctx context.Context, email string) (*models.User, error)
-	GetByIDFn      func(ctx context.Context, id string) (*models.User, error)
-	CreateFn       func(ctx context.Context, name, email string, emailVerified bool, image *string) (*models.User, error)
-	UpdateFn       func(ctx context.Context, user *models.User) (*models.User, error)
-	UpdateFieldsFn func(ctx context.Context, id string, fields map[string]any) error
-	DeleteFn       func(ctx context.Context, id string) error
+type MockUserRepository struct {
+	mock.Mock
 }
 
-func NewMockUserService(t *testing.T) *MockUserService {
-	t.Helper()
-	return &MockUserService{t: t, strict: true}
-}
+func (m *MockUserRepository) GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error) {
+	args := m.Called(ctx, cursor, limit)
+	users := args.Get(0)
+	cursor2 := args.Get(1)
 
-func (m *MockUserService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata json.RawMessage) (*models.User, error) {
-	if m.CreateFn != nil {
-		return m.CreateFn(ctx, name, email, emailVerified, image)
+	var usersSlice []models.User
+	if users != nil {
+		usersSlice = users.([]models.User)
 	}
-	failUnexpected(m.t, m.strict, "MockUserService.Create")
-	return &models.User{ID: "user-1", Name: name, Email: email, EmailVerified: emailVerified, Image: image}, nil
+
+	var cursorPtr *string
+	if cursor2 != nil {
+		cursorPtr = cursor2.(*string)
+	}
+
+	return usersSlice, cursorPtr, args.Error(2)
 }
 
-func (m *MockUserService) GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error) {
-	if m.GetAllFn != nil {
-		return m.GetAllFn(ctx, cursor, limit)
+func (m *MockUserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	failUnexpected(m.t, m.strict, "MockUserService.GetAll")
-	return []models.User{}, nil, nil
+	return args.Get(0).(*models.User), args.Error(1)
 }
 
-func (m *MockUserService) GetByID(ctx context.Context, id string) (*models.User, error) {
-	if m.GetByIDFn != nil {
-		return m.GetByIDFn(ctx, id)
+func (m *MockUserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
+	args := m.Called(ctx, email)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	failUnexpected(m.t, m.strict, "MockUserService.GetByID")
-	return &models.User{ID: id, Email: "test@example.com"}, nil
+	return args.Get(0).(*models.User), args.Error(1)
 }
 
-func (m *MockUserService) GetByEmail(ctx context.Context, email string) (*models.User, error) {
-	if m.GetByEmailFn != nil {
-		return m.GetByEmailFn(ctx, email)
+func (m *MockUserRepository) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata json.RawMessage) (*models.User, error) {
+	args := m.Called(ctx, name, email, emailVerified, image, metadata)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	failUnexpected(m.t, m.strict, "MockUserService.GetByEmail")
-	return &models.User{ID: "user-1", Email: email}, nil
+	return args.Get(0).(*models.User), args.Error(1)
 }
 
-func (m *MockUserService) Update(ctx context.Context, user *models.User) (*models.User, error) {
-	if m.UpdateFn != nil {
-		return m.UpdateFn(ctx, user)
+func (m *MockUserRepository) Update(ctx context.Context, user *models.User) (*models.User, error) {
+	args := m.Called(ctx, user)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	failUnexpected(m.t, m.strict, "MockUserService.Update")
-	return user, nil
+	return args.Get(0).(*models.User), args.Error(1)
 }
 
-func (m *MockUserService) UpdateFields(ctx context.Context, id string, fields map[string]any) error {
-	if m.UpdateFieldsFn != nil {
-		return m.UpdateFieldsFn(ctx, id, fields)
-	}
-	failUnexpected(m.t, m.strict, "MockUserService.UpdateFields")
-	return nil
+func (m *MockUserRepository) UpdateFields(ctx context.Context, id string, fields map[string]any) error {
+	args := m.Called(ctx, id, fields)
+	return args.Error(0)
 }
 
-func (m *MockUserService) Delete(ctx context.Context, id string) error {
-	if m.DeleteFn != nil {
-		return m.DeleteFn(ctx, id)
-	}
-	failUnexpected(m.t, m.strict, "MockUserService.Delete")
-	return nil
+func (m *MockUserRepository) Delete(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
 }
 
 type MockAccountService struct {
+	mock.Mock
 	t                           *testing.T
 	strict                      bool
 	CreateFn                    func(ctx context.Context, userID, accountID, providerID string, password *string) (*models.Account, error)
@@ -108,6 +102,13 @@ func NewMockAccountService(t *testing.T) *MockAccountService {
 }
 
 func (m *MockAccountService) Create(ctx context.Context, userID, accountID, providerID string, password *string) (*models.Account, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, userID, accountID, providerID, password)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).(*models.Account), args.Error(1)
+	}
 	if m.CreateFn != nil {
 		return m.CreateFn(ctx, userID, accountID, providerID, password)
 	}
@@ -116,6 +117,13 @@ func (m *MockAccountService) Create(ctx context.Context, userID, accountID, prov
 }
 
 func (m *MockAccountService) CreateOAuth2(ctx context.Context, userID, providerAccountID, provider, accessToken string, refreshToken *string, accessTokenExpiresAt, refreshTokenExpiresAt *time.Time, scope *string) (*models.Account, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, userID, providerAccountID, provider, accessToken, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt, scope)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).(*models.Account), args.Error(1)
+	}
 	if m.CreateOAuth2Fn != nil {
 		return m.CreateOAuth2Fn(ctx, userID, providerAccountID, provider, accessToken, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt, scope)
 	}
@@ -124,6 +132,13 @@ func (m *MockAccountService) CreateOAuth2(ctx context.Context, userID, providerA
 }
 
 func (m *MockAccountService) GetByUserID(ctx context.Context, userID string) (*models.Account, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, userID)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).(*models.Account), args.Error(1)
+	}
 	if m.GetByUserIDFn != nil {
 		return m.GetByUserIDFn(ctx, userID)
 	}
@@ -132,6 +147,13 @@ func (m *MockAccountService) GetByUserID(ctx context.Context, userID string) (*m
 }
 
 func (m *MockAccountService) GetByUserIDAndProvider(ctx context.Context, userID, provider string) (*models.Account, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, userID, provider)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).(*models.Account), args.Error(1)
+	}
 	if m.GetByUserIDAndProviderFn != nil {
 		return m.GetByUserIDAndProviderFn(ctx, userID, provider)
 	}
@@ -140,6 +162,13 @@ func (m *MockAccountService) GetByUserIDAndProvider(ctx context.Context, userID,
 }
 
 func (m *MockAccountService) GetByProviderAndAccountID(ctx context.Context, provider, accountID string) (*models.Account, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, provider, accountID)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).(*models.Account), args.Error(1)
+	}
 	if m.GetByProviderAndAccountIDFn != nil {
 		return m.GetByProviderAndAccountIDFn(ctx, provider, accountID)
 	}
@@ -148,6 +177,13 @@ func (m *MockAccountService) GetByProviderAndAccountID(ctx context.Context, prov
 }
 
 func (m *MockAccountService) Update(ctx context.Context, account *models.Account) (*models.Account, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, account)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).(*models.Account), args.Error(1)
+	}
 	if m.UpdateFn != nil {
 		return m.UpdateFn(ctx, account)
 	}
@@ -156,6 +192,10 @@ func (m *MockAccountService) Update(ctx context.Context, account *models.Account
 }
 
 func (m *MockAccountService) UpdateFields(ctx context.Context, userID string, fields map[string]any) error {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, userID, fields)
+		return args.Error(0)
+	}
 	if m.UpdateFieldsFn != nil {
 		return m.UpdateFieldsFn(ctx, userID, fields)
 	}
@@ -164,6 +204,7 @@ func (m *MockAccountService) UpdateFields(ctx context.Context, userID string, fi
 }
 
 type MockSessionService struct {
+	mock.Mock
 	t                      *testing.T
 	strict                 bool
 	GetByIDFn              func(ctx context.Context, id string) (*models.Session, error)
@@ -184,6 +225,13 @@ func NewMockSessionService(t *testing.T) *MockSessionService {
 }
 
 func (m *MockSessionService) GetByID(ctx context.Context, id string) (*models.Session, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, id)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).(*models.Session), args.Error(1)
+	}
 	if m.GetByIDFn != nil {
 		return m.GetByIDFn(ctx, id)
 	}
@@ -192,6 +240,13 @@ func (m *MockSessionService) GetByID(ctx context.Context, id string) (*models.Se
 }
 
 func (m *MockSessionService) Create(ctx context.Context, userID, hashedToken string, ipAddress, userAgent *string, maxAge time.Duration) (*models.Session, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, userID, hashedToken, ipAddress, userAgent, maxAge)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).(*models.Session), args.Error(1)
+	}
 	if m.CreateFn != nil {
 		return m.CreateFn(ctx, userID, hashedToken, ipAddress, userAgent, maxAge)
 	}
@@ -200,6 +255,13 @@ func (m *MockSessionService) Create(ctx context.Context, userID, hashedToken str
 }
 
 func (m *MockSessionService) GetByUserID(ctx context.Context, userID string) (*models.Session, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, userID)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).(*models.Session), args.Error(1)
+	}
 	if m.GetByUserIDFn != nil {
 		return m.GetByUserIDFn(ctx, userID)
 	}
@@ -208,6 +270,13 @@ func (m *MockSessionService) GetByUserID(ctx context.Context, userID string) (*m
 }
 
 func (m *MockSessionService) GetByToken(ctx context.Context, hashedToken string) (*models.Session, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, hashedToken)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).(*models.Session), args.Error(1)
+	}
 	if m.GetByTokenFn != nil {
 		return m.GetByTokenFn(ctx, hashedToken)
 	}
@@ -216,6 +285,13 @@ func (m *MockSessionService) GetByToken(ctx context.Context, hashedToken string)
 }
 
 func (m *MockSessionService) Update(ctx context.Context, session *models.Session) (*models.Session, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, session)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).(*models.Session), args.Error(1)
+	}
 	if m.UpdateFn != nil {
 		return m.UpdateFn(ctx, session)
 	}
@@ -224,6 +300,10 @@ func (m *MockSessionService) Update(ctx context.Context, session *models.Session
 }
 
 func (m *MockSessionService) Delete(ctx context.Context, id string) error {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, id)
+		return args.Error(0)
+	}
 	if m.DeleteFn != nil {
 		return m.DeleteFn(ctx, id)
 	}
@@ -232,6 +312,10 @@ func (m *MockSessionService) Delete(ctx context.Context, id string) error {
 }
 
 func (m *MockSessionService) DeleteAllByUserID(ctx context.Context, userID string) error {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, userID)
+		return args.Error(0)
+	}
 	if m.DeleteAllByUserIDFn != nil {
 		return m.DeleteAllByUserIDFn(ctx, userID)
 	}
@@ -240,6 +324,10 @@ func (m *MockSessionService) DeleteAllByUserID(ctx context.Context, userID strin
 }
 
 func (m *MockSessionService) DeleteAllExpired(ctx context.Context) error {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx)
+		return args.Error(0)
+	}
 	if m.DeleteAllExpiredFn != nil {
 		return m.DeleteAllExpiredFn(ctx)
 	}
@@ -248,6 +336,13 @@ func (m *MockSessionService) DeleteAllExpired(ctx context.Context) error {
 }
 
 func (m *MockSessionService) GetDistinctUserIDs(ctx context.Context) ([]string, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).([]string), args.Error(1)
+	}
 	if m.GetDistinctUserIDsFn != nil {
 		return m.GetDistinctUserIDsFn(ctx)
 	}
@@ -256,6 +351,10 @@ func (m *MockSessionService) GetDistinctUserIDs(ctx context.Context) ([]string, 
 }
 
 func (m *MockSessionService) DeleteOldestByUserID(ctx context.Context, userID string, maxCount int) error {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, userID, maxCount)
+		return args.Error(0)
+	}
 	if m.DeleteOldestByUserIDFn != nil {
 		return m.DeleteOldestByUserIDFn(ctx, userID, maxCount)
 	}
@@ -264,6 +363,7 @@ func (m *MockSessionService) DeleteOldestByUserID(ctx context.Context, userID st
 }
 
 type MockVerificationService struct {
+	mock.Mock
 	t                       *testing.T
 	strict                  bool
 	CreateFn                func(ctx context.Context, userID string, hashedToken string, vType models.VerificationType, value string, expiry time.Duration) (*models.Verification, error)
@@ -280,6 +380,13 @@ func NewMockVerificationService(t *testing.T) *MockVerificationService {
 }
 
 func (m *MockVerificationService) Create(ctx context.Context, userID string, hashedToken string, vType models.VerificationType, value string, expiry time.Duration) (*models.Verification, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, userID, hashedToken, vType, value, expiry)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).(*models.Verification), args.Error(1)
+	}
 	if m.CreateFn != nil {
 		return m.CreateFn(ctx, userID, hashedToken, vType, value, expiry)
 	}
@@ -288,6 +395,13 @@ func (m *MockVerificationService) Create(ctx context.Context, userID string, has
 }
 
 func (m *MockVerificationService) GetByToken(ctx context.Context, hashedToken string) (*models.Verification, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, hashedToken)
+		if args.Get(0) == nil {
+			return nil, args.Error(1)
+		}
+		return args.Get(0).(*models.Verification), args.Error(1)
+	}
 	if m.GetByTokenFn != nil {
 		return m.GetByTokenFn(ctx, hashedToken)
 	}
@@ -296,6 +410,10 @@ func (m *MockVerificationService) GetByToken(ctx context.Context, hashedToken st
 }
 
 func (m *MockVerificationService) Delete(ctx context.Context, id string) error {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, id)
+		return args.Error(0)
+	}
 	if m.DeleteFn != nil {
 		return m.DeleteFn(ctx, id)
 	}
@@ -304,6 +422,10 @@ func (m *MockVerificationService) Delete(ctx context.Context, id string) error {
 }
 
 func (m *MockVerificationService) DeleteByUserIDAndType(ctx context.Context, userID string, vType models.VerificationType) error {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, userID, vType)
+		return args.Error(0)
+	}
 	if m.DeleteByUserIDAndTypeFn != nil {
 		return m.DeleteByUserIDAndTypeFn(ctx, userID, vType)
 	}
@@ -312,6 +434,10 @@ func (m *MockVerificationService) DeleteByUserIDAndType(ctx context.Context, use
 }
 
 func (m *MockVerificationService) IsExpired(verif *models.Verification) bool {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(verif)
+		return args.Bool(0)
+	}
 	if m.IsExpiredFn != nil {
 		return m.IsExpiredFn(verif)
 	}
@@ -320,6 +446,10 @@ func (m *MockVerificationService) IsExpired(verif *models.Verification) bool {
 }
 
 func (m *MockVerificationService) DeleteExpired(ctx context.Context) error {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx)
+		return args.Error(0)
+	}
 	if m.DeleteExpiredFn != nil {
 		return m.DeleteExpiredFn(ctx)
 	}
@@ -328,6 +458,7 @@ func (m *MockVerificationService) DeleteExpired(ctx context.Context) error {
 }
 
 type MockTokenService struct {
+	mock.Mock
 	t          *testing.T
 	strict     bool
 	GenerateFn func() (string, error)
@@ -342,6 +473,13 @@ func NewMockTokenService(t *testing.T) *MockTokenService {
 }
 
 func (m *MockTokenService) Generate() (string, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called()
+		if args.Get(0) == nil {
+			return "", args.Error(1)
+		}
+		return args.String(0), args.Error(1)
+	}
 	if m.GenerateFn != nil {
 		return m.GenerateFn()
 	}
@@ -350,6 +488,10 @@ func (m *MockTokenService) Generate() (string, error) {
 }
 
 func (m *MockTokenService) Hash(token string) string {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(token)
+		return args.String(0)
+	}
 	if m.HashFn != nil {
 		return m.HashFn(token)
 	}
@@ -358,6 +500,13 @@ func (m *MockTokenService) Hash(token string) string {
 }
 
 func (m *MockTokenService) Encrypt(token string) (string, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(token)
+		if args.Get(0) == nil {
+			return "", args.Error(1)
+		}
+		return args.String(0), args.Error(1)
+	}
 	if m.EncryptFn != nil {
 		return m.EncryptFn(token)
 	}
@@ -366,6 +515,13 @@ func (m *MockTokenService) Encrypt(token string) (string, error) {
 }
 
 func (m *MockTokenService) Decrypt(encrypted string) (string, error) {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(encrypted)
+		if args.Get(0) == nil {
+			return "", args.Error(1)
+		}
+		return args.String(0), args.Error(1)
+	}
 	if m.DecryptFn != nil {
 		return m.DecryptFn(encrypted)
 	}
@@ -374,6 +530,7 @@ func (m *MockTokenService) Decrypt(encrypted string) (string, error) {
 }
 
 type MockMailerService struct {
+	mock.Mock
 	t           *testing.T
 	strict      bool
 	SendEmailFn func(ctx context.Context, to string, subject string, text string, html string) error
@@ -385,6 +542,10 @@ func NewMockMailerService(t *testing.T) *MockMailerService {
 }
 
 func (m *MockMailerService) SendEmail(ctx context.Context, to string, subject string, text string, html string) error {
+	if len(m.ExpectedCalls) > 0 {
+		args := m.Called(ctx, to, subject, text, html)
+		return args.Error(0)
+	}
 	if m.SendEmailFn != nil {
 		return m.SendEmailFn(ctx, to, subject, text, html)
 	}

@@ -1,180 +1,506 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/mock"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 )
 
-type rolePermissionUseCaseStub struct {
-	createPermissionFn         func(ctx context.Context, req types.CreatePermissionRequest) (*types.Permission, error)
-	getAllPermissionsFn        func(ctx context.Context) ([]types.Permission, error)
-	updatePermissionFn         func(ctx context.Context, permissionID string, req types.UpdatePermissionRequest) (*types.Permission, error)
-	deletePermissionFn         func(ctx context.Context, permissionID string) error
-	createRoleFn               func(ctx context.Context, req types.CreateRoleRequest) (*types.Role, error)
-	getAllRolesFn              func(ctx context.Context) ([]types.Role, error)
-	getRoleByIDFn              func(ctx context.Context, roleID string) (*types.RoleDetails, error)
-	updateRoleFn               func(ctx context.Context, roleID string, req types.UpdateRoleRequest) (*types.Role, error)
-	deleteRoleFn               func(ctx context.Context, roleID string) error
-	addPermissionToRoleFn      func(ctx context.Context, roleID string, permissionID string, grantedByUserID *string) error
-	removePermissionFromRoleFn func(ctx context.Context, roleID string, permissionID string) error
-	replaceRolePermissionsFn   func(ctx context.Context, roleID string, permissionIDs []string, grantedByUserID *string) error
-	assignRoleToUserFn         func(ctx context.Context, userID string, req types.AssignUserRoleRequest, assignedByUserID *string) error
-	removeRoleFromUserFn       func(ctx context.Context, userID string, roleID string) error
-	replaceUserRolesFn         func(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error
+func TestGetAllRolesHandler(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("GetAllRoles", mock.Anything).Return(nil, errors.New("internal error")).Once()
+		handler := NewGetAllRolesHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodGet, "/admin/roles", nil)
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusInternalServerError, "internal error")
+		useCase.AssertExpectations(t)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("GetAllRoles", mock.Anything).Return([]types.Role{{ID: "role-1", Name: "admin"}}, nil).Once()
+		handler := NewGetAllRolesHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodGet, "/admin/roles", nil)
+
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		payload := decodeResponseJSON(t, reqCtx)
+		if _, ok := payload["roles"]; !ok {
+			t.Fatalf("expected roles key, got %v", payload)
+		}
+		useCase.AssertExpectations(t)
+	})
 }
 
-func (s rolePermissionUseCaseStub) CreatePermission(ctx context.Context, req types.CreatePermissionRequest) (*types.Permission, error) {
-	return s.createPermissionFn(ctx, req)
+func TestGetRoleByIDHandler(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("GetRoleByID", mock.Anything, "role-1").Return(nil, errors.New("not found")).Once()
+		handler := NewGetRoleByIDHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodGet, "/admin/roles/role-1", nil)
+		req.SetPathValue("role_id", "role-1")
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusNotFound, "not found")
+		useCase.AssertExpectations(t)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("GetRoleByID", mock.Anything, "role-1").Return(&types.RoleDetails{Role: types.Role{ID: "role-1", Name: "admin"}}, nil).Once()
+		handler := NewGetRoleByIDHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodGet, "/admin/roles/role-1", nil)
+		req.SetPathValue("role_id", "role-1")
+
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		payload := decodeResponseJSON(t, reqCtx)
+		if _, ok := payload["data"]; !ok {
+			t.Fatalf("expected data key, got %v", payload)
+		}
+		useCase.AssertExpectations(t)
+	})
 }
 
-func (s rolePermissionUseCaseStub) GetAllPermissions(ctx context.Context) ([]types.Permission, error) {
-	return s.getAllPermissionsFn(ctx)
+func TestCreateRoleHandler(t *testing.T) {
+	t.Run("invalid json", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		handler := NewCreateRoleHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPost, "/admin/roles", []byte("{invalid"))
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusBadRequest, "invalid request body")
+	})
+
+	t.Run("error", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		request := types.CreateRoleRequest{Name: "admin"}
+		useCase.On("CreateRole", mock.Anything, request).Return(nil, errors.New("invalid role name")).Once()
+		handler := NewCreateRoleHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPost, "/admin/roles", mustJSON(t, request))
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusBadRequest, "invalid role name")
+		useCase.AssertExpectations(t)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		request := types.CreateRoleRequest{Name: "admin"}
+		useCase.On("CreateRole", mock.Anything, request).Return(&types.Role{ID: "role-1", Name: "admin"}, nil).Once()
+		handler := NewCreateRoleHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPost, "/admin/roles", mustJSON(t, request))
+
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusCreated {
+			t.Fatalf("expected status %d, got %d", http.StatusCreated, reqCtx.ResponseStatus)
+		}
+		payload := decodeResponseJSON(t, reqCtx)
+		if payload["message"] != "role created" {
+			t.Fatalf("expected role created message, got %v", payload["message"])
+		}
+		useCase.AssertExpectations(t)
+	})
 }
 
-func (s rolePermissionUseCaseStub) UpdatePermission(ctx context.Context, permissionID string, req types.UpdatePermissionRequest) (*types.Permission, error) {
-	return s.updatePermissionFn(ctx, permissionID, req)
+func TestUpdateRoleHandler(t *testing.T) {
+	t.Run("invalid json", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		handler := NewUpdateRoleHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPatch, "/admin/roles/role-1", []byte("{invalid"))
+		req.SetPathValue("role_id", "role-1")
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusBadRequest, "invalid request body")
+	})
+
+	t.Run("error", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		name := "ops"
+		request := types.UpdateRoleRequest{Name: &name}
+		useCase.On("UpdateRole", mock.Anything, "role-1", request).Return(nil, errors.New("forbidden")).Once()
+		handler := NewUpdateRoleHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPatch, "/admin/roles/role-1", mustJSON(t, request))
+		req.SetPathValue("role_id", "role-1")
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusForbidden, "forbidden")
+		useCase.AssertExpectations(t)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		name := "ops"
+		request := types.UpdateRoleRequest{Name: &name}
+		useCase.On("UpdateRole", mock.Anything, "role-1", request).Return(&types.Role{ID: "role-1", Name: name}, nil).Once()
+		handler := NewUpdateRoleHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPatch, "/admin/roles/role-1", mustJSON(t, request))
+		req.SetPathValue("role_id", "role-1")
+
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		payload := decodeResponseJSON(t, reqCtx)
+		if payload["message"] != "role updated" {
+			t.Fatalf("expected role updated message, got %v", payload["message"])
+		}
+		useCase.AssertExpectations(t)
+	})
 }
 
-func (s rolePermissionUseCaseStub) DeletePermission(ctx context.Context, permissionID string) error {
-	return s.deletePermissionFn(ctx, permissionID)
+func TestDeleteRoleHandler(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("DeleteRole", mock.Anything, "role-1").Return(errors.New("in use")).Once()
+		handler := NewDeleteRoleHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodDelete, "/admin/roles/role-1", nil)
+		req.SetPathValue("role_id", "role-1")
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusConflict, "in use")
+		useCase.AssertExpectations(t)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("DeleteRole", mock.Anything, "role-1").Return(nil).Once()
+		handler := NewDeleteRoleHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodDelete, "/admin/roles/role-1", nil)
+		req.SetPathValue("role_id", "role-1")
+
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		payload := decodeResponseJSON(t, reqCtx)
+		if payload["message"] != "role deleted" {
+			t.Fatalf("expected role deleted message, got %v", payload["message"])
+		}
+		useCase.AssertExpectations(t)
+	})
 }
 
-func (s rolePermissionUseCaseStub) CreateRole(ctx context.Context, req types.CreateRoleRequest) (*types.Role, error) {
-	return s.createRoleFn(ctx, req)
+func TestGetAllPermissionsHandler(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("GetAllPermissions", mock.Anything).Return(nil, errors.New("unauthorized")).Once()
+		handler := NewGetAllPermissionsHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodGet, "/admin/permissions", nil)
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusUnauthorized, "unauthorized")
+		useCase.AssertExpectations(t)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("GetAllPermissions", mock.Anything).Return([]types.Permission{{ID: "perm-1", Key: "admin.read"}}, nil).Once()
+		handler := NewGetAllPermissionsHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodGet, "/admin/permissions", nil)
+
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		payload := decodeResponseJSON(t, reqCtx)
+		if _, ok := payload["data"]; !ok {
+			t.Fatalf("expected data key, got %v", payload)
+		}
+		useCase.AssertExpectations(t)
+	})
 }
 
-func (s rolePermissionUseCaseStub) GetAllRoles(ctx context.Context) ([]types.Role, error) {
-	return s.getAllRolesFn(ctx)
+func TestCreatePermissionHandler(t *testing.T) {
+	t.Run("invalid json", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		handler := NewCreatePermissionHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPost, "/admin/permissions", []byte("{invalid"))
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid request body")
+	})
+
+	t.Run("error", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		request := types.CreatePermissionRequest{Key: "admin.read"}
+		useCase.On("CreatePermission", mock.Anything, request).Return(nil, errors.New("invalid permission key")).Once()
+		handler := NewCreatePermissionHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPost, "/admin/permissions", mustJSON(t, request))
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusBadRequest, "invalid permission key")
+		useCase.AssertExpectations(t)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		request := types.CreatePermissionRequest{Key: "admin.read"}
+		useCase.On("CreatePermission", mock.Anything, request).Return(&types.Permission{ID: "perm-1", Key: "admin.read"}, nil).Once()
+		handler := NewCreatePermissionHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPost, "/admin/permissions", mustJSON(t, request))
+
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusCreated {
+			t.Fatalf("expected status %d, got %d", http.StatusCreated, reqCtx.ResponseStatus)
+		}
+		payload := decodeResponseJSON(t, reqCtx)
+		if _, ok := payload["data"]; !ok {
+			t.Fatalf("expected data key, got %v", payload)
+		}
+		useCase.AssertExpectations(t)
+	})
 }
 
-func (s rolePermissionUseCaseStub) GetRoleByID(ctx context.Context, roleID string) (*types.RoleDetails, error) {
-	return s.getRoleByIDFn(ctx, roleID)
+func TestUpdatePermissionHandler(t *testing.T) {
+	t.Run("invalid json", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		handler := NewUpdatePermissionHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPatch, "/admin/permissions/perm-1", []byte("{invalid"))
+		req.SetPathValue("permission_id", "perm-1")
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusBadRequest, "invalid request body")
+	})
+
+	t.Run("error", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		desc := "updated"
+		request := types.UpdatePermissionRequest{Description: &desc}
+		useCase.On("UpdatePermission", mock.Anything, "perm-1", request).Return(nil, errors.New("forbidden")).Once()
+		handler := NewUpdatePermissionHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPatch, "/admin/permissions/perm-1", mustJSON(t, request))
+		req.SetPathValue("permission_id", "perm-1")
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusForbidden, "forbidden")
+		useCase.AssertExpectations(t)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		desc := "updated"
+		request := types.UpdatePermissionRequest{Description: &desc}
+		useCase.On("UpdatePermission", mock.Anything, "perm-1", request).Return(&types.Permission{ID: "perm-1", Key: "admin.read", Description: &desc}, nil).Once()
+		handler := NewUpdatePermissionHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPatch, "/admin/permissions/perm-1", mustJSON(t, request))
+		req.SetPathValue("permission_id", "perm-1")
+
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		payload := decodeResponseJSON(t, reqCtx)
+		if payload["message"] != "permission updated" {
+			t.Fatalf("expected permission updated message, got %v", payload["message"])
+		}
+		useCase.AssertExpectations(t)
+	})
 }
 
-func (s rolePermissionUseCaseStub) UpdateRole(ctx context.Context, roleID string, req types.UpdateRoleRequest) (*types.Role, error) {
-	return s.updateRoleFn(ctx, roleID, req)
+func TestDeletePermissionHandler(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("DeletePermission", mock.Anything, "perm-1").Return(errors.New("not found")).Once()
+		handler := NewDeletePermissionHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodDelete, "/admin/permissions/perm-1", nil)
+		req.SetPathValue("permission_id", "perm-1")
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusNotFound, "not found")
+		useCase.AssertExpectations(t)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("DeletePermission", mock.Anything, "perm-1").Return(nil).Once()
+		handler := NewDeletePermissionHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodDelete, "/admin/permissions/perm-1", nil)
+		req.SetPathValue("permission_id", "perm-1")
+
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		payload := decodeResponseJSON(t, reqCtx)
+		if payload["message"] != "permission deleted" {
+			t.Fatalf("expected permission deleted message, got %v", payload["message"])
+		}
+		useCase.AssertExpectations(t)
+	})
 }
 
-func (s rolePermissionUseCaseStub) DeleteRole(ctx context.Context, roleID string) error {
-	return s.deleteRoleFn(ctx, roleID)
+func TestAddRolePermissionHandler(t *testing.T) {
+	t.Run("uses query param", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		actorID := "actor-1"
+		useCase.On("AddPermissionToRole", mock.Anything, "role-1", "perm-1", &actorID).Return(nil).Once()
+		handler := NewAddRolePermissionHandler(useCase)
+
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPost, "/admin/roles/role-1/permissions?permission_id=perm-1", nil)
+		req.SetPathValue("role_id", "role-1")
+		reqCtx.UserID = &actorID
+
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		payload := decodeResponseJSON(t, reqCtx)
+		if payload["message"] != "permission assigned to role" {
+			t.Fatalf("expected success message, got %v", payload["message"])
+		}
+		useCase.AssertExpectations(t)
+	})
+
+	t.Run("falls back to json body", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("AddPermissionToRole", mock.Anything, "role-1", "perm-2", (*string)(nil)).Return(nil).Once()
+		handler := NewAddRolePermissionHandler(useCase)
+
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPost, "/admin/roles/role-1/permissions", mustJSON(t, map[string]string{"permission_id": "perm-2"}))
+		req.SetPathValue("role_id", "role-1")
+
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		useCase.AssertExpectations(t)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("AddPermissionToRole", mock.Anything, "role-1", "perm-1", (*string)(nil)).Return(errors.New("forbidden")).Once()
+		handler := NewAddRolePermissionHandler(useCase)
+
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPost, "/admin/roles/role-1/permissions?permission_id=perm-1", nil)
+		req.SetPathValue("role_id", "role-1")
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusForbidden, "forbidden")
+		useCase.AssertExpectations(t)
+	})
 }
 
-func (s rolePermissionUseCaseStub) AddPermissionToRole(ctx context.Context, roleID string, permissionID string, grantedByUserID *string) error {
-	return s.addPermissionToRoleFn(ctx, roleID, permissionID, grantedByUserID)
+func TestReplaceRolePermissionsHandler(t *testing.T) {
+	t.Run("invalid json", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		handler := NewReplaceRolePermissionsHandler(useCase)
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPut, "/admin/roles/role-1/permissions", []byte("{invalid"))
+		req.SetPathValue("role_id", "role-1")
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusBadRequest, "invalid request body")
+	})
+
+	t.Run("error", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		actorID := "actor-1"
+		request := types.ReplaceRolePermissionsRequest{PermissionIDs: []string{"perm-1", "perm-2"}}
+		useCase.On("ReplaceRolePermissions", mock.Anything, "role-1", request.PermissionIDs, &actorID).Return(errors.New("cannot replace")).Once()
+		handler := NewReplaceRolePermissionsHandler(useCase)
+
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPut, "/admin/roles/role-1/permissions", mustJSON(t, request))
+		req.SetPathValue("role_id", "role-1")
+		reqCtx.UserID = &actorID
+
+		handler.Handler()(w, req)
+
+		assertErrorMessage(t, reqCtx, http.StatusBadRequest, "cannot replace")
+		useCase.AssertExpectations(t)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		request := types.ReplaceRolePermissionsRequest{PermissionIDs: []string{"perm-1"}}
+		useCase.On("ReplaceRolePermissions", mock.Anything, "role-1", request.PermissionIDs, (*string)(nil)).Return(nil).Once()
+		handler := NewReplaceRolePermissionsHandler(useCase)
+
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodPut, "/admin/roles/role-1/permissions", mustJSON(t, request))
+		req.SetPathValue("role_id", "role-1")
+
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		payload := decodeResponseJSON(t, reqCtx)
+		if payload["message"] != "role permissions replaced" {
+			t.Fatalf("expected role permissions replaced message, got %v", payload["message"])
+		}
+		useCase.AssertExpectations(t)
+	})
 }
 
-func (s rolePermissionUseCaseStub) RemovePermissionFromRole(ctx context.Context, roleID string, permissionID string) error {
-	return s.removePermissionFromRoleFn(ctx, roleID, permissionID)
-}
+func TestRemoveRolePermissionHandler(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("RemovePermissionFromRole", mock.Anything, "role-1", "perm-1").Return(errors.New("not found")).Once()
+		handler := NewRemoveRolePermissionHandler(useCase)
 
-func (s rolePermissionUseCaseStub) ReplaceRolePermissions(ctx context.Context, roleID string, permissionIDs []string, grantedByUserID *string) error {
-	return s.replaceRolePermissionsFn(ctx, roleID, permissionIDs, grantedByUserID)
-}
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodDelete, "/admin/roles/role-1/permissions/perm-1", nil)
+		req.SetPathValue("role_id", "role-1")
+		req.SetPathValue("permission_id", "perm-1")
 
-func (s rolePermissionUseCaseStub) AssignRoleToUser(ctx context.Context, userID string, req types.AssignUserRoleRequest, assignedByUserID *string) error {
-	return s.assignRoleToUserFn(ctx, userID, req, assignedByUserID)
-}
+		handler.Handler()(w, req)
 
-func (s rolePermissionUseCaseStub) RemoveRoleFromUser(ctx context.Context, userID string, roleID string) error {
-	return s.removeRoleFromUserFn(ctx, userID, roleID)
-}
+		assertErrorMessage(t, reqCtx, http.StatusNotFound, "not found")
+		useCase.AssertExpectations(t)
+	})
 
-func (s rolePermissionUseCaseStub) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error {
-	return s.replaceUserRolesFn(ctx, userID, roleIDs, assignedByUserID)
-}
+	t.Run("success", func(t *testing.T) {
+		useCase := &mockRolePermissionUseCase{}
+		useCase.On("RemovePermissionFromRole", mock.Anything, "role-1", "perm-1").Return(nil).Once()
+		handler := NewRemoveRolePermissionHandler(useCase)
 
-func TestUpdatePermissionHandler_BadJSON(t *testing.T) {
-	stub := rolePermissionUseCaseStub{
-		createPermissionFn: func(ctx context.Context, req types.CreatePermissionRequest) (*types.Permission, error) {
-			return nil, nil
-		},
-		getAllPermissionsFn: func(ctx context.Context) ([]types.Permission, error) { return nil, nil },
-		updatePermissionFn: func(ctx context.Context, permissionID string, req types.UpdatePermissionRequest) (*types.Permission, error) {
-			return nil, nil
-		},
-		deletePermissionFn: func(ctx context.Context, permissionID string) error { return nil },
-		createRoleFn:       func(ctx context.Context, req types.CreateRoleRequest) (*types.Role, error) { return nil, nil },
-		getAllRolesFn:      func(ctx context.Context) ([]types.Role, error) { return nil, nil },
-		getRoleByIDFn:      func(ctx context.Context, roleID string) (*types.RoleDetails, error) { return nil, nil },
-		updateRoleFn: func(ctx context.Context, roleID string, req types.UpdateRoleRequest) (*types.Role, error) {
-			return nil, nil
-		},
-		deleteRoleFn: func(ctx context.Context, roleID string) error { return nil },
-		addPermissionToRoleFn: func(ctx context.Context, roleID string, permissionID string, grantedByUserID *string) error {
-			return nil
-		},
-		removePermissionFromRoleFn: func(ctx context.Context, roleID string, permissionID string) error { return nil },
-		replaceRolePermissionsFn: func(ctx context.Context, roleID string, permissionIDs []string, grantedByUserID *string) error {
-			return nil
-		},
-		assignRoleToUserFn: func(ctx context.Context, userID string, req types.AssignUserRoleRequest, assignedByUserID *string) error {
-			return nil
-		},
-		removeRoleFromUserFn: func(ctx context.Context, userID string, roleID string) error { return nil },
-		replaceUserRolesFn:   func(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error { return nil },
-	}
+		req, w, reqCtx := newAdminHandlerRequest(t, http.MethodDelete, "/admin/roles/role-1/permissions/perm-1", nil)
+		req.SetPathValue("role_id", "role-1")
+		req.SetPathValue("permission_id", "perm-1")
 
-	h := NewUpdatePermissionHandler(stub)
-	req := httptest.NewRequest(http.MethodPatch, "/admin/permissions/p-1", strings.NewReader("{"))
-	req.SetPathValue("id", "p-1")
-	req, rc := withReqCtx(req)
-	w := httptest.NewRecorder()
+		handler.Handler()(w, req)
 
-	h.Handler().ServeHTTP(w, req)
-
-	if rc.ResponseStatus != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d", rc.ResponseStatus)
-	}
-}
-
-func TestDeletePermissionHandler_Conflict(t *testing.T) {
-	stub := rolePermissionUseCaseStub{
-		createPermissionFn: func(ctx context.Context, req types.CreatePermissionRequest) (*types.Permission, error) {
-			return nil, nil
-		},
-		getAllPermissionsFn: func(ctx context.Context) ([]types.Permission, error) { return nil, nil },
-		updatePermissionFn: func(ctx context.Context, permissionID string, req types.UpdatePermissionRequest) (*types.Permission, error) {
-			return nil, nil
-		},
-		deletePermissionFn: func(ctx context.Context, permissionID string) error {
-			return errors.New("permission is in use by one or more roles")
-		},
-		createRoleFn:  func(ctx context.Context, req types.CreateRoleRequest) (*types.Role, error) { return nil, nil },
-		getAllRolesFn: func(ctx context.Context) ([]types.Role, error) { return nil, nil },
-		getRoleByIDFn: func(ctx context.Context, roleID string) (*types.RoleDetails, error) { return nil, nil },
-		updateRoleFn: func(ctx context.Context, roleID string, req types.UpdateRoleRequest) (*types.Role, error) {
-			return nil, nil
-		},
-		deleteRoleFn: func(ctx context.Context, roleID string) error { return nil },
-		addPermissionToRoleFn: func(ctx context.Context, roleID string, permissionID string, grantedByUserID *string) error {
-			return nil
-		},
-		removePermissionFromRoleFn: func(ctx context.Context, roleID string, permissionID string) error { return nil },
-		replaceRolePermissionsFn: func(ctx context.Context, roleID string, permissionIDs []string, grantedByUserID *string) error {
-			return nil
-		},
-		assignRoleToUserFn: func(ctx context.Context, userID string, req types.AssignUserRoleRequest, assignedByUserID *string) error {
-			return nil
-		},
-		removeRoleFromUserFn: func(ctx context.Context, userID string, roleID string) error { return nil },
-		replaceUserRolesFn:   func(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error { return nil },
-	}
-
-	h := NewDeletePermissionHandler(stub)
-	req := httptest.NewRequest(http.MethodDelete, "/admin/permissions/p-in-use", nil)
-	req.SetPathValue("id", "p-in-use")
-	req, rc := withReqCtx(req)
-	w := httptest.NewRecorder()
-
-	h.Handler().ServeHTTP(w, req)
-
-	if rc.ResponseStatus != http.StatusConflict {
-		t.Fatalf("expected status 409, got %d", rc.ResponseStatus)
-	}
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		payload := decodeResponseJSON(t, reqCtx)
+		if payload["message"] != "permission removed from role" {
+			t.Fatalf("expected permission removed message, got %v", payload["message"])
+		}
+		useCase.AssertExpectations(t)
+	})
 }

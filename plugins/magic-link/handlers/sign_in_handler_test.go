@@ -10,43 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/tests"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/magic-link/types"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/magic-link/usecases"
 )
-
-// Mocks
-
-type mockUserServiceWithError struct{}
-
-func (m *mockUserServiceWithError) GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error) {
-	return nil, nil, errors.New("database error")
-}
-
-func (m *mockUserServiceWithError) GetByEmail(ctx context.Context, email string) (*models.User, error) {
-	return nil, errors.New("database error")
-}
-
-func (m *mockUserServiceWithError) GetByID(ctx context.Context, id string) (*models.User, error) {
-	return &models.User{ID: id, Email: "test@example.com"}, nil
-}
-
-func (m *mockUserServiceWithError) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata json.RawMessage) (*models.User, error) {
-	return nil, errors.New("database error")
-}
-
-func (m *mockUserServiceWithError) Update(ctx context.Context, user *models.User) (*models.User, error) {
-	return user, nil
-}
-
-func (m *mockUserServiceWithError) UpdateFields(ctx context.Context, id string, fields map[string]any) error {
-	return nil
-}
-
-func (m *mockUserServiceWithError) Delete(ctx context.Context, id string) error {
-	return nil
-}
 
 // Tests
 
@@ -54,8 +24,8 @@ func TestSignInHandler_ValidRequestWithExistingUser(t *testing.T) {
 	payload := SignInPayload{
 		Email: "test@example.com",
 	}
-
 	body, _ := json.Marshal(payload)
+
 	req := httptest.NewRequest("POST", "/magic-link/sign-in", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
@@ -72,6 +42,23 @@ func TestSignInHandler_ValidRequestWithExistingUser(t *testing.T) {
 	ctx := models.SetRequestContext(context.Background(), reqCtx)
 	req = req.WithContext(ctx)
 
+	userService := &tests.MockUserRepository{}
+	userService.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{
+		ID:    "user-123",
+		Email: "test@example.com",
+	}, nil).Once()
+
+	tokenService := &tests.MockTokenService{}
+	tokenService.On("Generate").Return("token-123", nil).Once()
+	tokenService.On("Hash", "token-123").Return("hashed-token-123").Once()
+
+	mailingService := &tests.MockMailerService{}
+	mailingService.On("SendEmail", mock.Anything, "test@example.com", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+
+	verificationService := &tests.MockVerificationService{}
+	verificationService.On("Create", mock.Anything, "user-123", "hashed-token-123", models.TypeMagicLinkSignInRequest, "test@example.com", 15*time.Minute).
+		Return(&models.Verification{ID: "verif-1"}, nil).Once()
+
 	useCase := &usecases.SignInUseCaseImpl{
 		GlobalConfig: &models.Config{
 			BaseURL:  "http://localhost",
@@ -81,11 +68,11 @@ func TestSignInHandler_ValidRequestWithExistingUser(t *testing.T) {
 			ExpiresIn: 15 * time.Minute,
 		},
 		Logger:              &tests.MockLogger{},
-		UserService:         &tests.MockUserService{},
+		UserService:         userService,
 		AccountService:      &tests.MockAccountService{},
-		TokenService:        &tests.MockTokenService{},
-		VerificationService: &tests.MockVerificationService{},
-		MailerService:       &tests.MockMailerService{},
+		TokenService:        tokenService,
+		VerificationService: verificationService,
+		MailerService:       mailingService,
 	}
 
 	handler := &SignInHandler{UseCase: useCase}
@@ -163,13 +150,14 @@ func TestSignInHandler_UseCaseError(t *testing.T) {
 	ctx := models.SetRequestContext(context.Background(), reqCtx)
 	req = req.WithContext(ctx)
 
-	userSvc := &mockUserServiceWithError{}
+	userService := &tests.MockUserRepository{}
+	userService.On("GetByEmail", mock.Anything, "test@example.com").Return(nil, errors.New("database error")).Once()
 
 	useCase := &usecases.SignInUseCaseImpl{
 		GlobalConfig:        &models.Config{},
 		PluginConfig:        &types.MagicLinkPluginConfig{},
 		Logger:              &tests.MockLogger{},
-		UserService:         userSvc,
+		UserService:         userService,
 		AccountService:      &tests.MockAccountService{},
 		TokenService:        &tests.MockTokenService{},
 		VerificationService: &tests.MockVerificationService{},
@@ -216,6 +204,23 @@ func TestSignInHandler_ResponseStructure(t *testing.T) {
 	ctx := models.SetRequestContext(context.Background(), reqCtx)
 	req = req.WithContext(ctx)
 
+	userService := &tests.MockUserRepository{}
+	userService.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{
+		ID:    "user-123",
+		Email: "test@example.com",
+	}, nil).Once()
+
+	tokenService := &tests.MockTokenService{}
+	tokenService.On("Generate").Return("token-123", nil).Once()
+	tokenService.On("Hash", "token-123").Return("hashed-token-123").Once()
+
+	mailingService := &tests.MockMailerService{}
+	mailingService.On("SendEmail", mock.Anything, "test@example.com", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+
+	verificationService := &tests.MockVerificationService{}
+	verificationService.On("Create", mock.Anything, "user-123", "hashed-token-123", models.TypeMagicLinkSignInRequest, "test@example.com", 15*time.Minute).
+		Return(&models.Verification{ID: "verif-1"}, nil).Once()
+
 	useCase := &usecases.SignInUseCaseImpl{
 		GlobalConfig: &models.Config{
 			BaseURL:  "http://localhost",
@@ -225,11 +230,11 @@ func TestSignInHandler_ResponseStructure(t *testing.T) {
 			ExpiresIn: 15 * time.Minute,
 		},
 		Logger:              &tests.MockLogger{},
-		UserService:         &tests.MockUserService{},
+		UserService:         userService,
 		AccountService:      &tests.MockAccountService{},
-		TokenService:        &tests.MockTokenService{},
-		VerificationService: &tests.MockVerificationService{},
-		MailerService:       &tests.MockMailerService{},
+		TokenService:        tokenService,
+		VerificationService: verificationService,
+		MailerService:       mailingService,
 	}
 
 	handler := &SignInHandler{UseCase: useCase}

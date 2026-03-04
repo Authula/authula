@@ -7,37 +7,16 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/repositories"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 )
 
-type RolePermissionServicer interface {
-	CreatePermission(ctx context.Context, permission *types.Permission) error
-	GetAllPermissions(ctx context.Context) ([]types.Permission, error)
-	GetPermissionByID(ctx context.Context, permissionID string) (*types.Permission, error)
-	UpdatePermissionDescription(ctx context.Context, permissionID string, description *string) (bool, error)
-	CountRoleAssignmentsByPermissionID(ctx context.Context, permissionID string) (int, error)
-	DeletePermission(ctx context.Context, permissionID string) (bool, error)
-	CreateRole(ctx context.Context, role *types.Role) error
-	GetAllRoles(ctx context.Context) ([]types.Role, error)
-	GetRoleByID(ctx context.Context, roleID string) (*types.Role, error)
-	UpdateRole(ctx context.Context, roleID string, name *string, description *string) (bool, error)
-	DeleteRole(ctx context.Context, roleID string) (bool, error)
-	CountUserAssignmentsByRoleID(ctx context.Context, roleID string) (int, error)
-	GetRolePermissions(ctx context.Context, roleID string) ([]types.UserPermissionInfo, error)
-	ReplaceRolePermissions(ctx context.Context, roleID string, permissionIDs []string, grantedByUserID *string) error
-	AddRolePermission(ctx context.Context, roleID string, permissionID string, grantedByUserID *string) error
-	RemoveRolePermission(ctx context.Context, roleID string, permissionID string) error
-	AssignUserRole(ctx context.Context, userID string, roleID string, assignedByUserID *string, expiresAt *time.Time) error
-	RemoveUserRole(ctx context.Context, userID string, roleID string) error
-	ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error
-}
-
 type rolePermissionUseCase struct {
-	service RolePermissionServicer
+	repo repositories.RolePermissionRepository
 }
 
-func NewRolePermissionUseCase(service RolePermissionServicer) RolePermissionUseCase {
-	return &rolePermissionUseCase{service: service}
+func NewRolePermissionUseCase(repo repositories.RolePermissionRepository) RolePermissionUseCase {
+	return &rolePermissionUseCase{repo: repo}
 }
 
 func (u *rolePermissionUseCase) CreateRole(ctx context.Context, req types.CreateRoleRequest) (*types.Role, error) {
@@ -53,7 +32,7 @@ func (u *rolePermissionUseCase) CreateRole(ctx context.Context, req types.Create
 		IsSystem:    req.IsSystem,
 	}
 
-	if err := u.service.CreateRole(ctx, role); err != nil {
+	if err := u.repo.CreateRole(ctx, role); err != nil {
 		return nil, err
 	}
 
@@ -61,7 +40,7 @@ func (u *rolePermissionUseCase) CreateRole(ctx context.Context, req types.Create
 }
 
 func (u *rolePermissionUseCase) GetAllRoles(ctx context.Context) ([]types.Role, error) {
-	return u.service.GetAllRoles(ctx)
+	return u.repo.GetAllRoles(ctx)
 }
 
 func (u *rolePermissionUseCase) GetRoleByID(ctx context.Context, roleID string) (*types.RoleDetails, error) {
@@ -70,7 +49,7 @@ func (u *rolePermissionUseCase) GetRoleByID(ctx context.Context, roleID string) 
 		return nil, errors.New("role_id is required")
 	}
 
-	role, err := u.service.GetRoleByID(ctx, roleID)
+	role, err := u.repo.GetRoleByID(ctx, roleID)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +57,7 @@ func (u *rolePermissionUseCase) GetRoleByID(ctx context.Context, roleID string) 
 		return nil, errors.New("role not found")
 	}
 
-	permissions, err := u.service.GetRolePermissions(ctx, roleID)
+	permissions, err := u.repo.GetRolePermissions(ctx, roleID)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +78,7 @@ func (u *rolePermissionUseCase) UpdateRole(ctx context.Context, roleID string, r
 		return nil, errors.New("at least one field is required")
 	}
 
-	role, err := u.service.GetRoleByID(ctx, roleID)
+	role, err := u.repo.GetRoleByID(ctx, roleID)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +104,7 @@ func (u *rolePermissionUseCase) UpdateRole(ctx context.Context, roleID string, r
 		description = &trimmed
 	}
 
-	updated, err := u.service.UpdateRole(ctx, roleID, name, description)
+	updated, err := u.repo.UpdateRole(ctx, roleID, name, description)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +112,7 @@ func (u *rolePermissionUseCase) UpdateRole(ctx context.Context, roleID string, r
 		return nil, errors.New("role not found")
 	}
 
-	role, err = u.service.GetRoleByID(ctx, roleID)
+	role, err = u.repo.GetRoleByID(ctx, roleID)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +129,7 @@ func (u *rolePermissionUseCase) DeleteRole(ctx context.Context, roleID string) e
 		return errors.New("role_id is required")
 	}
 
-	role, err := u.service.GetRoleByID(ctx, roleID)
+	role, err := u.repo.GetRoleByID(ctx, roleID)
 	if err != nil {
 		return err
 	}
@@ -161,7 +140,7 @@ func (u *rolePermissionUseCase) DeleteRole(ctx context.Context, roleID string) e
 		return errors.New("cannot delete system role")
 	}
 
-	assignmentsCount, err := u.service.CountUserAssignmentsByRoleID(ctx, roleID)
+	assignmentsCount, err := u.repo.CountUserAssignmentsByRoleID(ctx, roleID)
 	if err != nil {
 		return err
 	}
@@ -169,7 +148,7 @@ func (u *rolePermissionUseCase) DeleteRole(ctx context.Context, roleID string) e
 		return errors.New("role is assigned to one or more users")
 	}
 
-	deleted, err := u.service.DeleteRole(ctx, roleID)
+	deleted, err := u.repo.DeleteRole(ctx, roleID)
 	if err != nil {
 		return err
 	}
@@ -193,7 +172,7 @@ func (u *rolePermissionUseCase) CreatePermission(ctx context.Context, req types.
 		IsSystem:    req.IsSystem,
 	}
 
-	if err := u.service.CreatePermission(ctx, permission); err != nil {
+	if err := u.repo.CreatePermission(ctx, permission); err != nil {
 		return nil, err
 	}
 
@@ -201,7 +180,7 @@ func (u *rolePermissionUseCase) CreatePermission(ctx context.Context, req types.
 }
 
 func (u *rolePermissionUseCase) GetAllPermissions(ctx context.Context) ([]types.Permission, error) {
-	return u.service.GetAllPermissions(ctx)
+	return u.repo.GetAllPermissions(ctx)
 }
 
 func (u *rolePermissionUseCase) UpdatePermission(ctx context.Context, permissionID string, req types.UpdatePermissionRequest) (*types.Permission, error) {
@@ -218,7 +197,7 @@ func (u *rolePermissionUseCase) UpdatePermission(ctx context.Context, permission
 		return nil, errors.New("description is required")
 	}
 
-	permission, err := u.service.GetPermissionByID(ctx, permissionID)
+	permission, err := u.repo.GetPermissionByID(ctx, permissionID)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +208,7 @@ func (u *rolePermissionUseCase) UpdatePermission(ctx context.Context, permission
 		return nil, errors.New("cannot update system permission")
 	}
 
-	updated, err := u.service.UpdatePermissionDescription(ctx, permissionID, &description)
+	updated, err := u.repo.UpdatePermissionDescription(ctx, permissionID, &description)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +216,7 @@ func (u *rolePermissionUseCase) UpdatePermission(ctx context.Context, permission
 		return nil, errors.New("permission not found")
 	}
 
-	permission, err = u.service.GetPermissionByID(ctx, permissionID)
+	permission, err = u.repo.GetPermissionByID(ctx, permissionID)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +233,7 @@ func (u *rolePermissionUseCase) DeletePermission(ctx context.Context, permission
 		return errors.New("permission_id is required")
 	}
 
-	permission, err := u.service.GetPermissionByID(ctx, permissionID)
+	permission, err := u.repo.GetPermissionByID(ctx, permissionID)
 	if err != nil {
 		return err
 	}
@@ -265,7 +244,7 @@ func (u *rolePermissionUseCase) DeletePermission(ctx context.Context, permission
 		return errors.New("cannot delete system permission")
 	}
 
-	assignmentsCount, err := u.service.CountRoleAssignmentsByPermissionID(ctx, permissionID)
+	assignmentsCount, err := u.repo.CountRoleAssignmentsByPermissionID(ctx, permissionID)
 	if err != nil {
 		return err
 	}
@@ -273,7 +252,7 @@ func (u *rolePermissionUseCase) DeletePermission(ctx context.Context, permission
 		return errors.New("permission is in use by one or more roles")
 	}
 
-	deleted, err := u.service.DeletePermission(ctx, permissionID)
+	deleted, err := u.repo.DeletePermission(ctx, permissionID)
 	if err != nil {
 		return err
 	}
@@ -295,7 +274,7 @@ func (u *rolePermissionUseCase) AddPermissionToRole(ctx context.Context, roleID 
 		return errors.New("permission_id is required")
 	}
 
-	role, err := u.service.GetRoleByID(ctx, roleID)
+	role, err := u.repo.GetRoleByID(ctx, roleID)
 	if err != nil {
 		return err
 	}
@@ -306,7 +285,7 @@ func (u *rolePermissionUseCase) AddPermissionToRole(ctx context.Context, roleID 
 		return errors.New("cannot modify system role")
 	}
 
-	permission, err := u.service.GetPermissionByID(ctx, permissionID)
+	permission, err := u.repo.GetPermissionByID(ctx, permissionID)
 	if err != nil {
 		return err
 	}
@@ -317,7 +296,7 @@ func (u *rolePermissionUseCase) AddPermissionToRole(ctx context.Context, roleID 
 		return errors.New("cannot modify system permission")
 	}
 
-	return u.service.AddRolePermission(ctx, roleID, permissionID, grantedByUserID)
+	return u.repo.AddRolePermission(ctx, roleID, permissionID, grantedByUserID)
 }
 
 func (u *rolePermissionUseCase) RemovePermissionFromRole(ctx context.Context, roleID string, permissionID string) error {
@@ -331,7 +310,7 @@ func (u *rolePermissionUseCase) RemovePermissionFromRole(ctx context.Context, ro
 		return errors.New("permission_id is required")
 	}
 
-	role, err := u.service.GetRoleByID(ctx, roleID)
+	role, err := u.repo.GetRoleByID(ctx, roleID)
 	if err != nil {
 		return err
 	}
@@ -342,7 +321,7 @@ func (u *rolePermissionUseCase) RemovePermissionFromRole(ctx context.Context, ro
 		return errors.New("cannot modify system role")
 	}
 
-	permission, err := u.service.GetPermissionByID(ctx, permissionID)
+	permission, err := u.repo.GetPermissionByID(ctx, permissionID)
 	if err != nil {
 		return err
 	}
@@ -353,7 +332,7 @@ func (u *rolePermissionUseCase) RemovePermissionFromRole(ctx context.Context, ro
 		return errors.New("cannot modify system permission")
 	}
 
-	return u.service.RemoveRolePermission(ctx, roleID, permissionID)
+	return u.repo.RemoveRolePermission(ctx, roleID, permissionID)
 }
 
 func (u *rolePermissionUseCase) ReplaceRolePermissions(ctx context.Context, roleID string, permissionIDs []string, grantedByUserID *string) error {
@@ -375,7 +354,7 @@ func (u *rolePermissionUseCase) ReplaceRolePermissions(ctx context.Context, role
 		normalized = append(normalized, permissionID)
 	}
 
-	return u.service.ReplaceRolePermissions(ctx, roleID, normalized, grantedByUserID)
+	return u.repo.ReplaceRolePermissions(ctx, roleID, normalized, grantedByUserID)
 }
 
 func (u *rolePermissionUseCase) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error {
@@ -397,7 +376,7 @@ func (u *rolePermissionUseCase) ReplaceUserRoles(ctx context.Context, userID str
 		normalized = append(normalized, roleID)
 	}
 
-	return u.service.ReplaceUserRoles(ctx, userID, normalized, assignedByUserID)
+	return u.repo.ReplaceUserRoles(ctx, userID, normalized, assignedByUserID)
 }
 
 func (u *rolePermissionUseCase) AssignRoleToUser(ctx context.Context, userID string, req types.AssignUserRoleRequest, assignedByUserID *string) error {
@@ -415,7 +394,7 @@ func (u *rolePermissionUseCase) AssignRoleToUser(ctx context.Context, userID str
 		return errors.New("expires_at must be in the future")
 	}
 
-	return u.service.AssignUserRole(ctx, userID, roleID, assignedByUserID, req.ExpiresAt)
+	return u.repo.AssignUserRole(ctx, userID, roleID, assignedByUserID, req.ExpiresAt)
 }
 
 func (u *rolePermissionUseCase) RemoveRoleFromUser(ctx context.Context, userID string, roleID string) error {
@@ -429,5 +408,5 @@ func (u *rolePermissionUseCase) RemoveRoleFromUser(ctx context.Context, userID s
 		return errors.New("role_id is required")
 	}
 
-	return u.service.RemoveUserRole(ctx, userID, roleID)
+	return u.repo.RemoveUserRole(ctx, userID, roleID)
 }

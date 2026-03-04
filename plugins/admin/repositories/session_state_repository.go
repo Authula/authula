@@ -12,15 +12,15 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 )
 
-type SessionStateRepository struct {
+type BunSessionStateRepository struct {
 	db bun.IDB
 }
 
-func NewSessionStateRepository(db bun.IDB) *SessionStateRepository {
-	return &SessionStateRepository{db: db}
+func NewBunSessionStateRepository(db bun.IDB) *BunSessionStateRepository {
+	return &BunSessionStateRepository{db: db}
 }
 
-func (r *SessionStateRepository) GetBySessionID(ctx context.Context, sessionID string) (*types.AdminSessionState, error) {
+func (r *BunSessionStateRepository) GetBySessionID(ctx context.Context, sessionID string) (*types.AdminSessionState, error) {
 	row := &types.AdminSessionState{}
 	err := r.db.NewSelect().Model(row).Where("session_id = ?", sessionID).Scan(ctx)
 	if err != nil {
@@ -32,7 +32,7 @@ func (r *SessionStateRepository) GetBySessionID(ctx context.Context, sessionID s
 	return row, nil
 }
 
-func (r *SessionStateRepository) Upsert(ctx context.Context, state *types.AdminSessionState) error {
+func (r *BunSessionStateRepository) Upsert(ctx context.Context, state *types.AdminSessionState) error {
 	now := time.Now().UTC()
 	_, err := r.db.NewInsert().
 		Model(state).
@@ -51,7 +51,7 @@ func (r *SessionStateRepository) Upsert(ctx context.Context, state *types.AdminS
 	return nil
 }
 
-func (r *SessionStateRepository) Delete(ctx context.Context, sessionID string) error {
+func (r *BunSessionStateRepository) Delete(ctx context.Context, sessionID string) error {
 	_, err := r.db.NewDelete().Model((*types.AdminSessionState)(nil)).Where("session_id = ?", sessionID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to delete session state: %w", err)
@@ -59,7 +59,7 @@ func (r *SessionStateRepository) Delete(ctx context.Context, sessionID string) e
 	return nil
 }
 
-func (r *SessionStateRepository) GetRevoked(ctx context.Context) ([]types.AdminSessionState, error) {
+func (r *BunSessionStateRepository) GetRevoked(ctx context.Context) ([]types.AdminSessionState, error) {
 	var rows []types.AdminSessionState
 	err := r.db.NewSelect().
 		Model(&rows).
@@ -72,7 +72,7 @@ func (r *SessionStateRepository) GetRevoked(ctx context.Context) ([]types.AdminS
 	return rows, nil
 }
 
-func (r *SessionStateRepository) SessionExists(ctx context.Context, sessionID string) (bool, error) {
+func (r *BunSessionStateRepository) SessionExists(ctx context.Context, sessionID string) (bool, error) {
 	count, err := r.db.NewSelect().Table("sessions").Where("id = ?", sessionID).Count(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to check session existence: %w", err)
@@ -80,7 +80,7 @@ func (r *SessionStateRepository) SessionExists(ctx context.Context, sessionID st
 	return count > 0, nil
 }
 
-func (r *SessionStateRepository) GetByUserID(ctx context.Context, userID string) ([]types.AdminUserSession, error) {
+func (r *BunSessionStateRepository) GetByUserID(ctx context.Context, userID string) ([]types.AdminUserSession, error) {
 	var sessions []models.Session
 	err := r.db.NewSelect().
 		Model(&sessions).

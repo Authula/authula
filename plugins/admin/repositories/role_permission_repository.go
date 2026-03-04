@@ -11,15 +11,15 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 )
 
-type RolePermissionRepository struct {
+type BunRolePermissionRepository struct {
 	db bun.IDB
 }
 
-func NewRolePermissionRepository(db bun.IDB) *RolePermissionRepository {
-	return &RolePermissionRepository{db: db}
+func NewBunRolePermissionRepository(db bun.IDB) *BunRolePermissionRepository {
+	return &BunRolePermissionRepository{db: db}
 }
 
-func (r *RolePermissionRepository) CreateRole(ctx context.Context, role *types.Role) error {
+func (r *BunRolePermissionRepository) CreateRole(ctx context.Context, role *types.Role) error {
 	_, err := r.db.NewInsert().Model(role).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create role: %w", err)
@@ -27,7 +27,7 @@ func (r *RolePermissionRepository) CreateRole(ctx context.Context, role *types.R
 	return nil
 }
 
-func (r *RolePermissionRepository) GetAllRoles(ctx context.Context) ([]types.Role, error) {
+func (r *BunRolePermissionRepository) GetAllRoles(ctx context.Context) ([]types.Role, error) {
 	roles := make([]types.Role, 0)
 	err := r.db.NewSelect().Model(&roles).Order("created_at ASC").Scan(ctx)
 	if err != nil {
@@ -36,7 +36,7 @@ func (r *RolePermissionRepository) GetAllRoles(ctx context.Context) ([]types.Rol
 	return roles, nil
 }
 
-func (r *RolePermissionRepository) GetRoleByID(ctx context.Context, roleID string) (*types.Role, error) {
+func (r *BunRolePermissionRepository) GetRoleByID(ctx context.Context, roleID string) (*types.Role, error) {
 	role := new(types.Role)
 	err := r.db.NewSelect().Model(role).Where("id = ?", roleID).Scan(ctx)
 	if err != nil {
@@ -49,7 +49,7 @@ func (r *RolePermissionRepository) GetRoleByID(ctx context.Context, roleID strin
 	return role, nil
 }
 
-func (r *RolePermissionRepository) UpdateRole(ctx context.Context, roleID string, name *string, description *string) (bool, error) {
+func (r *BunRolePermissionRepository) UpdateRole(ctx context.Context, roleID string, name *string, description *string) (bool, error) {
 	query := r.db.NewUpdate().
 		Model((*types.Role)(nil)).
 		Set("updated_at = ?", time.Now().UTC()).
@@ -76,7 +76,7 @@ func (r *RolePermissionRepository) UpdateRole(ctx context.Context, roleID string
 	return affected > 0, nil
 }
 
-func (r *RolePermissionRepository) DeleteRole(ctx context.Context, roleID string) (bool, error) {
+func (r *BunRolePermissionRepository) DeleteRole(ctx context.Context, roleID string) (bool, error) {
 	result, err := r.db.NewDelete().Model((*types.Role)(nil)).Where("id = ?", roleID).Exec(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to delete role: %w", err)
@@ -90,7 +90,7 @@ func (r *RolePermissionRepository) DeleteRole(ctx context.Context, roleID string
 	return affected > 0, nil
 }
 
-func (r *RolePermissionRepository) CountUserAssignmentsByRoleID(ctx context.Context, roleID string) (int, error) {
+func (r *BunRolePermissionRepository) CountUserAssignmentsByRoleID(ctx context.Context, roleID string) (int, error) {
 	count, err := r.db.NewSelect().
 		Model((*types.UserRole)(nil)).
 		Where("role_id = ?", roleID).
@@ -102,7 +102,7 @@ func (r *RolePermissionRepository) CountUserAssignmentsByRoleID(ctx context.Cont
 	return count, nil
 }
 
-func (r *RolePermissionRepository) GetAllPermissions(ctx context.Context) ([]types.Permission, error) {
+func (r *BunRolePermissionRepository) GetAllPermissions(ctx context.Context) ([]types.Permission, error) {
 	permissions := make([]types.Permission, 0)
 	err := r.db.NewSelect().Model(&permissions).Order("created_at ASC").Scan(ctx)
 	if err != nil {
@@ -111,7 +111,7 @@ func (r *RolePermissionRepository) GetAllPermissions(ctx context.Context) ([]typ
 	return permissions, nil
 }
 
-func (r *RolePermissionRepository) GetPermissionByID(ctx context.Context, permissionID string) (*types.Permission, error) {
+func (r *BunRolePermissionRepository) GetPermissionByID(ctx context.Context, permissionID string) (*types.Permission, error) {
 	permission := new(types.Permission)
 	err := r.db.NewSelect().Model(permission).Where("id = ?", permissionID).Scan(ctx)
 	if err != nil {
@@ -124,7 +124,7 @@ func (r *RolePermissionRepository) GetPermissionByID(ctx context.Context, permis
 	return permission, nil
 }
 
-func (r *RolePermissionRepository) CreatePermission(ctx context.Context, permission *types.Permission) error {
+func (r *BunRolePermissionRepository) CreatePermission(ctx context.Context, permission *types.Permission) error {
 	_, err := r.db.NewInsert().Model(permission).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create permission: %w", err)
@@ -132,7 +132,7 @@ func (r *RolePermissionRepository) CreatePermission(ctx context.Context, permiss
 	return nil
 }
 
-func (r *RolePermissionRepository) UpdatePermissionDescription(ctx context.Context, permissionID string, description *string) (bool, error) {
+func (r *BunRolePermissionRepository) UpdatePermissionDescription(ctx context.Context, permissionID string, description *string) (bool, error) {
 	result, err := r.db.NewUpdate().
 		Model((*types.Permission)(nil)).
 		Set("description = ?", description).
@@ -151,7 +151,7 @@ func (r *RolePermissionRepository) UpdatePermissionDescription(ctx context.Conte
 	return affected > 0, nil
 }
 
-func (r *RolePermissionRepository) DeletePermission(ctx context.Context, permissionID string) (bool, error) {
+func (r *BunRolePermissionRepository) DeletePermission(ctx context.Context, permissionID string) (bool, error) {
 	result, err := r.db.NewDelete().Model((*types.Permission)(nil)).Where("id = ?", permissionID).Exec(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to delete permission: %w", err)
@@ -165,7 +165,7 @@ func (r *RolePermissionRepository) DeletePermission(ctx context.Context, permiss
 	return affected > 0, nil
 }
 
-func (r *RolePermissionRepository) CountRoleAssignmentsByPermissionID(ctx context.Context, permissionID string) (int, error) {
+func (r *BunRolePermissionRepository) CountRoleAssignmentsByPermissionID(ctx context.Context, permissionID string) (int, error) {
 	count, err := r.db.NewSelect().
 		Model((*types.RolePermission)(nil)).
 		Where("permission_id = ?", permissionID).
@@ -177,16 +177,16 @@ func (r *RolePermissionRepository) CountRoleAssignmentsByPermissionID(ctx contex
 	return count, nil
 }
 
-func (r *RolePermissionRepository) GetRolePermissions(ctx context.Context, roleID string) ([]types.UserPermissionInfo, error) {
+func (r *BunRolePermissionRepository) GetRolePermissions(ctx context.Context, roleID string) ([]types.UserPermissionInfo, error) {
 	rows := make([]types.UserPermissionInfo, 0)
 
 	err := r.db.NewSelect().
 		TableExpr("admin_role_permissions arp").
 		ColumnExpr("ap.id AS permission_id").
-		ColumnExpr("ap.permission_key AS permission_key").
+		ColumnExpr("ap.key AS permission_key").
 		Join("JOIN admin_permissions ap ON ap.id = arp.permission_id").
 		Where("arp.role_id = ?", roleID).
-		OrderExpr("ap.permission_key ASC").
+		OrderExpr("ap.key ASC").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get role permissions: %w", err)
@@ -195,7 +195,7 @@ func (r *RolePermissionRepository) GetRolePermissions(ctx context.Context, roleI
 	return rows, nil
 }
 
-func (r *RolePermissionRepository) ReplaceRolePermissions(ctx context.Context, roleID string, permissionIDs []string, grantedByUserID *string) error {
+func (r *BunRolePermissionRepository) ReplaceRolePermissions(ctx context.Context, roleID string, permissionIDs []string, grantedByUserID *string) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.NewDelete().Model((*types.RolePermission)(nil)).Where("role_id = ?", roleID).Exec(ctx); err != nil {
 			return fmt.Errorf("failed to clear role permissions: %w", err)
@@ -218,7 +218,7 @@ func (r *RolePermissionRepository) ReplaceRolePermissions(ctx context.Context, r
 	})
 }
 
-func (r *RolePermissionRepository) AddRolePermission(ctx context.Context, roleID string, permissionID string, grantedByUserID *string) error {
+func (r *BunRolePermissionRepository) AddRolePermission(ctx context.Context, roleID string, permissionID string, grantedByUserID *string) error {
 	rp := &types.RolePermission{
 		RoleID:          roleID,
 		PermissionID:    permissionID,
@@ -234,7 +234,7 @@ func (r *RolePermissionRepository) AddRolePermission(ctx context.Context, roleID
 	return nil
 }
 
-func (r *RolePermissionRepository) RemoveRolePermission(ctx context.Context, roleID string, permissionID string) error {
+func (r *BunRolePermissionRepository) RemoveRolePermission(ctx context.Context, roleID string, permissionID string) error {
 	_, err := r.db.NewDelete().
 		Model((*types.RolePermission)(nil)).
 		Where("role_id = ?", roleID).
@@ -247,7 +247,7 @@ func (r *RolePermissionRepository) RemoveRolePermission(ctx context.Context, rol
 	return nil
 }
 
-func (r *RolePermissionRepository) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error {
+func (r *BunRolePermissionRepository) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.NewDelete().Model((*types.UserRole)(nil)).Where("user_id = ?", userID).Exec(ctx); err != nil {
 			return fmt.Errorf("failed to clear user roles: %w", err)
@@ -270,7 +270,7 @@ func (r *RolePermissionRepository) ReplaceUserRoles(ctx context.Context, userID 
 	})
 }
 
-func (r *RolePermissionRepository) AssignUserRole(ctx context.Context, userID string, roleID string, assignedByUserID *string, expiresAt *time.Time) error {
+func (r *BunRolePermissionRepository) AssignUserRole(ctx context.Context, userID string, roleID string, assignedByUserID *string, expiresAt *time.Time) error {
 	ur := &types.UserRole{
 		UserID:           userID,
 		RoleID:           roleID,
@@ -287,7 +287,7 @@ func (r *RolePermissionRepository) AssignUserRole(ctx context.Context, userID st
 	return nil
 }
 
-func (r *RolePermissionRepository) RemoveUserRole(ctx context.Context, userID string, roleID string) error {
+func (r *BunRolePermissionRepository) RemoveUserRole(ctx context.Context, userID string, roleID string) error {
 	_, err := r.db.NewDelete().
 		Model((*types.UserRole)(nil)).
 		Where("user_id = ?", userID).
