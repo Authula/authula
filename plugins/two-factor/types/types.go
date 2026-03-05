@@ -106,7 +106,8 @@ type EnableResult struct {
 }
 
 type VerifyResult struct {
-	User         *models.User
-	Session      *models.Session
-	SessionToken string
+	User               *models.User
+	Session            *models.Session
+	SessionToken       string
+	TrustedDeviceToken string // empty if not trusting
 }
