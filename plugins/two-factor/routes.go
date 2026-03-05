@@ -37,38 +37,38 @@ func (a *verificationServiceAdapter) Delete(ctx context.Context, id string) erro
 }
 
 func Routes(p *TwoFactorPlugin) []models.Route {
-	useCases := BuildUseCases(p)
+	uc := p.Api.useCases
 
 	verificationAdapter := &verificationServiceAdapter{svc: p.verificationService}
 
 	enableHandler := &handlers.EnableHandler{
-		UseCase:     useCases.Enable,
+		UseCase:     uc.Enable,
 		UserService: p.userService,
 	}
 	disableHandler := &handlers.DisableHandler{
-		UseCase: useCases.Disable,
+		UseCase: uc.Disable,
 	}
 	getTOTPURIHandler := &handlers.GetTOTPURIHandler{
-		UseCase:     useCases.GetTOTPURI,
+		UseCase:     uc.GetTOTPURI,
 		UserService: p.userService,
 	}
 	verifyTOTPHandler := &handlers.VerifyTOTPHandler{
-		UseCase:               useCases.VerifyTOTP,
+		UseCase:               uc.VerifyTOTP,
 		VerificationService:   verificationAdapter,
 		TokenService:          p.tokenService,
 		TrustedDeviceDuration: p.pluginConfig.TrustedDeviceDuration,
 	}
 	generateBackupCodesHandler := &handlers.GenerateBackupCodesHandler{
-		UseCase: useCases.GenerateBackupCodes,
+		UseCase: uc.GenerateBackupCodes,
 	}
 	verifyBackupCodeHandler := &handlers.VerifyBackupCodeHandler{
-		UseCase:               useCases.VerifyBackupCode,
+		UseCase:               uc.VerifyBackupCode,
 		VerificationService:   verificationAdapter,
 		TokenService:          p.tokenService,
 		TrustedDeviceDuration: p.pluginConfig.TrustedDeviceDuration,
 	}
 	viewBackupCodesHandler := &handlers.ViewBackupCodesHandler{
-		UseCase: useCases.ViewBackupCodes,
+		UseCase: uc.ViewBackupCodes,
 	}
 
 	return []models.Route{

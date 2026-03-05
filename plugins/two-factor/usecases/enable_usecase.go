@@ -3,7 +3,10 @@ package usecases
 import (
 	"context"
 	"encoding/json"
+	"time"
 
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/constants"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/repository"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/services"
@@ -19,6 +22,8 @@ type enableUseCase struct {
 	BackupCodeService *services.BackupCodeService
 	Repo              *repository.TwoFactorRepository
 	Config            *types.TwoFactorPluginConfig
+	EventBus          models.EventBus
+	Logger            models.Logger
 }
 
 func NewEnableUseCase(
@@ -29,6 +34,8 @@ func NewEnableUseCase(
 	backupCodeService *services.BackupCodeService,
 	repo *repository.TwoFactorRepository,
 	config *types.TwoFactorPluginConfig,
+	eventBus models.EventBus,
+	logger models.Logger,
 ) EnableUseCase {
 	return &enableUseCase{
 		AccountService:    accountService,
@@ -38,6 +45,8 @@ func NewEnableUseCase(
 		BackupCodeService: backupCodeService,
 		Repo:              repo,
 		Config:            config,
+		EventBus:          eventBus,
+		Logger:            logger,
 	}
 }
 
@@ -104,6 +113,24 @@ func (uc *enableUseCase) Enable(ctx context.Context, userID, password, issuer, e
 		issuer = uc.Config.Issuer
 	}
 	totpURI := uc.TOTPService.BuildURI(secret, issuer, email)
+
+	// Publish enabled event
+	payload, err := json.Marshal(map[string]string{"userID": userID})
+	if err != nil {
+		uc.Logger.Error(err.Error())
+	} else {
+		util.PublishEventAsync(
+			uc.EventBus,
+			uc.Logger,
+			models.Event{
+				ID:        util.GenerateUUID(),
+				Type:      constants.EventTwoFactorEnabled,
+				Payload:   payload,
+				Metadata:  nil,
+				Timestamp: time.Now().UTC(),
+			},
+		)
+	}
 
 	return &types.EnableResult{
 		TotpURI:     totpURI,

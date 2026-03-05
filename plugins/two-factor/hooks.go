@@ -91,7 +91,8 @@ func (p *TwoFactorPlugin) hasTrustedDevice(reqCtx *models.RequestContext) bool {
 		return false
 	}
 
-	device, err := p.repo.GetTrustedDeviceByToken(reqCtx.Request.Context(), cookie.Value)
+	hashedToken := p.tokenService.Hash(cookie.Value)
+	device, err := p.repo.GetTrustedDeviceByToken(reqCtx.Request.Context(), hashedToken)
 	if err != nil || device == nil {
 		return false
 	}
@@ -103,7 +104,7 @@ func (p *TwoFactorPlugin) hasTrustedDevice(reqCtx *models.RequestContext) bool {
 
 	// Refresh expiry
 	newExpiry := time.Now().Add(p.pluginConfig.TrustedDeviceDuration)
-	_ = p.repo.RefreshTrustedDevice(reqCtx.Request.Context(), cookie.Value, newExpiry)
+	_ = p.repo.RefreshTrustedDevice(reqCtx.Request.Context(), hashedToken, newExpiry)
 
 	return true
 }

@@ -13,6 +13,11 @@ func BuildAPI(plugin *TwoFactorPlugin) *API {
 	return &API{useCases: useCases}
 }
 
+// UseCases returns the use cases for external access.
+func (a *API) UseCases() *usecases.UseCases {
+	return a.useCases
+}
+
 func BuildUseCases(p *TwoFactorPlugin) *usecases.UseCases {
 	return &usecases.UseCases{
 		Enable: usecases.NewEnableUseCase(
@@ -23,11 +28,15 @@ func BuildUseCases(p *TwoFactorPlugin) *usecases.UseCases {
 			p.backupCodeService,
 			p.repo,
 			p.pluginConfig,
+			p.ctx.EventBus,
+			p.logger,
 		),
 		Disable: usecases.NewDisableUseCase(
 			p.accountService,
 			p.passwordService,
 			p.repo,
+			p.ctx.EventBus,
+			p.logger,
 		),
 		GetTOTPURI: usecases.NewGetTOTPURIUseCase(
 			p.accountService,
@@ -45,6 +54,8 @@ func BuildUseCases(p *TwoFactorPlugin) *usecases.UseCases {
 			p.repo,
 			p.globalConfig,
 			p.pluginConfig,
+			p.ctx.EventBus,
+			p.logger,
 		),
 		GenerateBackupCodes: usecases.NewGenerateBackupCodesUseCase(
 			p.accountService,
@@ -61,8 +72,12 @@ func BuildUseCases(p *TwoFactorPlugin) *usecases.UseCases {
 			p.repo,
 			p.globalConfig,
 			p.pluginConfig,
+			p.ctx.EventBus,
+			p.logger,
 		),
 		ViewBackupCodes: usecases.NewViewBackupCodesUseCase(
+			p.accountService,
+			p.passwordService,
 			p.tokenService,
 			p.repo,
 		),

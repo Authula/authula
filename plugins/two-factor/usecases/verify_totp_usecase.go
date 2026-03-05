@@ -2,8 +2,10 @@ package usecases
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/constants"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/repository"
@@ -20,6 +22,8 @@ type verifyTOTPUseCase struct {
 	Repo           *repository.TwoFactorRepository
 	GlobalConfig   *models.Config
 	Config         *types.TwoFactorPluginConfig
+	EventBus       models.EventBus
+	Logger         models.Logger
 }
 
 func NewVerifyTOTPUseCase(
@@ -30,6 +34,8 @@ func NewVerifyTOTPUseCase(
 	repo *repository.TwoFactorRepository,
 	globalConfig *models.Config,
 	config *types.TwoFactorPluginConfig,
+	eventBus models.EventBus,
+	logger models.Logger,
 ) VerifyTOTPUseCase {
 	return &verifyTOTPUseCase{
 		TokenService:   tokenService,
@@ -39,6 +45,8 @@ func NewVerifyTOTPUseCase(
 		Repo:           repo,
 		GlobalConfig:   globalConfig,
 		Config:         config,
+		EventBus:       eventBus,
+		Logger:         logger,
 	}
 }
 
@@ -101,32 +109,37 @@ func (uc *verifyTOTPUseCase) Verify(ctx context.Context, userID, code string, tr
 
 	// Optionally trust device
 	if trustDevice {
-		deviceToken, err := uc.createTrustedDevice(ctx, userID, userAgent)
+		deviceToken, err := createTrustedDevice(ctx, uc.TokenService, uc.Repo, uc.Config, userID, userAgent)
 		if err != nil {
 			return nil, err
 		}
 		result.TrustedDeviceToken = deviceToken
+
+		// Publish device trusted event
+		uc.publishEvent(constants.EventTwoFactorDeviceTrusted, userID)
 	}
+
+	// Publish verified event
+	uc.publishEvent(constants.EventTwoFactorVerified, userID)
 
 	return result, nil
 }
 
-func (uc *verifyTOTPUseCase) createTrustedDevice(ctx context.Context, userID string, userAgent *string) (string, error) {
-	token, err := uc.TokenService.Generate()
+func (uc *verifyTOTPUseCase) publishEvent(eventType, userID string) {
+	payload, err := json.Marshal(map[string]string{"userID": userID})
 	if err != nil {
-		return "", err
+		uc.Logger.Error(err.Error())
+		return
 	}
-
-	ua := ""
-	if userAgent != nil {
-		ua = *userAgent
-	}
-
-	expiresAt := time.Now().Add(uc.Config.TrustedDeviceDuration)
-	_, err = uc.Repo.CreateTrustedDevice(ctx, userID, token, ua, expiresAt)
-	if err != nil {
-		return "", err
-	}
-
-	return token, nil
+	util.PublishEventAsync(
+		uc.EventBus,
+		uc.Logger,
+		models.Event{
+			ID:        util.GenerateUUID(),
+			Type:      eventType,
+			Payload:   payload,
+			Metadata:  nil,
+			Timestamp: time.Now().UTC(),
+		},
+	)
 }

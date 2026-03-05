@@ -41,5 +41,5 @@ type VerifyBackupCodeUseCase interface {
 }
 
 type ViewBackupCodesUseCase interface {
-	View(ctx context.Context, userID string) ([]string, error)
+	View(ctx context.Context, userID, password string) ([]string, error)
 }

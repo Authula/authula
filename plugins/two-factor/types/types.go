@@ -67,6 +67,10 @@ type GenerateBackupCodesRequest struct {
 	Password string `json:"password"`
 }
 
+type ViewBackupCodesRequest struct {
+	Password string `json:"password"`
+}
+
 // Response payloads
 type EnableResponse struct {
 	TotpURI     string   `json:"totpURI"`

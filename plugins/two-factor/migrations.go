@@ -54,6 +54,7 @@ func twoFactorSQLiteInitial() migrations.Migration {
 				tx,
 				`DROP TABLE IF EXISTS trusted_devices;`,
 				`DROP TABLE IF EXISTS two_factor;`,
+				`ALTER TABLE users DROP COLUMN two_factor_enabled;`,
 			)
 		},
 	}
@@ -109,6 +110,7 @@ $$ LANGUAGE plpgsql;`,
 				`DROP FUNCTION IF EXISTS two_factor_update_updated_at_func();`,
 				`DROP TABLE IF EXISTS trusted_devices;`,
 				`DROP TABLE IF EXISTS two_factor;`,
+				`ALTER TABLE users DROP COLUMN IF EXISTS two_factor_enabled;`,
 			)
 		},
 	}
@@ -152,6 +154,7 @@ func twoFactorMySQLInitial() migrations.Migration {
 				tx,
 				`DROP TABLE IF EXISTS trusted_devices;`,
 				`DROP TABLE IF EXISTS two_factor;`,
+				`ALTER TABLE users DROP COLUMN two_factor_enabled;`,
 			)
 		},
 	}

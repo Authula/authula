@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/constants"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/types"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/usecases"
 )
@@ -68,7 +70,11 @@ func (h *VerifyTOTPHandler) Handler() http.HandlerFunc {
 
 		result, err := h.UseCase.Verify(ctx, userID, payload.Code, payload.TrustDevice, &clientIP, &userAgent)
 		if err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
+			status := http.StatusBadRequest
+			if errors.Is(err, constants.ErrInvalidTOTPCode) || errors.Is(err, constants.ErrTwoFactorNotEnabled) {
+				status = http.StatusUnauthorized
+			}
+			reqCtx.SetJSONResponse(status, map[string]any{
 				"message": err.Error(),
 			})
 			reqCtx.Handled = true

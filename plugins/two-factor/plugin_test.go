@@ -41,13 +41,15 @@ type mockPasswordService struct {
 	HashFn   func(password string) (string, error)
 }
 
-func (m *mockPasswordService) Verify(password, encoded string) bool { return m.VerifyFn(password, encoded) }
+func (m *mockPasswordService) Verify(password, encoded string) bool {
+	return m.VerifyFn(password, encoded)
+}
 func (m *mockPasswordService) Hash(password string) (string, error) { return m.HashFn(password) }
 
 type mockEventBus struct{}
 
-func (m *mockEventBus) Publish(_ context.Context, _ models.Event) error             { return nil }
-func (m *mockEventBus) Close() error                                                { return nil }
+func (m *mockEventBus) Publish(_ context.Context, _ models.Event) error { return nil }
+func (m *mockEventBus) Close() error                                    { return nil }
 func (m *mockEventBus) Subscribe(_ string, _ models.EventHandler) (models.SubscriptionID, error) {
 	return 0, nil
 }

@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/types"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/usecases"
@@ -25,7 +26,16 @@ func (h *ViewBackupCodesHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		codes, err := h.UseCase.View(ctx, *reqCtx.UserID)
+		var payload types.ViewBackupCodesRequest
+		if err := util.ParseJSON(r, &payload); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
+				"message": "invalid request body",
+			})
+			reqCtx.Handled = true
+			return
+		}
+
+		codes, err := h.UseCase.View(ctx, *reqCtx.UserID, payload.Password)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),

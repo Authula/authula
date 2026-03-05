@@ -2,8 +2,10 @@ package services
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"io"
+	"strings"
 )
 
 type BackupCodeService struct {
@@ -30,9 +32,11 @@ func (s *BackupCodeService) Generate() ([]string, error) {
 }
 
 // VerifyAndConsume checks if code is in the list and returns the list without it.
+// The comparison is constant-time and case-insensitive.
 func (s *BackupCodeService) VerifyAndConsume(codes []string, code string) ([]string, bool) {
+	code = strings.ToLower(strings.TrimSpace(code))
 	for i, c := range codes {
-		if c == code {
+		if subtle.ConstantTimeCompare([]byte(c), []byte(code)) == 1 {
 			remaining := make([]string, 0, len(codes)-1)
 			remaining = append(remaining, codes[:i]...)
 			remaining = append(remaining, codes[i+1:]...)
