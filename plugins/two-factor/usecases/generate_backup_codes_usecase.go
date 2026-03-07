@@ -15,7 +15,7 @@ type generateBackupCodesUseCase struct {
 	PasswordService   rootservices.PasswordService
 	TokenService      rootservices.TokenService
 	BackupCodeService *services.BackupCodeService
-	Repo              *repository.TwoFactorRepository
+	TwoFactorRepo     *repository.TwoFactorRepository
 }
 
 func NewGenerateBackupCodesUseCase(
@@ -23,14 +23,14 @@ func NewGenerateBackupCodesUseCase(
 	passwordService rootservices.PasswordService,
 	tokenService rootservices.TokenService,
 	backupCodeService *services.BackupCodeService,
-	repo *repository.TwoFactorRepository,
+	twoFactorRepo *repository.TwoFactorRepository,
 ) GenerateBackupCodesUseCase {
 	return &generateBackupCodesUseCase{
 		AccountService:    accountService,
 		PasswordService:   passwordService,
 		TokenService:      tokenService,
 		BackupCodeService: backupCodeService,
-		Repo:              repo,
+		TwoFactorRepo:     twoFactorRepo,
 	}
 }
 
@@ -41,7 +41,7 @@ func (uc *generateBackupCodesUseCase) Generate(ctx context.Context, userID, pass
 	}
 
 	// Check that 2FA is enabled
-	existing, err := uc.Repo.GetByUserID(ctx, userID)
+	existing, err := uc.TwoFactorRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (uc *generateBackupCodesUseCase) Generate(ctx context.Context, userID, pass
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.Repo.UpdateBackupCodes(ctx, userID, encrypted); err != nil {
+	if err := uc.TwoFactorRepo.UpdateBackupCodes(ctx, userID, encrypted); err != nil {
 		return nil, err
 	}
 

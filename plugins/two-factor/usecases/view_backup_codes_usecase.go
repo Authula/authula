@@ -13,20 +13,20 @@ type viewBackupCodesUseCase struct {
 	AccountService  rootservices.AccountService
 	PasswordService rootservices.PasswordService
 	TokenService    rootservices.TokenService
-	Repo            *repository.TwoFactorRepository
+	TwoFactorRepo   *repository.TwoFactorRepository
 }
 
 func NewViewBackupCodesUseCase(
 	accountService rootservices.AccountService,
 	passwordService rootservices.PasswordService,
 	tokenService rootservices.TokenService,
-	repo *repository.TwoFactorRepository,
+	twoFactorRepo *repository.TwoFactorRepository,
 ) ViewBackupCodesUseCase {
 	return &viewBackupCodesUseCase{
 		AccountService:  accountService,
 		PasswordService: passwordService,
 		TokenService:    tokenService,
-		Repo:            repo,
+		TwoFactorRepo:   twoFactorRepo,
 	}
 }
 
@@ -37,7 +37,7 @@ func (uc *viewBackupCodesUseCase) View(ctx context.Context, userID, password str
 	}
 
 	// Get two-factor record
-	record, err := uc.Repo.GetByUserID(ctx, userID)
+	record, err := uc.TwoFactorRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

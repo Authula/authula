@@ -27,7 +27,7 @@ func BuildUseCases(p *TwoFactorPlugin) *usecases.UseCases {
 			p.tokenService,
 			p.totpService,
 			p.backupCodeService,
-			p.repo,
+			p.twoFactorRepo,
 			p.pluginConfig,
 			p.ctx.EventBus,
 			p.logger,
@@ -35,7 +35,7 @@ func BuildUseCases(p *TwoFactorPlugin) *usecases.UseCases {
 		Disable: usecases.NewDisableUseCase(
 			p.accountService,
 			p.passwordService,
-			p.repo,
+			p.twoFactorRepo,
 			p.ctx.EventBus,
 			p.logger,
 		),
@@ -45,7 +45,7 @@ func BuildUseCases(p *TwoFactorPlugin) *usecases.UseCases {
 			p.passwordService,
 			p.tokenService,
 			p.totpService,
-			p.repo,
+			p.twoFactorRepo,
 			p.pluginConfig,
 		),
 		VerifyTOTP: usecases.NewVerifyTOTPUseCase(
@@ -54,7 +54,7 @@ func BuildUseCases(p *TwoFactorPlugin) *usecases.UseCases {
 			p.userService,
 			p.verificationService,
 			p.totpService,
-			p.repo,
+			p.twoFactorRepo,
 			p.globalConfig,
 			p.pluginConfig,
 			p.ctx.EventBus,
@@ -65,7 +65,7 @@ func BuildUseCases(p *TwoFactorPlugin) *usecases.UseCases {
 			p.passwordService,
 			p.tokenService,
 			p.backupCodeService,
-			p.repo,
+			p.twoFactorRepo,
 		),
 		VerifyBackupCode: usecases.NewVerifyBackupCodeUseCase(
 			p.tokenService,
@@ -73,7 +73,7 @@ func BuildUseCases(p *TwoFactorPlugin) *usecases.UseCases {
 			p.userService,
 			p.verificationService,
 			p.backupCodeService,
-			p.repo,
+			p.twoFactorRepo,
 			p.globalConfig,
 			p.pluginConfig,
 			p.ctx.EventBus,
@@ -83,7 +83,7 @@ func BuildUseCases(p *TwoFactorPlugin) *usecases.UseCases {
 			p.accountService,
 			p.passwordService,
 			p.tokenService,
-			p.repo,
+			p.twoFactorRepo,
 		),
 	}
 }

@@ -25,7 +25,7 @@ type TwoFactorPlugin struct {
 	passwordService     rootservices.PasswordService
 	totpService         *services.TOTPService
 	backupCodeService   *services.BackupCodeService
-	repo                *repository.TwoFactorRepository
+	twoFactorRepo       *repository.TwoFactorRepository
 	Api                 *API
 }
 
@@ -106,7 +106,7 @@ func (p *TwoFactorPlugin) Init(ctx *models.PluginContext) error {
 	}
 
 	// Create repository
-	p.repo = repository.NewTwoFactorRepository(ctx.DB)
+	p.twoFactorRepo = repository.NewTwoFactorRepository(ctx.DB)
 
 	// Build API
 	p.Api = BuildAPI(p)

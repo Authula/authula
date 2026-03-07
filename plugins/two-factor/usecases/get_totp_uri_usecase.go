@@ -16,7 +16,7 @@ type getTOTPURIUseCase struct {
 	PasswordService rootservices.PasswordService
 	TokenService    rootservices.TokenService
 	TOTPService     *services.TOTPService
-	Repo            *repository.TwoFactorRepository
+	TwoFactorRepo   *repository.TwoFactorRepository
 	Config          *types.TwoFactorPluginConfig
 }
 
@@ -26,7 +26,7 @@ func NewGetTOTPURIUseCase(
 	passwordService rootservices.PasswordService,
 	tokenService rootservices.TokenService,
 	totpService *services.TOTPService,
-	repo *repository.TwoFactorRepository,
+	twoFactorRepo *repository.TwoFactorRepository,
 	config *types.TwoFactorPluginConfig,
 ) GetTOTPURIUseCase {
 	return &getTOTPURIUseCase{
@@ -35,7 +35,7 @@ func NewGetTOTPURIUseCase(
 		PasswordService: passwordService,
 		TokenService:    tokenService,
 		TOTPService:     totpService,
-		Repo:            repo,
+		TwoFactorRepo:   twoFactorRepo,
 		Config:          config,
 	}
 }
@@ -47,7 +47,7 @@ func (uc *getTOTPURIUseCase) GetTOTPURI(ctx context.Context, userID, password st
 	}
 
 	// Get two-factor record
-	record, err := uc.Repo.GetByUserID(ctx, userID)
+	record, err := uc.TwoFactorRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return "", err
 	}

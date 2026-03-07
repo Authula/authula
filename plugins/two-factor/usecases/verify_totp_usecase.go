@@ -20,7 +20,7 @@ type verifyTOTPUseCase struct {
 	UserService         rootservices.UserService
 	VerificationService rootservices.VerificationService
 	TOTPService         *services.TOTPService
-	Repo                *repository.TwoFactorRepository
+	TwoFactorRepo       *repository.TwoFactorRepository
 	GlobalConfig        *models.Config
 	Config              *types.TwoFactorPluginConfig
 	EventBus            models.EventBus
@@ -33,7 +33,7 @@ func NewVerifyTOTPUseCase(
 	userService rootservices.UserService,
 	verificationService rootservices.VerificationService,
 	totpService *services.TOTPService,
-	repo *repository.TwoFactorRepository,
+	twoFactorRepo *repository.TwoFactorRepository,
 	globalConfig *models.Config,
 	config *types.TwoFactorPluginConfig,
 	eventBus models.EventBus,
@@ -45,7 +45,7 @@ func NewVerifyTOTPUseCase(
 		UserService:         userService,
 		VerificationService: verificationService,
 		TOTPService:         totpService,
-		Repo:                repo,
+		TwoFactorRepo:       twoFactorRepo,
 		GlobalConfig:        globalConfig,
 		Config:              config,
 		EventBus:            eventBus,
@@ -61,7 +61,7 @@ func (uc *verifyTOTPUseCase) Verify(ctx context.Context, pendingToken, code stri
 	}
 
 	// Get two-factor record
-	record, err := uc.Repo.GetByUserID(ctx, userID)
+	record, err := uc.TwoFactorRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (uc *verifyTOTPUseCase) Verify(ctx context.Context, pendingToken, code stri
 	// If this is the first successful verification (SkipVerificationOnEnable was false),
 	// enable 2FA on the two_factor record
 	if !record.Enabled {
-		if err := uc.Repo.SetEnabled(ctx, userID, true); err != nil {
+		if err := uc.TwoFactorRepo.SetEnabled(ctx, userID, true); err != nil {
 			return nil, err
 		}
 	}
@@ -121,7 +121,7 @@ func (uc *verifyTOTPUseCase) Verify(ctx context.Context, pendingToken, code stri
 
 	// Optionally trust device
 	if trustDevice {
-		deviceToken, err := createTrustedDevice(ctx, uc.TokenService, uc.Repo, uc.Config, userID, userAgent)
+		deviceToken, err := createTrustedDevice(ctx, uc.TokenService, uc.TwoFactorRepo, uc.Config, userID, userAgent)
 		if err != nil {
 			return nil, err
 		}

@@ -35,7 +35,7 @@ func verifyPassword(
 func createTrustedDevice(
 	ctx context.Context,
 	tokenService rootservices.TokenService,
-	repo *repository.TwoFactorRepository,
+	twoFactorRepo *repository.TwoFactorRepository,
 	config *types.TwoFactorPluginConfig,
 	userID string,
 	userAgent *string,
@@ -52,7 +52,7 @@ func createTrustedDevice(
 	}
 
 	expiresAt := time.Now().UTC().Add(config.TrustedDeviceDuration)
-	_, err = repo.CreateTrustedDevice(ctx, userID, hashedToken, ua, expiresAt)
+	_, err = twoFactorRepo.CreateTrustedDevice(ctx, userID, hashedToken, ua, expiresAt)
 	if err != nil {
 		return "", err
 	}

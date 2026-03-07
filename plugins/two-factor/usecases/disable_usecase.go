@@ -15,7 +15,7 @@ import (
 type disableUseCase struct {
 	AccountService  rootservices.AccountService
 	PasswordService rootservices.PasswordService
-	Repo            *repository.TwoFactorRepository
+	TwoFactorRepo   *repository.TwoFactorRepository
 	EventBus        models.EventBus
 	Logger          models.Logger
 }
@@ -23,14 +23,14 @@ type disableUseCase struct {
 func NewDisableUseCase(
 	accountService rootservices.AccountService,
 	passwordService rootservices.PasswordService,
-	repo *repository.TwoFactorRepository,
+	twoFactorRepo *repository.TwoFactorRepository,
 	eventBus models.EventBus,
 	logger models.Logger,
 ) DisableUseCase {
 	return &disableUseCase{
 		AccountService:  accountService,
 		PasswordService: passwordService,
-		Repo:            repo,
+		TwoFactorRepo:   twoFactorRepo,
 		EventBus:        eventBus,
 		Logger:          logger,
 	}
@@ -43,7 +43,7 @@ func (uc *disableUseCase) Disable(ctx context.Context, userID, password string) 
 	}
 
 	// Check that 2FA is enabled
-	existing, err := uc.Repo.GetByUserID(ctx, userID)
+	existing, err := uc.TwoFactorRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return err
 	}
@@ -52,12 +52,12 @@ func (uc *disableUseCase) Disable(ctx context.Context, userID, password string) 
 	}
 
 	// Delete two_factor record
-	if err := uc.Repo.DeleteByUserID(ctx, userID); err != nil {
+	if err := uc.TwoFactorRepo.DeleteByUserID(ctx, userID); err != nil {
 		return err
 	}
 
 	// Delete trusted devices
-	if err := uc.Repo.DeleteTrustedDevicesByUserID(ctx, userID); err != nil {
+	if err := uc.TwoFactorRepo.DeleteTrustedDevicesByUserID(ctx, userID); err != nil {
 		return err
 	}
 

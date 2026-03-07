@@ -21,7 +21,7 @@ type enableUseCase struct {
 	TokenService      rootservices.TokenService
 	TOTPService       *services.TOTPService
 	BackupCodeService *services.BackupCodeService
-	Repo              *repository.TwoFactorRepository
+	TwoFactorRepo     *repository.TwoFactorRepository
 	Config            *types.TwoFactorPluginConfig
 	EventBus          models.EventBus
 	Logger            models.Logger
@@ -34,7 +34,7 @@ func NewEnableUseCase(
 	tokenService rootservices.TokenService,
 	totpService *services.TOTPService,
 	backupCodeService *services.BackupCodeService,
-	repo *repository.TwoFactorRepository,
+	twoFactorRepo *repository.TwoFactorRepository,
 	config *types.TwoFactorPluginConfig,
 	eventBus models.EventBus,
 	logger models.Logger,
@@ -46,7 +46,7 @@ func NewEnableUseCase(
 		TokenService:      tokenService,
 		TOTPService:       totpService,
 		BackupCodeService: backupCodeService,
-		Repo:              repo,
+		TwoFactorRepo:     twoFactorRepo,
 		Config:            config,
 		EventBus:          eventBus,
 		Logger:            logger,
@@ -60,7 +60,7 @@ func (uc *enableUseCase) Enable(ctx context.Context, userID, password, issuer st
 	}
 
 	// Check if 2FA is already enabled
-	existing, err := uc.Repo.GetByUserID(ctx, userID)
+	existing, err := uc.TwoFactorRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -106,16 +106,16 @@ func (uc *enableUseCase) Enable(ctx context.Context, userID, password, issuer st
 	}
 
 	// Delete any existing record (in case of stale data) and create new
-	_ = uc.Repo.DeleteByUserID(ctx, userID)
+	_ = uc.TwoFactorRepo.DeleteByUserID(ctx, userID)
 
-	_, err = uc.Repo.Create(ctx, userID, encryptedSecret, encryptedBackup)
+	_, err = uc.TwoFactorRepo.Create(ctx, userID, encryptedSecret, encryptedBackup)
 	if err != nil {
 		return nil, err
 	}
 
 	// If SkipVerificationOnEnable, mark 2FA as enabled immediately
 	if uc.Config.SkipVerificationOnEnable {
-		if err := uc.Repo.SetEnabled(ctx, userID, true); err != nil {
+		if err := uc.TwoFactorRepo.SetEnabled(ctx, userID, true); err != nil {
 			return nil, err
 		}
 	}
