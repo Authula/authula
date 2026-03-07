@@ -15,7 +15,6 @@ type TwoFactorPluginConfig struct {
 	Period                   int           `json:"period" toml:"period"`
 	SkipVerificationOnEnable bool          `json:"skip_verification_on_enable" toml:"skip_verification_on_enable"`
 	BackupCodeCount          int           `json:"backup_code_count" toml:"backup_code_count"`
-	BackupCodeLength         int           `json:"backup_code_length" toml:"backup_code_length"`
 	TrustedDeviceDuration    time.Duration `json:"trusted_device_duration" toml:"trusted_device_duration"`
 	PendingTokenExpiry       time.Duration `json:"pending_token_expiry" toml:"pending_token_expiry"`
 	SecureCookie             bool          `json:"secure_cookie" toml:"secure_cookie"`
@@ -31,9 +30,6 @@ func (c *TwoFactorPluginConfig) ApplyDefaults() {
 	}
 	if c.BackupCodeCount == 0 {
 		c.BackupCodeCount = 10
-	}
-	if c.BackupCodeLength == 0 {
-		c.BackupCodeLength = 10
 	}
 	if c.TrustedDeviceDuration == 0 {
 		c.TrustedDeviceDuration = 30 * 24 * time.Hour

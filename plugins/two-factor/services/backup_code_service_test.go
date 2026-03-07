@@ -4,22 +4,27 @@ import (
 	"strings"
 	"testing"
 
+	argon2svc "github.com/GoBetterAuth/go-better-auth/v2/plugins/email-password/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func newTestBackupCodeService(count int) *BackupCodeService {
+	return NewBackupCodeService(count, argon2svc.NewArgon2PasswordService())
+}
+
 func TestGenerateBackupCodes(t *testing.T) {
-	svc := NewBackupCodeService(10, 10)
+	svc := newTestBackupCodeService(10)
 	codes, err := svc.Generate()
 	require.NoError(t, err)
 	assert.Len(t, codes, 10)
 	for _, code := range codes {
-		assert.Len(t, code, 10)
+		assert.Len(t, code, 12)
 	}
 }
 
 func TestBackupCodesAreUnique(t *testing.T) {
-	svc := NewBackupCodeService(10, 10)
+	svc := newTestBackupCodeService(10)
 	codes, err := svc.Generate()
 	require.NoError(t, err)
 	seen := make(map[string]bool)
@@ -29,49 +34,87 @@ func TestBackupCodesAreUnique(t *testing.T) {
 	}
 }
 
-func TestVerifyAndConsumeBackupCode(t *testing.T) {
-	svc := NewBackupCodeService(10, 10)
+func TestBackupCodesAreLowercaseBase32(t *testing.T) {
+	svc := newTestBackupCodeService(10)
 	codes, err := svc.Generate()
+	require.NoError(t, err)
+	for _, code := range codes {
+		assert.Equal(t, strings.ToLower(code), code, "code should be lowercase")
+		for _, ch := range code {
+			valid := (ch >= 'a' && ch <= 'z') || (ch >= '2' && ch <= '7')
+			assert.True(t, valid, "invalid base32 char: %c", ch)
+		}
+	}
+}
+
+func TestHashAndVerifyBackupCodes(t *testing.T) {
+	svc := newTestBackupCodeService(10)
+	codes, err := svc.Generate()
+	require.NoError(t, err)
+
+	hashed, err := svc.HashCodes(codes)
+	require.NoError(t, err)
+	assert.Len(t, hashed, 10)
+
+	// Each hashed code should differ from the plaintext
+	for i := range codes {
+		assert.NotEqual(t, codes[i], hashed[i])
+	}
+}
+
+func TestVerifyAndConsumeBackupCode(t *testing.T) {
+	svc := newTestBackupCodeService(10)
+	codes, err := svc.Generate()
+	require.NoError(t, err)
+
+	hashed, err := svc.HashCodes(codes)
 	require.NoError(t, err)
 
 	target := codes[3]
-	remaining, ok := svc.VerifyAndConsume(codes, target)
+	remaining, ok := svc.VerifyAndConsume(hashed, target)
 	assert.True(t, ok)
 	assert.Len(t, remaining, 9)
-	assert.NotContains(t, remaining, target)
 }
 
 func TestVerifyAndConsumeRejectsInvalid(t *testing.T) {
-	svc := NewBackupCodeService(10, 10)
+	svc := newTestBackupCodeService(10)
 	codes, err := svc.Generate()
 	require.NoError(t, err)
 
-	remaining, ok := svc.VerifyAndConsume(codes, "invalid-code")
+	hashed, err := svc.HashCodes(codes)
+	require.NoError(t, err)
+
+	remaining, ok := svc.VerifyAndConsume(hashed, "invalid-code")
 	assert.False(t, ok)
 	assert.Len(t, remaining, 10)
 }
 
 func TestVerifyAndConsumeCaseInsensitive(t *testing.T) {
-	svc := NewBackupCodeService(10, 10)
+	svc := newTestBackupCodeService(10)
 	codes, err := svc.Generate()
+	require.NoError(t, err)
+
+	hashed, err := svc.HashCodes(codes)
 	require.NoError(t, err)
 
 	target := codes[3]
 	upperTarget := strings.ToUpper(target)
 
-	remaining, ok := svc.VerifyAndConsume(codes, upperTarget)
+	remaining, ok := svc.VerifyAndConsume(hashed, upperTarget)
 	assert.True(t, ok, "expected case-insensitive match")
 	assert.Len(t, remaining, 9)
-	assert.NotContains(t, remaining, target)
 }
 
 func TestVerifyAndConsumeTrimsWhitespace(t *testing.T) {
-	svc := NewBackupCodeService(10, 10)
+	svc := newTestBackupCodeService(10)
 	codes, err := svc.Generate()
 	require.NoError(t, err)
 
+	hashed, err := svc.HashCodes(codes)
+	require.NoError(t, err)
+
 	target := codes[0]
-	remaining, ok := svc.VerifyAndConsume(codes, "  "+target+"  ")
+	remaining, ok := svc.VerifyAndConsume(hashed, "  "+target+"  ")
 	assert.True(t, ok, "expected whitespace-trimmed match")
 	assert.Len(t, remaining, 9)
 }

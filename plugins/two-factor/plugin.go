@@ -101,8 +101,8 @@ func (p *TwoFactorPlugin) Init(ctx *models.PluginContext) error {
 		Period: p.pluginConfig.Period,
 	}
 	p.backupCodeService = &services.BackupCodeService{
-		Count:  p.pluginConfig.BackupCodeCount,
-		Length: p.pluginConfig.BackupCodeLength,
+		Count:           p.pluginConfig.BackupCodeCount,
+		PasswordService: p.passwordService,
 	}
 
 	// Create repository
