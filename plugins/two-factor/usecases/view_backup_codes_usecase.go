@@ -12,49 +12,41 @@ import (
 type viewBackupCodesUseCase struct {
 	AccountService  rootservices.AccountService
 	PasswordService rootservices.PasswordService
-	TokenService    rootservices.TokenService
 	TwoFactorRepo   *repository.TwoFactorRepository
 }
 
 func NewViewBackupCodesUseCase(
 	accountService rootservices.AccountService,
 	passwordService rootservices.PasswordService,
-	tokenService rootservices.TokenService,
 	twoFactorRepo *repository.TwoFactorRepository,
 ) ViewBackupCodesUseCase {
 	return &viewBackupCodesUseCase{
 		AccountService:  accountService,
 		PasswordService: passwordService,
-		TokenService:    tokenService,
 		TwoFactorRepo:   twoFactorRepo,
 	}
 }
 
-func (uc *viewBackupCodesUseCase) View(ctx context.Context, userID, password string) ([]string, error) {
+func (uc *viewBackupCodesUseCase) View(ctx context.Context, userID, password string) (int, error) {
 	// Verify password
 	if err := verifyPassword(ctx, uc.AccountService, uc.PasswordService, userID, password); err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	// Get two-factor record
 	record, err := uc.TwoFactorRepo.GetByUserID(ctx, userID)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	if record == nil {
-		return nil, constants.ErrTwoFactorNotEnabled
+		return 0, constants.ErrTwoFactorNotEnabled
 	}
 
-	// Decrypt backup codes
-	decryptedJSON, err := uc.TokenService.Decrypt(record.BackupCodes)
-	if err != nil {
-		return nil, err
+	// Unmarshal hashed backup codes to count them
+	var hashedCodes []string
+	if err := json.Unmarshal([]byte(record.BackupCodes), &hashedCodes); err != nil {
+		return 0, err
 	}
 
-	var codes []string
-	if err := json.Unmarshal([]byte(decryptedJSON), &codes); err != nil {
-		return nil, err
-	}
-
-	return codes, nil
+	return len(hashedCodes), nil
 }

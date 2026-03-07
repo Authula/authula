@@ -95,12 +95,12 @@ func (uc *enableUseCase) Enable(ctx context.Context, userID, password, issuer st
 		return nil, err
 	}
 
-	// Encrypt backup codes (as JSON array)
-	backupJSON, err := json.Marshal(backupCodes)
+	// Hash backup codes for storage
+	hashedCodes, err := uc.BackupCodeService.HashCodes(backupCodes)
 	if err != nil {
 		return nil, err
 	}
-	encryptedBackup, err := uc.TokenService.Encrypt(string(backupJSON))
+	hashedJSON, err := json.Marshal(hashedCodes)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func (uc *enableUseCase) Enable(ctx context.Context, userID, password, issuer st
 	// Delete any existing record (in case of stale data) and create new
 	_ = uc.TwoFactorRepo.DeleteByUserID(ctx, userID)
 
-	_, err = uc.TwoFactorRepo.Create(ctx, userID, encryptedSecret, encryptedBackup)
+	_, err = uc.TwoFactorRepo.Create(ctx, userID, encryptedSecret, string(hashedJSON))
 	if err != nil {
 		return nil, err
 	}

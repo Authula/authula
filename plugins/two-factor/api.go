@@ -63,7 +63,6 @@ func BuildUseCases(p *TwoFactorPlugin) *usecases.UseCases {
 		GenerateBackupCodes: usecases.NewGenerateBackupCodesUseCase(
 			p.accountService,
 			p.passwordService,
-			p.tokenService,
 			p.backupCodeService,
 			p.twoFactorRepo,
 		),
@@ -82,7 +81,6 @@ func BuildUseCases(p *TwoFactorPlugin) *usecases.UseCases {
 		ViewBackupCodes: usecases.NewViewBackupCodesUseCase(
 			p.accountService,
 			p.passwordService,
-			p.tokenService,
 			p.twoFactorRepo,
 		),
 	}

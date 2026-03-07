@@ -35,7 +35,7 @@ func (h *ViewBackupCodesHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		codes, err := h.UseCase.View(ctx, *reqCtx.UserID, payload.Password)
+		count, err := h.UseCase.View(ctx, *reqCtx.UserID, payload.Password)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),
@@ -45,7 +45,7 @@ func (h *ViewBackupCodesHandler) Handler() http.HandlerFunc {
 		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, &types.ViewBackupCodesResponse{
-			BackupCodes: codes,
+			RemainingCount: count,
 		})
 	}
 }

@@ -115,7 +115,7 @@ type GenerateBackupCodesResponse struct {
 }
 
 type ViewBackupCodesResponse struct {
-	BackupCodes []string `json:"backupCodes"`
+	RemainingCount int `json:"remainingCount"`
 }
 
 type TwoFactorRedirectResponse struct {

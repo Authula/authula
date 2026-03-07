@@ -13,7 +13,6 @@ import (
 type generateBackupCodesUseCase struct {
 	AccountService    rootservices.AccountService
 	PasswordService   rootservices.PasswordService
-	TokenService      rootservices.TokenService
 	BackupCodeService *services.BackupCodeService
 	TwoFactorRepo     *repository.TwoFactorRepository
 }
@@ -21,14 +20,12 @@ type generateBackupCodesUseCase struct {
 func NewGenerateBackupCodesUseCase(
 	accountService rootservices.AccountService,
 	passwordService rootservices.PasswordService,
-	tokenService rootservices.TokenService,
 	backupCodeService *services.BackupCodeService,
 	twoFactorRepo *repository.TwoFactorRepository,
 ) GenerateBackupCodesUseCase {
 	return &generateBackupCodesUseCase{
 		AccountService:    accountService,
 		PasswordService:   passwordService,
-		TokenService:      tokenService,
 		BackupCodeService: backupCodeService,
 		TwoFactorRepo:     twoFactorRepo,
 	}
@@ -55,16 +52,16 @@ func (uc *generateBackupCodesUseCase) Generate(ctx context.Context, userID, pass
 		return nil, err
 	}
 
-	// Encrypt and update in DB
-	codesJSON, err := json.Marshal(codes)
+	// Hash and update in DB
+	hashedCodes, err := uc.BackupCodeService.HashCodes(codes)
 	if err != nil {
 		return nil, err
 	}
-	encrypted, err := uc.TokenService.Encrypt(string(codesJSON))
+	hashedJSON, err := json.Marshal(hashedCodes)
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.TwoFactorRepo.UpdateBackupCodes(ctx, userID, encrypted); err != nil {
+	if err := uc.TwoFactorRepo.UpdateBackupCodes(ctx, userID, string(hashedJSON)); err != nil {
 		return nil, err
 	}
 

@@ -70,19 +70,14 @@ func (uc *verifyBackupCodeUseCase) Verify(ctx context.Context, pendingToken, cod
 		return nil, constants.ErrTwoFactorNotEnabled
 	}
 
-	// Decrypt backup codes
-	decryptedJSON, err := uc.TokenService.Decrypt(record.BackupCodes)
-	if err != nil {
-		return nil, err
-	}
-
-	var codes []string
-	if err := json.Unmarshal([]byte(decryptedJSON), &codes); err != nil {
+	// Unmarshal hashed backup codes
+	var hashedCodes []string
+	if err := json.Unmarshal([]byte(record.BackupCodes), &hashedCodes); err != nil {
 		return nil, err
 	}
 
 	// Verify and consume the backup code
-	remaining, valid := uc.BackupCodeService.VerifyAndConsume(codes, code)
+	remaining, valid := uc.BackupCodeService.VerifyAndConsume(hashedCodes, code)
 	if !valid {
 		return nil, constants.ErrInvalidBackupCode
 	}
@@ -92,11 +87,7 @@ func (uc *verifyBackupCodeUseCase) Verify(ctx context.Context, pendingToken, cod
 	if err != nil {
 		return nil, err
 	}
-	encryptedRemaining, err := uc.TokenService.Encrypt(string(remainingJSON))
-	if err != nil {
-		return nil, err
-	}
-	if err := uc.TwoFactorRepo.UpdateBackupCodes(ctx, userID, encryptedRemaining); err != nil {
+	if err := uc.TwoFactorRepo.UpdateBackupCodes(ctx, userID, string(remainingJSON)); err != nil {
 		return nil, err
 	}
 
