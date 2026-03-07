@@ -20,11 +20,26 @@ func NewBunUserRepository(db bun.IDB) UserRepository {
 	return &BunUserRepository{db: db}
 }
 
-func (r *BunUserRepository) GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error) {
-	if limit <= 0 {
-		limit = 10
-	}
+func (r *BunUserRepository) Create(ctx context.Context, user *models.User) (*models.User, error) {
+	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		_, err := tx.NewInsert().
+			Model(user).
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
 
+		err = tx.NewSelect().
+			Model(user).
+			WherePK().
+			Scan(ctx)
+		return err
+	})
+
+	return user, err
+}
+
+func (r *BunUserRepository) GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error) {
 	query := r.db.NewSelect().
 		Model((*models.User)(nil)).
 		OrderExpr("id ASC").
@@ -74,25 +89,6 @@ func (r *BunUserRepository) GetByEmail(ctx context.Context, email string) (*mode
 	return user, err
 }
 
-func (r *BunUserRepository) Create(ctx context.Context, user *models.User) (*models.User, error) {
-	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := tx.NewInsert().
-			Model(user).
-			Exec(ctx)
-		if err != nil {
-			return err
-		}
-
-		err = tx.NewSelect().
-			Model(user).
-			WherePK().
-			Scan(ctx)
-		return err
-	})
-
-	return user, err
-}
-
 func (r *BunUserRepository) Update(ctx context.Context, user *models.User) (*models.User, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := tx.NewUpdate().
@@ -130,8 +126,4 @@ func (r *BunUserRepository) Delete(ctx context.Context, id string) error {
 		Where("id = ?", id).
 		Exec(ctx)
 	return err
-}
-
-func (r *BunUserRepository) WithTx(tx bun.IDB) UserRepository {
-	return &BunUserRepository{db: tx}
 }

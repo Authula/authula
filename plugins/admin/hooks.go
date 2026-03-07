@@ -2,21 +2,10 @@ package admin
 
 import (
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
-
-type AdminHookID string
-
-const (
-	HookIDAdminRBAC AdminHookID = "admin.rbac"
-)
-
-func (id AdminHookID) String() string {
-	return string(id)
-}
 
 func (p *AdminPlugin) Hooks() []models.Hook {
 	if p.Api == nil {
@@ -29,12 +18,6 @@ func (p *AdminPlugin) Hooks() []models.Hook {
 			Stage:   models.HookBefore,
 			Handler: p.enforceAdminState,
 			Order:   15,
-		},
-		{
-			Stage:    models.HookBefore,
-			PluginID: HookIDAdminRBAC.String(),
-			Handler:  p.requireRBAC,
-			Order:    20,
 		},
 	}
 }
@@ -86,73 +69,6 @@ func (p *AdminPlugin) enforceAdminState(reqCtx *models.RequestContext) error {
 		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "session is revoked"})
 		reqCtx.Handled = true
 		return nil
-	}
-
-	return nil
-}
-
-func (p *AdminPlugin) requireRBAC(reqCtx *models.RequestContext) error {
-	ctx := reqCtx.Request.Context()
-
-	if reqCtx.UserID == nil || *reqCtx.UserID == "" {
-		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-		reqCtx.Handled = true
-		return nil
-	}
-
-	requiredPermissions := readStringSliceMetadata(reqCtx, "permissions")
-	if len(requiredPermissions) == 0 {
-		reqCtx.SetJSONResponse(http.StatusForbidden, map[string]any{"message": "Forbidden"})
-		reqCtx.Handled = true
-		return nil
-	}
-
-	allowed, err := p.Api.HasPermissions(ctx, *reqCtx.UserID, requiredPermissions)
-	if err != nil {
-		reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": "failed to evaluate permissions"})
-		reqCtx.Handled = true
-		return nil
-	}
-
-	if !allowed {
-		reqCtx.SetJSONResponse(http.StatusForbidden, map[string]any{"message": "Forbidden"})
-		reqCtx.Handled = true
-		return nil
-	}
-
-	return nil
-}
-
-func readStringSliceMetadata(reqCtx *models.RequestContext, key string) []string {
-	if reqCtx == nil || reqCtx.Route == nil || reqCtx.Route.Metadata == nil {
-		return nil
-	}
-
-	raw, ok := reqCtx.Route.Metadata[key]
-	if !ok || raw == nil {
-		return nil
-	}
-
-	if values, ok := raw.([]string); ok {
-		result := make([]string, 0, len(values))
-		for _, value := range values {
-			trimmed := strings.TrimSpace(value)
-			if trimmed != "" {
-				result = append(result, trimmed)
-			}
-		}
-		return result
-	}
-
-	if valuesAny, ok := raw.([]any); ok {
-		result := make([]string, 0, len(valuesAny))
-		for _, value := range valuesAny {
-			str, ok := value.(string)
-			if ok && str != "" {
-				result = append(result, str)
-			}
-		}
-		return result
 	}
 
 	return nil

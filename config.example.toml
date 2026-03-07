@@ -147,7 +147,7 @@ buffer_size = 100
 [plugins.config_manager]
 enabled = false
 
-# --- Admin Plugin (custom-role RBAC and admin operations) ---
+# --- Admin Plugin (user, state, and impersonation operations) ---
 
 [plugins.admin]
 enabled = false
@@ -360,13 +360,6 @@ enabled = true
 # path = "/change-password"
 # method = "POST"
 # plugins = ["session.auth", "csrf.protect"]
-
-# Admin RBAC example
-# [[route_mappings]]
-# path = "/admin/users"
-# method = "GET"
-# plugins = ["admin.rbac"]
-# permissions = ["users.read"]
 
 # [[route_mappings]]
 # path = "/sign-out"

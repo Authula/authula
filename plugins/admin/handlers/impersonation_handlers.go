@@ -9,88 +9,6 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/usecases"
 )
 
-type StartImpersonationHandler struct {
-	useCase usecases.ImpersonationUseCase
-}
-
-func NewStartImpersonationHandler(useCase usecases.ImpersonationUseCase) *StartImpersonationHandler {
-	return &StartImpersonationHandler{useCase: useCase}
-}
-
-func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
-
-		if impersonationActorUserID(reqCtx) == nil {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
-
-		var payload types.StartImpersonationRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
-			reqCtx.Handled = true
-			return
-		}
-
-		result, err := h.useCase.StartImpersonation(r.Context(), *impersonationActorUserID(reqCtx), impersonationActorSessionID(reqCtx), payload)
-		if err != nil {
-			respondImpersonationError(reqCtx, err)
-			return
-		}
-
-		if result == nil || result.Impersonation == nil {
-			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": "failed to start impersonation"})
-			reqCtx.Handled = true
-			return
-		}
-
-		reqCtx.SetUserIDInContext(result.Impersonation.TargetUserID)
-
-		if result.SessionID != nil && *result.SessionID != "" {
-			reqCtx.Values[models.ContextSessionID.String()] = *result.SessionID
-		}
-
-		if result.SessionToken != nil && *result.SessionToken != "" {
-			reqCtx.Values[models.ContextSessionToken.String()] = *result.SessionToken
-			reqCtx.Values[models.ContextAuthSuccess.String()] = true
-		}
-
-		reqCtx.SetJSONResponse(http.StatusCreated, map[string]any{"message": "impersonation started", "data": result.Impersonation})
-	}
-}
-
-type EndImpersonationByIDHandler struct {
-	useCase usecases.ImpersonationUseCase
-}
-
-func NewEndImpersonationByIDHandler(useCase usecases.ImpersonationUseCase) *EndImpersonationByIDHandler {
-	return &EndImpersonationByIDHandler{useCase: useCase}
-}
-
-func (h *EndImpersonationByIDHandler) Handler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
-
-		if impersonationActorUserID(reqCtx) == nil {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
-
-		impersonationID := r.PathValue("impersonation_id")
-		if err := h.useCase.StopImpersonation(r.Context(), *impersonationActorUserID(reqCtx), types.StopImpersonationRequest{ImpersonationID: &impersonationID}); err != nil {
-			respondImpersonationError(reqCtx, err)
-			return
-		}
-
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"message": "impersonation ended"})
-	}
-}
-
 type GetAllImpersonationsHandler struct {
 	useCase usecases.ImpersonationUseCase
 }
@@ -136,6 +54,92 @@ func (h *GetImpersonationByIDHandler) Handler() http.HandlerFunc {
 	}
 }
 
+type StartImpersonationHandler struct {
+	useCase usecases.ImpersonationUseCase
+}
+
+func NewStartImpersonationHandler(useCase usecases.ImpersonationUseCase) *StartImpersonationHandler {
+	return &StartImpersonationHandler{useCase: useCase}
+}
+
+func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
+		actorUserID := impersonationActorUserID(reqCtx)
+
+		if actorUserID == nil {
+			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
+			reqCtx.Handled = true
+			return
+		}
+
+		var payload types.StartImpersonationRequest
+		if err := util.ParseJSON(r, &payload); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.Handled = true
+			return
+		}
+
+		result, err := h.useCase.StartImpersonation(r.Context(), *actorUserID, impersonationActorSessionID(reqCtx), payload)
+		if err != nil {
+			respondImpersonationError(reqCtx, err)
+			return
+		}
+
+		if result == nil || result.Impersonation == nil {
+			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": "failed to start impersonation"})
+			reqCtx.Handled = true
+			return
+		}
+
+		reqCtx.SetUserIDInContext(result.Impersonation.TargetUserID)
+
+		if result.SessionID != nil && *result.SessionID != "" {
+			reqCtx.Values[models.ContextSessionID.String()] = *result.SessionID
+		}
+
+		if result.SessionToken != nil && *result.SessionToken != "" {
+			reqCtx.Values[models.ContextSessionToken.String()] = *result.SessionToken
+			reqCtx.Values[models.ContextAuthSuccess.String()] = true
+		}
+
+		reqCtx.SetJSONResponse(http.StatusCreated, &types.StartImpersonationResponse{
+			Impersonation: result.Impersonation,
+		})
+	}
+}
+
+type StopImpersonationHandler struct {
+	useCase usecases.ImpersonationUseCase
+}
+
+func NewStopImpersonationHandler(useCase usecases.ImpersonationUseCase) *StopImpersonationHandler {
+	return &StopImpersonationHandler{useCase: useCase}
+}
+
+func (h *StopImpersonationHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
+		actorUserID := impersonationActorUserID(reqCtx)
+
+		if actorUserID == nil {
+			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
+			reqCtx.Handled = true
+			return
+		}
+
+		impersonationID := r.PathValue("impersonation_id")
+		if err := h.useCase.StopImpersonation(r.Context(), *actorUserID, types.StopImpersonationRequest{ImpersonationID: &impersonationID}); err != nil {
+			respondImpersonationError(reqCtx, err)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"message": "impersonation ended"})
+	}
+}
+
 func impersonationActorUserID(reqCtx *models.RequestContext) *string {
 	if reqCtx == nil || reqCtx.UserID == nil || *reqCtx.UserID == "" {
 		return nil
@@ -166,15 +170,10 @@ func respondImpersonationError(reqCtx *models.RequestContext, err error) {
 		return
 	}
 
-	message := "internal server error"
-	if err != nil {
-		message = err.Error()
-	}
-
-	reqCtx.SetJSONResponse(mapImpersonationErrorStatus(err), map[string]any{"message": message})
+	reqCtx.SetJSONResponse(mapImpersonationErrorStatus(err), map[string]any{"message": mapAdminHttpErrorMessage(err)})
 	reqCtx.Handled = true
 }
 
 func mapImpersonationErrorStatus(err error) int {
-	return mapAdminErrorStatus(err)
+	return mapAdminHttpErrorStatus(err)
 }

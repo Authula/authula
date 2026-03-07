@@ -1,113 +1,65 @@
 ---
 name: tdd-unit-testing
-description: Write unit tests in Go following strict Red-Green-Refactor TDD discipline. Use when the user asks for new features, bug fixes, refactoring, or code changes that require tests.
+description: Write unit tests in Go following Red-Green-Refactor TDD discipline with mocked dependencies.
 ---
 
-# When to use this skill
+# TDD & Unit Testing
 
-- User asks something similar to "implement", "add", "fix", "refactor", or "change" any Go code.
-- User mentions features, endpoints, services, repositories, or business logic.
-- User says something similar to "write tests for", "add test coverage", or "make it testable".
-- Any task where untested code would be produced.
+## When to use this skill
 
-# TDD Workflow (MANDATORY)
+- Implement new features (write test first)
+- Add test coverage for code changes
+- Test business logic, services, and handlers
+- Ensure error paths are covered
 
-**Always follow Red-Green-Refactor cycle exactly:**
+## Key principles
 
-1. **Red**: Write a failing test first that expresses the desired behavior.
-   - Make it obvious why it fails.
-   - Run `go test ./... -v` to confirm failure.
+1. **Red-Green-Refactor**: Write failing test → implement → refactor
+2. **Mock dependencies**: Use testify/mock to isolate units
+3. **Table-driven tests**: Use `tt` patterns for multiple cases
+4. **One behavior per test**: Keep tests focused and small
+5. **100% coverage target**: Test success and error paths
+6. **Descriptive names**: `TestTodoService_CreateTodo_ReturnsID_OnSuccess`
 
-2. **Green**: Write the _minimum_ production code to make the test pass.
-   - No refactoring yet; just make it green.
-   - Run `go test ./...` to confirm it passes.
+## Testing strategy
 
-3. **Refactor**: Clean up code and tests while keeping all tests green.
-   - Improve names, remove duplication, extract helpers.
-   - Run `go test ./...` after every refactor.
+**Handlers**: Create handler struct with UseCase field; return `http.HandlerFunc` from `Handler()` method; test via httptest
+**Services**: Mock repositories; test business logic and error handling
+**Repositories**: Test against real SQLite database (Bun ORM); use test fixtures to set up schema
+**Integration tests**: Use fixtures; test plugin routes end-to-end
 
-**Never** write production code first. Never write multiple tests without running them.
+## Pattern
 
-# Testing conventions
+Every test follows Arrange-Act-Assert (AAA):
 
-- **Table-driven tests** for multiple cases (use `tt` struct pattern).
-- **100% test coverage** for new/changed code (`go test -cover`).
-- **No external dependencies** in unit tests (mock interfaces, use `testify/mock` if needed).
-- **Descriptive test names**: `TestUserService_GetByID_ReturnsUser_WhenExists`, etc.
-- **Arrange-Act-Assert** structure with blank lines.
-- **Use `t.Parallel()`** for independent tests.
-- **Race condition checks**: Run tests with `-race` flag to ensure thread safety.
-- **Test edge cases** and error conditions, not just happy paths.
-- **Minimal tests**: Keep tests focused on one behavior per test function. Avoid testing multiple things in one test. Keep tests small and focused.
+1. **Arrange**: Create mocks, set expectations, prepare test data
+2. **Act**: Call the function under test
+3. **Assert**: Verify results and confirm all mock expectations were met
 
-# Handler Layer Testing (Request-Response Integration Pattern)
+## Example files
 
-For testing **handler functions** that receive `*models.RequestContext`, use the **Handler Layer Pattern**. This pattern tests HTTP request parsing, validation, and response handling without requiring a full database fixture.
+See [examples/](examples/) for Todos testing patterns:
 
-- **File Organization**: Create `test_helpers_test.go` for shared helpers + mock use cases; use separate `*_handlers_test.go` files for handler tests.
-- **Shared Utilities**: Provide `mustJSON()`, `newSomeHandlerRequest()`, `decodeResponseJSON()`, `assertErrorMessage()` for all tests.
-- **Mock Use Cases**: Create `testify/mock`-based mocks for each use case interface; configure expectations with `.On(...).Return(...).Once()` and verify with `.AssertExpectations(t)`.
-- **Context Mutations**: Test that handlers correctly update `UserID`, `SessionID`, `AuthSuccess` in the request context.
-- **Error Mapping**: Test that handlers map use case errors to correct HTTP status codes (NotFound → 404, Forbidden → 403, etc.).
+- `test_helpers.go` - MockTodoUseCase and MockTodoService interfaces
+- `handler_test.go` - Handler struct with UseCase, Handler() method, httptest patterns
+- `repository_test.go` - Real SQLite database tests with test fixtures, CRUD operations
+- `todo_service_test.go` - Service tests with mocked repositories and table-driven tests
+- `plugin_integration_test.go` - End-to-end route testing with fixtures
 
-See [references/handler_layer_testing.md](references/handler_layer_testing.md) for details and code examples.
+## Common mistakes
 
-# Plugin Integration Testing (Integration Fixture Pattern)
+1. Not writing test first (Red-Green-Refactor discipline)
+2. Testing multiple behaviors in one test
+3. Using real database instead of mocks
+4. Skipping error cases and edge cases
+5. Not asserting mock expectations with `AssertExpectations(t)`
+6. Tests that break on harmless refactoring
 
-For testing plugins, follow the **Integration Fixture Pattern**. This pattern exercises the full HTTP lifecycle including routes, hooks, and database persistence.
+## Quick commands
 
-- **File Organization**: Use `routes_integration_test.go` and `test_helpers_integration_test.go`.
-- **Fixture-based Testing**: Extend `BaseTestFixture` to set up a fresh database, router and auth stack for each test.
-- **ID Aliasing**: Use `ResolveID("test-user")` for stable, readable IDs in tests.
-- **Hook Injection**: Register temporary `models.HookBefore` to mock authentication or context values.
-- **Declarative RBAC**: Test permission enforcement by mapping plugin routes to required permissions in the test setup.
-
-See [references/integration_testing_conventions.md](references/integration_testing_conventions.md) and [examples/plugin_integration_test.go](examples/plugin_integration_test.go) for details.
-
-# Example patterns
-
-Follow `examples/user_service_test.go` exactly for new tests.
-
-## Mocking repositories/services
-
-Use `testify/mock` for interface dependencies.
-
-## Error cases
-
-Test both happy path and every error condition.
-
-# Instructions for the agent
-
-1. Identify the feature/behavior to test.
-2. Write ONE failing test first (Red).
-3. Implement minimal code to pass it (Green).
-4. Refactor both test and code.
-5. Add more tests following the same cycle.
-6. Show `go test ./... -cover -v` output confirming 100% coverage.
-7. If refactoring existing code, write tests for new/changed behavior first.
-
-**Output format**:
-
-Red: Failing test
-
-```go
-// test code...
+```bash
+go test ./...              # Run all tests
+go test -cover ./...       # With coverage
+go test -run TestFunc ...  # Specific test
+go test -race ./...        # Detect race conditions
 ```
-
-`go test` output showing failure
-
-Green: Minimal implementation
-
-```go
-// minimal code to pass...
-```
-
-`go test` output showing success
-
-Refactor: Clean implementation
-
-```go
-// final refactored code...
-```
-
-`go test` output showing 100% coverage

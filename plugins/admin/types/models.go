@@ -1,56 +1,13 @@
 package types
 
 import (
-	"encoding/json"
-	"time"
+"encoding/json"
+"time"
 
-	"github.com/uptrace/bun"
+"github.com/uptrace/bun"
 
-	"github.com/GoBetterAuth/go-better-auth/v2/models"
+"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
-
-// Models
-
-type Role struct {
-	bun.BaseModel `bun:"table:admin_roles"`
-
-	ID          string    `json:"id" bun:"column:id,pk"`
-	Name        string    `json:"name" bun:"column:name"`
-	Description *string   `json:"description" bun:"column:description"`
-	IsSystem    bool      `json:"is_system" bun:"column:is_system"`
-	CreatedAt   time.Time `json:"created_at" bun:"column:created_at,default:current_timestamp"`
-	UpdatedAt   time.Time `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
-}
-
-type Permission struct {
-	bun.BaseModel `bun:"table:admin_permissions"`
-
-	ID          string    `json:"id" bun:"column:id,pk"`
-	Key         string    `json:"key" bun:"column:key"`
-	Description *string   `json:"description" bun:"column:description"`
-	IsSystem    bool      `json:"is_system" bun:"column:is_system"`
-	CreatedAt   time.Time `json:"created_at" bun:"column:created_at,default:current_timestamp"`
-	UpdatedAt   time.Time `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
-}
-
-type RolePermission struct {
-	bun.BaseModel `bun:"table:admin_role_permissions"`
-
-	RoleID          string    `json:"role_id" bun:"column:role_id,pk"`
-	PermissionID    string    `json:"permission_id" bun:"column:permission_id,pk"`
-	GrantedByUserID *string   `json:"granted_by_user_id" bun:"column:granted_by_user_id"`
-	GrantedAt       time.Time `json:"granted_at" bun:"column:granted_at"`
-}
-
-type UserRole struct {
-	bun.BaseModel `bun:"table:admin_user_roles"`
-
-	UserID           string     `json:"user_id" bun:"column:user_id,pk"`
-	RoleID           string     `json:"role_id" bun:"column:role_id,pk"`
-	AssignedByUserID *string    `json:"assigned_by_user_id" bun:"column:assigned_by_user_id"`
-	AssignedAt       time.Time  `json:"assigned_at" bun:"column:assigned_at"`
-	ExpiresAt        *time.Time `json:"expires_at" bun:"column:expires_at"`
-}
 
 type Impersonation struct {
 	bun.BaseModel `bun:"table:admin_impersonations"`
@@ -96,75 +53,41 @@ type AdminSessionState struct {
 	UpdatedAt              time.Time  `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
 }
 
-// Types
-
-type GetAllRolesResponse struct {
-	Roles []Role `json:"roles"`
+type CreateUserRequest struct {
+	Name          string          `json:"name"`
+	Email         string          `json:"email"`
+	EmailVerified *bool           `json:"email_verified,omitempty"`
+	Image         *string         `json:"image,omitempty"`
+	Metadata      json.RawMessage `json:"metadata,omitempty"`
 }
 
-type CreateRoleRequest struct {
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	IsSystem    bool    `json:"is_system"`
+type CreateUserResponse struct {
+	User *models.User `json:"user"`
 }
 
-type UpdateRoleRequest struct {
-	Name        *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
+type GetUserByIDResponse struct {
+	User *models.User `json:"user"`
 }
 
-type CreatePermissionRequest struct {
-	Key         string  `json:"key"`
-	Description *string `json:"description,omitempty"`
-	IsSystem    bool    `json:"is_system"`
+type UpdateUserRequest struct {
+	Name          *string         `json:"name,omitempty"`
+	Email         *string         `json:"email,omitempty"`
+	EmailVerified *bool           `json:"email_verified,omitempty"`
+	Image         *string         `json:"image,omitempty"`
+	Metadata      json.RawMessage `json:"metadata,omitempty"`
 }
 
-type UpdatePermissionRequest struct {
-	Description *string `json:"description,omitempty"`
+type UpdateUserResponse struct {
+	User *models.User `json:"user"`
 }
 
-type AddRolePermissionRequest struct {
-	PermissionID string `json:"permission_id"`
+type DeleteUserResponse struct {
+	Message string `json:"message"`
 }
 
-type ReplaceRolePermissionsRequest struct {
-	PermissionIDs []string `json:"permission_ids"`
-}
-
-type AssignUserRoleRequest struct {
-	RoleID    string     `json:"role_id"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-}
-
-type ReplaceUserRolesRequest struct {
-	RoleIDs []string `json:"role_ids"`
-}
-
-type UserRoleInfo struct {
-	RoleID    string     `json:"role_id"`
-	RoleName  string     `json:"role_name"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-}
-
-type UserPermissionInfo struct {
-	PermissionID  string `json:"permission_id"`
-	PermissionKey string `json:"permission_key"`
-}
-
-type UserWithRoles struct {
-	User  models.User    `json:"user"`
-	Roles []UserRoleInfo `json:"roles"`
-}
-
-type UserWithPermissions struct {
-	User        models.User          `json:"user"`
-	Permissions []UserPermissionInfo `json:"permissions"`
-}
-
-type UserAuthorizationProfile struct {
-	User        models.User          `json:"user"`
-	Roles       []UserRoleInfo       `json:"roles"`
-	Permissions []UserPermissionInfo `json:"permissions"`
+type UsersPage struct {
+	Users      []models.User `json:"users"`
+	NextCursor *string       `json:"next_cursor,omitempty"`
 }
 
 type StartImpersonationRequest struct {
@@ -173,8 +96,16 @@ type StartImpersonationRequest struct {
 	ExpiresInSeconds *int   `json:"expires_in_seconds,omitempty"`
 }
 
+type StartImpersonationResponse struct {
+	Impersonation *Impersonation `json:"impersonation"`
+}
+
 type StopImpersonationRequest struct {
 	ImpersonationID *string `json:"impersonation_id,omitempty"`
+}
+
+type StopImpersonationResponse struct {
+	Message string `json:"message"`
 }
 
 type RevokeSessionRequest struct {
@@ -184,11 +115,6 @@ type RevokeSessionRequest struct {
 type BanUserRequest struct {
 	BannedUntil *time.Time `json:"banned_until,omitempty"`
 	Reason      *string    `json:"reason,omitempty"`
-}
-
-type RoleDetails struct {
-	Role        Role                 `json:"role"`
-	Permissions []UserPermissionInfo `json:"permissions"`
 }
 
 type AdminUserSession struct {
@@ -210,29 +136,8 @@ type UpsertSessionStateRequest struct {
 	ImpersonationExpiresAt *time.Time `json:"impersonation_expires_at,omitempty"`
 }
 
-type CreateUserRequest struct {
-	Name          string          `json:"name"`
-	Email         string          `json:"email"`
-	EmailVerified *bool           `json:"email_verified,omitempty"`
-	Image         *string         `json:"image,omitempty"`
-	Metadata      json.RawMessage `json:"metadata,omitempty"`
-}
-
-type UpdateUserRequest struct {
-	Name          *string         `json:"name,omitempty"`
-	Email         *string         `json:"email,omitempty"`
-	EmailVerified *bool           `json:"email_verified,omitempty"`
-	Image         *string         `json:"image,omitempty"`
-	Metadata      json.RawMessage `json:"metadata,omitempty"`
-}
-
 type StartImpersonationResult struct {
 	Impersonation *Impersonation `json:"impersonation"`
 	SessionID     *string        `json:"session_id,omitempty"`
 	SessionToken  *string        `json:"session_token,omitempty"`
-}
-
-type UsersPage struct {
-	Users      []models.User `json:"users"`
-	NextCursor *string       `json:"next_cursor,omitempty"`
 }

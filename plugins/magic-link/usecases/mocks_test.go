@@ -8,7 +8,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/magic-link/types"
 )
 
-type mockUserService = inttests.MockUserRepository
+type mockUserService = inttests.MockUserService
 type mockAccountService = inttests.MockAccountService
 type mockSessionService = inttests.MockSessionService
 type mockVerificationService = inttests.MockVerificationService

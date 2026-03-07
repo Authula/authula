@@ -42,7 +42,7 @@ func TestSignInHandler_ValidRequestWithExistingUser(t *testing.T) {
 	ctx := models.SetRequestContext(context.Background(), reqCtx)
 	req = req.WithContext(ctx)
 
-	userService := &tests.MockUserRepository{}
+	userService := &tests.MockUserService{}
 	userService.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{
 		ID:    "user-123",
 		Email: "test@example.com",
@@ -150,7 +150,7 @@ func TestSignInHandler_UseCaseError(t *testing.T) {
 	ctx := models.SetRequestContext(context.Background(), reqCtx)
 	req = req.WithContext(ctx)
 
-	userService := &tests.MockUserRepository{}
+	userService := &tests.MockUserService{}
 	userService.On("GetByEmail", mock.Anything, "test@example.com").Return(nil, errors.New("database error")).Once()
 
 	useCase := &usecases.SignInUseCaseImpl{
@@ -204,7 +204,7 @@ func TestSignInHandler_ResponseStructure(t *testing.T) {
 	ctx := models.SetRequestContext(context.Background(), reqCtx)
 	req = req.WithContext(ctx)
 
-	userService := &tests.MockUserRepository{}
+	userService := &tests.MockUserService{}
 	userService.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{
 		ID:    "user-123",
 		Email: "test@example.com",

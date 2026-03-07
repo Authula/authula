@@ -53,29 +53,29 @@ func (h *AuthorizeHandler) Handler() http.HandlerFunc {
 			Name:     constants.CookieState,
 			Value:    resp.StateCookie,
 			Path:     "/",
+			MaxAge:   int(time.Minute.Seconds()) * 5,
 			HttpOnly: true,
 			Secure:   secure,
 			SameSite: http.SameSiteLaxMode,
-			MaxAge:   int(time.Minute.Seconds()) * 5,
 		})
 		http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
 			Name:     constants.CookieRedirectTo,
 			Value:    resp.RedirectCookie,
 			Path:     "/",
+			MaxAge:   int(time.Minute.Seconds()) * 5,
 			HttpOnly: true,
 			Secure:   secure,
 			SameSite: http.SameSiteLaxMode,
-			MaxAge:   int(time.Minute.Seconds()) * 5,
 		})
 		if resp.VerifierCookie != nil {
 			http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
 				Name:     constants.CookieVerifier,
 				Value:    *resp.VerifierCookie,
 				Path:     "/",
+				MaxAge:   int(time.Minute.Seconds()) * 5,
 				HttpOnly: true,
 				Secure:   secure,
 				SameSite: http.SameSiteLaxMode,
-				MaxAge:   int(time.Minute.Seconds()) * 5,
 			})
 		}
 

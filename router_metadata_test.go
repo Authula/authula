@@ -21,11 +21,11 @@ func TestRouteMetadataPopulation(t *testing.T) {
 
 	// Set up route metadata from config
 	routeMetadata := map[string]map[string]any{
-		"GET:/me": {
-			"plugins": []string{"session.auth", "bearer.auth"},
+		"GET:/resource/details": {
+			"plugins": []string{"plugin.auth", "plugin.verification"},
 		},
-		"POST:/sign-in": {
-			"plugins": []string{"email_password.issuance"},
+		"POST:/resource/create": {
+			"plugins": []string{"plugin.process"},
 		},
 	}
 	router.SetRouteMetadataFromConfig(routeMetadata)
@@ -45,13 +45,13 @@ func TestRouteMetadataPopulation(t *testing.T) {
 	// Register a test route
 	route := models.Route{
 		Method:  "GET",
-		Path:    "/me",
+		Path:    "/resource/details",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
 	}
 	router.RegisterRoute(route)
 
 	// Make a test request
-	req := httptest.NewRequest("GET", "/auth/me", nil)
+	req := httptest.NewRequest("GET", "/auth/resource/details", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -70,7 +70,7 @@ func TestRouteMetadataPopulation(t *testing.T) {
 	}
 
 	// Verify the plugins list
-	expected := []string{"session.auth", "bearer.auth"}
+	expected := []string{"plugin.auth", "plugin.verification"}
 	if len(pluginIDs) != len(expected) {
 		t.Fatalf("expected %v plugins, got %v", expected, pluginIDs)
 	}
@@ -92,11 +92,11 @@ func TestPluginIDBasedHookExecution(t *testing.T) {
 
 	// Set up route metadata
 	routeMetadata := map[string]map[string]any{
-		"GET:/me": {
-			"plugins": []string{"session.auth"},
+		"GET:/resource/details": {
+			"plugins": []string{"plugin.auth"},
 		},
-		"POST:/sign-in": {
-			"plugins": []string{"email_password.issuance"},
+		"POST:/resource/create": {
+			"plugins": []string{"plugin.process"},
 		},
 	}
 	router.SetRouteMetadataFromConfig(routeMetadata)
@@ -107,9 +107,9 @@ func TestPluginIDBasedHookExecution(t *testing.T) {
 	emailPasswordHookCalled := false
 
 	// Register hooks with PluginID
-	sessionHook := models.Hook{
+	plugin1Hook := models.Hook{
 		Stage:    models.HookBefore,
-		PluginID: "session.auth",
+		PluginID: "plugin.auth",
 		Handler: func(ctx *models.RequestContext) error {
 			sessionHookCalled = true
 			return nil
@@ -117,9 +117,9 @@ func TestPluginIDBasedHookExecution(t *testing.T) {
 		Order: 10,
 	}
 
-	bearerHook := models.Hook{
+	plugin2Hook := models.Hook{
 		Stage:    models.HookBefore,
-		PluginID: "bearer.auth",
+		PluginID: "plugin.verification",
 		Handler: func(ctx *models.RequestContext) error {
 			bearerHookCalled = true
 			return nil
@@ -127,9 +127,9 @@ func TestPluginIDBasedHookExecution(t *testing.T) {
 		Order: 5,
 	}
 
-	emailPasswordHook := models.Hook{
+	plugin3Hook := models.Hook{
 		Stage:    models.HookBefore,
-		PluginID: "email_password.issuance",
+		PluginID: "plugin.process",
 		Handler: func(ctx *models.RequestContext) error {
 			emailPasswordHookCalled = true
 			return nil
@@ -137,59 +137,59 @@ func TestPluginIDBasedHookExecution(t *testing.T) {
 		Order: 10,
 	}
 
-	router.RegisterHook(sessionHook)
-	router.RegisterHook(bearerHook)
-	router.RegisterHook(emailPasswordHook)
+	router.RegisterHook(plugin1Hook)
+	router.RegisterHook(plugin2Hook)
+	router.RegisterHook(plugin3Hook)
 
 	// Register test routes
 	router.RegisterRoute(models.Route{
 		Method:  "GET",
-		Path:    "/me",
+		Path:    "/resource/details",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
 	})
 
 	router.RegisterRoute(models.Route{
 		Method:  "POST",
-		Path:    "/sign-in",
+		Path:    "/resource/create",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
 	})
 
-	// Test 1: GET /auth/me should only run session.auth hook (not bearer.auth)
+	// Test 1: GET /auth/resource/details should only run plugin.auth hook (not plugin.verification)
 	sessionHookCalled = false
 	bearerHookCalled = false
 	emailPasswordHookCalled = false
 
-	req := httptest.NewRequest("GET", "/auth/me", nil)
+	req := httptest.NewRequest("GET", "/auth/resource/details", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	if !sessionHookCalled {
-		t.Error("session.auth hook should have been called for /auth/me")
+		t.Error("plugin.auth hook should have been called for /auth/resource/details")
 	}
 	if bearerHookCalled {
-		t.Error("bearer.auth hook should NOT have been called for /auth/me")
+		t.Error("plugin.verification hook should NOT have been called for /auth/resource/details")
 	}
 	if emailPasswordHookCalled {
-		t.Error("email_password.issuance hook should NOT have been called for /auth/me")
+		t.Error("plugin.process hook should NOT have been called for /auth/resource/details")
 	}
 
-	// Test 2: POST /auth/sign-in should only run email_password.issuance hook
+	// Test 2: POST /auth/resource/create should only run plugin.process hook
 	sessionHookCalled = false
 	bearerHookCalled = false
 	emailPasswordHookCalled = false
 
-	req = httptest.NewRequest("POST", "/auth/sign-in", nil)
+	req = httptest.NewRequest("POST", "/auth/resource/create", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	if sessionHookCalled {
-		t.Error("session.auth hook should NOT have been called for /auth/sign-in")
+		t.Error("plugin.auth hook should NOT have been called for /auth/resource/create")
 	}
 	if bearerHookCalled {
-		t.Error("bearer.auth hook should NOT have been called for /auth/sign-in")
+		t.Error("plugin.verification hook should NOT have been called for /auth/resource/create")
 	}
 	if !emailPasswordHookCalled {
-		t.Error("email_password.issuance hook should have been called for /auth/sign-in")
+		t.Error("plugin.process hook should have been called for /auth/resource/create")
 	}
 }
 
@@ -197,21 +197,19 @@ func TestPluginIDBasedHookExecution(t *testing.T) {
 func TestRouteMetadataConversion(t *testing.T) {
 	routes := []models.RouteMapping{
 		{
-			Path:        "/auth/me",
-			Method:      "GET",
-			Plugins:     []string{"session.auth", "bearer.auth"},
-			Permissions: []string{"admin.read", "admin.write"},
+			Path:    "/resource/list",
+			Method:  "GET",
+			Plugins: []string{"plugin.auth", "plugin.verification"},
 		},
 		{
-			Path:    "/auth/sign-in",
+			Path:    "/resource/create",
 			Method:  "POST",
-			Plugins: []string{"email_password.issuance"},
+			Plugins: []string{"plugin.process"},
 		},
 		{
-			Path:        "/auth/change-password",
-			Method:      "POST",
-			Plugins:     []string{"session.auth", "csrf.protect"},
-			Permissions: []string{"users.write"},
+			Path:    "/resource/update",
+			Method:  "POST",
+			Plugins: []string{"plugin.auth", "plugin.validation"},
 		},
 	}
 
@@ -220,8 +218,8 @@ func TestRouteMetadataConversion(t *testing.T) {
 		t.Fatalf("ConvertRouteMetadata failed: %v", err)
 	}
 
-	// Test 1: Verify GET:/auth/me
-	key := "GET:/auth/me"
+	// Test 1: Verify GET:/resource/list
+	key := "GET:/resource/list"
 	if _, exists := metadata[key]; !exists {
 		t.Fatalf("expected key %s in metadata", key)
 	}
@@ -231,21 +229,12 @@ func TestRouteMetadataConversion(t *testing.T) {
 		t.Fatalf("plugins not found or wrong type for %s", key)
 	}
 
-	if len(pluginIDs) != 2 || pluginIDs[0] != "session.auth" || pluginIDs[1] != "bearer.auth" {
+	if len(pluginIDs) != 2 || pluginIDs[0] != "plugin.auth" || pluginIDs[1] != "plugin.verification" {
 		t.Errorf("unexpected plugins for %s: %v", key, pluginIDs)
 	}
 
-	permissions, ok := metadata[key]["permissions"].([]string)
-	if !ok {
-		t.Fatalf("permissions not found or wrong type for %s", key)
-	}
-
-	if len(permissions) != 2 || permissions[0] != "admin.read" || permissions[1] != "admin.write" {
-		t.Errorf("unexpected permissions for %s: %v", key, permissions)
-	}
-
-	// Test 2: Verify POST:/auth/sign-in
-	key = "POST:/auth/sign-in"
+	// Test 2: Verify POST:/resource/create
+	key = "POST:/resource/create"
 	if _, exists := metadata[key]; !exists {
 		t.Fatalf("expected key %s in metadata", key)
 	}
@@ -255,12 +244,12 @@ func TestRouteMetadataConversion(t *testing.T) {
 		t.Fatalf("plugins not found or wrong type for %s", key)
 	}
 
-	if len(pluginIDs) != 1 || pluginIDs[0] != "email_password.issuance" {
+	if len(pluginIDs) != 1 || pluginIDs[0] != "plugin.process" {
 		t.Errorf("unexpected plugins for %s: %v", key, pluginIDs)
 	}
 
-	// Test 3: Verify POST:/auth/change-password
-	key = "POST:/auth/change-password"
+	// Test 3: Verify POST:/resource/update
+	key = "POST:/resource/update"
 	if _, exists := metadata[key]; !exists {
 		t.Fatalf("expected key %s in metadata", key)
 	}
@@ -270,17 +259,8 @@ func TestRouteMetadataConversion(t *testing.T) {
 		t.Fatalf("plugins not found or wrong type for %s", key)
 	}
 
-	if len(pluginIDs) != 2 || pluginIDs[0] != "session.auth" || pluginIDs[1] != "csrf.protect" {
+	if len(pluginIDs) != 2 || pluginIDs[0] != "plugin.auth" || pluginIDs[1] != "plugin.validation" {
 		t.Errorf("unexpected plugins for %s: %v", key, pluginIDs)
-	}
-
-	permissions, ok = metadata[key]["permissions"].([]string)
-	if !ok {
-		t.Fatalf("permissions not found or wrong type for %s", key)
-	}
-
-	if len(permissions) != 1 || permissions[0] != "users.write" {
-		t.Errorf("unexpected permissions for %s: %v", key, permissions)
 	}
 }
 
@@ -292,17 +272,16 @@ func TestRouteMetadataFromConfigMergesWithRouteMetadata(t *testing.T) {
 	router := NewRouter(config, logger, nil)
 
 	router.SetRouteMetadataFromConfig(map[string]map[string]any{
-		"GET:/admin/users": {
-			"plugins":     []string{"session.auth"},
-			"permissions": []string{"admin.read"},
+		"GET:/resource/action": {
+			"plugins": []string{"plugin.primary"},
 		},
 	})
 
 	router.RegisterRoute(models.Route{
 		Method: http.MethodGet,
-		Path:   "/admin/users",
+		Path:   "/resource/action",
 		Metadata: map[string]any{
-			"plugins": []string{"admin.rbac"},
+			"plugins": []string{"plugin.primary", "plugin.secondary"},
 		},
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -318,7 +297,7 @@ func TestRouteMetadataFromConfigMergesWithRouteMetadata(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/admin/users", nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/resource/action", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -327,13 +306,8 @@ func TestRouteMetadataFromConfigMergesWithRouteMetadata(t *testing.T) {
 	}
 
 	plugins, ok := capturedCtx.Route.Metadata["plugins"].([]string)
-	if !ok || len(plugins) != 2 || plugins[0] != "session.auth" || plugins[1] != "admin.rbac" {
+	if !ok || len(plugins) != 2 || plugins[0] != "plugin.primary" || plugins[1] != "plugin.secondary" {
 		t.Fatalf("expected merged plugins metadata, got %v", capturedCtx.Route.Metadata["plugins"])
-	}
-
-	permissions, ok := capturedCtx.Route.Metadata["permissions"].([]string)
-	if !ok || len(permissions) != 1 || permissions[0] != "admin.read" {
-		t.Fatalf("expected merged permissions metadata, got %v", capturedCtx.Route.Metadata["permissions"])
 	}
 }
 
@@ -426,14 +400,14 @@ func TestDynamicRouteMatching(t *testing.T) {
 
 	// Set up route metadata with dynamic routes (using {param} syntax)
 	routeMetadata := map[string]map[string]any{
-		"POST:/auth/oauth2/callback/{provider}": {
-			"plugins": []string{"session.issuance", "session.context"},
+		"POST:/auth/resource/{id}/action": {
+			"plugins": []string{"plugin.process", "plugin.context"},
 		},
-		"GET:/auth/verify/{token}": {
-			"plugins": []string{"email.verify"},
+		"GET:/auth/verify/{code}": {
+			"plugins": []string{"plugin.verify"},
 		},
-		"POST:/auth/oauth2/callback/{provider}/extra": {
-			"plugins": []string{"oauth2.process"},
+		"POST:/auth/resource/{id}/action/complete": {
+			"plugins": []string{"plugin.finalize"},
 		},
 	}
 	router.SetRouteMetadataFromConfig(routeMetadata)
@@ -442,125 +416,125 @@ func TestDynamicRouteMatching(t *testing.T) {
 	var hooksExecuted []string
 
 	// Register hooks with plugin IDs
-	sessionIssuanceHook := models.Hook{
+	plugin1Hook := models.Hook{
 		Stage:    models.HookBefore,
-		PluginID: "session.issuance",
+		PluginID: "plugin.process",
 		Handler: func(ctx *models.RequestContext) error {
-			hooksExecuted = append(hooksExecuted, "session.issuance")
+			hooksExecuted = append(hooksExecuted, "plugin.process")
 			return nil
 		},
 		Order: 10,
 	}
 
-	sessionContextHook := models.Hook{
+	plugin2Hook := models.Hook{
 		Stage:    models.HookBefore,
-		PluginID: "session.context",
+		PluginID: "plugin.context",
 		Handler: func(ctx *models.RequestContext) error {
-			hooksExecuted = append(hooksExecuted, "session.context")
+			hooksExecuted = append(hooksExecuted, "plugin.context")
 			return nil
 		},
 		Order: 5,
 	}
 
-	emailVerifyHook := models.Hook{
+	plugin3Hook := models.Hook{
 		Stage:    models.HookBefore,
-		PluginID: "email.verify",
+		PluginID: "plugin.verify",
 		Handler: func(ctx *models.RequestContext) error {
-			hooksExecuted = append(hooksExecuted, "email.verify")
+			hooksExecuted = append(hooksExecuted, "plugin.verify")
 			return nil
 		},
 		Order: 0,
 	}
 
-	oauth2ProcessHook := models.Hook{
+	plugin4Hook := models.Hook{
 		Stage:    models.HookBefore,
-		PluginID: "oauth2.process",
+		PluginID: "plugin.finalize",
 		Handler: func(ctx *models.RequestContext) error {
-			hooksExecuted = append(hooksExecuted, "oauth2.process")
+			hooksExecuted = append(hooksExecuted, "plugin.finalize")
 			return nil
 		},
 		Order: 0,
 	}
 
-	router.RegisterHook(sessionIssuanceHook)
-	router.RegisterHook(sessionContextHook)
-	router.RegisterHook(emailVerifyHook)
-	router.RegisterHook(oauth2ProcessHook)
+	router.RegisterHook(plugin1Hook)
+	router.RegisterHook(plugin2Hook)
+	router.RegisterHook(plugin3Hook)
+	router.RegisterHook(plugin4Hook)
 
 	// Register test routes
 	router.RegisterRoute(models.Route{
 		Method:  "POST",
-		Path:    "/oauth2/callback/{provider}",
+		Path:    "/resource/{id}/action",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
 	})
 
 	router.RegisterRoute(models.Route{
 		Method:  "GET",
-		Path:    "/verify/{token}",
+		Path:    "/verify/{code}",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
 	})
 
 	router.RegisterRoute(models.Route{
 		Method:  "POST",
-		Path:    "/oauth2/callback/{provider}/extra",
+		Path:    "/resource/{id}/action/complete",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
 	})
 
-	// Test 1: POST /auth/oauth2/callback/discord should match the dynamic route pattern
+	// Test 1: POST /auth/resource/123/action should match the dynamic route pattern
 	hooksExecuted = nil
-	req := httptest.NewRequest("POST", "/auth/oauth2/callback/discord", nil)
+	req := httptest.NewRequest("POST", "/auth/resource/123/action", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	if len(hooksExecuted) != 2 {
-		t.Errorf("expected 2 hooks to execute for POST /auth/oauth2/callback/discord, got %d: %v", len(hooksExecuted), hooksExecuted)
+		t.Errorf("expected 2 hooks to execute for POST /auth/resource/123/action, got %d: %v", len(hooksExecuted), hooksExecuted)
 	}
-	if len(hooksExecuted) >= 1 && hooksExecuted[0] != "session.context" {
-		t.Errorf("expected session.context hook first (order 5), got %s", hooksExecuted[0])
+	if len(hooksExecuted) >= 1 && hooksExecuted[0] != "plugin.context" {
+		t.Errorf("expected plugin.context hook first (order 5), got %s", hooksExecuted[0])
 	}
-	if len(hooksExecuted) >= 2 && hooksExecuted[1] != "session.issuance" {
-		t.Errorf("expected session.issuance hook second (order 10), got %s", hooksExecuted[1])
+	if len(hooksExecuted) >= 2 && hooksExecuted[1] != "plugin.process" {
+		t.Errorf("expected plugin.process hook second (order 10), got %s", hooksExecuted[1])
 	}
 
-	// Test 2: POST /auth/oauth2/callback/github should also match the same pattern
+	// Test 2: POST /auth/resource/456/action should also match the same pattern
 	hooksExecuted = nil
-	req = httptest.NewRequest("POST", "/auth/oauth2/callback/github", nil)
+	req = httptest.NewRequest("POST", "/auth/resource/456/action", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	if len(hooksExecuted) != 2 {
-		t.Errorf("expected 2 hooks to execute for POST /auth/oauth2/callback/github, got %d: %v", len(hooksExecuted), hooksExecuted)
+		t.Errorf("expected 2 hooks to execute for POST /auth/resource/456/action, got %d: %v", len(hooksExecuted), hooksExecuted)
 	}
 
-	// Test 3: GET /auth/verify/abc123def456 should match the email.verify route
+	// Test 3: GET /auth/verify/token123 should match the plugin.verify route
 	hooksExecuted = nil
-	req = httptest.NewRequest("GET", "/auth/verify/abc123def456", nil)
+	req = httptest.NewRequest("GET", "/auth/verify/token123", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	if len(hooksExecuted) != 1 {
-		t.Errorf("expected 1 hook to execute for GET /auth/verify/abc123def456, got %d: %v", len(hooksExecuted), hooksExecuted)
+		t.Errorf("expected 1 hook to execute for GET /auth/verify/token123, got %d: %v", len(hooksExecuted), hooksExecuted)
 	}
-	if len(hooksExecuted) >= 1 && hooksExecuted[0] != "email.verify" {
-		t.Errorf("expected email.verify hook, got %s", hooksExecuted[0])
+	if len(hooksExecuted) >= 1 && hooksExecuted[0] != "plugin.verify" {
+		t.Errorf("expected plugin.verify hook, got %s", hooksExecuted[0])
 	}
 
-	// Test 4: POST /auth/oauth2/callback/google/extra should match the three-segment pattern
+	// Test 4: POST /auth/resource/789/action/complete should match the four-segment pattern
 	hooksExecuted = nil
-	req = httptest.NewRequest("POST", "/auth/oauth2/callback/google/extra", nil)
+	req = httptest.NewRequest("POST", "/auth/resource/789/action/complete", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	if len(hooksExecuted) != 1 {
-		t.Errorf("expected 1 hook to execute for POST /auth/oauth2/callback/google/extra, got %d: %v", len(hooksExecuted), hooksExecuted)
+		t.Errorf("expected 1 hook to execute for POST /auth/resource/789/action/complete, got %d: %v", len(hooksExecuted), hooksExecuted)
 	}
-	if len(hooksExecuted) >= 1 && hooksExecuted[0] != "oauth2.process" {
-		t.Errorf("expected oauth2.process hook, got %s", hooksExecuted[0])
+	if len(hooksExecuted) >= 1 && hooksExecuted[0] != "plugin.finalize" {
+		t.Errorf("expected plugin.finalize hook, got %s", hooksExecuted[0])
 	}
 
-	// Test 5: Wrong method should not match (POST should not match GET pattern)
+	// Test 5: Wrong method should not match (GET instead of POST)
 	hooksExecuted = nil
-	req = httptest.NewRequest("GET", "/auth/oauth2/callback/discord", nil)
+	req = httptest.NewRequest("GET", "/auth/resource/999/action", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -578,22 +552,22 @@ func TestRoutePathMatching(t *testing.T) {
 		description string
 	}{
 		// Exact matches
-		{"/oauth2/callback/discord", "/oauth2/callback/discord", true, "exact path match"},
-		{"/api/users/123", "/api/users/123", true, "exact path with numbers"},
+		{"/resource/action/item", "/resource/action/item", true, "exact path match"},
+		{"/api/data/123", "/api/data/123", true, "exact path with numbers"},
 
 		// Dynamic parameter matches
-		{"/oauth2/callback/discord", "/oauth2/callback/{provider}", true, "single dynamic parameter"},
-		{"/oauth2/callback/github", "/oauth2/callback/{provider}", true, "single dynamic parameter different value"},
-		{"/verify/abc123def456", "/verify/{token}", true, "dynamic token parameter"},
-		{"/api/users/123/posts/456", "/api/users/{id}/posts/{postId}", true, "multiple dynamic parameters"},
-		{"/api/users/john/settings/profile", "/api/users/{username}/settings/{section}", true, "multiple params with non-numeric values"},
+		{"/resource/action/item", "/resource/action/{param}", true, "single dynamic parameter"},
+		{"/resource/action/other", "/resource/action/{param}", true, "single dynamic parameter different value"},
+		{"/verify/code123", "/verify/{code}", true, "dynamic code parameter"},
+		{"/api/entities/123/items/456", "/api/entities/{id}/items/{itemId}", true, "multiple dynamic parameters"},
+		{"/api/entities/name/status/active", "/api/entities/{name}/status/{state}", true, "multiple params with non-numeric values"},
 
 		// Non-matches
-		{"/oauth2/callback", "/oauth2/callback/{provider}", false, "missing dynamic parameter"},
-		{"/oauth2/callback/discord/extra", "/oauth2/callback/{provider}", false, "extra path segment"},
-		{"/different/path", "/oauth2/callback/{provider}", false, "completely different path"},
-		{"/oauth2/callback/discord", "/oauth2/authorize", false, "different static segments"},
-		{"/api/users/123/posts", "/api/users/{id}/posts/{postId}", false, "missing second dynamic parameter"},
+		{"/resource/action", "/resource/action/{param}", false, "missing dynamic parameter"},
+		{"/resource/action/item/extra", "/resource/action/{param}", false, "extra path segment"},
+		{"/other/path", "/resource/action/{param}", false, "completely different path"},
+		{"/resource/action/item", "/resource/other", false, "different static segments"},
+		{"/api/entities/123/items", "/api/entities/{id}/items/{itemId}", false, "missing second dynamic parameter"},
 	}
 
 	for _, tc := range testCases {
@@ -605,8 +579,8 @@ func TestRoutePathMatching(t *testing.T) {
 	}
 }
 
-// TestDynamicPathWithBasePathDebug tests the exact scenario: /api/auth/oauth2/callback/google
-// with route mapping of /oauth2/callback/{provider} and basePath of /api/auth
+// TestDynamicPathWithBasePathDebug tests the exact scenario: /api/auth/resource/123/action
+// with route mapping of /resource/{id}/action and basePath of /api/auth
 func TestDynamicPathWithBasePathDebug(t *testing.T) {
 	config := &models.Config{
 		BasePath: "/api/auth",
@@ -615,11 +589,11 @@ func TestDynamicPathWithBasePathDebug(t *testing.T) {
 	router := NewRouter(config, logger, nil)
 
 	// Simulating what happens in auth.go Handler()
-	// The config has "/oauth2/callback/{provider}" which gets the basePath prefixed
-	// So it becomes "/api/auth/oauth2/callback/{provider}"
+	// The config has "/resource/{id}/action" which gets the basePath prefixed
+	// So it becomes "/api/auth/resource/{id}/action"
 	routeMetadata := map[string]map[string]any{
-		"POST:/api/auth/oauth2/callback/{provider}": {
-			"plugins": []string{"oauth2.callback"},
+		"POST:/api/auth/resource/{id}/action": {
+			"plugins": []string{"plugin.process"},
 		},
 	}
 	router.SetRouteMetadataFromConfig(routeMetadata)
@@ -627,11 +601,11 @@ func TestDynamicPathWithBasePathDebug(t *testing.T) {
 	// Track hook execution
 	var hooksExecuted []string
 
-	oAuth2Hook := models.Hook{
+	processHook := models.Hook{
 		Stage:    models.HookBefore,
-		PluginID: "oauth2.callback",
+		PluginID: "plugin.process",
 		Handler: func(ctx *models.RequestContext) error {
-			hooksExecuted = append(hooksExecuted, "oauth2.callback")
+			hooksExecuted = append(hooksExecuted, "plugin.process")
 			if ctx.Route != nil {
 				t.Logf("Route metadata: %v", ctx.Route.Metadata)
 			}
@@ -640,17 +614,17 @@ func TestDynamicPathWithBasePathDebug(t *testing.T) {
 		Order: 0,
 	}
 
-	router.RegisterHook(oAuth2Hook)
+	router.RegisterHook(processHook)
 
 	// Register the route
 	router.RegisterRoute(models.Route{
 		Method:  "POST",
-		Path:    "/oauth2/callback/{provider}",
+		Path:    "/resource/{id}/action",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
 	})
 
-	// Test: Request to /api/auth/oauth2/callback/google
-	req := httptest.NewRequest("POST", "/api/auth/oauth2/callback/google", nil)
+	// Test: Request to /api/auth/resource/123/action
+	req := httptest.NewRequest("POST", "/api/auth/resource/123/action", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -680,21 +654,21 @@ func TestDoubleBasePathApplication(t *testing.T) {
 	router := NewRouter(config, logger, nil)
 
 	// This simulates what auth.go does:
-	// 1. Route mapping: "/oauth2/callback/{provider}"
-	// 2. ConvertRouteMetadata produces: "POST:/oauth2/callback/{provider}"
-	// 3. ApplyBasePathToMetadataKey produces: "POST:/api/auth/oauth2/callback/{provider}"
+	// 1. Route mapping: "/resource/{id}/action"
+	// 2. ConvertRouteMetadata produces: "POST:/resource/{id}/action"
+	// 3. ApplyBasePathToMetadataKey produces: "POST:/api/auth/resource/{id}/action"
 	// 4. SetRouteMetadataFromConfig is called with the adjusted key
 
 	// So the key already has basePath applied
 	routeMetadata := map[string]map[string]any{
-		"POST:/api/auth/oauth2/callback/{provider}": {
-			"plugins": []string{"oauth2.callback"},
+		"POST:/api/auth/resource/{id}/action": {
+			"plugins": []string{"plugin.process"},
 		},
 	}
 	router.SetRouteMetadataFromConfig(routeMetadata)
 
 	// The router should store this correctly
-	expectedKey := "POST:/api/auth/oauth2/callback/{provider}"
+	expectedKey := "POST:/api/auth/resource/{id}/action"
 	if _, exists := router.routeMetadata[expectedKey]; !exists {
 		t.Errorf("expected key %s in routeMetadata, but got keys: %v", expectedKey, keysFromMap(router.routeMetadata))
 	}
@@ -705,7 +679,7 @@ func TestDoubleBasePathApplication(t *testing.T) {
 	}
 
 	entry := router.routeEntries[0]
-	expectedSegments := []string{"api", "auth", "oauth2", "callback", "{provider}"}
+	expectedSegments := []string{"api", "auth", "resource", "{id}", "action"}
 	if len(entry.Segments) != len(expectedSegments) {
 		t.Errorf("expected %d segments, got %d: %v", len(expectedSegments), len(entry.Segments), entry.Segments)
 	}
@@ -726,37 +700,37 @@ func TestRouteGroupMetadata(t *testing.T) {
 
 	router.RegisterCustomRouteGroup(
 		models.RouteGroup{
-			Path: "/test",
+			Path: "/resource",
 			Routes: []models.Route{
 				{Method: "GET", Path: "", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})},
-				{Method: "GET", Path: "/metadata", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
+				{Method: "GET", Path: "/details", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
 					Metadata: map[string]any{
 						"plugins": []string{
-							"bearer.auth",
+							"plugin.verification",
 						},
 					},
 				},
 			},
 			Metadata: map[string]any{
 				"plugins": []string{
-					"session.auth",
+					"plugin.auth",
 				},
 			},
 		},
 	)
 
-	testPluginsAny := router.routeMetadata["GET:/test"]["plugins"]
+	testPluginsAny := router.routeMetadata["GET:/resource"]["plugins"]
 	testPlugins := testPluginsAny.([]string)
 
-	if !slices.Contains(testPlugins, "session.auth") {
-		t.Errorf("expected session.auth in plugins, got %s", testPlugins)
+	if !slices.Contains(testPlugins, "plugin.auth") {
+		t.Errorf("expected plugin.auth in plugins, got %s", testPlugins)
 	}
 
-	metadataPluginsAny := router.routeMetadata["GET:/test/metadata"]["plugins"]
-	metadataPlugins := metadataPluginsAny.([]string)
+	detailsPluginsAny := router.routeMetadata["GET:/resource/details"]["plugins"]
+	detailsPlugins := detailsPluginsAny.([]string)
 
-	if !slices.Contains(metadataPlugins, "session.auth") || !slices.Contains(metadataPlugins, "bearer.auth") {
-		t.Errorf("expected session.auth and bearer.auth in plugins, got %s", metadataPlugins)
+	if !slices.Contains(detailsPlugins, "plugin.auth") || !slices.Contains(detailsPlugins, "plugin.verification") {
+		t.Errorf("expected plugin.auth and plugin.verification in plugins, got %s", detailsPlugins)
 	}
 }
 
@@ -769,29 +743,29 @@ func TestRouteGroupMetadataDuplicatePlugins(t *testing.T) {
 
 	router.RegisterCustomRouteGroup(
 		models.RouteGroup{
-			Path: "/test",
+			Path: "/resource",
 			Routes: []models.Route{
 				{Method: "GET", Path: "", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
 					Metadata: map[string]any{
 						"plugins": []string{
-							"session.auth",
+							"plugin.auth",
 						},
 					},
 				},
 			},
 			Metadata: map[string]any{
 				"plugins": []string{
-					"session.auth",
+					"plugin.auth",
 				},
 			},
 		},
 	)
 
-	testPluginsAny := router.routeMetadata["GET:/test"]["plugins"]
-	testPlugins := testPluginsAny.([]string)
+	resourcePluginsAny := router.routeMetadata["GET:/resource"]["plugins"]
+	resourcePlugins := resourcePluginsAny.([]string)
 
-	if len(testPlugins) != 1 {
-		t.Errorf("expected only one plugin, got %d %s", len(testPlugins), testPlugins)
+	if len(resourcePlugins) != 1 {
+		t.Errorf("expected only one plugin, got %d %s", len(resourcePlugins), resourcePlugins)
 	}
 }
 

@@ -21,7 +21,6 @@ type UserRepository interface {
 	Update(ctx context.Context, user *models.User) (*models.User, error)
 	UpdateFields(ctx context.Context, id string, fields map[string]any) error
 	Delete(ctx context.Context, id string) error
-	WithTx(tx bun.IDB) UserRepository
 }
 
 type AccountRepository interface {

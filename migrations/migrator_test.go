@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
 
@@ -28,7 +28,7 @@ func newTestDB(t *testing.T) *bun.DB {
 
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
 	sqlDB, err := sql.Open("sqlite3", dsn)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	t.Cleanup(func() {
 		_ = sqlDB.Close()
 	})
@@ -48,7 +48,7 @@ func TestMigrator_MigrateAndRollback(t *testing.T) {
 	ctx := context.Background()
 
 	migrator, err := NewMigrator(db, testLogger{t})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	set := MigrationSet{
 		PluginID: "test_plugin",
@@ -68,16 +68,16 @@ func TestMigrator_MigrateAndRollback(t *testing.T) {
 	}
 
 	err = migrator.Migrate(ctx, []MigrationSet{set})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	_, err = db.ExecContext(ctx, `INSERT INTO test_entities (id) VALUES (?)`, "abc")
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	err = migrator.RollbackAll(ctx, []MigrationSet{set})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	_, err = db.ExecContext(ctx, `INSERT INTO test_entities (id) VALUES (?)`, "def")
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestMigrator_DependencyOrdering(t *testing.T) {
@@ -87,7 +87,7 @@ func TestMigrator_DependencyOrdering(t *testing.T) {
 	ctx := context.Background()
 
 	migrator, err := NewMigrator(db, testLogger{t})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	parent := MigrationSet{
 		PluginID:  "parent",
@@ -126,16 +126,16 @@ func TestMigrator_DependencyOrdering(t *testing.T) {
 	}
 
 	err = migrator.Migrate(ctx, []MigrationSet{child, parent})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	_, err = db.ExecContext(ctx, `INSERT INTO parent_entities (id) VALUES (?)`, "parent-1")
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	_, err = db.ExecContext(ctx, `INSERT INTO child_entities (id, parent_id) VALUES (?, ?)`, "child-1", "parent-1")
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	err = migrator.RollbackAll(ctx, []MigrationSet{parent, child})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func TestMigrator_DetectsCycles(t *testing.T) {
@@ -145,11 +145,11 @@ func TestMigrator_DetectsCycles(t *testing.T) {
 	ctx := context.Background()
 
 	migrator, err := NewMigrator(db, testLogger{t})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	setA := MigrationSet{PluginID: "a", DependsOn: []string{"b"}}
 	setB := MigrationSet{PluginID: "b", DependsOn: []string{"a"}}
 
 	err = migrator.Migrate(ctx, []MigrationSet{setA, setB})
-	require.Error(t, err)
+	assert.Error(t, err)
 }

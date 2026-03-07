@@ -1,37 +1,50 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
-	"strings"
+
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/constants"
 )
 
-func mapAdminErrorStatus(err error) int {
+func mapAdminHttpErrorStatus(err error) int {
 	if err == nil {
 		return http.StatusInternalServerError
 	}
 
-	message := strings.ToLower(strings.TrimSpace(err.Error()))
-
 	switch {
-	case strings.Contains(message, "unauthorized"):
-		return http.StatusUnauthorized
-	case strings.Contains(message, "forbidden"):
-		return http.StatusForbidden
-	case strings.Contains(message, "not found"):
-		return http.StatusNotFound
-	case isAdminBadRequestMessage(message):
+	case errors.Is(err, constants.ErrBadRequest):
 		return http.StatusBadRequest
+	case errors.Is(err, constants.ErrUnauthorized):
+		return http.StatusUnauthorized
+	case errors.Is(err, constants.ErrForbidden):
+		return http.StatusForbidden
+	case errors.Is(err, constants.ErrNotFound):
+		return http.StatusNotFound
+	case errors.Is(err, constants.ErrConflict):
+		return http.StatusConflict
 	default:
 		return http.StatusInternalServerError
 	}
 }
 
-func isAdminBadRequestMessage(message string) bool {
-	markers := []string{"required", "invalid", "cannot", "exceeds", "you can only", "no active", "already exists"}
-	for _, marker := range markers {
-		if strings.Contains(message, marker) {
-			return true
-		}
+func mapAdminHttpErrorMessage(err error) string {
+	if err == nil {
+		return "internal server error"
 	}
-	return false
+
+	switch {
+	case errors.Is(err, constants.ErrBadRequest):
+		return "bad request"
+	case errors.Is(err, constants.ErrUnauthorized):
+		return "unauthorized"
+	case errors.Is(err, constants.ErrForbidden):
+		return "forbidden"
+	case errors.Is(err, constants.ErrNotFound):
+		return "not found"
+	case errors.Is(err, constants.ErrConflict):
+		return "conflict"
+	default:
+		return err.Error()
+	}
 }

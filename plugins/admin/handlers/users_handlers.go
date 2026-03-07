@@ -11,6 +11,38 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/usecases"
 )
 
+type CreateUserHandler struct {
+	useCase usecases.UsersUseCase
+}
+
+func NewCreateUserHandler(useCase usecases.UsersUseCase) *CreateUserHandler {
+	return &CreateUserHandler{useCase: useCase}
+}
+
+func (h *CreateUserHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
+
+		var payload types.CreateUserRequest
+		if err := util.ParseJSON(r, &payload); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.Handled = true
+			return
+		}
+
+		user, err := h.useCase.Create(ctx, payload)
+		if err != nil {
+			respondUsersError(reqCtx, err)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusCreated, &types.CreateUserResponse{
+			User: user,
+		})
+	}
+}
+
 type GetAllUsersHandler struct {
 	useCase usecases.UsersUseCase
 }
@@ -21,7 +53,8 @@ func NewGetAllUsersHandler(useCase usecases.UsersUseCase) *GetAllUsersHandler {
 
 func (h *GetAllUsersHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		reqCtx, _ := models.GetRequestContext(r.Context())
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
 
 		cursorValue := strings.TrimSpace(r.URL.Query().Get("cursor"))
 		var cursor *string
@@ -29,7 +62,7 @@ func (h *GetAllUsersHandler) Handler() http.HandlerFunc {
 			cursor = &cursorValue
 		}
 
-		limit := 20
+		limit := 10
 		if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
 			value, err := strconv.Atoi(raw)
 			if err != nil {
@@ -40,7 +73,7 @@ func (h *GetAllUsersHandler) Handler() http.HandlerFunc {
 			limit = value
 		}
 
-		page, err := h.useCase.GetAll(r.Context(), cursor, limit)
+		page, err := h.useCase.GetAll(ctx, cursor, limit)
 		if err != nil {
 			respondUsersError(reqCtx, err)
 			return
@@ -77,36 +110,9 @@ func (h *GetUserByIDHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"user": user})
-	}
-}
-
-type CreateUserHandler struct {
-	useCase usecases.UsersUseCase
-}
-
-func NewCreateUserHandler(useCase usecases.UsersUseCase) *CreateUserHandler {
-	return &CreateUserHandler{useCase: useCase}
-}
-
-func (h *CreateUserHandler) Handler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		reqCtx, _ := models.GetRequestContext(r.Context())
-
-		var payload types.CreateUserRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
-			reqCtx.Handled = true
-			return
-		}
-
-		user, err := h.useCase.Create(r.Context(), payload)
-		if err != nil {
-			respondUsersError(reqCtx, err)
-			return
-		}
-
-		reqCtx.SetJSONResponse(http.StatusCreated, map[string]any{"user": user})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.GetUserByIDResponse{
+			User: user,
+		})
 	}
 }
 
@@ -136,7 +142,9 @@ func (h *UpdateUserHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"user": user})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.UpdateUserResponse{
+			User: user,
+		})
 	}
 }
 
@@ -167,15 +175,12 @@ func respondUsersError(reqCtx *models.RequestContext, err error) {
 		return
 	}
 
-	message := "internal server error"
-	if err != nil {
-		message = err.Error()
-	}
-
-	reqCtx.SetJSONResponse(mapUsersErrorStatus(err), map[string]any{"message": message})
+	reqCtx.SetJSONResponse(mapUsersErrorStatus(err), map[string]any{
+		"message": mapAdminHttpErrorMessage(err),
+	})
 	reqCtx.Handled = true
 }
 
 func mapUsersErrorStatus(err error) int {
-	return mapAdminErrorStatus(err)
+	return mapAdminHttpErrorStatus(err)
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDynamicRouteHooks(t *testing.T) {
@@ -45,8 +45,8 @@ func TestDynamicRouteHooks(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	require.True(t, hookCalled, "Hook should have been called for dynamic route")
-	require.Equal(t, "google", w.Result().Header.Get("X-Provider"), "Provider should be 'google'")
+	assert.True(t, hookCalled, "Hook should have been called for dynamic route")
+	assert.Equal(t, "google", w.Result().Header.Get("X-Provider"), "Provider should be 'google'")
 
 	// Reset for provider = "discord"
 	hookCalled = false
@@ -54,8 +54,8 @@ func TestDynamicRouteHooks(t *testing.T) {
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
 
-	require.True(t, hookCalled, "Hook should have been called for dynamic route")
-	require.Equal(t, "discord", w2.Result().Header.Get("X-Provider"), "Provider should be 'discord'")
+	assert.True(t, hookCalled, "Hook should have been called for dynamic route")
+	assert.Equal(t, "discord", w2.Result().Header.Get("X-Provider"), "Provider should be 'discord'")
 }
 
 // TestLogger is a minimal logger for testing

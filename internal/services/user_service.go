@@ -20,10 +20,6 @@ func NewUserService(repo repositories.UserRepository, dbHooks *models.CoreDataba
 	return &userService{repo: repo, dbHooks: dbHooks}
 }
 
-func (s *userService) GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error) {
-	return s.repo.GetAll(ctx, cursor, limit)
-}
-
 func (s *userService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata json.RawMessage) (*models.User, error) {
 	existing, _ := s.repo.GetByEmail(ctx, email)
 	if existing != nil {
@@ -57,6 +53,14 @@ func (s *userService) Create(ctx context.Context, name string, email string, ema
 	}
 
 	return created, nil
+}
+
+func (s *userService) GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+
+	return s.repo.GetAll(ctx, cursor, limit)
 }
 
 func (s *userService) GetByID(ctx context.Context, id string) (*models.User, error) {

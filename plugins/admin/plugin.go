@@ -29,7 +29,7 @@ func (p *AdminPlugin) Metadata() models.PluginMetadata {
 	return models.PluginMetadata{
 		ID:          models.PluginAdmin.String(),
 		Version:     "1.0.0",
-		Description: "Provides admin operations and RBAC functionality.",
+		Description: "Provides admin operations for users, state, and impersonation.",
 	}
 }
 
@@ -45,8 +45,6 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 		return err
 	}
 
-	rolePermissionRepo := repositories.NewBunRolePermissionRepository(ctx.DB)
-	userAccessRepo := repositories.NewBunUserAccessRepository(ctx.DB)
 	impersonationRepo := repositories.NewBunImpersonationRepository(ctx.DB)
 	userStateRepo := repositories.NewBunUserStateRepository(ctx.DB)
 	sessionStateRepo := repositories.NewBunSessionStateRepository(ctx.DB)
@@ -65,20 +63,16 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 
 	adminUseCases := usecases.NewAdminUseCases(
 		p.config,
-		rolePermissionRepo,
-		userAccessRepo,
-		impersonationRepo,
-		userStateRepo,
-		sessionStateRepo,
 		coreUserRepo,
 		sessionService,
 		tokenService,
+		userStateRepo,
+		sessionStateRepo,
+		impersonationRepo,
 		ctx.GetConfig().Session.ExpiresIn,
 	)
 	p.Api = NewAPI(
 		adminUseCases,
-		rolePermissionRepo,
-		userAccessRepo,
 		impersonationRepo,
 		userStateRepo,
 		sessionStateRepo,

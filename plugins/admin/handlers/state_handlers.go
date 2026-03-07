@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
@@ -305,7 +304,9 @@ func (h *RevokeSessionHandler) Handler() http.HandlerFunc {
 
 		var payload types.RevokeSessionRequest
 		if err := util.ParseJSON(r, &payload); err != nil {
-			payload = types.RevokeSessionRequest{}
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.Handled = true
+			return
 		}
 
 		state, err := h.useCase.RevokeSession(r.Context(), sessionID, payload.Reason, stateActorUserID(reqCtx))
@@ -330,42 +331,10 @@ func respondStateError(reqCtx *models.RequestContext, err error) {
 		return
 	}
 
-	message := "internal server error"
-	if err != nil {
-		message = err.Error()
-	}
-
-	reqCtx.SetJSONResponse(mapStateErrorStatus(err), map[string]any{"message": message})
+	reqCtx.SetJSONResponse(mapStateErrorStatus(err), map[string]any{"message": mapAdminHttpErrorMessage(err)})
 	reqCtx.Handled = true
 }
 
 func mapStateErrorStatus(err error) int {
-	if err == nil {
-		return http.StatusInternalServerError
-	}
-
-	message := strings.ToLower(strings.TrimSpace(err.Error()))
-
-	switch {
-	case strings.Contains(message, "unauthorized"):
-		return http.StatusUnauthorized
-	case strings.Contains(message, "forbidden"):
-		return http.StatusForbidden
-	case strings.Contains(message, "not found"):
-		return http.StatusNotFound
-	case stateIsBadRequestMessage(message):
-		return http.StatusBadRequest
-	default:
-		return http.StatusInternalServerError
-	}
-}
-
-func stateIsBadRequestMessage(message string) bool {
-	markers := []string{"required", "invalid", "cannot", "exceeds", "you can only", "no active"}
-	for _, marker := range markers {
-		if strings.Contains(message, marker) {
-			return true
-		}
-	}
-	return false
+	return mapAdminHttpErrorStatus(err)
 }
