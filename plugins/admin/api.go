@@ -64,6 +64,28 @@ func (a *API) DeleteUser(ctx context.Context, userID string) error {
 	return a.useCases.DeleteUser(ctx, userID)
 }
 
+// Account management
+
+func (a *API) CreateAccount(ctx context.Context, userID string, request types.CreateAccountRequest) (*models.Account, error) {
+	return a.useCases.CreateAccount(ctx, userID, request)
+}
+
+func (a *API) GetAccountByID(ctx context.Context, accountID string) (*models.Account, error) {
+	return a.useCases.GetAccountByID(ctx, accountID)
+}
+
+func (a *API) GetUserAccounts(ctx context.Context, userID string) ([]models.Account, error) {
+	return a.useCases.GetUserAccounts(ctx, userID)
+}
+
+func (a *API) UpdateAccount(ctx context.Context, accountID string, request types.UpdateAccountRequest) (*models.Account, error) {
+	return a.useCases.UpdateAccount(ctx, accountID, request)
+}
+
+func (a *API) DeleteAccount(ctx context.Context, accountID string) error {
+	return a.useCases.DeleteAccount(ctx, accountID)
+}
+
 // Impersonation
 
 func (a *API) GetAllImpersonations(ctx context.Context) ([]types.Impersonation, error) {

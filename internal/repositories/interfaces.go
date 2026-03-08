@@ -26,10 +26,12 @@ type UserRepository interface {
 type AccountRepository interface {
 	GetByID(ctx context.Context, id string) (*models.Account, error)
 	GetByUserID(ctx context.Context, userID string) (*models.Account, error)
+	GetAllByUserID(ctx context.Context, userID string) ([]models.Account, error)
 	GetByUserIDAndProvider(ctx context.Context, userID string, provider string) (*models.Account, error)
 	GetByProviderAndAccountID(ctx context.Context, provider string, accountID string) (*models.Account, error)
 	Create(ctx context.Context, account *models.Account) (*models.Account, error)
 	Update(ctx context.Context, account *models.Account) (*models.Account, error)
+	Delete(ctx context.Context, id string) error
 	UpdateFields(ctx context.Context, userID string, fields map[string]any) error
 	WithTx(tx bun.IDB) AccountRepository
 }

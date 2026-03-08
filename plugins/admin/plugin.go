@@ -50,6 +50,7 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 	sessionStateRepo := repositories.NewBunSessionStateRepository(ctx.DB)
 
 	coreUserRepo := coreinternalrepos.NewBunUserRepository(ctx.DB)
+	coreAccountRepo := coreinternalrepos.NewBunAccountRepository(ctx.DB)
 
 	sessionService, ok := ctx.ServiceRegistry.Get(models.ServiceSession.String()).(rootservices.SessionService)
 	if !ok {
@@ -61,11 +62,18 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 		return fmt.Errorf("required service %s is not registered", models.ServiceToken.String())
 	}
 
+	passwordService, ok := ctx.ServiceRegistry.Get(models.ServicePassword.String()).(rootservices.PasswordService)
+	if !ok {
+		return fmt.Errorf("required service %s is not registered", models.ServicePassword.String())
+	}
+
 	adminUseCases := usecases.NewAdminUseCases(
 		p.config,
 		coreUserRepo,
+		coreAccountRepo,
 		sessionService,
 		tokenService,
+		passwordService,
 		userStateRepo,
 		sessionStateRepo,
 		impersonationRepo,

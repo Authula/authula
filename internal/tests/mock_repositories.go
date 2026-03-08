@@ -107,6 +107,14 @@ func (m *MockAccountRepository) GetByUserID(ctx context.Context, userID string) 
 	return args.Get(0).(*models.Account), args.Error(1)
 }
 
+func (m *MockAccountRepository) GetAllByUserID(ctx context.Context, userID string) ([]models.Account, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Account), args.Error(1)
+}
+
 func (m *MockAccountRepository) GetByUserIDAndProvider(ctx context.Context, userID string, provider string) (*models.Account, error) {
 	args := m.Called(ctx, userID, provider)
 	if args.Get(0) == nil {
@@ -139,12 +147,17 @@ func (m *MockAccountRepository) Update(ctx context.Context, account *models.Acco
 	return args.Get(0).(*models.Account), args.Error(1)
 }
 
+func (m *MockAccountRepository) Delete(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 func (m *MockAccountRepository) UpdateFields(ctx context.Context, userID string, fields map[string]any) error {
 	args := m.Called(ctx, userID, fields)
 	return args.Error(0)
 }
 
-func (m *MockAccountRepository) WithTx(tx bun.IDB) *MockAccountRepository {
+func (m *MockAccountRepository) WithTx(tx bun.IDB) repositories.AccountRepository {
 	args := m.Called(tx)
 	if args.Get(0) != nil {
 		if v, ok := args.Get(0).(*MockAccountRepository); ok {

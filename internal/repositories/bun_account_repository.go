@@ -36,6 +36,15 @@ func (r *BunAccountRepository) GetByUserID(ctx context.Context, userID string) (
 	return acc, err
 }
 
+func (r *BunAccountRepository) GetAllByUserID(ctx context.Context, userID string) ([]models.Account, error) {
+	accounts := make([]models.Account, 0)
+	err := r.db.NewSelect().Model(&accounts).Where("user_id = ?", userID).Scan(ctx)
+	if err == sql.ErrNoRows {
+		return []models.Account{}, nil
+	}
+	return accounts, err
+}
+
 func (r *BunAccountRepository) GetByUserIDAndProvider(ctx context.Context, userID, provider string) (*models.Account, error) {
 	acc := new(models.Account)
 	err := r.db.NewSelect().
@@ -104,6 +113,11 @@ func (r *BunAccountRepository) Update(ctx context.Context, account *models.Accou
 	}
 
 	return account, nil
+}
+
+func (r *BunAccountRepository) Delete(ctx context.Context, id string) error {
+	_, err := r.db.NewDelete().Model((*models.Account)(nil)).Where("id = ?", id).Exec(ctx)
+	return err
 }
 
 func (r *BunAccountRepository) UpdateFields(ctx context.Context, userID string, fields map[string]any) error {

@@ -14,6 +14,7 @@ import (
 
 type AdminUseCases struct {
 	users         UsersUseCase
+	accounts      AccountsUseCase
 	state         StateUseCase
 	impersonation ImpersonationUseCase
 }
@@ -21,14 +22,17 @@ type AdminUseCases struct {
 func NewAdminUseCases(
 	config types.AdminPluginConfig,
 	userRepo corerepositories.UserRepository,
+	accountRepo corerepositories.AccountRepository,
 	sessionService rootservices.SessionService,
 	tokenService rootservices.TokenService,
+	passwordService rootservices.PasswordService,
 	userStateRepo repositories.UserStateRepository,
 	sessionStateRepo repositories.SessionStateRepository,
 	impersonationRepo repositories.ImpersonationRepository,
 	sessionExpiresIn time.Duration,
 ) *AdminUseCases {
 	usersService := services.NewUsersService(userRepo)
+	accountsService := services.NewAccountsService(accountRepo, userRepo, passwordService)
 	impersonationService := services.NewImpersonationService(
 		impersonationRepo,
 		sessionStateRepo,
@@ -41,6 +45,7 @@ func NewAdminUseCases(
 
 	return &AdminUseCases{
 		users:         NewUsersUseCase(usersService),
+		accounts:      NewAccountsUseCase(accountsService),
 		impersonation: NewImpersonationUseCase(impersonationService),
 		state:         NewStateUseCase(stateService),
 	}
@@ -52,6 +57,10 @@ func (u *AdminUseCases) UsersUseCase() UsersUseCase {
 
 func (u *AdminUseCases) StateUseCase() StateUseCase {
 	return u.state
+}
+
+func (u *AdminUseCases) AccountsUseCase() AccountsUseCase {
+	return u.accounts
 }
 
 func (u *AdminUseCases) ImpersonationUseCase() ImpersonationUseCase {
@@ -76,6 +85,26 @@ func (u *AdminUseCases) UpdateUser(ctx context.Context, userID string, request t
 
 func (u *AdminUseCases) DeleteUser(ctx context.Context, userID string) error {
 	return u.users.Delete(ctx, userID)
+}
+
+func (u *AdminUseCases) CreateAccount(ctx context.Context, userID string, request types.CreateAccountRequest) (*models.Account, error) {
+	return u.accounts.Create(ctx, userID, request)
+}
+
+func (u *AdminUseCases) GetAccountByID(ctx context.Context, accountID string) (*models.Account, error) {
+	return u.accounts.GetByID(ctx, accountID)
+}
+
+func (u *AdminUseCases) GetUserAccounts(ctx context.Context, userID string) ([]models.Account, error) {
+	return u.accounts.GetByUserID(ctx, userID)
+}
+
+func (u *AdminUseCases) UpdateAccount(ctx context.Context, accountID string, request types.UpdateAccountRequest) (*models.Account, error) {
+	return u.accounts.Update(ctx, accountID, request)
+}
+
+func (u *AdminUseCases) DeleteAccount(ctx context.Context, accountID string) error {
+	return u.accounts.Delete(ctx, accountID)
 }
 
 func (u *AdminUseCases) GetAllImpersonations(ctx context.Context) ([]types.Impersonation, error) {

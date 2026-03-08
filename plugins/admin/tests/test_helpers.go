@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	internaltests "github.com/GoBetterAuth/go-better-auth/v2/internal/tests"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	adminservices "github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/services"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/usecases"
@@ -28,6 +29,35 @@ func NewUsersUseCaseFixture() (usecases.UsersUseCase, *internaltests.MockUserRep
 	mockUserRepo := &internaltests.MockUserRepository{}
 	service := adminservices.NewUsersService(mockUserRepo)
 	return usecases.NewUsersUseCase(service), mockUserRepo
+}
+
+type MockPasswordService struct {
+	mock.Mock
+}
+
+func (m *MockPasswordService) Hash(password string) (string, error) {
+	args := m.Called(password)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockPasswordService) Verify(password, encoded string) bool {
+	args := m.Called(password, encoded)
+	return args.Bool(0)
+}
+
+func NewAccountsUseCaseFixture() (usecases.AccountsUseCase, *adminservices.AccountsService, *internaltests.MockAccountRepository, *internaltests.MockUserRepository, *MockPasswordService) {
+	accountRepo := &internaltests.MockAccountRepository{}
+	userRepo := &internaltests.MockUserRepository{}
+	passwordSvc := &MockPasswordService{}
+	service := adminservices.NewAccountsService(accountRepo, userRepo, passwordSvc)
+	return usecases.NewAccountsUseCase(service), service, accountRepo, userRepo, passwordSvc
+}
+
+func NewAccountsServiceFixture() (*adminservices.AccountsService, *internaltests.MockAccountRepository, *internaltests.MockUserRepository, *MockPasswordService) {
+	accountRepo := &internaltests.MockAccountRepository{}
+	userRepo := &internaltests.MockUserRepository{}
+	passwordSvc := &MockPasswordService{}
+	return adminservices.NewAccountsService(accountRepo, userRepo, passwordSvc), accountRepo, userRepo, passwordSvc
 }
 
 type MockUserStateRepository struct {
@@ -169,6 +199,10 @@ func NewStateUseCaseFixture() (usecases.StateUseCase, *MockUserStateRepository, 
 	impRepo := &MockImpersonationRepository{}
 	service := adminservices.NewStateService(userStateRepo, sessionStateRepo, impRepo)
 	return usecases.NewStateUseCase(service), userStateRepo, sessionStateRepo, impRepo
+}
+
+func BuildAccountModel(id, userID, providerID, accountID string) *models.Account {
+	return &models.Account{ID: id, UserID: userID, ProviderID: providerID, AccountID: accountID}
 }
 
 // helper for constructing service directly with mocks
