@@ -128,7 +128,7 @@ func (r *BunSessionRepository) DeleteOldestByUserID(ctx context.Context, userID 
 	if len(deleteIDs) > 0 {
 		_, err = r.db.NewDelete().
 			Model(&models.Session{}).
-			Where("id IN (?)", bun.In(deleteIDs)).
+			Where("id IN (?)", bun.List(deleteIDs)).
 			Exec(ctx)
 		return err
 	}

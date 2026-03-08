@@ -169,7 +169,7 @@ func (r *BunSessionStateRepository) GetByUserID(ctx context.Context, userID stri
 
 	err = r.db.NewSelect().
 		Model(&states).
-		Where("session_id IN (?)", bun.In(sessionIDs)).
+		Where("session_id IN (?)", bun.List(sessionIDs)).
 		Scan(ctx)
 
 	if err != nil {

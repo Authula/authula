@@ -111,8 +111,8 @@ func TestBunUserStateRepository_GetBanned(t *testing.T) {
 	ctx := context.Background()
 	b1 := &types.AdminUserState{UserID: "b1", IsBanned: true}
 	nb := &types.AdminUserState{UserID: "nb", IsBanned: false}
-	repo.Upsert(ctx, b1)
-	repo.Upsert(ctx, nb)
+	_ = repo.Upsert(ctx, b1)
+	_ = repo.Upsert(ctx, nb)
 
 	list, err := repo.GetBanned(ctx)
 	if err != nil {

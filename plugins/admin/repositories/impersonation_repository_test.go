@@ -154,8 +154,8 @@ func TestBunImpersonationRepository_GetActiveImpersonationByID_NotActive(t *test
 		ExpiresAt:    now.Add(1 * time.Hour),
 		EndedAt:      &end,
 	}
-	repo.CreateImpersonation(ctx, imp1)
-	repo.CreateImpersonation(ctx, imp2)
+	_ = repo.CreateImpersonation(ctx, imp1)
+	_ = repo.CreateImpersonation(ctx, imp2)
 
 	if imp, _ := repo.GetActiveImpersonationByID(ctx, "imp-exp"); imp != nil {
 		t.Fatalf("expected expired to be ignored")
@@ -185,8 +185,8 @@ func TestBunImpersonationRepository_GetLatestActiveImpersonationByActor(t *testi
 		StartedAt:    now.Add(-1 * time.Hour),
 		ExpiresAt:    now.Add(1 * time.Hour),
 	}
-	repo.CreateImpersonation(ctx, first)
-	repo.CreateImpersonation(ctx, second)
+	_ = repo.CreateImpersonation(ctx, first)
+	_ = repo.CreateImpersonation(ctx, second)
 
 	got, err := repo.GetLatestActiveImpersonationByActor(ctx, "actor-1")
 	if err != nil {
@@ -210,7 +210,7 @@ func TestBunImpersonationRepository_EndImpersonation(t *testing.T) {
 		StartedAt:    now,
 		ExpiresAt:    now.Add(1 * time.Hour),
 	}
-	repo.CreateImpersonation(ctx, imp)
+	_ = repo.CreateImpersonation(ctx, imp)
 
 	if err := repo.EndImpersonation(ctx, "imp-end", tests.PtrString("admin")); err != nil {
 		t.Fatalf("end impersonation failed: %v", err)
@@ -238,8 +238,8 @@ func TestBunImpersonationRepository_GetAllImpersonations(t *testing.T) {
 	now := time.Now().UTC()
 	a := &types.Impersonation{ID: "a", ActorUserID: "x", TargetUserID: "y", StartedAt: now.Add(-1 * time.Hour), ExpiresAt: now.Add(1 * time.Hour)}
 	b := &types.Impersonation{ID: "b", ActorUserID: "x", TargetUserID: "z", StartedAt: now.Add(-2 * time.Hour), ExpiresAt: now.Add(1 * time.Hour)}
-	repo.CreateImpersonation(ctx, a)
-	repo.CreateImpersonation(ctx, b)
+	_ = repo.CreateImpersonation(ctx, a)
+	_ = repo.CreateImpersonation(ctx, b)
 
 	list, err := repo.GetAllImpersonations(ctx)
 	if err != nil {

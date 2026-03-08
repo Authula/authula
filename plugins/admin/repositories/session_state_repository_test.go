@@ -76,7 +76,7 @@ func TestBunSessionStateRepository_Delete(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	repo.Upsert(ctx, &types.AdminSessionState{SessionID: "s2"})
+	_ = repo.Upsert(ctx, &types.AdminSessionState{SessionID: "s2"})
 	if err := repo.Delete(ctx, "s2"); err != nil {
 		t.Fatalf("delete error: %v", err)
 	}
@@ -90,8 +90,8 @@ func TestBunSessionStateRepository_GetRevoked(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	repo.Upsert(ctx, &types.AdminSessionState{SessionID: "r1", RevokedAt: ptrTime(t, 0)})
-	repo.Upsert(ctx, &types.AdminSessionState{SessionID: "nr", RevokedAt: nil})
+	_ = repo.Upsert(ctx, &types.AdminSessionState{SessionID: "r1", RevokedAt: ptrTime(t, 0)})
+	_ = repo.Upsert(ctx, &types.AdminSessionState{SessionID: "nr", RevokedAt: nil})
 
 	list, err := repo.GetRevoked(ctx)
 	if err != nil {
@@ -134,11 +134,11 @@ func TestBunSessionStateRepository_GetByUserID(t *testing.T) {
 	now := time.Now().UTC()
 	s1 := &models.Session{ID: "s1", UserID: "u-1", Token: "t", ExpiresAt: now}
 	s2 := &models.Session{ID: "s2", UserID: "u-1", Token: "t", ExpiresAt: now}
-	db.NewInsert().Model(s1).Exec(ctx)
-	db.NewInsert().Model(s2).Exec(ctx)
+	_, _ = db.NewInsert().Model(s1).Exec(ctx)
+	_, _ = db.NewInsert().Model(s2).Exec(ctx)
 
 	// only s1 has state
-	repo.Upsert(ctx, &types.AdminSessionState{SessionID: "s1", RevokedAt: ptrTime(t, 0)})
+	_ = repo.Upsert(ctx, &types.AdminSessionState{SessionID: "s1", RevokedAt: ptrTime(t, 0)})
 
 	rows, err := repo.GetByUserID(ctx, "u-1")
 	if err != nil {

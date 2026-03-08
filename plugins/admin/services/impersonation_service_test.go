@@ -24,48 +24,44 @@ func newImpersonationServiceFixture() (*adminservices.ImpersonationService, *adm
 func TestImpersonationService_StartImpersonation_validation(t *testing.T) {
 	t.Parallel()
 
-	svc, impRepo, sessRepo, sessSvc, tokSvc := newImpersonationServiceFixture()
 	ctx := context.Background()
 
 	tests := []struct {
 		name  string
 		actor string
 		req   admintypes.StartImpersonationRequest
-		setup func()
+		setup func(impRepo *admintests.MockImpersonationRepository)
 		want  error
 	}{
 		{name: "empty actor", actor: "", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r"}, want: adminconstants.ErrBadRequest},
 		{name: "empty target", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "  ", Reason: "r"}, want: adminconstants.ErrBadRequest},
 		{name: "same user", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "a1", Reason: "r"}, want: adminconstants.ErrBadRequest},
 		{name: "empty reason", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "   "}, want: adminconstants.ErrBadRequest},
-		{name: "actor not exists", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r"}, setup: func() {
+		{name: "actor not exists", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r"}, setup: func(impRepo *admintests.MockImpersonationRepository) {
 			impRepo.On("UserExists", mock.Anything, "a1").Return(false, nil).Once()
 		}, want: adminconstants.ErrNotFound},
-		{name: "target not exists", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r"}, setup: func() {
+		{name: "target not exists", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r"}, setup: func(impRepo *admintests.MockImpersonationRepository) {
 			impRepo.On("UserExists", mock.Anything, "a1").Return(true, nil).Once()
 			impRepo.On("UserExists", mock.Anything, "u2").Return(false, nil).Once()
 		}, want: adminconstants.ErrNotFound},
-		{name: "expires invalid zero", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r", ExpiresInSeconds: func(i int) *int { return &i }(0)}, setup: func() {
+		{name: "expires invalid zero", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r", ExpiresInSeconds: func(i int) *int { return &i }(0)}, setup: func(impRepo *admintests.MockImpersonationRepository) {
 			impRepo.On("UserExists", mock.Anything, "a1").Return(true, nil).Once()
 			impRepo.On("UserExists", mock.Anything, "u2").Return(true, nil).Once()
 		}, want: adminconstants.ErrBadRequest},
-		{name: "expires invalid large", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r", ExpiresInSeconds: func(i int) *int { return &i }(999999)}, setup: func() {
+		{name: "expires invalid large", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r", ExpiresInSeconds: func(i int) *int { return &i }(999999)}, setup: func(impRepo *admintests.MockImpersonationRepository) {
 			impRepo.On("UserExists", mock.Anything, "a1").Return(true, nil).Once()
 			impRepo.On("UserExists", mock.Anything, "u2").Return(true, nil).Once()
 		}, want: adminconstants.ErrBadRequest},
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			// reset mocks
-			impRepo.ExpectedCalls = nil
-			sessRepo.ExpectedCalls = nil
-			sessSvc.ExpectedCalls = nil
-			tokSvc.ExpectedCalls = nil
+
+			svc, impRepo, _, _, _ := newImpersonationServiceFixture()
+
 			if tc.setup != nil {
-				tc.setup()
+				tc.setup(impRepo)
 			}
 
 			_, err := svc.StartImpersonation(ctx, tc.actor, nil, tc.req)
