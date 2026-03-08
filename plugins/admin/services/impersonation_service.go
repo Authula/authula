@@ -202,7 +202,7 @@ func (s *ImpersonationService) StopImpersonation(ctx context.Context, actorUserI
 		}
 	}
 
-	if target.ImpersonationSessionID != nil && s.sessionService != nil {
+	if target.ImpersonationSessionID != nil {
 		if err := s.sessionService.Delete(ctx, *target.ImpersonationSessionID); err != nil {
 			return err
 		}

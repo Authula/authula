@@ -33,11 +33,10 @@ func TestImpersonationUseCase_GetAllImpersonations(t *testing.T) {
 func TestImpersonationUseCase_GetImpersonationByID(t *testing.T) {
 	t.Parallel()
 
-	useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-
 	t.Run("bad request when empty id", func(t *testing.T) {
 		t.Parallel()
 
+		useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
 		_, err := useCase.GetImpersonationByID(context.Background(), "   ")
 		assert.ErrorIs(t, err, constants.ErrBadRequest)
 	})
@@ -45,6 +44,7 @@ func TestImpersonationUseCase_GetImpersonationByID(t *testing.T) {
 	t.Run("forwards trimmed id", func(t *testing.T) {
 		t.Parallel()
 
+		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
 		impRepo.On("GetImpersonationByID", mock.Anything, "imp-1").Return(&admintypes.Impersonation{ID: "imp-1"}, nil).Once()
 		res, err := useCase.GetImpersonationByID(context.Background(), " imp-1 ")
 		assert.NoError(t, err)
@@ -55,6 +55,7 @@ func TestImpersonationUseCase_GetImpersonationByID(t *testing.T) {
 	t.Run("not found propagates", func(t *testing.T) {
 		t.Parallel()
 
+		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
 		impRepo.On("GetImpersonationByID", mock.Anything, "imp-2").Return((*admintypes.Impersonation)(nil), constants.ErrNotFound).Once()
 		_, err := useCase.GetImpersonationByID(context.Background(), "imp-2")
 		assert.ErrorIs(t, err, constants.ErrNotFound)
@@ -65,11 +66,10 @@ func TestImpersonationUseCase_GetImpersonationByID(t *testing.T) {
 func TestImpersonationUseCase_StartImpersonation(t *testing.T) {
 	t.Parallel()
 
-	useCase, impRepo, sessionStateRepo, sessionSvc, tokenSvc := admintests.NewImpersonationUseCaseFixture(t)
-
 	t.Run("bad request when actor empty", func(t *testing.T) {
 		t.Parallel()
 
+		useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
 		_, err := useCase.StartImpersonation(context.Background(), "", nil, admintypes.StartImpersonationRequest{TargetUserID: "t", Reason: "r"})
 		assert.ErrorIs(t, err, constants.ErrBadRequest)
 	})
@@ -77,7 +77,8 @@ func TestImpersonationUseCase_StartImpersonation(t *testing.T) {
 	t.Run("happy path returns result", func(t *testing.T) {
 		t.Parallel()
 
-		// set up mocks so service will act normally
+		useCase, impRepo, sessionStateRepo, sessionSvc, tokenSvc := admintests.NewImpersonationUseCaseFixture(t)
+
 		impRepo.On("UserExists", mock.Anything, "actor-1").Return(true, nil).Once()
 		impRepo.On("UserExists", mock.Anything, "target-1").Return(true, nil).Once()
 		tokenSvc.On("Generate").Return("tok", nil).Once()
@@ -101,6 +102,7 @@ func TestImpersonationUseCase_StartImpersonation(t *testing.T) {
 	t.Run("error from token service propagates", func(t *testing.T) {
 		t.Parallel()
 
+		useCase, impRepo, _, _, tokenSvc := admintests.NewImpersonationUseCaseFixture(t)
 		impRepo.On("UserExists", mock.Anything, "actor-1").Return(true, nil).Once()
 		impRepo.On("UserExists", mock.Anything, "target-1").Return(true, nil).Once()
 		tokenSvc.On("Generate").Return("", errors.New("fail")).Once()
@@ -115,11 +117,10 @@ func TestImpersonationUseCase_StartImpersonation(t *testing.T) {
 func TestImpersonationUseCase_StopImpersonation(t *testing.T) {
 	t.Parallel()
 
-	useCase, impRepo, sessionStateRepo, sessionSvc, _ := admintests.NewImpersonationUseCaseFixture(t)
-
 	t.Run("bad request when actor empty", func(t *testing.T) {
 		t.Parallel()
 
+		useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
 		err := useCase.StopImpersonation(context.Background(), "", admintypes.StopImpersonationRequest{})
 		assert.ErrorIs(t, err, constants.ErrBadRequest)
 	})
@@ -127,6 +128,7 @@ func TestImpersonationUseCase_StopImpersonation(t *testing.T) {
 	t.Run("not found when no active impersonation", func(t *testing.T) {
 		t.Parallel()
 
+		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
 		impRepo.On("GetLatestActiveImpersonationByActor", mock.Anything, "actor-1").Return((*admintypes.Impersonation)(nil), nil).Once()
 		err := useCase.StopImpersonation(context.Background(), "actor-1", admintypes.StopImpersonationRequest{})
 		assert.ErrorIs(t, err, constants.ErrNotFound)
@@ -135,6 +137,8 @@ func TestImpersonationUseCase_StopImpersonation(t *testing.T) {
 
 	t.Run("successful stop updates state and deletes session", func(t *testing.T) {
 		t.Parallel()
+
+		useCase, impRepo, sessionStateRepo, sessionSvc, _ := admintests.NewImpersonationUseCaseFixture(t)
 
 		imp := &admintypes.Impersonation{ID: "imp-1", ActorUserID: "actor-1", ImpersonationSessionID: internaltests.PtrString("sess")}
 		impRepo.On("GetLatestActiveImpersonationByActor", mock.Anything, "actor-1").Return(imp, nil).Once()
