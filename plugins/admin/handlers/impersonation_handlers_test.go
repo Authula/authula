@@ -16,6 +16,74 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 )
 
+func TestGetAllImpersonationsHandler(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
+		impRepo.On("GetAllImpersonations", mock.Anything).Return(([]types.Impersonation)(nil), errors.New("internal error")).Once()
+		handler := adminhandlers.NewGetAllImpersonationsHandler(useCase)
+
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations", nil)
+		handler.Handler()(w, req)
+
+		internaltests.AssertErrorMessage(t, reqCtx, http.StatusInternalServerError, "internal error")
+		impRepo.AssertExpectations(t)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		now := time.Now().UTC()
+		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
+		impRepo.On("GetAllImpersonations", mock.Anything).Return([]types.Impersonation{{ID: "imp-1", ActorUserID: "actor-1", TargetUserID: "target-1", StartedAt: now, ExpiresAt: now.Add(time.Minute)}}, nil).Once()
+		handler := adminhandlers.NewGetAllImpersonationsHandler(useCase)
+
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations", nil)
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		payload := internaltests.DecodeResponseJSON[[]types.Impersonation](t, reqCtx)
+		if payload == nil || len(payload) != 1 {
+			t.Fatalf("expected 1 impersonation, got %v", payload)
+		}
+		impRepo.AssertExpectations(t)
+	})
+}
+
+func TestGetImpersonationByIDHandler(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
+		impRepo.On("GetImpersonationByID", mock.Anything, "imp-1").Return((*types.Impersonation)(nil), adminconstants.ErrNotFound).Once()
+		handler := adminhandlers.NewGetImpersonationByIDHandler(useCase)
+
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations/imp-1", nil)
+		req.SetPathValue("impersonation_id", "imp-1")
+		handler.Handler()(w, req)
+
+		internaltests.AssertErrorMessage(t, reqCtx, http.StatusNotFound, "not found")
+		impRepo.AssertExpectations(t)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		now := time.Now().UTC()
+		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
+		impRepo.On("GetImpersonationByID", mock.Anything, "imp-1").Return(&types.Impersonation{ID: "imp-1", ActorUserID: "actor-1", TargetUserID: "target-1", StartedAt: now, ExpiresAt: now.Add(5 * time.Minute)}, nil).Once()
+		handler := adminhandlers.NewGetImpersonationByIDHandler(useCase)
+
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations/imp-1", nil)
+		req.SetPathValue("impersonation_id", "imp-1")
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		payload := internaltests.DecodeResponseJSON[types.GetImpersonationByIDResponse](t, reqCtx)
+		if payload.Impersonation == nil {
+			t.Fatalf("expected impersonation, got %v", payload)
+		}
+		impRepo.AssertExpectations(t)
+	})
+}
+
 func TestStartImpersonationHandler_Unauthorized(t *testing.T) {
 	useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
 	handler := adminhandlers.NewStartImpersonationHandler(useCase)
@@ -97,7 +165,7 @@ func TestStartImpersonationHandler_SuccessSetsContextValues(t *testing.T) {
 
 	payload := internaltests.DecodeResponseJSON[types.StartImpersonationResponse](t, reqCtx)
 	if payload.Impersonation == nil {
-		t.Fatal("expected impersonation key, got nil")
+		t.Fatal("expected impersonation, got nil")
 	}
 	impRepo.AssertExpectations(t)
 	sessionStateRepo.AssertExpectations(t)
@@ -150,76 +218,8 @@ func TestEndImpersonationByIDHandler(t *testing.T) {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
 		}
 		payload := internaltests.DecodeResponseJSON[types.StopImpersonationResponse](t, reqCtx)
-		if payload.Message != "impersonation ended" {
+		if payload.Message != "Impersonation stopped" {
 			t.Fatalf("expected success message, got %v", payload.Message)
-		}
-		impRepo.AssertExpectations(t)
-	})
-}
-
-func TestGetAllImpersonationsHandler(t *testing.T) {
-	t.Run("error", func(t *testing.T) {
-		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		impRepo.On("GetAllImpersonations", mock.Anything).Return(([]types.Impersonation)(nil), errors.New("internal error")).Once()
-		handler := adminhandlers.NewGetAllImpersonationsHandler(useCase)
-
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations", nil)
-		handler.Handler()(w, req)
-
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusInternalServerError, "internal error")
-		impRepo.AssertExpectations(t)
-	})
-
-	t.Run("success", func(t *testing.T) {
-		now := time.Now().UTC()
-		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		impRepo.On("GetAllImpersonations", mock.Anything).Return([]types.Impersonation{{ID: "imp-1", ActorUserID: "actor-1", TargetUserID: "target-1", StartedAt: now, ExpiresAt: now.Add(time.Minute)}}, nil).Once()
-		handler := adminhandlers.NewGetAllImpersonationsHandler(useCase)
-
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations", nil)
-		handler.Handler()(w, req)
-
-		if reqCtx.ResponseStatus != http.StatusOK {
-			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
-		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if _, ok := payload["data"]; !ok {
-			t.Fatalf("expected data key, got %v", payload)
-		}
-		impRepo.AssertExpectations(t)
-	})
-}
-
-func TestGetImpersonationByIDHandler(t *testing.T) {
-	t.Run("error", func(t *testing.T) {
-		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		impRepo.On("GetImpersonationByID", mock.Anything, "imp-1").Return((*types.Impersonation)(nil), adminconstants.ErrNotFound).Once()
-		handler := adminhandlers.NewGetImpersonationByIDHandler(useCase)
-
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations/imp-1", nil)
-		req.SetPathValue("impersonation_id", "imp-1")
-		handler.Handler()(w, req)
-
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusNotFound, "not found")
-		impRepo.AssertExpectations(t)
-	})
-
-	t.Run("success", func(t *testing.T) {
-		now := time.Now().UTC()
-		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		impRepo.On("GetImpersonationByID", mock.Anything, "imp-1").Return(&types.Impersonation{ID: "imp-1", ActorUserID: "actor-1", TargetUserID: "target-1", StartedAt: now, ExpiresAt: now.Add(5 * time.Minute)}, nil).Once()
-		handler := adminhandlers.NewGetImpersonationByIDHandler(useCase)
-
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations/imp-1", nil)
-		req.SetPathValue("impersonation_id", "imp-1")
-		handler.Handler()(w, req)
-
-		if reqCtx.ResponseStatus != http.StatusOK {
-			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
-		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if _, ok := payload["data"]; !ok {
-			t.Fatalf("expected data key, got %v", payload)
 		}
 		impRepo.AssertExpectations(t)
 	})

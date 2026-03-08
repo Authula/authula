@@ -27,7 +27,7 @@ func (h *GetAllImpersonationsHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": rows})
+		reqCtx.SetJSONResponse(http.StatusOK, rows)
 	}
 }
 
@@ -44,13 +44,13 @@ func (h *GetImpersonationByIDHandler) Handler() http.HandlerFunc {
 		reqCtx, _ := models.GetRequestContext(r.Context())
 		impersonationID := r.PathValue("impersonation_id")
 
-		row, err := h.useCase.GetImpersonationByID(r.Context(), impersonationID)
+		impersonation, err := h.useCase.GetImpersonationByID(r.Context(), impersonationID)
 		if err != nil {
 			respondImpersonationError(reqCtx, err)
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": row})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.GetImpersonationByIDResponse{Impersonation: impersonation})
 	}
 }
 
@@ -136,7 +136,7 @@ func (h *StopImpersonationHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"message": "impersonation ended"})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.StopImpersonationResponse{Message: "Impersonation stopped"})
 	}
 }
 

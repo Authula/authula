@@ -154,6 +154,10 @@ type RevokeSessionResponse struct {
 	State *AdminSessionState `json:"state"`
 }
 
+type GetImpersonationByIDResponse struct {
+	Impersonation *Impersonation `json:"impersonation"`
+}
+
 type StartImpersonationRequest struct {
 	TargetUserID     string `json:"target_user_id"`
 	Reason           string `json:"reason"`
