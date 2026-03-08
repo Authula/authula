@@ -57,10 +57,16 @@ type TokenService interface {
 	Decrypt(encrypted string) (string, error)
 }
 
+type PasswordService interface {
+	Hash(password string) (string, error)
+	Verify(password, encoded string) bool
+}
+
 type CoreServices struct {
 	UserService         UserService
 	AccountService      AccountService
 	SessionService      SessionService
 	VerificationService VerificationService
 	TokenService        TokenService
+	PasswordService     PasswordService
 }

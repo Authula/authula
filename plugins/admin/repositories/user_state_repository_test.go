@@ -104,6 +104,21 @@ func TestBunUserStateRepository_Delete(t *testing.T) {
 	}
 }
 
+func TestBunUserStateRepository_GetBanned_EmptyRows(t *testing.T) {
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	list, err := repo.GetBanned(ctx)
+	if err != nil {
+		t.Fatalf("get banned failed: %v", err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("expected empty list: %v", list)
+	}
+}
+
 func TestBunUserStateRepository_GetBanned(t *testing.T) {
 	repo, cleanup := setupRepo(t)
 	defer cleanup()

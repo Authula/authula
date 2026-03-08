@@ -7,7 +7,6 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email-password/services"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/email-password/types"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
@@ -88,8 +87,11 @@ func (p *EmailPasswordPlugin) Init(ctx *models.PluginContext) error {
 	}
 	p.tokenService = tokenService
 
-	p.passwordService = services.NewArgon2PasswordService()
-	ctx.ServiceRegistry.Register(models.ServicePassword.String(), p.passwordService)
+	passwordService, ok := ctx.ServiceRegistry.Get(models.ServicePassword.String()).(rootservices.PasswordService)
+	if !ok {
+		return fmt.Errorf("password service not available in service registry")
+	}
+	p.passwordService = passwordService
 
 	mailerService, ok := ctx.ServiceRegistry.Get(models.ServiceMailer.String()).(rootservices.MailerService)
 	if !ok {

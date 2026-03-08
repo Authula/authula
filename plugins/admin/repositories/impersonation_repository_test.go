@@ -30,68 +30,6 @@ func setupImpersonationRepo(t *testing.T) (*repositories.BunImpersonationReposit
 	return repo, db, cleanup
 }
 
-func TestBunImpersonationRepository_UserExists(t *testing.T) {
-	repo, db, cleanup := setupImpersonationRepo(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	exists, err := repo.UserExists(ctx, "u1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if exists {
-		t.Fatalf("expected false when user missing")
-	}
-
-	user := &models.User{
-		ID:            "u1",
-		Name:          "n",
-		Email:         "e@example.com",
-		EmailVerified: true,
-		CreatedAt:     time.Now().UTC(),
-		UpdatedAt:     time.Now().UTC(),
-	}
-	if _, err := db.NewInsert().Model(user).Exec(ctx); err != nil {
-		t.Fatalf("failed to insert user: %v", err)
-	}
-
-	exists2, err := repo.UserExists(ctx, "u1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !exists2 {
-		t.Fatalf("expected user to exist")
-	}
-}
-
-func TestBunImpersonationRepository_GetActiveImpersonationByID_NotFound(t *testing.T) {
-	repo, _, cleanup := setupImpersonationRepo(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	imp, err := repo.GetActiveImpersonationByID(ctx, "nope")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if imp != nil {
-		t.Fatalf("expected nil result, got %v", imp)
-	}
-}
-
-func TestBunImpersonationRepository_GetImpersonationByID_NotFound(t *testing.T) {
-	repo, _, cleanup := setupImpersonationRepo(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	imp, err := repo.GetImpersonationByID(ctx, "nope")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if imp != nil {
-		t.Fatalf("expected nil result, got %v", imp)
-	}
-}
-
 func TestBunImpersonationRepository_CreateAndGetActive(t *testing.T) {
 	repo, _, cleanup := setupImpersonationRepo(t)
 	defer cleanup()
@@ -125,6 +63,72 @@ func TestBunImpersonationRepository_CreateAndGetActive(t *testing.T) {
 	}
 	if got2 == nil || got2.ID != "imp-1" {
 		t.Fatalf("unexpected latest record: %v", got2)
+	}
+}
+
+func TestBunImpersonationRepository_GetAllImpersonations_EmptyRows(t *testing.T) {
+	repo, _, cleanup := setupImpersonationRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	list, err := repo.GetAllImpersonations(ctx)
+	if err != nil {
+		t.Fatalf("get all failed: %v", err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("expected 0 rows, got %d", len(list))
+	}
+}
+
+func TestBunImpersonationRepository_GetAllImpersonations(t *testing.T) {
+	repo, _, cleanup := setupImpersonationRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	a := &types.Impersonation{ID: "a", ActorUserID: "x", TargetUserID: "y", StartedAt: now.Add(-1 * time.Hour), ExpiresAt: now.Add(1 * time.Hour)}
+	b := &types.Impersonation{ID: "b", ActorUserID: "x", TargetUserID: "z", StartedAt: now.Add(-2 * time.Hour), ExpiresAt: now.Add(1 * time.Hour)}
+	_ = repo.CreateImpersonation(ctx, a)
+	_ = repo.CreateImpersonation(ctx, b)
+
+	list, err := repo.GetAllImpersonations(ctx)
+	if err != nil {
+		t.Fatalf("get all failed: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(list))
+	}
+	if list[0].ID != "a" || list[1].ID != "b" {
+		t.Fatalf("ordering incorrect: %v", list)
+	}
+}
+
+func TestBunImpersonationRepository_GetImpersonationByID_NotFound(t *testing.T) {
+	repo, _, cleanup := setupImpersonationRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	imp, err := repo.GetImpersonationByID(ctx, "nope")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if imp != nil {
+		t.Fatalf("expected nil result, got %v", imp)
+	}
+}
+
+func TestBunImpersonationRepository_GetActiveImpersonationByID_NotFound(t *testing.T) {
+	repo, _, cleanup := setupImpersonationRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	imp, err := repo.GetActiveImpersonationByID(ctx, "nope")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if imp != nil {
+		t.Fatalf("expected nil result, got %v", imp)
 	}
 }
 
@@ -230,25 +234,36 @@ func TestBunImpersonationRepository_EndImpersonation(t *testing.T) {
 	}
 }
 
-func TestBunImpersonationRepository_GetAllImpersonations(t *testing.T) {
-	repo, _, cleanup := setupImpersonationRepo(t)
+func TestBunImpersonationRepository_UserExists(t *testing.T) {
+	repo, db, cleanup := setupImpersonationRepo(t)
 	defer cleanup()
 
 	ctx := context.Background()
-	now := time.Now().UTC()
-	a := &types.Impersonation{ID: "a", ActorUserID: "x", TargetUserID: "y", StartedAt: now.Add(-1 * time.Hour), ExpiresAt: now.Add(1 * time.Hour)}
-	b := &types.Impersonation{ID: "b", ActorUserID: "x", TargetUserID: "z", StartedAt: now.Add(-2 * time.Hour), ExpiresAt: now.Add(1 * time.Hour)}
-	_ = repo.CreateImpersonation(ctx, a)
-	_ = repo.CreateImpersonation(ctx, b)
-
-	list, err := repo.GetAllImpersonations(ctx)
+	exists, err := repo.UserExists(ctx, "u1")
 	if err != nil {
-		t.Fatalf("get all failed: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(list) != 2 {
-		t.Fatalf("expected 2 rows, got %d", len(list))
+	if exists {
+		t.Fatalf("expected false when user missing")
 	}
-	if list[0].ID != "a" || list[1].ID != "b" {
-		t.Fatalf("ordering incorrect: %v", list)
+
+	user := &models.User{
+		ID:            "u1",
+		Name:          "n",
+		Email:         "e@example.com",
+		EmailVerified: true,
+		CreatedAt:     time.Now().UTC(),
+		UpdatedAt:     time.Now().UTC(),
+	}
+	if _, err := db.NewInsert().Model(user).Exec(ctx); err != nil {
+		t.Fatalf("failed to insert user: %v", err)
+	}
+
+	exists2, err := repo.UserExists(ctx, "u1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !exists2 {
+		t.Fatalf("expected user to exist")
 	}
 }

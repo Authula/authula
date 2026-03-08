@@ -74,12 +74,14 @@ func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.
 	sessionService := internalservices.NewSessionService(sessionRepo, signer, config.CoreDatabaseHooks)
 	verificationService := internalservices.NewVerificationService(verificationRepo, signer, config.CoreDatabaseHooks)
 	tokenService := internalservices.NewTokenService(tokenRepo)
+	passwordService := internalservices.NewArgon2PasswordService()
 
 	serviceRegistry.Register(models.ServiceUser.String(), userService)
 	serviceRegistry.Register(models.ServiceAccount.String(), accountService)
 	serviceRegistry.Register(models.ServiceSession.String(), sessionService)
 	serviceRegistry.Register(models.ServiceVerification.String(), verificationService)
 	serviceRegistry.Register(models.ServiceToken.String(), tokenService)
+	serviceRegistry.Register(models.ServicePassword.String(), passwordService)
 
 	return &coreservices.CoreServices{
 		UserService:         userService,
@@ -87,6 +89,7 @@ func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.
 		SessionService:      sessionService,
 		VerificationService: verificationService,
 		TokenService:        tokenService,
+		PasswordService:     passwordService,
 	}
 }
 

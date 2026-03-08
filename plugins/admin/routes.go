@@ -11,16 +11,16 @@ import (
 type routeUseCases struct {
 	users         usecases.UsersUseCase
 	accounts      usecases.AccountsUseCase
-	impersonation usecases.ImpersonationUseCase
 	state         usecases.StateUseCase
+	impersonation usecases.ImpersonationUseCase
 }
 
 func newRouteUseCases(api *API) routeUseCases {
 	return routeUseCases{
 		users:         api.useCases.UsersUseCase(),
 		accounts:      api.useCases.AccountsUseCase(),
-		impersonation: api.useCases.ImpersonationUseCase(),
 		state:         api.useCases.StateUseCase(),
+		impersonation: api.useCases.ImpersonationUseCase(),
 	}
 }
 
@@ -38,9 +38,9 @@ func Routes(api *API) []models.Route {
 		// Account management
 		{Method: http.MethodPost, Path: "/admin/users/{user_id}/accounts", Handler: adminhandlers.NewCreateAccountHandler(usecases.accounts).Handler()},
 		{Method: http.MethodGet, Path: "/admin/users/{user_id}/accounts", Handler: adminhandlers.NewGetUserAccountsHandler(usecases.accounts).Handler()},
-		{Method: http.MethodGet, Path: "/admin/accounts/{account_id}", Handler: adminhandlers.NewGetAccountByIDHandler(usecases.accounts).Handler()},
-		{Method: http.MethodPatch, Path: "/admin/accounts/{account_id}", Handler: adminhandlers.NewUpdateAccountHandler(usecases.accounts).Handler()},
-		{Method: http.MethodDelete, Path: "/admin/accounts/{account_id}", Handler: adminhandlers.NewDeleteAccountHandler(usecases.accounts).Handler()},
+		{Method: http.MethodGet, Path: "/admin/accounts/{id}", Handler: adminhandlers.NewGetAccountByIDHandler(usecases.accounts).Handler()},
+		{Method: http.MethodPatch, Path: "/admin/accounts/{id}", Handler: adminhandlers.NewUpdateAccountHandler(usecases.accounts).Handler()},
+		{Method: http.MethodDelete, Path: "/admin/accounts/{id}", Handler: adminhandlers.NewDeleteAccountHandler(usecases.accounts).Handler()},
 
 		// User state
 		{Method: http.MethodGet, Path: "/admin/users/{user_id}/state", Handler: adminhandlers.NewGetUserStateHandler(usecases.state).Handler()},

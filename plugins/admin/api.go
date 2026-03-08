@@ -44,16 +44,16 @@ func (a *API) SessionStateRepository() repositories.SessionStateRepository {
 
 // User management
 
+func (a *API) CreateUser(ctx context.Context, request types.CreateUserRequest) (*models.User, error) {
+	return a.useCases.CreateUser(ctx, request)
+}
+
 func (a *API) GetAllUsers(ctx context.Context, cursor *string, limit int) (*types.UsersPage, error) {
 	return a.useCases.GetAllUsers(ctx, cursor, limit)
 }
 
 func (a *API) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
 	return a.useCases.GetUserByID(ctx, userID)
-}
-
-func (a *API) CreateUser(ctx context.Context, request types.CreateUserRequest) (*models.User, error) {
-	return a.useCases.CreateUser(ctx, request)
 }
 
 func (a *API) UpdateUser(ctx context.Context, userID string, request types.UpdateUserRequest) (*models.User, error) {

@@ -8,11 +8,6 @@ import (
 )
 
 func (p *AdminPlugin) Hooks() []models.Hook {
-	if p.Api == nil {
-		p.logger.Warn("Api reference is not set for Admin plugin, returning empty hooks.")
-		return []models.Hook{}
-	}
-
 	return []models.Hook{
 		{
 			Stage:   models.HookBefore,
@@ -42,7 +37,7 @@ func (p *AdminPlugin) enforceState(reqCtx *models.RequestContext) error {
 
 	if state != nil && state.IsBanned {
 		if state.BannedUntil == nil || state.BannedUntil.After(time.Now().UTC()) {
-			reqCtx.SetJSONResponse(http.StatusForbidden, map[string]any{"message": "account is banned"})
+			reqCtx.SetJSONResponse(http.StatusForbidden, map[string]any{"message": "user is banned"})
 			reqCtx.Handled = true
 			return nil
 		}

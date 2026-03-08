@@ -67,5 +67,10 @@ func (r *BunUserStateRepository) GetBanned(ctx context.Context) ([]types.AdminUs
 	if err != nil {
 		return nil, fmt.Errorf("failed to get banned user states: %w", err)
 	}
+
+	if rows == nil {
+		return []types.AdminUserState{}, nil
+	}
+
 	return rows, nil
 }

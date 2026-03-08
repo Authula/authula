@@ -19,20 +19,45 @@ func NewBunImpersonationRepository(db bun.IDB) *BunImpersonationRepository {
 	return &BunImpersonationRepository{db: db}
 }
 
-func (r *BunImpersonationRepository) UserExists(ctx context.Context, userID string) (bool, error) {
-	count, err := r.db.NewSelect().Table("users").Where("id = ?", userID).Count(ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to check user existence: %w", err)
-	}
-	return count > 0, nil
-}
-
 func (r *BunImpersonationRepository) CreateImpersonation(ctx context.Context, impersonation *types.Impersonation) error {
 	_, err := r.db.NewInsert().Model(impersonation).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create impersonation: %w", err)
 	}
 	return nil
+}
+
+func (r *BunImpersonationRepository) GetAllImpersonations(ctx context.Context) ([]types.Impersonation, error) {
+	var rows []types.Impersonation
+	err := r.db.NewSelect().
+		Model(&rows).
+		OrderExpr("started_at DESC").
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get impersonations: %w", err)
+	}
+
+	if rows == nil {
+		return []types.Impersonation{}, nil
+	}
+
+	return rows, nil
+}
+
+func (r *BunImpersonationRepository) GetImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error) {
+	row := &types.Impersonation{}
+	err := r.db.NewSelect().
+		Model(row).
+		Where("id = ?", impersonationID).
+		Scan(ctx)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get impersonation by id: %w", err)
+	}
+
+	return row, nil
 }
 
 func (r *BunImpersonationRepository) GetActiveImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error) {
@@ -72,10 +97,9 @@ func (r *BunImpersonationRepository) GetLatestActiveImpersonationByActor(ctx con
 }
 
 func (r *BunImpersonationRepository) EndImpersonation(ctx context.Context, impersonationID string, endedByUserID *string) error {
-	now := time.Now().UTC()
 	_, err := r.db.NewUpdate().
 		Model((*types.Impersonation)(nil)).
-		Set("ended_at = ?", now).
+		Set("ended_at = ?", time.Now().UTC()).
 		Set("ended_by_user_id = ?", endedByUserID).
 		Where("id = ?", impersonationID).
 		Where("ended_at IS NULL").
@@ -86,31 +110,10 @@ func (r *BunImpersonationRepository) EndImpersonation(ctx context.Context, imper
 	return nil
 }
 
-func (r *BunImpersonationRepository) GetAllImpersonations(ctx context.Context) ([]types.Impersonation, error) {
-	var rows []types.Impersonation
-	err := r.db.NewSelect().
-		Model(&rows).
-		OrderExpr("started_at DESC").
-		Scan(ctx)
+func (r *BunImpersonationRepository) UserExists(ctx context.Context, userID string) (bool, error) {
+	count, err := r.db.NewSelect().Table("users").Where("id = ?", userID).Count(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get impersonations: %w", err)
+		return false, fmt.Errorf("failed to check user existence: %w", err)
 	}
-
-	return rows, nil
-}
-
-func (r *BunImpersonationRepository) GetImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error) {
-	row := &types.Impersonation{}
-	err := r.db.NewSelect().
-		Model(row).
-		Where("id = ?", impersonationID).
-		Scan(ctx)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to get impersonation by id: %w", err)
-	}
-
-	return row, nil
+	return count > 0, nil
 }

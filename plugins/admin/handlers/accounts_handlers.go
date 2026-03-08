@@ -50,7 +50,7 @@ func NewGetAccountByIDHandler(useCase usecases.AccountsUseCase) *GetAccountByIDH
 func (h *GetAccountByIDHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
-		accountID := r.PathValue("account_id")
+		accountID := r.PathValue("id")
 
 		account, err := h.useCase.GetByID(r.Context(), accountID)
 		if err != nil {
@@ -101,7 +101,7 @@ func NewUpdateAccountHandler(useCase usecases.AccountsUseCase) *UpdateAccountHan
 func (h *UpdateAccountHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
-		accountID := r.PathValue("account_id")
+		accountID := r.PathValue("id")
 
 		var payload types.UpdateAccountRequest
 		if err := util.ParseJSON(r, &payload); err != nil {
@@ -131,7 +131,7 @@ func NewDeleteAccountHandler(useCase usecases.AccountsUseCase) *DeleteAccountHan
 func (h *DeleteAccountHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
-		accountID := r.PathValue("account_id")
+		accountID := r.PathValue("id")
 
 		if err := h.useCase.Delete(r.Context(), accountID); err != nil {
 			respondAccountsError(reqCtx, err)
