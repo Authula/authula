@@ -1,12 +1,12 @@
 package types
 
 import (
-"encoding/json"
-"time"
+	"encoding/json"
+	"time"
 
-"github.com/uptrace/bun"
+	"github.com/uptrace/bun"
 
-"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
 type Impersonation struct {
