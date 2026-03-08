@@ -36,7 +36,7 @@ func (r *BunUserStateRepository) Upsert(ctx context.Context, state *types.AdminU
 	_, err := r.db.NewInsert().
 		Model(state).
 		On("CONFLICT (user_id) DO UPDATE").
-		Set("is_banned = EXCLUDED.is_banned").
+		Set("banned = EXCLUDED.banned").
 		Set("banned_at = EXCLUDED.banned_at").
 		Set("banned_until = EXCLUDED.banned_until").
 		Set("banned_reason = EXCLUDED.banned_reason").
@@ -61,7 +61,7 @@ func (r *BunUserStateRepository) GetBanned(ctx context.Context) ([]types.AdminUs
 	var rows []types.AdminUserState
 	err := r.db.NewSelect().
 		Model(&rows).
-		Where("is_banned = ?", true).
+		Where("banned = ?", true).
 		OrderExpr("updated_at DESC").
 		Scan(ctx)
 	if err != nil {

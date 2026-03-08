@@ -49,7 +49,7 @@ func adminSQLiteInitial() migrations.Migration {
 				`CREATE INDEX IF NOT EXISTS idx_admin_impersonations_expires_at_ended_at ON admin_impersonations(expires_at, ended_at);`,
 				`CREATE TABLE IF NOT EXISTS admin_user_states (
           user_id TEXT PRIMARY KEY,
-          is_banned BOOLEAN NOT NULL DEFAULT 0,
+          banned BOOLEAN NOT NULL DEFAULT 0,
           banned_at TIMESTAMP,
           banned_until TIMESTAMP,
           banned_reason TEXT,
@@ -59,7 +59,7 @@ func adminSQLiteInitial() migrations.Migration {
           FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
           FOREIGN KEY (banned_by_user_id) REFERENCES users(id) ON DELETE SET NULL
         );`,
-				`CREATE INDEX IF NOT EXISTS idx_admin_user_states_is_banned_banned_until ON admin_user_states(is_banned, banned_until);`,
+				`CREATE INDEX IF NOT EXISTS idx_admin_user_states_banned_banned_until ON admin_user_states(banned, banned_until);`,
 				`CREATE TABLE IF NOT EXISTS admin_session_states (
           session_id TEXT PRIMARY KEY,
           revoked_at TIMESTAMP,
@@ -133,7 +133,7 @@ func adminPostgresInitial() migrations.Migration {
 				`CREATE INDEX IF NOT EXISTS idx_admin_impersonations_expires_at_ended_at ON admin_impersonations(expires_at, ended_at);`,
 				`CREATE TABLE IF NOT EXISTS admin_user_states (
           user_id UUID PRIMARY KEY,
-          is_banned BOOLEAN NOT NULL DEFAULT FALSE,
+          banned BOOLEAN NOT NULL DEFAULT FALSE,
           banned_at TIMESTAMP WITH TIME ZONE,
           banned_until TIMESTAMP WITH TIME ZONE,
           banned_reason TEXT,
@@ -148,7 +148,7 @@ func adminPostgresInitial() migrations.Migration {
         BEFORE UPDATE ON admin_user_states
         FOR EACH ROW
         EXECUTE FUNCTION admin_set_updated_at_fn();`,
-				`CREATE INDEX IF NOT EXISTS idx_admin_user_states_is_banned_banned_until ON admin_user_states(is_banned, banned_until);`,
+				`CREATE INDEX IF NOT EXISTS idx_admin_user_states_banned_banned_until ON admin_user_states(banned, banned_until);`,
 				`CREATE TABLE IF NOT EXISTS admin_session_states (
           session_id UUID PRIMARY KEY,
           revoked_at TIMESTAMP WITH TIME ZONE,
@@ -220,7 +220,7 @@ func adminMySQLInitial() migrations.Migration {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 				`CREATE TABLE IF NOT EXISTS admin_user_states (
           user_id BINARY(16) NOT NULL PRIMARY KEY,
-          is_banned TINYINT(1) NOT NULL DEFAULT 0,
+          banned TINYINT(1) NOT NULL DEFAULT 0,
           banned_at TIMESTAMP NULL,
           banned_until TIMESTAMP NULL,
           banned_reason TEXT NULL,
@@ -229,7 +229,7 @@ func adminMySQLInitial() migrations.Migration {
           updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           CONSTRAINT fk_admin_user_states_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
           CONSTRAINT fk_admin_user_states_banned_by FOREIGN KEY (banned_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
-          INDEX idx_admin_user_states_is_banned_banned_until (is_banned, banned_until)
+          INDEX idx_admin_user_states_banned_banned_until (banned, banned_until)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 				`CREATE TABLE IF NOT EXISTS admin_session_states (
           session_id BINARY(16) NOT NULL PRIMARY KEY,
