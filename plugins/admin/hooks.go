@@ -16,13 +16,13 @@ func (p *AdminPlugin) Hooks() []models.Hook {
 	return []models.Hook{
 		{
 			Stage:   models.HookBefore,
-			Handler: p.enforceAdminState,
+			Handler: p.enforceState,
 			Order:   15,
 		},
 	}
 }
 
-func (p *AdminPlugin) enforceAdminState(reqCtx *models.RequestContext) error {
+func (p *AdminPlugin) enforceState(reqCtx *models.RequestContext) error {
 	if reqCtx == nil || reqCtx.Request == nil {
 		return nil
 	}

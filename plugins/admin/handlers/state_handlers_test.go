@@ -55,9 +55,9 @@ func TestGetUserStateHandler(t *testing.T) {
 		if reqCtx.ResponseStatus != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
 		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if _, ok := payload["data"]; !ok {
-			t.Fatalf("expected data key, got %v", payload)
+		payload := internaltests.DecodeResponseJSON[types.GetUserStateResponse](t, reqCtx)
+		if payload.State == nil {
+			t.Fatalf("expected state, got %v", payload)
 		}
 		userStateRepo.AssertExpectations(t)
 	})
@@ -111,9 +111,9 @@ func TestUpsertUserStateHandler(t *testing.T) {
 		if reqCtx.ResponseStatus != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
 		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if _, ok := payload["data"]; !ok {
-			t.Fatalf("expected data key, got %v", payload)
+		payload := internaltests.DecodeResponseJSON[types.UpsertUserStateResponse](t, reqCtx)
+		if payload.State == nil {
+			t.Fatalf("expected state, got %v", payload)
 		}
 		impRepo.AssertExpectations(t)
 		userStateRepo.AssertExpectations(t)
@@ -146,9 +146,9 @@ func TestDeleteUserStateHandler(t *testing.T) {
 		if reqCtx.ResponseStatus != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
 		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if payload["message"] != "user state deleted" {
-			t.Fatalf("expected user state deleted message, got %v", payload["message"])
+		payload := internaltests.DecodeResponseJSON[types.DeleteUserStateResponse](t, reqCtx)
+		if payload.Message != "user state deleted" {
+			t.Fatalf("expected user state deleted message, got %v", payload.Message)
 		}
 		userStateRepo.AssertExpectations(t)
 	})
@@ -178,9 +178,9 @@ func TestGetBannedUserStatesHandler(t *testing.T) {
 		if reqCtx.ResponseStatus != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
 		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if _, ok := payload["data"]; !ok {
-			t.Fatalf("expected data key, got %v", payload)
+		payload := internaltests.DecodeResponseJSON[[]types.AdminUserState](t, reqCtx)
+		if payload == nil || len(payload) != 1 {
+			t.Fatalf("expected banned user state, got %v", payload)
 		}
 		userStateRepo.AssertExpectations(t)
 	})
@@ -234,9 +234,9 @@ func TestBanUserHandler(t *testing.T) {
 		if reqCtx.ResponseStatus != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
 		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if _, ok := payload["data"]; !ok {
-			t.Fatalf("expected data key, got %v", payload)
+		payload := internaltests.DecodeResponseJSON[types.UpsertUserStateResponse](t, reqCtx)
+		if payload.State == nil {
+			t.Fatalf("expected state, got %v", payload)
 		}
 		impRepo.AssertExpectations(t)
 		userStateRepo.AssertExpectations(t)
@@ -276,9 +276,9 @@ func TestUnbanUserHandler(t *testing.T) {
 		if reqCtx.ResponseStatus != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
 		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if _, ok := payload["data"]; !ok {
-			t.Fatalf("expected data key, got %v", payload)
+		payload := internaltests.DecodeResponseJSON[types.UnbanUserResponse](t, reqCtx)
+		if payload.State == nil {
+			t.Fatalf("expected state, got %v", payload)
 		}
 		impRepo.AssertExpectations(t)
 		userStateRepo.AssertExpectations(t)
@@ -324,9 +324,9 @@ func TestGetSessionStateHandler(t *testing.T) {
 		if reqCtx.ResponseStatus != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
 		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if _, ok := payload["data"]; !ok {
-			t.Fatalf("expected data key, got %v", payload)
+		payload := internaltests.DecodeResponseJSON[types.GetSessionStateResponse](t, reqCtx)
+		if payload.State == nil {
+			t.Fatalf("expected state, got %v", payload)
 		}
 		sessionStateRepo.AssertExpectations(t)
 	})
@@ -378,9 +378,9 @@ func TestUpsertSessionStateHandler(t *testing.T) {
 		if reqCtx.ResponseStatus != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
 		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if _, ok := payload["data"]; !ok {
-			t.Fatalf("expected data key, got %v", payload)
+		payload := internaltests.DecodeResponseJSON[types.UpsertSessionStateResponse](t, reqCtx)
+		if payload.State == nil {
+			t.Fatalf("expected state, got %v", payload)
 		}
 		sessionStateRepo.AssertExpectations(t)
 	})
@@ -412,9 +412,9 @@ func TestDeleteSessionStateHandler(t *testing.T) {
 		if reqCtx.ResponseStatus != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
 		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if payload["message"] != "session state deleted" {
-			t.Fatalf("expected session state deleted message, got %v", payload["message"])
+		payload := internaltests.DecodeResponseJSON[types.DeleteSessionStateResponse](t, reqCtx)
+		if payload.Message != "session state deleted" {
+			t.Fatalf("expected session state deleted message, got %v", payload.Message)
 		}
 		sessionStateRepo.AssertExpectations(t)
 	})
@@ -444,9 +444,9 @@ func TestGetRevokedSessionStatesHandler(t *testing.T) {
 		if reqCtx.ResponseStatus != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
 		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if _, ok := payload["data"]; !ok {
-			t.Fatalf("expected data key, got %v", payload)
+		payload := internaltests.DecodeResponseJSON[[]types.AdminSessionState](t, reqCtx)
+		if payload == nil || len(payload) != 1 {
+			t.Fatalf("expected session state, got %v", payload)
 		}
 		sessionStateRepo.AssertExpectations(t)
 	})
@@ -482,9 +482,9 @@ func TestGetUserAdminSessionsHandler(t *testing.T) {
 		if reqCtx.ResponseStatus != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
 		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if _, ok := payload["data"]; !ok {
-			t.Fatalf("expected data key, got %v", payload)
+		payload := internaltests.DecodeResponseJSON[[]types.AdminUserSession](t, reqCtx)
+		if payload == nil || len(payload) != 1 {
+			t.Fatalf("expected user sessions, got %v", payload)
 		}
 		impRepo.AssertExpectations(t)
 		sessionStateRepo.AssertExpectations(t)
@@ -535,9 +535,9 @@ func TestRevokeSessionHandler(t *testing.T) {
 		if reqCtx.ResponseStatus != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
 		}
-		payload := internaltests.DecodeResponseJSON[map[string]any](t, reqCtx)
-		if _, ok := payload["data"]; !ok {
-			t.Fatalf("expected data key, got %v", payload)
+		payload := internaltests.DecodeResponseJSON[types.RevokeSessionResponse](t, reqCtx)
+		if payload.State == nil {
+			t.Fatalf("expected session state, got %v", payload)
 		}
 		sessionStateRepo.AssertExpectations(t)
 	})

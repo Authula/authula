@@ -53,6 +53,11 @@ type AdminSessionState struct {
 	UpdatedAt              time.Time  `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
 }
 
+type AdminUserSession struct {
+	Session models.Session     `json:"session"`
+	State   *AdminSessionState `json:"state,omitempty"`
+}
+
 type CreateUserRequest struct {
 	Name          string          `json:"name"`
 	Email         string          `json:"email"`
@@ -90,10 +95,75 @@ type UsersPage struct {
 	NextCursor *string       `json:"next_cursor,omitempty"`
 }
 
+type GetUserStateResponse struct {
+	State *AdminUserState `json:"state"`
+}
+
+type UpsertUserStateResponse struct {
+	State *AdminUserState `json:"state"`
+}
+
+type UpsertUserStateRequest struct {
+	IsBanned     bool       `json:"is_banned"`
+	BannedUntil  *time.Time `json:"banned_until,omitempty"`
+	BannedReason *string    `json:"banned_reason,omitempty"`
+}
+
+type DeleteUserStateResponse struct {
+	Message string `json:"message"`
+}
+
+type BanUserRequest struct {
+	BannedUntil *time.Time `json:"banned_until,omitempty"`
+	Reason      *string    `json:"reason,omitempty"`
+}
+
+type BanUserResponse struct {
+	State *AdminUserState `json:"state"`
+}
+
+type UnbanUserResponse struct {
+	State *AdminUserState `json:"state"`
+}
+
+type GetSessionStateResponse struct {
+	State *AdminSessionState `json:"state"`
+}
+
+type UpsertSessionStateRequest struct {
+	Revoke                 bool       `json:"revoke"`
+	RevokedReason          *string    `json:"revoked_reason,omitempty"`
+	ImpersonatorUserID     *string    `json:"impersonator_user_id,omitempty"`
+	ImpersonationReason    *string    `json:"impersonation_reason,omitempty"`
+	ImpersonationExpiresAt *time.Time `json:"impersonation_expires_at,omitempty"`
+}
+
+type UpsertSessionStateResponse struct {
+	State *AdminSessionState `json:"state"`
+}
+
+type DeleteSessionStateResponse struct {
+	Message string `json:"message"`
+}
+
+type RevokeSessionRequest struct {
+	Reason *string `json:"reason,omitempty"`
+}
+
+type RevokeSessionResponse struct {
+	State *AdminSessionState `json:"state"`
+}
+
 type StartImpersonationRequest struct {
 	TargetUserID     string `json:"target_user_id"`
 	Reason           string `json:"reason"`
 	ExpiresInSeconds *int   `json:"expires_in_seconds,omitempty"`
+}
+
+type StartImpersonationResult struct {
+	Impersonation *Impersonation `json:"impersonation"`
+	SessionID     *string        `json:"session_id,omitempty"`
+	SessionToken  *string        `json:"session_token,omitempty"`
 }
 
 type StartImpersonationResponse struct {
@@ -106,38 +176,4 @@ type StopImpersonationRequest struct {
 
 type StopImpersonationResponse struct {
 	Message string `json:"message"`
-}
-
-type RevokeSessionRequest struct {
-	Reason *string `json:"reason,omitempty"`
-}
-
-type BanUserRequest struct {
-	BannedUntil *time.Time `json:"banned_until,omitempty"`
-	Reason      *string    `json:"reason,omitempty"`
-}
-
-type AdminUserSession struct {
-	Session models.Session     `json:"session"`
-	State   *AdminSessionState `json:"state,omitempty"`
-}
-
-type UpsertUserStateRequest struct {
-	IsBanned     bool       `json:"is_banned"`
-	BannedUntil  *time.Time `json:"banned_until,omitempty"`
-	BannedReason *string    `json:"banned_reason,omitempty"`
-}
-
-type UpsertSessionStateRequest struct {
-	Revoke                 bool       `json:"revoke"`
-	RevokedReason          *string    `json:"revoked_reason,omitempty"`
-	ImpersonatorUserID     *string    `json:"impersonator_user_id,omitempty"`
-	ImpersonationReason    *string    `json:"impersonation_reason,omitempty"`
-	ImpersonationExpiresAt *time.Time `json:"impersonation_expires_at,omitempty"`
-}
-
-type StartImpersonationResult struct {
-	Impersonation *Impersonation `json:"impersonation"`
-	SessionID     *string        `json:"session_id,omitempty"`
-	SessionToken  *string        `json:"session_token,omitempty"`
 }

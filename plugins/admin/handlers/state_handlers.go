@@ -33,7 +33,7 @@ func (h *GetUserStateHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": state})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.GetUserStateResponse{State: state})
 	}
 }
 
@@ -63,7 +63,7 @@ func (h *UpsertUserStateHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": state})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.UpsertUserStateResponse{State: state})
 	}
 }
 
@@ -85,7 +85,7 @@ func (h *DeleteUserStateHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"message": "user state deleted"})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.DeleteUserStateResponse{Message: "user state deleted"})
 	}
 }
 
@@ -107,7 +107,7 @@ func (h *GetBannedUserStatesHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": rows})
+		reqCtx.SetJSONResponse(http.StatusOK, rows)
 	}
 }
 
@@ -137,7 +137,7 @@ func (h *BanUserHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": state})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.BanUserResponse{State: state})
 	}
 }
 
@@ -160,7 +160,7 @@ func (h *UnbanUserHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": state})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.UnbanUserResponse{State: state})
 	}
 }
 
@@ -188,7 +188,7 @@ func (h *GetSessionStateHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": state})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.GetSessionStateResponse{State: state})
 	}
 }
 
@@ -218,7 +218,7 @@ func (h *UpsertSessionStateHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": state})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.UpsertSessionStateResponse{State: state})
 	}
 }
 
@@ -240,7 +240,7 @@ func (h *DeleteSessionStateHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"message": "session state deleted"})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.DeleteSessionStateResponse{Message: "session state deleted"})
 	}
 }
 
@@ -262,7 +262,7 @@ func (h *GetRevokedSessionStatesHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": rows})
+		reqCtx.SetJSONResponse(http.StatusOK, rows)
 	}
 }
 
@@ -285,7 +285,7 @@ func (h *GetUserAdminSessionsHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": rows})
+		reqCtx.SetJSONResponse(http.StatusOK, rows)
 	}
 }
 
@@ -315,7 +315,7 @@ func (h *RevokeSessionHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{"data": state})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.RevokeSessionResponse{State: state})
 	}
 }
 
