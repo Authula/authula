@@ -51,7 +51,11 @@ func (r *BunUserRepository) GetAll(ctx context.Context, cursor *string, limit in
 
 	var users []models.User
 	if err := query.Scan(ctx, &users); err != nil {
-		return nil, nil, fmt.Errorf("failed to list users: %w", err)
+		return []models.User{}, nil, fmt.Errorf("failed to list users: %w", err)
+	}
+
+	if users == nil {
+		users = []models.User{}
 	}
 
 	if len(users) <= limit {
