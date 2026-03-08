@@ -2,10 +2,7 @@ package usecases
 
 import (
 	"context"
-	"encoding/json"
-	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/constants"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/repository"
@@ -62,22 +59,7 @@ func (uc *disableUseCase) Disable(ctx context.Context, userID, password string) 
 	}
 
 	// Publish disabled event
-	payload, err := json.Marshal(map[string]string{"userID": userID})
-	if err != nil {
-		uc.Logger.Error(err.Error())
-	} else {
-		util.PublishEventAsync(
-			uc.EventBus,
-			uc.Logger,
-			models.Event{
-				ID:        util.GenerateUUID(),
-				Type:      constants.EventTwoFactorDisabled,
-				Payload:   payload,
-				Metadata:  nil,
-				Timestamp: time.Now().UTC(),
-			},
-		)
-	}
+	publishEvent(uc.EventBus, uc.Logger, constants.EventTwoFactorDisabled, userID)
 
 	return nil
 }

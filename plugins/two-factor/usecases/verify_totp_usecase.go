@@ -2,11 +2,8 @@ package usecases
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/constants"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/repository"
@@ -56,7 +53,7 @@ func NewVerifyTOTPUseCase(
 
 func (uc *verifyTOTPUseCase) Verify(ctx context.Context, pendingToken, code string, trustDevice bool, ipAddress, userAgent *string) (*types.VerifyResult, error) {
 	// Resolve userID from pending token
-	userID, verificationID, err := uc.resolvePendingToken(ctx, pendingToken)
+	userID, verificationID, err := resolvePendingToken(ctx, uc.TokenService, uc.VerificationService, pendingToken)
 	if err != nil {
 		return nil, err
 	}
@@ -99,19 +96,10 @@ func (uc *verifyTOTPUseCase) Verify(ctx context.Context, pendingToken, code stri
 	}
 
 	// Create session
-	token, err := uc.TokenService.Generate()
+	session, token, err := createSessionForUser(ctx, uc.TokenService, uc.SessionService, uc.VerificationService, uc.GlobalConfig, userID, verificationID, ipAddress, userAgent)
 	if err != nil {
 		return nil, err
 	}
-	hashedToken := uc.TokenService.Hash(token)
-
-	session, err := uc.SessionService.Create(ctx, userID, hashedToken, ipAddress, userAgent, uc.GlobalConfig.Session.ExpiresIn)
-	if err != nil {
-		return nil, err
-	}
-
-	// Delete the pending verification
-	_ = uc.VerificationService.Delete(ctx, verificationID)
 
 	result := &types.VerifyResult{
 		User:                  user,
@@ -131,50 +119,11 @@ func (uc *verifyTOTPUseCase) Verify(ctx context.Context, pendingToken, code stri
 		result.TrustedDeviceToken = deviceToken
 
 		// Publish device trusted event
-		uc.publishEvent(constants.EventTwoFactorDeviceTrusted, userID)
+		publishEvent(uc.EventBus, uc.Logger, constants.EventTwoFactorDeviceTrusted, userID)
 	}
 
 	// Publish verified event
-	uc.publishEvent(constants.EventTwoFactorVerified, userID)
+	publishEvent(uc.EventBus, uc.Logger, constants.EventTwoFactorVerified, userID)
 
 	return result, nil
-}
-
-// resolvePendingToken hashes the raw token, looks up the verification record,
-// checks expiry, and returns the userID and verification ID.
-func (uc *verifyTOTPUseCase) resolvePendingToken(ctx context.Context, rawToken string) (userID, verificationID string, err error) {
-	hashedToken := uc.TokenService.Hash(rawToken)
-	verification, err := uc.VerificationService.GetByToken(ctx, hashedToken)
-	if err != nil {
-		return "", "", errors.New(err.Error())
-	}
-	if verification == nil || verification.UserID == nil {
-		return "", "", constants.ErrInvalidPendingToken
-	}
-	if verification.Type != models.TypeTwoFactorPendingAuth {
-		return "", "", constants.ErrInvalidVerificationType
-	}
-	if verification.ExpiresAt.Before(time.Now().UTC()) {
-		return "", "", constants.ErrPendingTokenExpired
-	}
-	return *verification.UserID, verification.ID, nil
-}
-
-func (uc *verifyTOTPUseCase) publishEvent(eventType, userID string) {
-	payload, err := json.Marshal(map[string]string{"userID": userID})
-	if err != nil {
-		uc.Logger.Error(err.Error())
-		return
-	}
-	util.PublishEventAsync(
-		uc.EventBus,
-		uc.Logger,
-		models.Event{
-			ID:        util.GenerateUUID(),
-			Type:      eventType,
-			Payload:   payload,
-			Metadata:  nil,
-			Timestamp: time.Now().UTC(),
-		},
-	)
 }
