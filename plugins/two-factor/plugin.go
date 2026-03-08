@@ -131,5 +131,5 @@ func (p *TwoFactorPlugin) Migrations(provider string) []migrations.Migration {
 }
 
 func (p *TwoFactorPlugin) DependsOn() []string {
-	return []string{"email_password"}
+	return nil
 }

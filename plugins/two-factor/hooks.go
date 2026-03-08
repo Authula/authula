@@ -2,6 +2,7 @@ package twofactor
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
@@ -25,10 +26,15 @@ func (p *TwoFactorPlugin) signInSuccessMatcher(reqCtx *models.RequestContext) bo
 }
 
 func (p *TwoFactorPlugin) interceptSignInHook(reqCtx *models.RequestContext) error {
-	userID, ok := reqCtx.Values[models.ContextUserID.String()].(string)
-	if !ok || userID == "" {
+	// Skip two-factor verify routes to avoid intercepting our own auth success
+	if strings.Contains(reqCtx.Request.URL.Path, "/two-factor/verify") {
 		return nil
 	}
+
+	if reqCtx.UserID == nil || *reqCtx.UserID == "" {
+		return nil
+	}
+	userID := *reqCtx.UserID
 
 	// Check if user has 2FA enabled via the two_factor table
 	enabled, err := p.twoFactorRepo.IsEnabled(reqCtx.Request.Context(), userID)

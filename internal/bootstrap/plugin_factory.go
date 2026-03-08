@@ -26,6 +26,8 @@ import (
 	ratelimitplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/rate-limit"
 	secondarystorageplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/secondary-storage"
 	sessionplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/session"
+	twofactorplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor"
+	twofactorplugintypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/types"
 )
 
 // PluginFactory defines a factory function for creating a plugin instance from typed config data.
@@ -132,6 +134,22 @@ var pluginFactories = []PluginFactory{
 		},
 		Constructor: func(typedConfig any) models.Plugin {
 			return emailpasswordplugin.New(typedConfig.(emailpasswordplugintypes.EmailPasswordPluginConfig))
+		},
+	},
+	{
+		ID:                models.PluginTwoFactor.String(),
+		RequiredByDefault: false,
+		ConfigParser: func(rawConfig any) (any, error) {
+			config := twofactorplugintypes.TwoFactorPluginConfig{}
+			if rawConfig != nil {
+				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
+					return nil, fmt.Errorf("failed to parse two_factor plugin config: %w", err)
+				}
+			}
+			return config, nil
+		},
+		Constructor: func(typedConfig any) models.Plugin {
+			return twofactorplugin.New(typedConfig.(twofactorplugintypes.TwoFactorPluginConfig))
 		},
 	},
 	{
