@@ -66,9 +66,9 @@ func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-		actorUserID := impersonationActorUserID(reqCtx)
+		impersonatorUserID := getUserID(reqCtx)
 
-		if actorUserID == nil {
+		if impersonatorUserID == nil {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
 			reqCtx.Handled = true
 			return
@@ -81,7 +81,8 @@ func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		result, err := h.useCase.StartImpersonation(r.Context(), *actorUserID, impersonationActorSessionID(reqCtx), payload)
+		userAgent := r.UserAgent()
+		result, err := h.useCase.StartImpersonation(r.Context(), *impersonatorUserID, getSessionID(reqCtx), &reqCtx.ClientIP, &userAgent, payload)
 		if err != nil {
 			respondImpersonationError(reqCtx, err)
 			return
@@ -94,11 +95,9 @@ func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 		}
 
 		reqCtx.SetUserIDInContext(result.Impersonation.TargetUserID)
-
 		if result.SessionID != nil && *result.SessionID != "" {
 			reqCtx.Values[models.ContextSessionID.String()] = *result.SessionID
 		}
-
 		if result.SessionToken != nil && *result.SessionToken != "" {
 			reqCtx.Values[models.ContextSessionToken.String()] = *result.SessionToken
 			reqCtx.Values[models.ContextAuthSuccess.String()] = true
@@ -122,36 +121,35 @@ func (h *StopImpersonationHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-		actorUserID := impersonationActorUserID(reqCtx)
+		impersonatedUserID := getUserID(reqCtx)
+		impersonatedSessionID := getSessionID(reqCtx)
 
-		if actorUserID == nil {
+		if impersonatedUserID == nil || impersonatedSessionID == nil {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
 			reqCtx.Handled = true
 			return
 		}
 
 		impersonationID := r.PathValue("impersonation_id")
-		if err := h.useCase.StopImpersonation(r.Context(), *actorUserID, types.StopImpersonationRequest{ImpersonationID: &impersonationID}); err != nil {
+		if err := h.useCase.StopImpersonation(r.Context(), *impersonatedUserID, *impersonatedSessionID, types.StopImpersonationRequest{ImpersonationID: &impersonationID}); err != nil {
 			respondImpersonationError(reqCtx, err)
 			return
 		}
+
+		reqCtx.Values[models.ContextAuthSignOut.String()] = true
 
 		reqCtx.SetJSONResponse(http.StatusOK, &types.StopImpersonationResponse{Message: "Impersonation stopped"})
 	}
 }
 
-func impersonationActorUserID(reqCtx *models.RequestContext) *string {
-	if reqCtx == nil || reqCtx.UserID == nil || *reqCtx.UserID == "" {
+func getUserID(reqCtx *models.RequestContext) *string {
+	if reqCtx.UserID == nil || *reqCtx.UserID == "" {
 		return nil
 	}
 	return reqCtx.UserID
 }
 
-func impersonationActorSessionID(reqCtx *models.RequestContext) *string {
-	if reqCtx == nil {
-		return nil
-	}
-
+func getSessionID(reqCtx *models.RequestContext) *string {
 	value, ok := reqCtx.Values[models.ContextSessionID.String()]
 	if !ok || value == nil {
 		return nil
@@ -166,10 +164,6 @@ func impersonationActorSessionID(reqCtx *models.RequestContext) *string {
 }
 
 func respondImpersonationError(reqCtx *models.RequestContext, err error) {
-	if reqCtx == nil {
-		return
-	}
-
 	reqCtx.SetJSONResponse(mapImpersonationErrorStatus(err), map[string]any{"message": mapAdminHttpErrorMessage(err)})
 	reqCtx.Handled = true
 }

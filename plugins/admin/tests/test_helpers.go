@@ -185,12 +185,14 @@ func (m *MockImpersonationRepository) GetImpersonationByID(ctx context.Context, 
 }
 
 func NewImpersonationUseCaseFixture(t *testing.T) (usecases.ImpersonationUseCase, *MockImpersonationRepository, *MockSessionStateRepository, *internaltests.MockSessionService, *internaltests.MockTokenService) {
+	userStateRepo := &MockUserStateRepository{}
 	impRepo := &MockImpersonationRepository{}
 	sessionStateRepo := &MockSessionStateRepository{}
 	sessionSvc := &internaltests.MockSessionService{}
 	tokenSvc := &internaltests.MockTokenService{}
+	stateService := adminservices.NewStateService(userStateRepo, sessionStateRepo, impRepo)
 	service := adminservices.NewImpersonationService(impRepo, sessionStateRepo, sessionSvc, tokenSvc, 15*time.Minute, 15*time.Minute)
-	return usecases.NewImpersonationUseCase(service), impRepo, sessionStateRepo, sessionSvc, tokenSvc
+	return usecases.NewImpersonationUseCase(stateService, service), impRepo, sessionStateRepo, sessionSvc, tokenSvc
 }
 
 func NewStateUseCaseFixture() (usecases.StateUseCase, *MockUserStateRepository, *MockSessionStateRepository, *MockImpersonationRepository) {

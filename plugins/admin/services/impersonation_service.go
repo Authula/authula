@@ -18,7 +18,7 @@ type ImpersonationService struct {
 	sessionService    rootservices.SessionService
 	tokenService      rootservices.TokenService
 	sessionExpiresIn  time.Duration
-	maxExpires        time.Duration
+	maxExpiresIn      time.Duration
 }
 
 func NewImpersonationService(
@@ -27,13 +27,13 @@ func NewImpersonationService(
 	sessionService rootservices.SessionService,
 	tokenService rootservices.TokenService,
 	sessionExpiresIn time.Duration,
-	maxExpires time.Duration,
+	maxExpiresIn time.Duration,
 ) *ImpersonationService {
-	if maxExpires <= 0 {
-		maxExpires = 15 * time.Minute
+	if maxExpiresIn <= 0 {
+		maxExpiresIn = 15 * time.Minute
 	}
 	if sessionExpiresIn <= 0 {
-		sessionExpiresIn = maxExpires
+		sessionExpiresIn = maxExpiresIn
 	}
 
 	return &ImpersonationService{
@@ -42,11 +42,39 @@ func NewImpersonationService(
 		sessionService:    sessionService,
 		tokenService:      tokenService,
 		sessionExpiresIn:  sessionExpiresIn,
-		maxExpires:        maxExpires,
+		maxExpiresIn:      maxExpiresIn,
 	}
 }
 
-func (s *ImpersonationService) StartImpersonation(ctx context.Context, actorUserID string, actorSessionID *string, req types.StartImpersonationRequest) (*types.StartImpersonationResult, error) {
+func (s *ImpersonationService) GetAllImpersonations(ctx context.Context) ([]types.Impersonation, error) {
+	return s.impersonationRepo.GetAllImpersonations(ctx)
+}
+
+func (s *ImpersonationService) GetImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error) {
+	impersonationID = strings.TrimSpace(impersonationID)
+	if impersonationID == "" {
+		return nil, adminconstants.ErrBadRequest
+	}
+
+	row, err := s.impersonationRepo.GetImpersonationByID(ctx, impersonationID)
+	if err != nil {
+		return nil, err
+	}
+	if row == nil {
+		return nil, adminconstants.ErrNotFound
+	}
+
+	return row, nil
+}
+
+func (s *ImpersonationService) StartImpersonation(
+	ctx context.Context,
+	actorUserID string,
+	actorSessionID *string,
+	ipAddress *string,
+	userAgent *string,
+	req types.StartImpersonationRequest,
+) (*types.StartImpersonationResult, error) {
 	actorUserID = strings.TrimSpace(actorUserID)
 	targetUserID := strings.TrimSpace(req.TargetUserID)
 	reason := strings.TrimSpace(req.Reason)
@@ -81,14 +109,14 @@ func (s *ImpersonationService) StartImpersonation(ctx context.Context, actorUser
 	}
 
 	now := time.Now().UTC()
-	expiresAt := now.Add(s.maxExpires)
-	maxDuration := s.maxExpires
+	expiresAt := now.Add(s.maxExpiresIn)
+	maxDuration := s.maxExpiresIn
 	if req.ExpiresInSeconds != nil {
 		if *req.ExpiresInSeconds <= 0 {
 			return nil, adminconstants.ErrBadRequest
 		}
 		requestedDuration := time.Duration(*req.ExpiresInSeconds) * time.Second
-		if requestedDuration > s.maxExpires {
+		if requestedDuration > s.maxExpiresIn {
 			return nil, adminconstants.ErrBadRequest
 		}
 		maxDuration = requestedDuration
@@ -109,8 +137,8 @@ func (s *ImpersonationService) StartImpersonation(ctx context.Context, actorUser
 			ctx,
 			targetUserID,
 			hashedToken,
-			nil,
-			nil,
+			ipAddress,
+			userAgent,
 			maxDuration,
 		)
 		if err != nil {
@@ -210,25 +238,4 @@ func (s *ImpersonationService) StopImpersonation(ctx context.Context, actorUserI
 
 	endedBy := actorUserID
 	return s.impersonationRepo.EndImpersonation(ctx, target.ID, &endedBy)
-}
-
-func (s *ImpersonationService) GetAllImpersonations(ctx context.Context) ([]types.Impersonation, error) {
-	return s.impersonationRepo.GetAllImpersonations(ctx)
-}
-
-func (s *ImpersonationService) GetImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error) {
-	impersonationID = strings.TrimSpace(impersonationID)
-	if impersonationID == "" {
-		return nil, adminconstants.ErrBadRequest
-	}
-
-	row, err := s.impersonationRepo.GetImpersonationByID(ctx, impersonationID)
-	if err != nil {
-		return nil, err
-	}
-	if row == nil {
-		return nil, adminconstants.ErrNotFound
-	}
-
-	return row, nil
 }

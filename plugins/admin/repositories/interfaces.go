@@ -28,6 +28,6 @@ type ImpersonationRepository interface {
 	GetImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error)
 	GetActiveImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error)
 	GetLatestActiveImpersonationByActor(ctx context.Context, actorUserID string) (*types.Impersonation, error)
-	UserExists(ctx context.Context, userID string) (bool, error)
 	EndImpersonation(ctx context.Context, impersonationID string, endedByUserID *string) error
+	UserExists(ctx context.Context, userID string) (bool, error)
 }

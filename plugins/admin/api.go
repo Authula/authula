@@ -96,12 +96,12 @@ func (a *API) GetImpersonationByID(ctx context.Context, impersonationID string) 
 	return a.useCases.GetImpersonationByID(ctx, impersonationID)
 }
 
-func (a *API) StartImpersonation(ctx context.Context, actorUserID string, actorSessionID *string, req types.StartImpersonationRequest) (*types.StartImpersonationResult, error) {
-	return a.useCases.StartImpersonation(ctx, actorUserID, actorSessionID, req)
+func (a *API) StartImpersonation(ctx context.Context, actorUserID string, actorSessionID *string, ipAddress *string, userAgent *string, req types.StartImpersonationRequest) (*types.StartImpersonationResult, error) {
+	return a.useCases.StartImpersonation(ctx, actorUserID, actorSessionID, ipAddress, userAgent, req)
 }
 
-func (a *API) StopImpersonation(ctx context.Context, actorUserID string, req types.StopImpersonationRequest) error {
-	return a.useCases.StopImpersonation(ctx, actorUserID, req)
+func (a *API) StopImpersonation(ctx context.Context, impersonatedUserID string, impersonatedSessionID string, req types.StopImpersonationRequest) error {
+	return a.useCases.StopImpersonation(ctx, impersonatedUserID, impersonatedSessionID, req)
 }
 
 // User state

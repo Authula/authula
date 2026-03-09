@@ -62,6 +62,6 @@ func Routes(api *API) []models.Route {
 		{Method: http.MethodGet, Path: "/admin/impersonations", Handler: adminhandlers.NewGetAllImpersonationsHandler(usecases.impersonation).Handler()},
 		{Method: http.MethodGet, Path: "/admin/impersonations/{impersonation_id}", Handler: adminhandlers.NewGetImpersonationByIDHandler(usecases.impersonation).Handler()},
 		{Method: http.MethodPost, Path: "/admin/impersonations", Handler: adminhandlers.NewStartImpersonationHandler(usecases.impersonation).Handler()},
-		{Method: http.MethodPost, Path: "/admin/impersonations/{impersonation_id}/end", Handler: adminhandlers.NewStopImpersonationHandler(usecases.impersonation).Handler()},
+		{Method: http.MethodPost, Path: "/admin/impersonations/{impersonation_id}/stop", Handler: adminhandlers.NewStopImpersonationHandler(usecases.impersonation).Handler()},
 	}
 }

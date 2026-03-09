@@ -46,8 +46,8 @@ func NewAdminUseCases(
 	return &AdminUseCases{
 		users:         NewUsersUseCase(usersService),
 		accounts:      NewAccountsUseCase(accountsService),
-		impersonation: NewImpersonationUseCase(impersonationService),
 		state:         NewStateUseCase(stateService),
+		impersonation: NewImpersonationUseCase(stateService, impersonationService),
 	}
 }
 
@@ -115,12 +115,12 @@ func (u *AdminUseCases) GetImpersonationByID(ctx context.Context, impersonationI
 	return u.impersonation.GetImpersonationByID(ctx, impersonationID)
 }
 
-func (u *AdminUseCases) StartImpersonation(ctx context.Context, actorUserID string, actorSessionID *string, req types.StartImpersonationRequest) (*types.StartImpersonationResult, error) {
-	return u.impersonation.StartImpersonation(ctx, actorUserID, actorSessionID, req)
+func (u *AdminUseCases) StartImpersonation(ctx context.Context, actorUserID string, actorSessionID *string, ipAddress *string, userAgent *string, req types.StartImpersonationRequest) (*types.StartImpersonationResult, error) {
+	return u.impersonation.StartImpersonation(ctx, actorUserID, actorSessionID, ipAddress, userAgent, req)
 }
 
-func (u *AdminUseCases) StopImpersonation(ctx context.Context, actorUserID string, request types.StopImpersonationRequest) error {
-	return u.impersonation.StopImpersonation(ctx, actorUserID, request)
+func (u *AdminUseCases) StopImpersonation(ctx context.Context, impersonatedUserID string, impersonatedSessionID string, request types.StopImpersonationRequest) error {
+	return u.impersonation.StopImpersonation(ctx, impersonatedUserID, impersonatedSessionID, request)
 }
 
 func (u *AdminUseCases) GetUserState(ctx context.Context, userID string) (*types.AdminUserState, error) {
