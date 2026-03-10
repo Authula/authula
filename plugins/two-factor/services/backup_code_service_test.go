@@ -4,12 +4,13 @@ import (
 	"strings"
 	"testing"
 
+	coreservices "github.com/GoBetterAuth/go-better-auth/v2/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func newTestBackupCodeService(count int) *BackupCodeService {
-	return NewBackupCodeService(count, NewArgon2HashService())
+	return NewBackupCodeService(count, coreservices.NewArgon2PasswordService())
 }
 
 func TestGenerateBackupCodes(t *testing.T) {

@@ -18,6 +18,10 @@ func NewTwoFactorRepository(db bun.IDB) *TwoFactorRepository {
 	return &TwoFactorRepository{db: db}
 }
 
+func (r *TwoFactorRepository) WithTx(tx bun.IDB) *TwoFactorRepository {
+	return &TwoFactorRepository{db: tx}
+}
+
 // --- TwoFactorRecord operations ---
 
 func (r *TwoFactorRepository) GetByUserID(ctx context.Context, userID string) (*TwoFactorRecord, error) {

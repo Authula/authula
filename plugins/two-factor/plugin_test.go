@@ -80,11 +80,11 @@ func (m *mockVerifyTOTPUseCase) Verify(ctx context.Context, pendingToken, code s
 func buildTestPlugin(t *testing.T) (*TwoFactorPlugin, *tests.MockUserService, *tests.MockTokenService, *tests.MockVerificationService) {
 	t.Helper()
 
-	userSvc := tests.NewMockUserService(t)
-	accountSvc := tests.NewMockAccountService(t)
-	sessionSvc := tests.NewMockSessionService(t)
-	verifSvc := tests.NewMockVerificationService(t)
-	tokenSvc := tests.NewMockTokenService(t)
+	userSvc := &tests.MockUserService{}
+	accountSvc := &tests.MockAccountService{}
+	sessionSvc := &tests.MockSessionService{}
+	verifSvc := &tests.MockVerificationService{}
+	tokenSvc := &tests.MockTokenService{}
 	passwordSvc := &mockPasswordService{
 		VerifyFn: func(_, _ string) bool { return true },
 		HashFn:   func(p string) (string, error) { return "hashed-" + p, nil },

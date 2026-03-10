@@ -9,13 +9,24 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/two-factor/types"
 )
 
+type TwoFactorHookID string
+
+const (
+	HookIDTwoFactorIntercept TwoFactorHookID = "two_factor.intercept"
+)
+
+func (id TwoFactorHookID) String() string {
+	return string(id)
+}
+
 func (p *TwoFactorPlugin) buildHooks() []models.Hook {
 	return []models.Hook{
 		{
-			Stage:   models.HookAfter,
-			Matcher: p.signInSuccessMatcher,
-			Handler: p.interceptSignInHook,
-			Order:   1, // Must run before session (5) and JWT (10) hooks to intercept auth
+			Stage:    models.HookAfter,
+			PluginID: HookIDTwoFactorIntercept.String(),
+			Matcher:  p.signInSuccessMatcher,
+			Handler:  p.interceptSignInHook,
+			Order:    1, // Must run before session (5) and JWT (10) hooks to intercept auth
 		},
 	}
 }
