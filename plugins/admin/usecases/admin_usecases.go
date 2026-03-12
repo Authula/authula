@@ -131,6 +131,14 @@ func (u *AdminUseCases) UpsertUserState(ctx context.Context, userID string, requ
 	return u.state.UpsertUserState(ctx, userID, request, actorUserID)
 }
 
+func (u *AdminUseCases) CreateUserState(ctx context.Context, userID string, request types.CreateUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
+	return u.state.CreateUserState(ctx, userID, request, actorUserID)
+}
+
+func (u *AdminUseCases) UpdateUserState(ctx context.Context, userID string, request types.UpsertUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
+	return u.state.UpdateUserState(ctx, userID, request, actorUserID)
+}
+
 func (u *AdminUseCases) DeleteUserState(ctx context.Context, userID string) error {
 	return u.state.DeleteUserState(ctx, userID)
 }
@@ -153,6 +161,14 @@ func (u *AdminUseCases) GetSessionState(ctx context.Context, sessionID string) (
 
 func (u *AdminUseCases) UpsertSessionState(ctx context.Context, sessionID string, request types.UpsertSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
 	return u.state.UpsertSessionState(ctx, sessionID, request, actorUserID)
+}
+
+func (u *AdminUseCases) CreateSessionState(ctx context.Context, sessionID string, request types.CreateSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
+	return u.state.CreateSessionState(ctx, sessionID, request, actorUserID)
+}
+
+func (u *AdminUseCases) UpdateSessionState(ctx context.Context, sessionID string, request types.UpsertSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
+	return u.state.UpdateSessionState(ctx, sessionID, request, actorUserID)
 }
 
 func (u *AdminUseCases) DeleteSessionState(ctx context.Context, sessionID string) error {

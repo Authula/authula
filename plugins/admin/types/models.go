@@ -147,6 +147,12 @@ type UpsertUserStateResponse struct {
 	State *AdminUserState `json:"state"`
 }
 
+type CreateUserStateRequest struct {
+	Banned       bool       `json:"banned"`
+	BannedUntil  *time.Time `json:"banned_until,omitempty"`
+	BannedReason *string    `json:"banned_reason,omitempty"`
+}
+
 type UpsertUserStateRequest struct {
 	Banned       bool       `json:"banned"`
 	BannedUntil  *time.Time `json:"banned_until,omitempty"`
@@ -172,6 +178,14 @@ type UnbanUserResponse struct {
 
 type GetSessionStateResponse struct {
 	State *AdminSessionState `json:"state"`
+}
+
+type CreateSessionStateRequest struct {
+	Revoke                 bool       `json:"revoke"`
+	RevokedReason          *string    `json:"revoked_reason,omitempty"`
+	ImpersonatorUserID     *string    `json:"impersonator_user_id,omitempty"`
+	ImpersonationReason    *string    `json:"impersonation_reason,omitempty"`
+	ImpersonationExpiresAt *time.Time `json:"impersonation_expires_at,omitempty"`
 }
 
 type UpsertSessionStateRequest struct {

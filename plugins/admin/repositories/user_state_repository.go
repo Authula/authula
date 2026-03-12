@@ -49,6 +49,32 @@ func (r *BunUserStateRepository) Upsert(ctx context.Context, state *types.AdminU
 	return nil
 }
 
+func (r *BunUserStateRepository) Create(ctx context.Context, state *types.AdminUserState) error {
+	_, err := r.db.NewInsert().Model(state).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create user state: %w", err)
+	}
+	return nil
+}
+
+func (r *BunUserStateRepository) Update(ctx context.Context, state *types.AdminUserState) error {
+	now := time.Now().UTC()
+	_, err := r.db.NewUpdate().
+		Model(state).
+		Set("banned = ?", state.Banned).
+		Set("banned_at = ?", state.BannedAt).
+		Set("banned_until = ?", state.BannedUntil).
+		Set("banned_reason = ?", state.BannedReason).
+		Set("banned_by_user_id = ?", state.BannedByUserID).
+		Set("updated_at = ?", now).
+		Where("user_id = ?", state.UserID).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update user state: %w", err)
+	}
+	return nil
+}
+
 func (r *BunUserStateRepository) Delete(ctx context.Context, userID string) error {
 	_, err := r.db.NewDelete().Model((*types.AdminUserState)(nil)).Where("user_id = ?", userID).Exec(ctx)
 	if err != nil {

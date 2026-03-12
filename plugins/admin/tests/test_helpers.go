@@ -77,6 +77,16 @@ func (m *MockUserStateRepository) Upsert(ctx context.Context, state *types.Admin
 	return args.Error(0)
 }
 
+func (m *MockUserStateRepository) Create(ctx context.Context, state *types.AdminUserState) error {
+	args := m.Called(ctx, state)
+	return args.Error(0)
+}
+
+func (m *MockUserStateRepository) Update(ctx context.Context, state *types.AdminUserState) error {
+	args := m.Called(ctx, state)
+	return args.Error(0)
+}
+
 func (m *MockUserStateRepository) Delete(ctx context.Context, userID string) error {
 	args := m.Called(ctx, userID)
 	return args.Error(0)
@@ -103,6 +113,16 @@ func (m *MockSessionStateRepository) GetBySessionID(ctx context.Context, session
 }
 
 func (m *MockSessionStateRepository) Upsert(ctx context.Context, state *types.AdminSessionState) error {
+	args := m.Called(ctx, state)
+	return args.Error(0)
+}
+
+func (m *MockSessionStateRepository) Create(ctx context.Context, state *types.AdminSessionState) error {
+	args := m.Called(ctx, state)
+	return args.Error(0)
+}
+
+func (m *MockSessionStateRepository) Update(ctx context.Context, state *types.AdminSessionState) error {
 	args := m.Called(ctx, state)
 	return args.Error(0)
 }

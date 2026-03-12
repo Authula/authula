@@ -35,6 +35,24 @@ func (u StateUseCase) UpsertUserState(ctx context.Context, userID string, reques
 	return u.service.UpsertUserState(ctx, userID, request, actorUserID)
 }
 
+func (u StateUseCase) CreateUserState(ctx context.Context, userID string, request types.CreateUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, constants.ErrBadRequest
+	}
+
+	return u.service.CreateUserState(ctx, userID, request, actorUserID)
+}
+
+func (u StateUseCase) UpdateUserState(ctx context.Context, userID string, request types.UpsertUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, constants.ErrBadRequest
+	}
+
+	return u.service.UpdateUserState(ctx, userID, request, actorUserID)
+}
+
 func (u StateUseCase) DeleteUserState(ctx context.Context, userID string) error {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
@@ -64,6 +82,24 @@ func (u StateUseCase) UpsertSessionState(ctx context.Context, sessionID string, 
 	}
 
 	return u.service.UpsertSessionState(ctx, sessionID, request, actorUserID)
+}
+
+func (u StateUseCase) CreateSessionState(ctx context.Context, sessionID string, request types.CreateSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, constants.ErrBadRequest
+	}
+
+	return u.service.CreateSessionState(ctx, sessionID, request, actorUserID)
+}
+
+func (u StateUseCase) UpdateSessionState(ctx context.Context, sessionID string, request types.UpsertSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, constants.ErrBadRequest
+	}
+
+	return u.service.UpdateSessionState(ctx, sessionID, request, actorUserID)
 }
 
 func (u StateUseCase) DeleteSessionState(ctx context.Context, sessionID string) error {

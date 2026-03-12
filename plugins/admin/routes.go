@@ -44,7 +44,8 @@ func Routes(api *API) []models.Route {
 
 		// User state
 		{Method: http.MethodGet, Path: "/admin/users/{user_id}/state", Handler: adminhandlers.NewGetUserStateHandler(usecases.state).Handler()},
-		{Method: http.MethodPost, Path: "/admin/users/{user_id}/state", Handler: adminhandlers.NewUpsertUserStateHandler(usecases.state).Handler()},
+		{Method: http.MethodPost, Path: "/admin/users/{user_id}/state", Handler: adminhandlers.NewCreateUserStateHandler(usecases.state).Handler()},
+		{Method: http.MethodPatch, Path: "/admin/users/{user_id}/state", Handler: adminhandlers.NewUpdateUserStateHandler(usecases.state).Handler()},
 		{Method: http.MethodDelete, Path: "/admin/users/{user_id}/state", Handler: adminhandlers.NewDeleteUserStateHandler(usecases.state).Handler()},
 		{Method: http.MethodGet, Path: "/admin/users/states/banned", Handler: adminhandlers.NewGetBannedUserStatesHandler(usecases.state).Handler()},
 		{Method: http.MethodPost, Path: "/admin/users/{user_id}/ban", Handler: adminhandlers.NewBanUserHandler(usecases.state).Handler()},
@@ -53,7 +54,8 @@ func Routes(api *API) []models.Route {
 
 		// Session state
 		{Method: http.MethodGet, Path: "/admin/sessions/{session_id}/state", Handler: adminhandlers.NewGetSessionStateHandler(usecases.state).Handler()},
-		{Method: http.MethodPost, Path: "/admin/sessions/{session_id}/state", Handler: adminhandlers.NewUpsertSessionStateHandler(usecases.state).Handler()},
+		{Method: http.MethodPost, Path: "/admin/sessions/{session_id}/state", Handler: adminhandlers.NewCreateSessionStateHandler(usecases.state).Handler()},
+		{Method: http.MethodPatch, Path: "/admin/sessions/{session_id}/state", Handler: adminhandlers.NewUpdateSessionStateHandler(usecases.state).Handler()},
 		{Method: http.MethodDelete, Path: "/admin/sessions/{session_id}/state", Handler: adminhandlers.NewDeleteSessionStateHandler(usecases.state).Handler()},
 		{Method: http.MethodGet, Path: "/admin/sessions/states/revoked", Handler: adminhandlers.NewGetRevokedSessionStatesHandler(usecases.state).Handler()},
 		{Method: http.MethodPost, Path: "/admin/sessions/{session_id}/revoke", Handler: adminhandlers.NewRevokeSessionHandler(usecases.state).Handler()},

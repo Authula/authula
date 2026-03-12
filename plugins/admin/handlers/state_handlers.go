@@ -37,6 +37,66 @@ func (h *GetUserStateHandler) Handler() http.HandlerFunc {
 	}
 }
 
+type CreateUserStateHandler struct {
+	useCase usecases.StateUseCase
+}
+
+func NewCreateUserStateHandler(useCase usecases.StateUseCase) *CreateUserStateHandler {
+	return &CreateUserStateHandler{useCase: useCase}
+}
+
+func (h *CreateUserStateHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		reqCtx, _ := models.GetRequestContext(r.Context())
+		userID := r.PathValue("user_id")
+
+		var payload types.CreateUserStateRequest
+		if err := util.ParseJSON(r, &payload); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.Handled = true
+			return
+		}
+
+		state, err := h.useCase.CreateUserState(r.Context(), userID, payload, stateActorUserID(reqCtx))
+		if err != nil {
+			respondStateError(reqCtx, err)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusCreated, &types.UpsertUserStateResponse{State: state})
+	}
+}
+
+type UpdateUserStateHandler struct {
+	useCase usecases.StateUseCase
+}
+
+func NewUpdateUserStateHandler(useCase usecases.StateUseCase) *UpdateUserStateHandler {
+	return &UpdateUserStateHandler{useCase: useCase}
+}
+
+func (h *UpdateUserStateHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		reqCtx, _ := models.GetRequestContext(r.Context())
+		userID := r.PathValue("user_id")
+
+		var payload types.UpsertUserStateRequest
+		if err := util.ParseJSON(r, &payload); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.Handled = true
+			return
+		}
+
+		state, err := h.useCase.UpdateUserState(r.Context(), userID, payload, stateActorUserID(reqCtx))
+		if err != nil {
+			respondStateError(reqCtx, err)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusOK, &types.UpsertUserStateResponse{State: state})
+	}
+}
+
 type UpsertUserStateHandler struct {
 	useCase usecases.StateUseCase
 }
@@ -189,6 +249,66 @@ func (h *GetSessionStateHandler) Handler() http.HandlerFunc {
 		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, &types.GetSessionStateResponse{State: state})
+	}
+}
+
+type CreateSessionStateHandler struct {
+	useCase usecases.StateUseCase
+}
+
+func NewCreateSessionStateHandler(useCase usecases.StateUseCase) *CreateSessionStateHandler {
+	return &CreateSessionStateHandler{useCase: useCase}
+}
+
+func (h *CreateSessionStateHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		reqCtx, _ := models.GetRequestContext(r.Context())
+		sessionID := r.PathValue("session_id")
+
+		var payload types.CreateSessionStateRequest
+		if err := util.ParseJSON(r, &payload); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.Handled = true
+			return
+		}
+
+		state, err := h.useCase.CreateSessionState(r.Context(), sessionID, payload, stateActorUserID(reqCtx))
+		if err != nil {
+			respondStateError(reqCtx, err)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusCreated, &types.UpsertSessionStateResponse{State: state})
+	}
+}
+
+type UpdateSessionStateHandler struct {
+	useCase usecases.StateUseCase
+}
+
+func NewUpdateSessionStateHandler(useCase usecases.StateUseCase) *UpdateSessionStateHandler {
+	return &UpdateSessionStateHandler{useCase: useCase}
+}
+
+func (h *UpdateSessionStateHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		reqCtx, _ := models.GetRequestContext(r.Context())
+		sessionID := r.PathValue("session_id")
+
+		var payload types.UpsertSessionStateRequest
+		if err := util.ParseJSON(r, &payload); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.Handled = true
+			return
+		}
+
+		state, err := h.useCase.UpdateSessionState(r.Context(), sessionID, payload, stateActorUserID(reqCtx))
+		if err != nil {
+			respondStateError(reqCtx, err)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusOK, &types.UpsertSessionStateResponse{State: state})
 	}
 }
 

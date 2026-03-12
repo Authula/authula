@@ -107,6 +107,40 @@ func (r *BunSessionStateRepository) Upsert(ctx context.Context, state *types.Adm
 	return nil
 }
 
+func (r *BunSessionStateRepository) Create(ctx context.Context, state *types.AdminSessionState) error {
+	now := time.Now().UTC()
+	state.UpdatedAt = now
+
+	_, err := r.db.NewInsert().Model(state).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create session state: %w", err)
+	}
+
+	return nil
+}
+
+func (r *BunSessionStateRepository) Update(ctx context.Context, state *types.AdminSessionState) error {
+	now := time.Now().UTC()
+	state.UpdatedAt = now
+
+	_, err := r.db.NewUpdate().
+		Model(state).
+		Set("revoked_at = ?", state.RevokedAt).
+		Set("revoked_reason = ?", state.RevokedReason).
+		Set("revoked_by_user_id = ?", state.RevokedByUserID).
+		Set("impersonator_user_id = ?", state.ImpersonatorUserID).
+		Set("impersonation_reason = ?", state.ImpersonationReason).
+		Set("impersonation_expires_at = ?", state.ImpersonationExpiresAt).
+		Set("updated_at = ?", now).
+		Where("session_id = ?", state.SessionID).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update session state: %w", err)
+	}
+
+	return nil
+}
+
 func (r *BunSessionStateRepository) Delete(ctx context.Context, sessionID string) error {
 	_, err := r.db.NewDelete().Model((*types.AdminSessionState)(nil)).Where("session_id = ?", sessionID).Exec(ctx)
 

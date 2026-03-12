@@ -8,6 +8,8 @@ import (
 
 type UserStateRepository interface {
 	GetByUserID(ctx context.Context, userID string) (*types.AdminUserState, error)
+	Create(ctx context.Context, state *types.AdminUserState) error
+	Update(ctx context.Context, state *types.AdminUserState) error
 	Upsert(ctx context.Context, state *types.AdminUserState) error
 	Delete(ctx context.Context, userID string) error
 	GetBanned(ctx context.Context) ([]types.AdminUserState, error)
@@ -15,6 +17,8 @@ type UserStateRepository interface {
 
 type SessionStateRepository interface {
 	GetBySessionID(ctx context.Context, sessionID string) (*types.AdminSessionState, error)
+	Create(ctx context.Context, state *types.AdminSessionState) error
+	Update(ctx context.Context, state *types.AdminSessionState) error
 	Upsert(ctx context.Context, state *types.AdminSessionState) error
 	Delete(ctx context.Context, sessionID string) error
 	GetRevoked(ctx context.Context) ([]types.AdminSessionState, error)
