@@ -24,6 +24,7 @@ const (
 	PluginBearer           PluginID = "bearer"
 	PluginRateLimit        PluginID = "ratelimit"
 	PluginMagicLink        PluginID = "magic_link"
+	PluginAccessControl    PluginID = "access_control"
 )
 
 func (id PluginID) String() string {

@@ -273,7 +273,8 @@ func TestRouteMetadataFromConfigMergesWithRouteMetadata(t *testing.T) {
 
 	router.SetRouteMetadataFromConfig(map[string]map[string]any{
 		"GET:/resource/action": {
-			"plugins": []string{"plugin.primary"},
+			"plugins":     []string{"plugin.primary"},
+			"permissions": []string{"permission.read"},
 		},
 	})
 
@@ -281,7 +282,8 @@ func TestRouteMetadataFromConfigMergesWithRouteMetadata(t *testing.T) {
 		Method: http.MethodGet,
 		Path:   "/resource/action",
 		Metadata: map[string]any{
-			"plugins": []string{"plugin.primary", "plugin.secondary"},
+			"plugins":     []string{"plugin.primary", "plugin.secondary"},
+			"permissions": []string{"permission.read"},
 		},
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -308,6 +310,11 @@ func TestRouteMetadataFromConfigMergesWithRouteMetadata(t *testing.T) {
 	plugins, ok := capturedCtx.Route.Metadata["plugins"].([]string)
 	if !ok || len(plugins) != 2 || plugins[0] != "plugin.primary" || plugins[1] != "plugin.secondary" {
 		t.Fatalf("expected merged plugins metadata, got %v", capturedCtx.Route.Metadata["plugins"])
+	}
+
+	permissions, ok := capturedCtx.Route.Metadata["permissions"].([]string)
+	if !ok || len(permissions) != 1 || permissions[0] != "permission.read" {
+		t.Fatalf("expected merged permissions metadata, got %v", capturedCtx.Route.Metadata["permissions"])
 	}
 }
 

@@ -1,6 +1,7 @@
 package util
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -87,6 +88,39 @@ func IsPluginEnabled(config *models.Config, pluginID string) bool {
 	return true
 }
 
+func getEnabledFromConfig(config any) (bool, bool) {
+	if config == nil {
+		return false, false
+	}
+
+	if configMap, ok := config.(map[string]any); ok {
+		if enabled, found := configMap["enabled"]; found {
+			if value, ok := enabled.(bool); ok {
+				return value, true
+			}
+		}
+		return false, false
+	}
+
+	data, err := json.Marshal(config)
+	if err != nil {
+		return false, false
+	}
+
+	var parsedConfig map[string]any
+	if err := json.Unmarshal(data, &parsedConfig); err != nil {
+		return false, false
+	}
+
+	if enabled, found := parsedConfig["enabled"]; found {
+		if value, ok := enabled.(bool); ok {
+			return value, true
+		}
+	}
+
+	return false, false
+}
+
 // ConvertRouteMetadata converts a list of RouteMapping configs into the internal
 // route metadata map used by the router for plugin routing.
 // Returns a map keyed by "METHOD:path" containing metadata with "plugins" field.
@@ -108,6 +142,7 @@ func ConvertRouteMetadata(routes []models.RouteMapping) (map[string]map[string]a
 		key := route.Method + ":" + route.Path
 		metadata := make(map[string]any)
 		metadata["plugins"] = route.Plugins
+		metadata["permissions"] = route.Permissions
 		result[key] = metadata
 	}
 

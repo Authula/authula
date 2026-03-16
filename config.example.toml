@@ -147,6 +147,11 @@ buffer_size = 100
 [plugins.config_manager]
 enabled = false
 
+# --- Access Control Plugin (role based access control) ---
+
+[plugins.access_control]
+enabled = false
+
 # --- Admin Plugin (user, state, and impersonation operations) ---
 
 [plugins.admin]
@@ -365,3 +370,10 @@ enabled = true
 # path = "/sign-out"
 # method = "POST"
 # plugins = ["session.auth", "csrf.protect"]
+
+# Access control (opt-in per route)
+# [[route_mappings]]
+# path = "/admin/users"
+# method = "GET"
+# plugins = ["access_control.enforce"]
+# permissions = ["users.read"]
