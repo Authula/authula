@@ -5,6 +5,8 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	accesscontrolplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/access-control"
+	accesscontrolplugintypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/access-control/types"
 	adminplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/admin"
 	adminplugintypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/admin/types"
 	bearerplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/bearer"
@@ -226,6 +228,22 @@ var pluginFactories = []PluginFactory{
 		},
 		Constructor: func(typedConfig any) models.Plugin {
 			return magiclinkplugin.New(typedConfig.(magiclinkplugintypes.MagicLinkPluginConfig))
+		},
+	},
+	{
+		ID:                models.PluginAccessControl.String(),
+		RequiredByDefault: false,
+		ConfigParser: func(rawConfig any) (any, error) {
+			config := accesscontrolplugintypes.AccessControlPluginConfig{}
+			if rawConfig != nil {
+				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
+					return nil, fmt.Errorf("failed to parse access control plugin config: %w", err)
+				}
+			}
+			return config, nil
+		},
+		Constructor: func(typedConfig any) models.Plugin {
+			return accesscontrolplugin.New(typedConfig.(accesscontrolplugintypes.AccessControlPluginConfig))
 		},
 	},
 }

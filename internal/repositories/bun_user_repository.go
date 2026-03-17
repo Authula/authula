@@ -8,7 +8,6 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
@@ -118,7 +117,9 @@ func (r *BunUserRepository) UpdateFields(ctx context.Context, id string, fields 
 		Model(&models.User{}).
 		Where("id = ?", id)
 
-	q = util.ApplyFieldUpdates(q, fields)
+	for field, value := range fields {
+		q = q.Set(field+" = ?", value)
+	}
 
 	_, err := q.Exec(ctx)
 	return err

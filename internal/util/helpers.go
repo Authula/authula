@@ -126,3 +126,43 @@ func FormatDuration(d time.Duration) string {
 	}
 	return fmt.Sprintf("%d %s", totalMinutes, unit)
 }
+
+func ReadStringSliceMetadata(reqCtx *models.RequestContext, key string) []string {
+	if reqCtx == nil || reqCtx.Route == nil || reqCtx.Route.Metadata == nil {
+		return nil
+	}
+
+	raw, ok := reqCtx.Route.Metadata[key]
+	if !ok || raw == nil {
+		return nil
+	}
+
+	if values, ok := raw.([]string); ok {
+		result := make([]string, 0, len(values))
+		for _, value := range values {
+			trimmed := strings.TrimSpace(value)
+			if trimmed != "" {
+				result = append(result, trimmed)
+			}
+		}
+		return result
+	}
+
+	if valuesAny, ok := raw.([]any); ok {
+		result := make([]string, 0, len(valuesAny))
+		for _, value := range valuesAny {
+			str, ok := value.(string)
+			if !ok {
+				continue
+			}
+
+			trimmed := strings.TrimSpace(str)
+			if trimmed != "" {
+				result = append(result, trimmed)
+			}
+		}
+		return result
+	}
+
+	return nil
+}

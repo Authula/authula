@@ -142,14 +142,13 @@ type PluginsConfig map[string]any
 //	path = "/auth/me"
 //	method = "GET"
 //	plugins = ["session.auth", "bearer.auth"]
+//
+// permissions = ["users.read"]
 type RouteMapping struct {
-	// Path is the route path (e.g., "/auth/me", "/auth/sign-in")
-	Path string `json:"path" toml:"path"`
-	// Method is the HTTP method (e.g., "GET", "POST", "PUT", "DELETE")
-	Method string `json:"method" toml:"method"`
-	// Plugins is the list of plugin IDs that should execute for this route.
-	// Plugin IDs follow the format "{plugin_name}.{capability}" (e.g., "session.auth", "csrf.protect")
-	Plugins []string `json:"plugins" toml:"plugins"`
+	Path        string   `json:"path" toml:"path"`
+	Method      string   `json:"method" toml:"method"`
+	Plugins     []string `json:"plugins" toml:"plugins"`
+	Permissions []string `json:"permissions" toml:"permissions"`
 }
 
 type CoreDatabaseHooksConfig struct {

@@ -273,7 +273,8 @@ func TestRouteMetadataFromConfigMergesWithRouteMetadata(t *testing.T) {
 
 	router.SetRouteMetadataFromConfig(map[string]map[string]any{
 		"GET:/resource/action": {
-			"plugins": []string{"plugin.primary"},
+			"plugins":     []string{"plugin.primary"},
+			"permissions": []string{"permission.read"},
 		},
 	})
 
@@ -281,7 +282,8 @@ func TestRouteMetadataFromConfigMergesWithRouteMetadata(t *testing.T) {
 		Method: http.MethodGet,
 		Path:   "/resource/action",
 		Metadata: map[string]any{
-			"plugins": []string{"plugin.primary", "plugin.secondary"},
+			"plugins":     []string{"plugin.primary", "plugin.secondary"},
+			"permissions": []string{"permission.read"},
 		},
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -308,6 +310,11 @@ func TestRouteMetadataFromConfigMergesWithRouteMetadata(t *testing.T) {
 	plugins, ok := capturedCtx.Route.Metadata["plugins"].([]string)
 	if !ok || len(plugins) != 2 || plugins[0] != "plugin.primary" || plugins[1] != "plugin.secondary" {
 		t.Fatalf("expected merged plugins metadata, got %v", capturedCtx.Route.Metadata["plugins"])
+	}
+
+	permissions, ok := capturedCtx.Route.Metadata["permissions"].([]string)
+	if !ok || len(permissions) != 1 || permissions[0] != "permission.read" {
+		t.Fatalf("expected merged permissions metadata, got %v", capturedCtx.Route.Metadata["permissions"])
 	}
 }
 
@@ -688,6 +695,60 @@ func TestDoubleBasePathApplication(t *testing.T) {
 		if seg != expectedSegments[i] {
 			t.Errorf("segment %d: expected %q, got %q", i, expectedSegments[i], seg)
 		}
+	}
+}
+
+func TestRouteMappingsApplyToCustomRoute(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
+	logger := &testLogger{}
+	router := NewRouter(config, logger, nil)
+
+	router.SetRouteMetadataFromConfig(map[string]map[string]any{
+		"GET:/api/auth/health": {
+			"plugins":     []string{"plugin.auth"},
+			"permissions": []string{"users.read"},
+		},
+	})
+
+	pluginHookCalled := false
+	router.RegisterHook(models.Hook{
+		Stage:    models.HookBefore,
+		PluginID: "plugin.auth",
+		Handler: func(ctx *models.RequestContext) error {
+			pluginHookCalled = true
+
+			permissions, ok := ctx.Route.Metadata["permissions"].([]string)
+			if !ok {
+				t.Fatalf("expected permissions metadata to be present")
+			}
+			if len(permissions) != 1 || permissions[0] != "users.read" {
+				t.Fatalf("unexpected permissions: %v", permissions)
+			}
+
+			return nil
+		},
+	})
+
+	router.RegisterCustomRoute(models.Route{
+		Method: http.MethodGet,
+		Path:   "/health",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	if !pluginHookCalled {
+		t.Fatalf("expected plugin hook to execute for custom route via route mapping metadata")
 	}
 }
 
