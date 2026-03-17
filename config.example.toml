@@ -144,19 +144,19 @@ buffer_size = 100
 
 # --- Config Manager Plugin (allows runtime configuration changes via the Admin API) ---
 
-[plugins.config_manager]
-enabled = false
+# [plugins.config_manager]
+# enabled = true
 
 # --- Access Control Plugin (role based access control) ---
 
-[plugins.access_control]
-enabled = false
+# [plugins.access_control]
+# enabled = true
 
 # --- Admin Plugin (user, state, and impersonation operations) ---
 
-[plugins.admin]
-enabled = false
-impersonation_max_expires_in = "15m"
+# [plugins.admin]
+# enabled = true
+# impersonation_max_expires_in = "15m"
 
 # --- Secondary Storage Plugin (provides secondary storage backends for other plugins) ---
 
@@ -348,7 +348,7 @@ enabled = true
 # period_seconds = 30
 # skip_verification_on_enable = false
 # backup_code_count = 10
-# trusted_device_duration = "30d"
+# trusted_device_duration = "720h"
 # pending_token_expiry = "10m"
 # secure_cookie = false
 # same_site = "lax"  # Options: "lax", "strict", "none"
