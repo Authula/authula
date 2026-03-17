@@ -184,6 +184,9 @@ func (r *BunRolePermissionRepository) GetRolePermissions(ctx context.Context, ro
 		TableExpr("access_control_role_permissions arp").
 		ColumnExpr("ap.id AS permission_id").
 		ColumnExpr("ap.key AS permission_key").
+		ColumnExpr("ap.description AS permission_description").
+		ColumnExpr("arp.granted_by_user_id AS granted_by_user_id").
+		ColumnExpr("arp.granted_at AS granted_at").
 		Join("JOIN access_control_permissions ap ON ap.id = arp.permission_id").
 		Where("arp.role_id = ?", roleID).
 		OrderExpr("ap.key ASC").

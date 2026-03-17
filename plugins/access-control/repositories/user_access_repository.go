@@ -22,16 +22,17 @@ func NewBunUserAccessRepository(db bun.IDB) *BunUserAccessRepository {
 
 func (r *BunUserAccessRepository) GetUserRoles(ctx context.Context, userID string) ([]types.UserRoleInfo, error) {
 	var rows []types.UserRoleInfo
-	now := time.Now().UTC()
 	err := r.db.NewSelect().
 		TableExpr("access_control_user_roles acur").
 		ColumnExpr("acur.role_id AS role_id").
 		ColumnExpr("acr.name AS role_name").
+		ColumnExpr("acr.description AS role_description").
+		ColumnExpr("acur.assigned_by_user_id AS assigned_by_user_id").
+		ColumnExpr("acur.assigned_at AS assigned_at").
 		ColumnExpr("acur.expires_at AS expires_at").
 		Join("JOIN access_control_roles acr ON acr.id = acur.role_id").
 		Where("acur.user_id = ?", userID).
-		Where("acur.expires_at IS NULL OR acur.expires_at > ?", now).
-		OrderExpr("acr.name ASC").
+		OrderExpr("acr.name ASC, acur.assigned_at DESC").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user roles: %w", err)
@@ -42,18 +43,37 @@ func (r *BunUserAccessRepository) GetUserRoles(ctx context.Context, userID strin
 	return rows, nil
 }
 
+type userEffectivePermissionRow struct {
+	PermissionID          string     `bun:"permission_id"`
+	PermissionKey         string     `bun:"permission_key"`
+	PermissionDescription *string    `bun:"permission_description"`
+	SourceRoleID          string     `bun:"source_role_id"`
+	SourceRoleName        string     `bun:"source_role_name"`
+	GrantedByUserID       *string    `bun:"granted_by_user_id"`
+	GrantedAt             *time.Time `bun:"granted_at"`
+}
+
 func (r *BunUserAccessRepository) GetUserEffectivePermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
-	var rows []types.UserPermissionInfo
+	var rows []userEffectivePermissionRow
 	now := time.Now().UTC()
 	err := r.db.NewSelect().
 		TableExpr("access_control_user_roles pur").
-		ColumnExpr("DISTINCT pp.id AS permission_id").
+		ColumnExpr("pp.id AS permission_id").
 		ColumnExpr("pp.key AS permission_key").
+		ColumnExpr("pp.description AS permission_description").
+		ColumnExpr("pr.id AS source_role_id").
+		ColumnExpr("pr.name AS source_role_name").
+		ColumnExpr("prp.granted_by_user_id AS granted_by_user_id").
+		ColumnExpr("prp.granted_at AS granted_at").
 		Join("JOIN access_control_role_permissions prp ON prp.role_id = pur.role_id").
 		Join("JOIN access_control_permissions pp ON pp.id = prp.permission_id").
+		Join("JOIN access_control_roles pr ON pr.id = pur.role_id").
 		Where("pur.user_id = ?", userID).
 		Where("pur.expires_at IS NULL OR pur.expires_at > ?", now).
 		OrderExpr("pp.key ASC").
+		OrderExpr("pr.name ASC").
+		OrderExpr("CASE WHEN prp.granted_at IS NULL THEN 1 ELSE 0 END ASC").
+		OrderExpr("prp.granted_at DESC").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user effective permissions: %w", err)
@@ -61,7 +81,32 @@ func (r *BunUserAccessRepository) GetUserEffectivePermissions(ctx context.Contex
 	if rows == nil {
 		return []types.UserPermissionInfo{}, nil
 	}
-	return rows, nil
+
+	permissions := make([]types.UserPermissionInfo, 0)
+	permissionIndex := make(map[string]int)
+
+	for _, row := range rows {
+		idx, exists := permissionIndex[row.PermissionID]
+		if !exists {
+			permissions = append(permissions, types.UserPermissionInfo{
+				PermissionID:          row.PermissionID,
+				PermissionKey:         row.PermissionKey,
+				PermissionDescription: row.PermissionDescription,
+			})
+			idx = len(permissions) - 1
+			permissionIndex[row.PermissionID] = idx
+		}
+
+		source := types.PermissionGrantSource{
+			RoleID:          row.SourceRoleID,
+			RoleName:        row.SourceRoleName,
+			GrantedByUserID: row.GrantedByUserID,
+			GrantedAt:       row.GrantedAt,
+		}
+		permissions[idx].Sources = append(permissions[idx].Sources, source)
+	}
+
+	return permissions, nil
 }
 
 type userWithRoleRow struct {

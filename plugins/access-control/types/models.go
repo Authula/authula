@@ -144,14 +144,28 @@ type GetUserEffectivePermissionsResponse struct {
 }
 
 type UserRoleInfo struct {
-	RoleID    string     `json:"role_id"`
-	RoleName  string     `json:"role_name"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	RoleID           string     `json:"role_id"`
+	RoleName         string     `json:"role_name"`
+	RoleDescription  *string    `json:"role_description,omitempty"`
+	AssignedByUserID *string    `json:"assigned_by_user_id,omitempty"`
+	AssignedAt       *time.Time `json:"assigned_at,omitempty"`
+	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
+}
+
+type PermissionGrantSource struct {
+	RoleID          string     `json:"role_id"`
+	RoleName        string     `json:"role_name"`
+	GrantedByUserID *string    `json:"granted_by_user_id,omitempty"`
+	GrantedAt       *time.Time `json:"granted_at,omitempty"`
 }
 
 type UserPermissionInfo struct {
-	PermissionID  string `json:"permission_id"`
-	PermissionKey string `json:"permission_key"`
+	PermissionID          string                  `json:"permission_id"`
+	PermissionKey         string                  `json:"permission_key"`
+	PermissionDescription *string                 `json:"permission_description,omitempty"`
+	GrantedByUserID       *string                 `json:"granted_by_user_id,omitempty"`
+	GrantedAt             *time.Time              `json:"granted_at,omitempty"`
+	Sources               []PermissionGrantSource `json:"sources,omitempty"`
 }
 
 type UserWithRoles struct {
