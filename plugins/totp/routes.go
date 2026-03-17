@@ -11,7 +11,8 @@ func Routes(p *TOTPPlugin) []models.Route {
 	uc := p.Api.useCases
 
 	enableHandler := &handlers.EnableHandler{
-		UseCase: uc.Enable,
+		UseCase:      uc.Enable,
+		PluginConfig: p.pluginConfig,
 	}
 	disableHandler := &handlers.DisableHandler{
 		UseCase: uc.Disable,

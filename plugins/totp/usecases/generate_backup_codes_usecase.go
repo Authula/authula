@@ -5,25 +5,24 @@ import (
 	"encoding/json"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/constants"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/repository"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/services"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
-type generateBackupCodesUseCase struct {
+type GenerateBackupCodesUseCase struct {
 	AccountService    rootservices.AccountService
 	PasswordService   rootservices.PasswordService
 	BackupCodeService *services.BackupCodeService
-	TOTPRepo          *repository.TOTPRepository
+	TOTPRepo          TOTPRepository
 }
 
 func NewGenerateBackupCodesUseCase(
 	accountService rootservices.AccountService,
 	passwordService rootservices.PasswordService,
 	backupCodeService *services.BackupCodeService,
-	totpRepo *repository.TOTPRepository,
-) GenerateBackupCodesUseCase {
-	return &generateBackupCodesUseCase{
+	totpRepo TOTPRepository,
+) *GenerateBackupCodesUseCase {
+	return &GenerateBackupCodesUseCase{
 		AccountService:    accountService,
 		PasswordService:   passwordService,
 		BackupCodeService: backupCodeService,
@@ -31,7 +30,7 @@ func NewGenerateBackupCodesUseCase(
 	}
 }
 
-func (uc *generateBackupCodesUseCase) Generate(ctx context.Context, userID, password string) ([]string, error) {
+func (uc *GenerateBackupCodesUseCase) Generate(ctx context.Context, userID string, password string) ([]string, error) {
 	if err := verifyPassword(ctx, uc.AccountService, uc.PasswordService, userID, password); err != nil {
 		return nil, err
 	}

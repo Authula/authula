@@ -5,12 +5,14 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/constants"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/types"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/usecases"
 )
 
 type EnableHandler struct {
-	UseCase usecases.EnableUseCase
+	UseCase      *usecases.EnableUseCase
+	PluginConfig *types.TOTPPluginConfig
 }
 
 func (h *EnableHandler) Handler() http.HandlerFunc {
@@ -42,6 +44,18 @@ func (h *EnableHandler) Handler() http.HandlerFunc {
 			})
 			reqCtx.Handled = true
 			return
+		}
+
+		if result.PendingToken != "" {
+			http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
+				Name:     constants.CookieTOTPPending,
+				Value:    result.PendingToken,
+				Path:     "/",
+				MaxAge:   int(h.PluginConfig.PendingTokenExpiry.Seconds()),
+				HttpOnly: true,
+				Secure:   h.PluginConfig.SecureCookie,
+				SameSite: types.ParseSameSite(h.PluginConfig.SameSite),
+			})
 		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, &types.EnableResponse{

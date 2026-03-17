@@ -6,7 +6,17 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/migrations"
+	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
+
+// MigrationSet returns the TOTP plugin migrations as a migration set
+// compatible with the shared migrator.
+func MigrationSet(provider string) migrations.MigrationSet {
+	return migrations.MigrationSet{
+		PluginID:   models.PluginTOTP.String(),
+		Migrations: totpMigrationsForProvider(provider),
+	}
+}
 
 func totpMigrationsForProvider(provider string) []migrations.Migration {
 	return migrations.ForProvider(provider, migrations.ProviderVariants{

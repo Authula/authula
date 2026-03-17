@@ -5,14 +5,13 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/constants"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/repository"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
-type disableUseCase struct {
+type DisableUseCase struct {
 	AccountService  rootservices.AccountService
 	PasswordService rootservices.PasswordService
-	TOTPRepo        *repository.TOTPRepository
+	TOTPRepo        TOTPRepository
 	EventBus        models.EventBus
 	Logger          models.Logger
 }
@@ -20,11 +19,11 @@ type disableUseCase struct {
 func NewDisableUseCase(
 	accountService rootservices.AccountService,
 	passwordService rootservices.PasswordService,
-	totpRepo *repository.TOTPRepository,
+	totpRepo TOTPRepository,
 	eventBus models.EventBus,
 	logger models.Logger,
-) DisableUseCase {
-	return &disableUseCase{
+) *DisableUseCase {
+	return &DisableUseCase{
 		AccountService:  accountService,
 		PasswordService: passwordService,
 		TOTPRepo:        totpRepo,
@@ -33,7 +32,7 @@ func NewDisableUseCase(
 	}
 }
 
-func (uc *disableUseCase) Disable(ctx context.Context, userID, password string) error {
+func (uc *DisableUseCase) Disable(ctx context.Context, userID, password string) error {
 	if err := verifyPassword(ctx, uc.AccountService, uc.PasswordService, userID, password); err != nil {
 		return err
 	}

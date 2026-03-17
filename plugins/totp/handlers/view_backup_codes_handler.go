@@ -10,7 +10,7 @@ import (
 )
 
 type ViewBackupCodesHandler struct {
-	UseCase usecases.ViewBackupCodesUseCase
+	UseCase *usecases.ViewBackupCodesUseCase
 }
 
 func (h *ViewBackupCodesHandler) Handler() http.HandlerFunc {

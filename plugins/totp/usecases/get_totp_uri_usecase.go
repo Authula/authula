@@ -4,19 +4,18 @@ import (
 	"context"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/constants"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/repository"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/services"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/types"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
-type getTOTPURIUseCase struct {
+type GetTOTPURIUseCase struct {
 	UserService     rootservices.UserService
 	AccountService  rootservices.AccountService
 	PasswordService rootservices.PasswordService
 	TokenService    rootservices.TokenService
 	TOTPService     *services.TOTPService
-	TOTPRepo        *repository.TOTPRepository
+	TOTPRepo        TOTPReadRepository
 	Config          *types.TOTPPluginConfig
 }
 
@@ -26,10 +25,10 @@ func NewGetTOTPURIUseCase(
 	passwordService rootservices.PasswordService,
 	tokenService rootservices.TokenService,
 	totpService *services.TOTPService,
-	totpRepo *repository.TOTPRepository,
+	totpRepo TOTPReadRepository,
 	config *types.TOTPPluginConfig,
-) GetTOTPURIUseCase {
-	return &getTOTPURIUseCase{
+) *GetTOTPURIUseCase {
+	return &GetTOTPURIUseCase{
 		UserService:     userService,
 		AccountService:  accountService,
 		PasswordService: passwordService,
@@ -40,7 +39,7 @@ func NewGetTOTPURIUseCase(
 	}
 }
 
-func (uc *getTOTPURIUseCase) GetTOTPURI(ctx context.Context, userID, password string) (string, error) {
+func (uc *GetTOTPURIUseCase) GetTOTPURI(ctx context.Context, userID string, password string) (string, error) {
 	if err := verifyPassword(ctx, uc.AccountService, uc.PasswordService, userID, password); err != nil {
 		return "", err
 	}

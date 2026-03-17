@@ -370,6 +370,19 @@ enabled = true
 # [[route_mappings]]
 # path = "/sign-in"
 # method = "POST"
+# plugins = ["session.auth.optional", "totp.intercept"]
+
+# If using TOTP plugin, keep /totp/verify and /totp/verify-backup-code accessible
+# to the pending-token flow (do not require an existing session cookie).
+# [[route_mappings]]
+# path = "/totp/verify"
+# method = "POST"
+# plugins = ["session.auth.optional"]
+
+# [[route_mappings]]
+# path = "/totp/verify-backup-code"
+# method = "POST"
+# plugins = ["session.auth.optional"]
 
 # [[route_mappings]]
 # path = "/sign-up"

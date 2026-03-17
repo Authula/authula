@@ -12,7 +12,7 @@ import (
 )
 
 type VerifyBackupCodeHandler struct {
-	UseCase      usecases.VerifyBackupCodeUseCase
+	UseCase      *usecases.VerifyBackupCodeUseCase
 	PluginConfig *types.TOTPPluginConfig
 }
 

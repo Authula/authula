@@ -10,7 +10,7 @@ import (
 )
 
 type GetTOTPURIHandler struct {
-	UseCase usecases.GetTOTPURIUseCase
+	UseCase *usecases.GetTOTPURIUseCase
 }
 
 func (h *GetTOTPURIHandler) Handler() http.HandlerFunc {

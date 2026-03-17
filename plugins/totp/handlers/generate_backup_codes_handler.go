@@ -10,7 +10,7 @@ import (
 )
 
 type GenerateBackupCodesHandler struct {
-	UseCase usecases.GenerateBackupCodesUseCase
+	UseCase *usecases.GenerateBackupCodesUseCase
 }
 
 func (h *GenerateBackupCodesHandler) Handler() http.HandlerFunc {

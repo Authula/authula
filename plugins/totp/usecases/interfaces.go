@@ -2,44 +2,44 @@ package usecases
 
 import (
 	"context"
+	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/types"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/repository"
 )
 
 type UseCases struct {
-	Enable              EnableUseCase
-	Disable             DisableUseCase
-	GetTOTPURI          GetTOTPURIUseCase
-	VerifyTOTP          VerifyTOTPUseCase
-	GenerateBackupCodes GenerateBackupCodesUseCase
-	VerifyBackupCode    VerifyBackupCodeUseCase
-	ViewBackupCodes     ViewBackupCodesUseCase
+	Enable              *EnableUseCase
+	Disable             *DisableUseCase
+	GetTOTPURI          *GetTOTPURIUseCase
+	VerifyTOTP          *VerifyTOTPUseCase
+	GenerateBackupCodes *GenerateBackupCodesUseCase
+	VerifyBackupCode    *VerifyBackupCodeUseCase
+	ViewBackupCodes     *ViewBackupCodesUseCase
 }
 
-type EnableUseCase interface {
-	Enable(ctx context.Context, userID, password, issuer string) (*types.EnableResult, error)
+type TOTPReadRepository interface {
+	GetByUserID(ctx context.Context, userID string) (*repository.TOTPRecord, error)
 }
 
-type DisableUseCase interface {
-	Disable(ctx context.Context, userID, password string) error
+type TOTPWriteRepository interface {
+	DeleteByUserID(ctx context.Context, userID string) error
+	SetEnabled(ctx context.Context, userID string, enabled bool) error
+	UpdateBackupCodes(ctx context.Context, userID, backupCodes string) error
+	CompareAndSwapBackupCodes(ctx context.Context, userID, expectedBackupCodes, newBackupCodes string) (bool, error)
 }
 
-type GetTOTPURIUseCase interface {
-	GetTOTPURI(ctx context.Context, userID, password string) (string, error)
+type TOTPCreateRepository interface {
+	Create(ctx context.Context, userID, secret, backupCodes string) (*repository.TOTPRecord, error)
+	CreateTrustedDevice(ctx context.Context, userID, token, userAgent string, expiresAt time.Time) (*repository.TrustedDevice, error)
 }
 
-type VerifyTOTPUseCase interface {
-	Verify(ctx context.Context, pendingToken, code string, trustDevice bool, ipAddress, userAgent *string) (*types.VerifyResult, error)
+type TOTPTrustedDeviceRepository interface {
+	DeleteTrustedDevicesByUserID(ctx context.Context, userID string) error
 }
 
-type GenerateBackupCodesUseCase interface {
-	Generate(ctx context.Context, userID, password string) ([]string, error)
-}
-
-type VerifyBackupCodeUseCase interface {
-	Verify(ctx context.Context, pendingToken, code string, trustDevice bool, ipAddress, userAgent *string) (*types.VerifyResult, error)
-}
-
-type ViewBackupCodesUseCase interface {
-	View(ctx context.Context, userID, password string) (int, error)
+type TOTPRepository interface {
+	TOTPReadRepository
+	TOTPWriteRepository
+	TOTPCreateRepository
+	TOTPTrustedDeviceRepository
 }

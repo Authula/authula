@@ -6,52 +6,51 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/constants"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/repository"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/services"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/types"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
-type verifyTOTPUseCase struct {
+type VerifyTOTPUseCase struct {
+	GlobalConfig        *models.Config
+	Config              *types.TOTPPluginConfig
+	Logger              models.Logger
+	EventBus            models.EventBus
 	TokenService        rootservices.TokenService
 	SessionService      rootservices.SessionService
 	UserService         rootservices.UserService
 	VerificationService rootservices.VerificationService
 	TOTPService         *services.TOTPService
-	TOTPRepo            *repository.TOTPRepository
-	GlobalConfig        *models.Config
-	Config              *types.TOTPPluginConfig
-	EventBus            models.EventBus
-	Logger              models.Logger
+	TOTPRepo            TOTPRepository
 }
 
 func NewVerifyTOTPUseCase(
+	globalConfig *models.Config,
+	config *types.TOTPPluginConfig,
+	logger models.Logger,
+	eventBus models.EventBus,
 	tokenService rootservices.TokenService,
 	sessionService rootservices.SessionService,
 	userService rootservices.UserService,
 	verificationService rootservices.VerificationService,
 	totpService *services.TOTPService,
-	totpRepo *repository.TOTPRepository,
-	globalConfig *models.Config,
-	config *types.TOTPPluginConfig,
-	eventBus models.EventBus,
-	logger models.Logger,
-) VerifyTOTPUseCase {
-	return &verifyTOTPUseCase{
+	totpRepo TOTPRepository,
+) *VerifyTOTPUseCase {
+	return &VerifyTOTPUseCase{
+		GlobalConfig:        globalConfig,
+		Config:              config,
+		Logger:              logger,
+		EventBus:            eventBus,
 		TokenService:        tokenService,
 		SessionService:      sessionService,
 		UserService:         userService,
 		VerificationService: verificationService,
 		TOTPService:         totpService,
 		TOTPRepo:            totpRepo,
-		GlobalConfig:        globalConfig,
-		Config:              config,
-		EventBus:            eventBus,
-		Logger:              logger,
 	}
 }
 
-func (uc *verifyTOTPUseCase) Verify(ctx context.Context, pendingToken, code string, trustDevice bool, ipAddress, userAgent *string) (*types.VerifyResult, error) {
+func (uc *VerifyTOTPUseCase) Verify(ctx context.Context, pendingToken, code string, trustDevice bool, ipAddress, userAgent *string) (*types.VerifyResult, error) {
 	userID, verificationID, err := resolvePendingToken(ctx, uc.TokenService, uc.VerificationService, pendingToken)
 	if err != nil {
 		return nil, err

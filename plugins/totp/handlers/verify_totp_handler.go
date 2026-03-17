@@ -12,7 +12,7 @@ import (
 )
 
 type VerifyTOTPHandler struct {
-	UseCase      usecases.VerifyTOTPUseCase
+	UseCase      *usecases.VerifyTOTPUseCase
 	PluginConfig *types.TOTPPluginConfig
 }
 

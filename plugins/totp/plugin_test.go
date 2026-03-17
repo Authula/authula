@@ -1,20 +1,26 @@
 package totp
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/sqlitedialect"
+
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/tests"
+	"github.com/GoBetterAuth/go-better-auth/v2/migrations"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/constants"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/handlers"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/repository"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/types"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/usecases"
 )
 
 // ---------------------------------------------------------------------------
@@ -22,58 +28,73 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockServiceRegistry struct {
-	services map[string]any
+	mock.Mock
 }
 
 func newMockServiceRegistry() *mockServiceRegistry {
-	return &mockServiceRegistry{services: make(map[string]any)}
+	return &mockServiceRegistry{}
 }
 
 func (m *mockServiceRegistry) Register(name string, service any) {
-	m.services[name] = service
+	m.Called(name, service)
 }
 
 func (m *mockServiceRegistry) Get(name string) any {
-	return m.services[name]
+	args := m.Called(name)
+	return args.Get(0)
 }
 
 type mockPasswordService struct {
-	VerifyFn func(password, encoded string) bool
-	HashFn   func(password string) (string, error)
+	mock.Mock
 }
 
 func (m *mockPasswordService) Verify(password, encoded string) bool {
-	return m.VerifyFn(password, encoded)
+	args := m.Called(password, encoded)
+	return args.Bool(0)
 }
-func (m *mockPasswordService) Hash(password string) (string, error) { return m.HashFn(password) }
 
-type mockEventBus struct{}
-
-func (m *mockEventBus) Publish(_ context.Context, _ models.Event) error { return nil }
-func (m *mockEventBus) Close() error                                    { return nil }
-func (m *mockEventBus) Subscribe(_ string, _ models.EventHandler) (models.SubscriptionID, error) {
-	return 0, nil
+func (m *mockPasswordService) Hash(password string) (string, error) {
+	args := m.Called(password)
+	if args.Get(0) == nil {
+		return "", args.Error(1)
+	}
+	return args.String(0), args.Error(1)
 }
-func (m *mockEventBus) Unsubscribe(_ string, _ models.SubscriptionID) {}
+
+type mockEventBus struct {
+	mock.Mock
+}
+
+func (m *mockEventBus) Publish(ctx context.Context, event models.Event) error {
+	args := m.Called(ctx, event)
+	return args.Error(0)
+}
+
+func (m *mockEventBus) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *mockEventBus) Subscribe(topic string, handler models.EventHandler) (models.SubscriptionID, error) {
+	args := m.Called(topic, handler)
+	if args.Get(0) == nil {
+		return 0, args.Error(1)
+	}
+	return args.Get(0).(models.SubscriptionID), args.Error(1)
+}
+
+func (m *mockEventBus) Unsubscribe(topic string, subscriptionID models.SubscriptionID) {
+	m.Called(topic, subscriptionID)
+}
+
+type testLogger struct{}
+
+func (testLogger) Debug(msg string, args ...any) {}
+func (testLogger) Info(msg string, args ...any)  {}
+func (testLogger) Warn(msg string, args ...any)  {}
+func (testLogger) Error(msg string, args ...any) {}
 
 // mockEnableUseCase implements usecases.EnableUseCase for handler-level tests.
-type mockEnableUseCase struct {
-	EnableFn func(ctx context.Context, userID, password, issuer string) (*types.EnableResult, error)
-}
-
-func (m *mockEnableUseCase) Enable(ctx context.Context, userID, password, issuer string) (*types.EnableResult, error) {
-	return m.EnableFn(ctx, userID, password, issuer)
-}
-
-// mockVerifyTOTPUseCase implements usecases.VerifyTOTPUseCase for handler-level tests.
-type mockVerifyTOTPUseCase struct {
-	VerifyFn func(ctx context.Context, pendingToken, code string, trustDevice bool, ipAddress, userAgent *string) (*types.VerifyResult, error)
-}
-
-func (m *mockVerifyTOTPUseCase) Verify(ctx context.Context, pendingToken, code string, trustDevice bool, ipAddress, userAgent *string) (*types.VerifyResult, error) {
-	return m.VerifyFn(ctx, pendingToken, code, trustDevice, ipAddress, userAgent)
-}
-
 // ---------------------------------------------------------------------------
 // Helper: build a fully-initialized plugin with mock services
 // ---------------------------------------------------------------------------
@@ -86,25 +107,31 @@ func buildTestPlugin(t *testing.T) (*TOTPPlugin, *tests.MockUserService, *tests.
 	sessionSvc := &tests.MockSessionService{}
 	verifSvc := &tests.MockVerificationService{}
 	tokenSvc := &tests.MockTokenService{}
-	passwordSvc := &mockPasswordService{
-		VerifyFn: func(_, _ string) bool { return true },
-		HashFn:   func(p string) (string, error) { return "hashed-" + p, nil },
-	}
+	passwordSvc := &mockPasswordService{}
+	eventBus := &mockEventBus{}
 
 	reg := newMockServiceRegistry()
-	reg.Register(models.ServiceUser.String(), userSvc)
-	reg.Register(models.ServiceAccount.String(), accountSvc)
-	reg.Register(models.ServiceSession.String(), sessionSvc)
-	reg.Register(models.ServiceVerification.String(), verifSvc)
-	reg.Register(models.ServiceToken.String(), tokenSvc)
-	reg.Register(models.ServicePassword.String(), passwordSvc)
+	reg.On("Get", models.ServiceUser.String()).Return(userSvc)
+	reg.On("Get", models.ServiceAccount.String()).Return(accountSvc)
+	reg.On("Get", models.ServiceSession.String()).Return(sessionSvc)
+	reg.On("Get", models.ServiceVerification.String()).Return(verifSvc)
+	reg.On("Get", models.ServiceToken.String()).Return(tokenSvc)
+	reg.On("Get", models.ServicePassword.String()).Return(passwordSvc)
+
+	passwordSvc.On("Verify", mock.Anything, mock.Anything).Return(true).Maybe()
+	passwordSvc.On("Hash", mock.Anything).Return("hashed-password", nil).Maybe()
+
+	eventBus.On("Publish", mock.Anything, mock.Anything).Return(nil).Maybe()
+	eventBus.On("Close").Return(nil).Maybe()
+	eventBus.On("Subscribe", mock.Anything, mock.Anything).Return(models.SubscriptionID(0), nil).Maybe()
+	eventBus.On("Unsubscribe", mock.Anything, mock.Anything).Return().Maybe()
 
 	plugin := New(types.TOTPPluginConfig{})
 
 	pluginCtx := &models.PluginContext{
 		DB:              nil, // not used in hook/handler tests
 		Logger:          &tests.MockLogger{},
-		EventBus:        &mockEventBus{},
+		EventBus:        eventBus,
 		ServiceRegistry: reg,
 		GetConfig: func() *models.Config {
 			return &models.Config{
@@ -148,126 +175,140 @@ func TestPluginInit(t *testing.T) {
 // were removed because the hook now uses repo.IsEnabled() which requires a real
 // database connection. These scenarios should be covered by integration tests.
 
-func TestVerifyTOTPHandlerSuccess(t *testing.T) {
-	mockUC := &mockVerifyTOTPUseCase{
-		VerifyFn: func(_ context.Context, pendingToken, code string, trustDevice bool, ipAddr, ua *string) (*types.VerifyResult, error) {
-			return &types.VerifyResult{
-				User: &models.User{
-					ID:    "user-1",
-					Email: "test@example.com",
-				},
-				Session: &models.Session{
-					ID:        "session-1",
-					UserID:    "user-1",
-					ExpiresAt: time.Now().Add(24 * time.Hour),
-				},
-				SessionToken: "session-token-xyz",
-			}, nil
-		},
-	}
+func newHookTestDB(t *testing.T) *bun.DB {
+	t.Helper()
 
-	handler := &handlers.VerifyTOTPHandler{
-		UseCase:      mockUC,
-		PluginConfig: &types.TOTPPluginConfig{},
-	}
+	sqlDB, err := sql.Open("sqlite3", ":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 
-	body, _ := json.Marshal(types.VerifyTOTPRequest{
-		Code: "123456",
-	})
+	db := bun.NewDB(sqlDB, sqlitedialect.New())
+	t.Cleanup(func() { _ = db.Close() })
 
-	req := httptest.NewRequest("POST", "/totp/verify", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{
-		Name:  constants.CookieTOTPPending,
-		Value: "pending-token-abc",
-	})
+	ctx := context.Background()
+	migrator, err := migrations.NewMigrator(db, testLogger{})
+	require.NoError(t, err)
 
+	coreSet, err := migrations.CoreMigrationSet("sqlite")
+	require.NoError(t, err)
+	totpSet := MigrationSet("sqlite")
+
+	err = migrator.Migrate(ctx, []migrations.MigrationSet{coreSet, totpSet})
+	require.NoError(t, err)
+
+	return db
+}
+
+func TestInterceptHook_DoesNotBypassWithOtherUsersTrustedToken(t *testing.T) {
+	plugin, _, tokenSvc, verifSvc := buildTestPlugin(t)
+	db := newHookTestDB(t)
+	repo := repository.NewTOTPRepository(db)
+	plugin.totpRepo = repo
+
+	ctx := context.Background()
+	_, err := db.ExecContext(ctx, `INSERT INTO users (id, name, email) VALUES (?, ?, ?)`, "user-1", "User One", "user1@example.com")
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, `INSERT INTO users (id, name, email) VALUES (?, ?, ?)`, "user-2", "User Two", "user2@example.com")
+	require.NoError(t, err)
+
+	_, err = repo.Create(ctx, "user-1", "enc-secret", "[]")
+	require.NoError(t, err)
+	require.NoError(t, repo.SetEnabled(ctx, "user-1", true))
+
+	_, err = repo.CreateTrustedDevice(ctx, "user-2", "hash-trusted", "ua", time.Now().UTC().Add(24*time.Hour))
+	require.NoError(t, err)
+
+	tokenSvc.On("Hash", "trusted-cookie-token").Return("hash-trusted").Once()
+	tokenSvc.On("Generate").Return("raw-pending", nil).Once()
+	tokenSvc.On("Hash", "raw-pending").Return("hash-pending").Once()
+	verifSvc.On(
+		"Create",
+		mock.Anything,
+		"user-1",
+		"hash-pending",
+		models.TypeTOTPPendingAuth,
+		"user-1",
+		plugin.pluginConfig.PendingTokenExpiry,
+	).Return(&models.Verification{ID: "verif-1"}, nil).Once()
+
+	req := httptest.NewRequest(http.MethodPost, "/sign-in", nil)
+	req.AddCookie(&http.Cookie{Name: constants.CookieTOTPTrusted, Value: "trusted-cookie-token"})
 	w := httptest.NewRecorder()
 
+	userID := "user-1"
 	reqCtx := &models.RequestContext{
 		Request:        req,
 		ResponseWriter: w,
-		Values:         make(map[string]any),
+		Values: map[string]any{
+			models.ContextAuthSuccess.String(): true,
+		},
+		UserID: &userID,
 	}
 
-	ctx := models.SetRequestContext(context.Background(), reqCtx)
-	req = req.WithContext(ctx)
-	reqCtx.Request = req
+	err = plugin.interceptSignInHook(reqCtx)
+	require.NoError(t, err)
 
-	handler.Handler().ServeHTTP(w, req)
+	_, authSuccessExists := reqCtx.Values[models.ContextAuthSuccess.String()]
+	assert.False(t, authSuccessExists)
+	assert.Equal(t, http.StatusOK, reqCtx.ResponseStatus)
 
-	if reqCtx.ResponseStatus != http.StatusOK {
-		t.Errorf("expected status 200, got %d", reqCtx.ResponseStatus)
+	cookies := w.Result().Cookies()
+	var pendingCookie *http.Cookie
+	for _, c := range cookies {
+		if c.Name == constants.CookieTOTPPending {
+			pendingCookie = c
+			break
+		}
 	}
+	require.NotNil(t, pendingCookie)
+	assert.Equal(t, "raw-pending", pendingCookie.Value)
+
+	tokenSvc.AssertExpectations(t)
+	verifSvc.AssertExpectations(t)
+}
+
+func TestInterceptHook_BypassesWithMatchingTrustedDevice(t *testing.T) {
+	plugin, _, tokenSvc, verifSvc := buildTestPlugin(t)
+	db := newHookTestDB(t)
+	repo := repository.NewTOTPRepository(db)
+	plugin.totpRepo = repo
+
+	ctx := context.Background()
+	_, err := db.ExecContext(ctx, `INSERT INTO users (id, name, email) VALUES (?, ?, ?)`, "user-1", "User One", "user1@example.com")
+	require.NoError(t, err)
+
+	_, err = repo.Create(ctx, "user-1", "enc-secret", "[]")
+	require.NoError(t, err)
+	require.NoError(t, repo.SetEnabled(ctx, "user-1", true))
+
+	_, err = repo.CreateTrustedDevice(ctx, "user-1", "hash-trusted", "ua", time.Now().UTC().Add(24*time.Hour))
+	require.NoError(t, err)
+
+	tokenSvc.On("Hash", "trusted-cookie-token").Return("hash-trusted").Once()
+
+	req := httptest.NewRequest(http.MethodPost, "/sign-in", nil)
+	req.AddCookie(&http.Cookie{Name: constants.CookieTOTPTrusted, Value: "trusted-cookie-token"})
+	w := httptest.NewRecorder()
+
+	userID := "user-1"
+	reqCtx := &models.RequestContext{
+		Request:        req,
+		ResponseWriter: w,
+		Values: map[string]any{
+			models.ContextAuthSuccess.String(): true,
+		},
+		UserID: &userID,
+	}
+
+	err = plugin.interceptSignInHook(reqCtx)
+	require.NoError(t, err)
 
 	authSuccess, ok := reqCtx.Values[models.ContextAuthSuccess.String()].(bool)
-	if !ok || !authSuccess {
-		t.Error("expected ContextAuthSuccess=true in values")
-	}
+	assert.True(t, ok)
+	assert.True(t, authSuccess)
+	assert.False(t, reqCtx.ResponseReady)
+	assert.Empty(t, w.Result().Cookies())
 
-	sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string)
-	if !ok || sessionID == "" {
-		t.Error("expected ContextSessionID to be set")
-	}
-	if sessionID != "session-1" {
-		t.Errorf("expected session ID 'session-1', got '%s'", sessionID)
-	}
+	tokenSvc.AssertExpectations(t)
+	verifSvc.AssertExpectations(t)
 }
-
-func TestEnableHandlerSuccess(t *testing.T) {
-	userID := "user-1"
-
-	mockUC := &mockEnableUseCase{
-		EnableFn: func(_ context.Context, uid, password, issuer string) (*types.EnableResult, error) {
-			return &types.EnableResult{
-				TotpURI:     "otpauth://totp/MyApp:test@example.com?secret=ABCDEF&issuer=MyApp",
-				BackupCodes: []string{"code1", "code2", "code3"},
-			}, nil
-		},
-	}
-
-	handler := &handlers.EnableHandler{
-		UseCase: mockUC,
-	}
-
-	body, _ := json.Marshal(types.EnableRequest{
-		Password: "my-password",
-	})
-
-	req := httptest.NewRequest("POST", "/totp/enable", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	reqCtx := &models.RequestContext{
-		Request:        req,
-		ResponseWriter: w,
-		Values:         make(map[string]any),
-		UserID:         &userID,
-	}
-
-	ctx := models.SetRequestContext(context.Background(), reqCtx)
-	req = req.WithContext(ctx)
-	reqCtx.Request = req
-
-	handler.Handler().ServeHTTP(w, req)
-
-	if reqCtx.ResponseStatus != http.StatusOK {
-		t.Errorf("expected status 200, got %d", reqCtx.ResponseStatus)
-	}
-
-	var resp types.EnableResponse
-	if err := json.Unmarshal(reqCtx.ResponseBody, &resp); err != nil {
-		t.Fatalf("failed to parse response: %v", err)
-	}
-
-	if resp.TotpURI == "" {
-		t.Error("expected totpURI in response")
-	}
-	if len(resp.BackupCodes) != 3 {
-		t.Errorf("expected 3 backup codes, got %d", len(resp.BackupCodes))
-	}
-}
-
-// Ensure usecases package is used (prevents "imported and not used" error).
-var _ usecases.EnableUseCase = (*mockEnableUseCase)(nil)
-var _ usecases.VerifyTOTPUseCase = (*mockVerifyTOTPUseCase)(nil)

@@ -5,29 +5,28 @@ import (
 	"encoding/json"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/constants"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/repository"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
-type viewBackupCodesUseCase struct {
+type ViewBackupCodesUseCase struct {
 	AccountService  rootservices.AccountService
 	PasswordService rootservices.PasswordService
-	TOTPRepo        *repository.TOTPRepository
+	TOTPRepo        TOTPReadRepository
 }
 
 func NewViewBackupCodesUseCase(
 	accountService rootservices.AccountService,
 	passwordService rootservices.PasswordService,
-	totpRepo *repository.TOTPRepository,
-) ViewBackupCodesUseCase {
-	return &viewBackupCodesUseCase{
+	totpRepo TOTPReadRepository,
+) *ViewBackupCodesUseCase {
+	return &ViewBackupCodesUseCase{
 		AccountService:  accountService,
 		PasswordService: passwordService,
 		TOTPRepo:        totpRepo,
 	}
 }
 
-func (uc *viewBackupCodesUseCase) View(ctx context.Context, userID, password string) (int, error) {
+func (uc *ViewBackupCodesUseCase) View(ctx context.Context, userID, password string) (int, error) {
 	if err := verifyPassword(ctx, uc.AccountService, uc.PasswordService, userID, password); err != nil {
 		return 0, err
 	}

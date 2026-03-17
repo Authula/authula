@@ -50,12 +50,20 @@ func (p *TOTPPlugin) interceptSignInHook(reqCtx *models.RequestContext) error {
 
 	// Check if user has 2FA enabled via the totp table
 	enabled, err := p.totpRepo.IsEnabled(reqCtx.Request.Context(), userID)
-	if err != nil || !enabled {
+	if err != nil {
+		p.logger.Error("failed to check totp status", map[string]any{"error": err.Error(), "user_id": userID})
+		reqCtx.SetJSONResponse(http.StatusServiceUnavailable, map[string]any{
+			"message": "totp verification unavailable",
+		})
+		reqCtx.Handled = true
+		return nil
+	}
+	if !enabled {
 		return nil // No 2FA, pass through
 	}
 
 	// Check for trusted device cookie
-	if p.hasTrustedDevice(reqCtx) {
+	if p.hasTrustedDevice(reqCtx, userID) {
 		return nil // Trusted device, pass through
 	}
 
@@ -63,6 +71,10 @@ func (p *TOTPPlugin) interceptSignInHook(reqCtx *models.RequestContext) error {
 	token, err := p.tokenService.Generate()
 	if err != nil {
 		p.logger.Error("failed to generate pending token", map[string]any{"error": err.Error()})
+		reqCtx.SetJSONResponse(http.StatusServiceUnavailable, map[string]any{
+			"message": "totp verification unavailable",
+		})
+		reqCtx.Handled = true
 		return nil
 	}
 	hashedToken := p.tokenService.Hash(token)
@@ -77,6 +89,10 @@ func (p *TOTPPlugin) interceptSignInHook(reqCtx *models.RequestContext) error {
 	)
 	if err != nil {
 		p.logger.Error("failed to create pending verification", map[string]any{"error": err.Error()})
+		reqCtx.SetJSONResponse(http.StatusServiceUnavailable, map[string]any{
+			"message": "totp verification unavailable",
+		})
+		reqCtx.Handled = true
 		return nil
 	}
 
@@ -104,7 +120,7 @@ func (p *TOTPPlugin) interceptSignInHook(reqCtx *models.RequestContext) error {
 	return nil
 }
 
-func (p *TOTPPlugin) hasTrustedDevice(reqCtx *models.RequestContext) bool {
+func (p *TOTPPlugin) hasTrustedDevice(reqCtx *models.RequestContext, userID string) bool {
 	cookie, err := reqCtx.Request.Cookie(constants.CookieTOTPTrusted)
 	if err != nil || cookie.Value == "" {
 		return false
@@ -116,12 +132,14 @@ func (p *TOTPPlugin) hasTrustedDevice(reqCtx *models.RequestContext) bool {
 		return false
 	}
 
-	// Check expiry
+	if device.UserID != userID {
+		return false
+	}
+
 	if device.ExpiresAt.Before(time.Now().UTC()) {
 		return false
 	}
 
-	// Refresh expiry
 	newExpiry := time.Now().UTC().Add(p.pluginConfig.TrustedDeviceDuration)
 	_ = p.totpRepo.RefreshTrustedDevice(reqCtx.Request.Context(), hashedToken, newExpiry)
 

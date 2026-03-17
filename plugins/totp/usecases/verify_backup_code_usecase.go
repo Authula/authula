@@ -6,52 +6,51 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/constants"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/repository"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/services"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/types"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
-type verifyBackupCodeUseCase struct {
+type VerifyBackupCodeUseCase struct {
+	GlobalConfig        *models.Config
+	Config              *types.TOTPPluginConfig
+	Logger              models.Logger
+	EventBus            models.EventBus
 	TokenService        rootservices.TokenService
 	SessionService      rootservices.SessionService
 	UserService         rootservices.UserService
 	VerificationService rootservices.VerificationService
 	BackupCodeService   *services.BackupCodeService
-	TOTPRepo            *repository.TOTPRepository
-	GlobalConfig        *models.Config
-	Config              *types.TOTPPluginConfig
-	EventBus            models.EventBus
-	Logger              models.Logger
+	TOTPRepo            TOTPRepository
 }
 
 func NewVerifyBackupCodeUseCase(
+	globalConfig *models.Config,
+	config *types.TOTPPluginConfig,
+	logger models.Logger,
+	eventBus models.EventBus,
 	tokenService rootservices.TokenService,
 	sessionService rootservices.SessionService,
 	userService rootservices.UserService,
 	verificationService rootservices.VerificationService,
 	backupCodeService *services.BackupCodeService,
-	totpRepo *repository.TOTPRepository,
-	globalConfig *models.Config,
-	config *types.TOTPPluginConfig,
-	eventBus models.EventBus,
-	logger models.Logger,
-) VerifyBackupCodeUseCase {
-	return &verifyBackupCodeUseCase{
+	totpRepo TOTPRepository,
+) *VerifyBackupCodeUseCase {
+	return &VerifyBackupCodeUseCase{
+		GlobalConfig:        globalConfig,
+		Config:              config,
+		Logger:              logger,
+		EventBus:            eventBus,
 		TokenService:        tokenService,
 		SessionService:      sessionService,
 		UserService:         userService,
 		VerificationService: verificationService,
 		BackupCodeService:   backupCodeService,
 		TOTPRepo:            totpRepo,
-		GlobalConfig:        globalConfig,
-		Config:              config,
-		EventBus:            eventBus,
-		Logger:              logger,
 	}
 }
 
-func (uc *verifyBackupCodeUseCase) Verify(ctx context.Context, pendingToken, code string, trustDevice bool, ipAddress, userAgent *string) (*types.VerifyResult, error) {
+func (uc *VerifyBackupCodeUseCase) Verify(ctx context.Context, pendingToken, code string, trustDevice bool, ipAddress, userAgent *string) (*types.VerifyResult, error) {
 	userID, verificationID, err := resolvePendingToken(ctx, uc.TokenService, uc.VerificationService, pendingToken)
 	if err != nil {
 		return nil, err
@@ -79,8 +78,12 @@ func (uc *verifyBackupCodeUseCase) Verify(ctx context.Context, pendingToken, cod
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.TOTPRepo.UpdateBackupCodes(ctx, userID, string(remainingJSON)); err != nil {
+	updated, err := uc.TOTPRepo.CompareAndSwapBackupCodes(ctx, userID, record.BackupCodes, string(remainingJSON))
+	if err != nil {
 		return nil, err
+	}
+	if !updated {
+		return nil, constants.ErrInvalidBackupCode
 	}
 
 	user, err := uc.UserService.GetByID(ctx, userID)

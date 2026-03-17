@@ -70,6 +70,26 @@ func (r *TOTPRepository) UpdateBackupCodes(ctx context.Context, userID, backupCo
 	return err
 }
 
+func (r *TOTPRepository) CompareAndSwapBackupCodes(ctx context.Context, userID, expectedBackupCodes, newBackupCodes string) (bool, error) {
+	res, err := r.db.NewUpdate().
+		Model(&TOTPRecord{}).
+		Set("backup_codes = ?", newBackupCodes).
+		Set("updated_at = ?", time.Now().UTC()).
+		Where("user_id = ?", userID).
+		Where("backup_codes = ?", expectedBackupCodes).
+		Exec(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	return affected > 0, nil
+}
+
 func (r *TOTPRepository) DeleteByUserID(ctx context.Context, userID string) error {
 	_, err := r.db.NewDelete().
 		Model(&TOTPRecord{}).

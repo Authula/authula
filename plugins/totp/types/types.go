@@ -71,12 +71,12 @@ type GetTOTPURIRequest struct {
 
 type VerifyTOTPRequest struct {
 	Code        string `json:"code"`
-	TrustDevice bool   `json:"trustDevice,omitempty"`
+	TrustDevice bool   `json:"trust_device,omitempty"`
 }
 
 type VerifyBackupCodeRequest struct {
 	Code        string `json:"code"`
-	TrustDevice bool   `json:"trustDevice,omitempty"`
+	TrustDevice bool   `json:"trust_device,omitempty"`
 }
 
 type GenerateBackupCodesRequest struct {
@@ -89,12 +89,12 @@ type ViewBackupCodesRequest struct {
 
 // Response payloads
 type EnableResponse struct {
-	TotpURI     string   `json:"totpURI"`
-	BackupCodes []string `json:"backupCodes"`
+	TotpURI     string   `json:"totp_uri"`
+	BackupCodes []string `json:"backup_codes"`
 }
 
 type GetTOTPURIResponse struct {
-	TotpURI string `json:"totpURI"`
+	TotpURI string `json:"totp_uri"`
 }
 
 type VerifyTOTPResponse struct {
@@ -108,21 +108,22 @@ type VerifyBackupCodeResponse struct {
 }
 
 type GenerateBackupCodesResponse struct {
-	BackupCodes []string `json:"backupCodes"`
+	BackupCodes []string `json:"backup_codes"`
 }
 
 type ViewBackupCodesResponse struct {
-	RemainingCount int `json:"remainingCount"`
+	RemainingCount int `json:"remaining_count"`
 }
 
 type TOTPRedirectResponse struct {
-	TOTPRedirect bool `json:"totpRedirect"`
+	TOTPRedirect bool `json:"totp_redirect"`
 }
 
 // Internal result types
 type EnableResult struct {
-	TotpURI     string
-	BackupCodes []string
+	TotpURI      string
+	BackupCodes  []string
+	PendingToken string
 }
 
 type VerifyResult struct {

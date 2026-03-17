@@ -10,7 +10,7 @@ import (
 )
 
 type DisableHandler struct {
-	UseCase usecases.DisableUseCase
+	UseCase *usecases.DisableUseCase
 }
 
 func (h *DisableHandler) Handler() http.HandlerFunc {

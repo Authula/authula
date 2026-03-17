@@ -8,7 +8,6 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/constants"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/repository"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/types"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
@@ -37,7 +36,7 @@ func verifyPassword(
 func createTrustedDevice(
 	ctx context.Context,
 	tokenService rootservices.TokenService,
-	totpRepo *repository.TOTPRepository,
+	totpRepo TOTPCreateRepository,
 	config *types.TOTPPluginConfig,
 	userID string,
 	userAgent *string,

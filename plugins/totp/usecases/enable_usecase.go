@@ -6,20 +6,20 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/constants"
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/repository"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/services"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/types"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
 
-type enableUseCase struct {
+type EnableUseCase struct {
 	UserService       rootservices.UserService
 	AccountService    rootservices.AccountService
 	PasswordService   rootservices.PasswordService
 	TokenService      rootservices.TokenService
+	Verification      rootservices.VerificationService
 	TOTPService       *services.TOTPService
 	BackupCodeService *services.BackupCodeService
-	TOTPRepo          *repository.TOTPRepository
+	TOTPRepo          TOTPRepository
 	Config            *types.TOTPPluginConfig
 	EventBus          models.EventBus
 	Logger            models.Logger
@@ -30,18 +30,20 @@ func NewEnableUseCase(
 	accountService rootservices.AccountService,
 	passwordService rootservices.PasswordService,
 	tokenService rootservices.TokenService,
+	verificationService rootservices.VerificationService,
 	totpService *services.TOTPService,
 	backupCodeService *services.BackupCodeService,
-	totpRepo *repository.TOTPRepository,
+	totpRepo TOTPRepository,
 	config *types.TOTPPluginConfig,
 	eventBus models.EventBus,
 	logger models.Logger,
-) EnableUseCase {
-	return &enableUseCase{
+) *EnableUseCase {
+	return &EnableUseCase{
 		UserService:       userService,
 		AccountService:    accountService,
 		PasswordService:   passwordService,
 		TokenService:      tokenService,
+		Verification:      verificationService,
 		TOTPService:       totpService,
 		BackupCodeService: backupCodeService,
 		TOTPRepo:          totpRepo,
@@ -51,7 +53,7 @@ func NewEnableUseCase(
 	}
 }
 
-func (uc *enableUseCase) Enable(ctx context.Context, userID, password, issuer string) (*types.EnableResult, error) {
+func (uc *EnableUseCase) Enable(ctx context.Context, userID, password, issuer string) (*types.EnableResult, error) {
 	if err := verifyPassword(ctx, uc.AccountService, uc.PasswordService, userID, password); err != nil {
 		return nil, err
 	}
@@ -103,10 +105,32 @@ func (uc *enableUseCase) Enable(ctx context.Context, userID, password, issuer st
 		return nil, err
 	}
 
+	result := &types.EnableResult{}
+
 	if uc.Config.SkipVerificationOnEnable {
 		if err := uc.TOTPRepo.SetEnabled(ctx, userID, true); err != nil {
 			return nil, err
 		}
+	} else {
+		token, err := uc.TokenService.Generate()
+		if err != nil {
+			return nil, err
+		}
+
+		hashedToken := uc.TokenService.Hash(token)
+		_, err = uc.Verification.Create(
+			ctx,
+			userID,
+			hashedToken,
+			models.TypeTOTPPendingAuth,
+			userID,
+			uc.Config.PendingTokenExpiry,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		result.PendingToken = token
 	}
 
 	if issuer == "" {
@@ -116,8 +140,8 @@ func (uc *enableUseCase) Enable(ctx context.Context, userID, password, issuer st
 
 	publishEvent(uc.EventBus, uc.Logger, constants.EventTOTPEnabled, userID)
 
-	return &types.EnableResult{
-		TotpURI:     totpURI,
-		BackupCodes: backupCodes,
-	}, nil
+	result.TotpURI = totpURI
+	result.BackupCodes = backupCodes
+
+	return result, nil
 }
