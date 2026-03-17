@@ -698,6 +698,60 @@ func TestDoubleBasePathApplication(t *testing.T) {
 	}
 }
 
+func TestRouteMappingsApplyToCustomRoute(t *testing.T) {
+	config := &models.Config{
+		BasePath: "/api/auth",
+	}
+	logger := &testLogger{}
+	router := NewRouter(config, logger, nil)
+
+	router.SetRouteMetadataFromConfig(map[string]map[string]any{
+		"GET:/api/auth/health": {
+			"plugins":     []string{"plugin.auth"},
+			"permissions": []string{"users.read"},
+		},
+	})
+
+	pluginHookCalled := false
+	router.RegisterHook(models.Hook{
+		Stage:    models.HookBefore,
+		PluginID: "plugin.auth",
+		Handler: func(ctx *models.RequestContext) error {
+			pluginHookCalled = true
+
+			permissions, ok := ctx.Route.Metadata["permissions"].([]string)
+			if !ok {
+				t.Fatalf("expected permissions metadata to be present")
+			}
+			if len(permissions) != 1 || permissions[0] != "users.read" {
+				t.Fatalf("unexpected permissions: %v", permissions)
+			}
+
+			return nil
+		},
+	})
+
+	router.RegisterCustomRoute(models.Route{
+		Method: http.MethodGet,
+		Path:   "/health",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	if !pluginHookCalled {
+		t.Fatalf("expected plugin hook to execute for custom route via route mapping metadata")
+	}
+}
+
 func TestRouteGroupMetadata(t *testing.T) {
 	config := &models.Config{
 		BasePath: "/",

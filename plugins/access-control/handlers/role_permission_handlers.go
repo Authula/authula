@@ -169,6 +169,30 @@ func (h *GetAllPermissionsHandler) Handler() http.HandlerFunc {
 	}
 }
 
+type GetRolePermissionsHandler struct {
+	useCase usecases.RolePermissionUseCase
+}
+
+func NewGetRolePermissionsHandler(useCase usecases.RolePermissionUseCase) *GetRolePermissionsHandler {
+	return &GetRolePermissionsHandler{useCase: useCase}
+}
+
+func (h *GetRolePermissionsHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
+		roleID := r.PathValue("role_id")
+
+		permissions, err := h.useCase.GetRolePermissions(r.Context(), roleID)
+		if err != nil {
+			respondRolePermissionError(reqCtx, err)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusOK, permissions)
+	}
+}
+
 type CreatePermissionHandler struct {
 	useCase usecases.RolePermissionUseCase
 }

@@ -41,6 +41,22 @@ func TestBunUserAccessRepositoryGetUserRolesFiltersExpired(t *testing.T) {
 	}
 }
 
+func TestBunUserAccessRepositoryGetUserRolesReturnsEmptyArrayWhenNoRoles(t *testing.T) {
+	db := setupRepoDB(t)
+	uaRepo := NewBunUserAccessRepository(db)
+
+	roles, err := uaRepo.GetUserRoles(context.Background(), "missing-user")
+	if err != nil {
+		t.Fatalf("failed to get user roles: %v", err)
+	}
+	if roles == nil {
+		t.Fatal("expected empty roles slice, got nil")
+	}
+	if len(roles) != 0 {
+		t.Fatalf("expected 0 roles, got %d", len(roles))
+	}
+}
+
 func TestBunUserAccessRepositoryGetUserEffectivePermissions(t *testing.T) {
 	db := setupRepoDB(t)
 	rpRepo := NewBunRolePermissionRepository(db)
@@ -69,5 +85,21 @@ func TestBunUserAccessRepositoryGetUserEffectivePermissions(t *testing.T) {
 	}
 	if perms[0].PermissionKey != "posts.read" {
 		t.Fatalf("expected posts.read, got %s", perms[0].PermissionKey)
+	}
+}
+
+func TestBunUserAccessRepositoryGetUserEffectivePermissionsReturnsEmptyArrayWhenNoPermissions(t *testing.T) {
+	db := setupRepoDB(t)
+	uaRepo := NewBunUserAccessRepository(db)
+
+	perms, err := uaRepo.GetUserEffectivePermissions(context.Background(), "missing-user")
+	if err != nil {
+		t.Fatalf("failed to get effective permissions: %v", err)
+	}
+	if perms == nil {
+		t.Fatal("expected empty permissions slice, got nil")
+	}
+	if len(perms) != 0 {
+		t.Fatalf("expected 0 permissions, got %d", len(perms))
 	}
 }

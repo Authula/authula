@@ -296,6 +296,60 @@ func TestGetAllPermissionsHandler(t *testing.T) {
 	})
 }
 
+func TestGetRolePermissionsHandler(t *testing.T) {
+	t.Parallel()
+
+	t.Run("use case error", func(t *testing.T) {
+		t.Parallel()
+
+		useCase, repo := tests.NewRolePermissionUseCaseFixture()
+		repo.On("GetRoleByID", mock.Anything, "role-1").Return((*types.Role)(nil), nil).Once()
+		handler := NewGetRolePermissionsHandler(useCase)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles/role-1/permissions", nil)
+		req.SetPathValue("role_id", "role-1")
+
+		handler.Handler()(w, req)
+
+		internaltests.AssertErrorMessage(t, reqCtx, http.StatusNotFound, "not found")
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("invalid role id", func(t *testing.T) {
+		t.Parallel()
+
+		useCase, _ := tests.NewRolePermissionUseCaseFixture()
+		handler := NewGetRolePermissionsHandler(useCase)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles/%20%20%20/permissions", nil)
+		req.SetPathValue("role_id", "   ")
+
+		handler.Handler()(w, req)
+
+		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "unprocessable entity")
+	})
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		useCase, repo := tests.NewRolePermissionUseCaseFixture()
+		repo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "admin"}, nil).Once()
+		repo.On("GetRolePermissions", mock.Anything, "role-1").Return([]types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "users.read"}}, nil).Once()
+		handler := NewGetRolePermissionsHandler(useCase)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles/role-1/permissions", nil)
+		req.SetPathValue("role_id", "role-1")
+
+		handler.Handler()(w, req)
+
+		if reqCtx.ResponseStatus != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
+		}
+		payload := internaltests.DecodeResponseJSON[[]types.UserPermissionInfo](t, reqCtx)
+		if len(payload) != 1 || payload[0].PermissionID != "perm-1" {
+			t.Fatalf("expected role permissions payload, got %v", payload)
+		}
+		repo.AssertExpectations(t)
+	})
+}
+
 func TestCreatePermissionHandler(t *testing.T) {
 	t.Parallel()
 

@@ -27,15 +27,10 @@ func MarshalToJSON(t *testing.T, payload any) []byte {
 	return body
 }
 
-func NewHandlerRequest(t *testing.T, method, path string, body []byte) (*http.Request, *httptest.ResponseRecorder, *models.RequestContext) {
+func NewHandlerRequest(t *testing.T, method string, path string, body []byte) (*http.Request, *httptest.ResponseRecorder, *models.RequestContext) {
 	t.Helper()
-	var reader *bytes.Reader
-	if body == nil {
-		reader = bytes.NewReader(nil)
-	} else {
-		reader = bytes.NewReader(body)
-	}
 
+	reader := bytes.NewReader(body)
 	req := httptest.NewRequest(method, path, reader)
 	w := httptest.NewRecorder()
 	reqCtx := &models.RequestContext{

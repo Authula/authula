@@ -23,6 +23,8 @@ func mapHttpErrorStatus(err error) int {
 		return http.StatusConflict
 	case errors.Is(err, constants.ErrBadRequest):
 		return http.StatusBadRequest
+	case errors.Is(err, constants.ErrUnprocessableEntity):
+		return http.StatusUnprocessableEntity
 	default:
 		return http.StatusInternalServerError
 	}
@@ -44,6 +46,8 @@ func mapHttpErrorMessage(err error) string {
 		return "conflict"
 	case errors.Is(err, constants.ErrBadRequest):
 		return "bad request"
+	case errors.Is(err, constants.ErrUnprocessableEntity):
+		return "unprocessable entity"
 	case errors.Is(err, constants.ErrCannotUpdateSystemRole):
 		return "cannot update system role"
 	default:

@@ -31,7 +31,7 @@ func (h *GetUserRolesHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, &types.GetUserRolesResponse{Roles: roles})
+		reqCtx.SetJSONResponse(http.StatusOK, roles)
 	}
 }
 

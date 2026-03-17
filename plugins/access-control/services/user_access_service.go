@@ -19,21 +19,21 @@ func NewUserAccessService(repo repositories.UserAccessRepository) *UserAccessSer
 
 func (s *UserAccessService) GetUserRoles(ctx context.Context, userID string) ([]types.UserRoleInfo, error) {
 	if strings.TrimSpace(userID) == "" {
-		return nil, constants.ErrBadRequest
+		return nil, constants.ErrUnprocessableEntity
 	}
 	return s.userAccessRepo.GetUserRoles(ctx, userID)
 }
 
 func (s *UserAccessService) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
 	if strings.TrimSpace(userID) == "" {
-		return nil, constants.ErrBadRequest
+		return nil, constants.ErrUnprocessableEntity
 	}
 	return s.userAccessRepo.GetUserWithRolesByID(ctx, userID)
 }
 
 func (s *UserAccessService) GetUserWithPermissionsByID(ctx context.Context, userID string) (*types.UserWithPermissions, error) {
 	if strings.TrimSpace(userID) == "" {
-		return nil, constants.ErrBadRequest
+		return nil, constants.ErrUnprocessableEntity
 	}
 	return s.userAccessRepo.GetUserWithPermissionsByID(ctx, userID)
 }
@@ -65,7 +65,7 @@ func (s *UserAccessService) GetUserAuthorizationProfile(ctx context.Context, use
 
 func (s *UserAccessService) GetUserEffectivePermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
 	if strings.TrimSpace(userID) == "" {
-		return nil, constants.ErrBadRequest
+		return nil, constants.ErrUnprocessableEntity
 	}
 	return s.userAccessRepo.GetUserEffectivePermissions(ctx, userID)
 }

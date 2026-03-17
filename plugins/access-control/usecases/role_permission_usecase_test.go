@@ -17,9 +17,6 @@ func newRolePermissionUseCase(mockRepo *MockRolePermissionService) RolePermissio
 	return NewRolePermissionUseCase(services.NewRolePermissionService(mockRepo))
 }
 
-// Tests
-
-// TestCreateRole tests the CreateRole method with table-driven test cases
 func TestCreateRole(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -82,7 +79,6 @@ func TestCreateRole(t *testing.T) {
 	}
 }
 
-// TestGetAllRoles tests the GetAllRoles method
 func TestGetAllRoles(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -132,7 +128,6 @@ func TestGetAllRoles(t *testing.T) {
 	}
 }
 
-// TestGetRoleByID tests the GetRoleByID method
 func TestGetRoleByID(t *testing.T) {
 	testCases := []struct {
 		name            string
@@ -212,7 +207,6 @@ func TestGetRoleByID(t *testing.T) {
 	}
 }
 
-// TestUpdateRole tests the UpdateRole method
 func TestUpdateRole(t *testing.T) {
 	testCases := []struct {
 		name             string
@@ -339,7 +333,6 @@ func TestUpdateRole(t *testing.T) {
 	}
 }
 
-// TestDeleteRole tests the DeleteRole method
 func TestDeleteRole(t *testing.T) {
 	testCases := []struct {
 		name             string
@@ -434,7 +427,6 @@ func TestDeleteRole(t *testing.T) {
 	}
 }
 
-// TestCreatePermission tests the CreatePermission method
 func TestCreatePermission(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -498,7 +490,6 @@ func TestCreatePermission(t *testing.T) {
 	}
 }
 
-// TestGetAllPermissions tests the GetAllPermissions method
 func TestGetAllPermissions(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -548,7 +539,85 @@ func TestGetAllPermissions(t *testing.T) {
 	}
 }
 
-// TestUpdatePermission tests the UpdatePermission method
+func TestGetRolePermissions(t *testing.T) {
+	testCases := []struct {
+		name            string
+		roleID          string
+		mockRole        *types.Role
+		mockRoleErr     error
+		mockPermissions []types.UserPermissionInfo
+		mockPermErr     error
+		expectedError   string
+		expectedLength  int
+	}{
+		{
+			name:   "success with permissions",
+			roleID: "role-1",
+			mockRole: &types.Role{
+				ID:   "role-1",
+				Name: "Admin",
+			},
+			mockPermissions: []types.UserPermissionInfo{
+				{PermissionID: "perm-1", PermissionKey: "admin:read"},
+				{PermissionID: "perm-2", PermissionKey: "admin:write"},
+			},
+			expectedLength: 2,
+		},
+		{
+			name:          "empty roleID",
+			roleID:        "",
+			expectedError: "unprocessable entity",
+		},
+		{
+			name:          "whitespace roleID",
+			roleID:        "   ",
+			expectedError: "unprocessable entity",
+		},
+		{
+			name:          "role not found",
+			roleID:        "missing-role",
+			mockRole:      nil,
+			expectedError: "not found",
+		},
+		{
+			name:          "role lookup error",
+			roleID:        "role-1",
+			mockRoleErr:   errors.New("db error"),
+			expectedError: "db error",
+		},
+		{
+			name:   "permissions lookup error",
+			roleID: "role-1",
+			mockRole: &types.Role{
+				ID:   "role-1",
+				Name: "Admin",
+			},
+			mockPermErr:   errors.New("perm db error"),
+			expectedError: "perm db error",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := &MockRolePermissionService{}
+			mockService.On("GetRoleByID", mock.Anything, mock.Anything).Return(tt.mockRole, tt.mockRoleErr).Maybe()
+			mockService.On("GetRolePermissions", mock.Anything, mock.Anything).Return(tt.mockPermissions, tt.mockPermErr).Maybe()
+
+			uc := newRolePermissionUseCase(mockService)
+			permissions, err := uc.GetRolePermissions(context.Background(), tt.roleID)
+
+			if tt.expectedError == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedLength, len(permissions))
+			} else {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedError, err.Error())
+				assert.Nil(t, permissions)
+			}
+		})
+	}
+}
+
 func TestUpdatePermission(t *testing.T) {
 	testCases := []struct {
 		name             string
@@ -572,12 +641,12 @@ func TestUpdatePermission(t *testing.T) {
 		{
 			name:          "empty permissionID",
 			permissionID:  "",
-			expectedError: "bad request",
+			expectedError: "unprocessable entity",
 		},
 		{
 			name:          "whitespace permissionID",
 			permissionID:  "   ",
-			expectedError: "bad request",
+			expectedError: "unprocessable entity",
 		},
 		{
 			name:         "nil description",
@@ -585,7 +654,7 @@ func TestUpdatePermission(t *testing.T) {
 			req: types.UpdatePermissionRequest{
 				Description: nil,
 			},
-			expectedError: "bad request",
+			expectedError: "unprocessable entity",
 		},
 		{
 			name:         "empty description",
@@ -593,7 +662,7 @@ func TestUpdatePermission(t *testing.T) {
 			req: types.UpdatePermissionRequest{
 				Description: new("   "),
 			},
-			expectedError: "bad request",
+			expectedError: "unprocessable entity",
 		},
 		{
 			name:          "not found",
@@ -654,7 +723,6 @@ func TestUpdatePermission(t *testing.T) {
 	}
 }
 
-// TestDeletePermission tests the DeletePermission method
 func TestDeletePermission(t *testing.T) {
 	testCases := []struct {
 		name             string
@@ -749,7 +817,6 @@ func TestDeletePermission(t *testing.T) {
 	}
 }
 
-// TestAddPermissionToRole tests the AddPermissionToRole method
 func TestAddPermissionToRole(t *testing.T) {
 	testCases := []struct {
 		name              string
@@ -860,7 +927,6 @@ func TestAddPermissionToRole(t *testing.T) {
 	}
 }
 
-// TestRemovePermissionFromRole tests the RemovePermissionFromRole method
 func TestRemovePermissionFromRole(t *testing.T) {
 	testCases := []struct {
 		name                 string
@@ -886,13 +952,13 @@ func TestRemovePermissionFromRole(t *testing.T) {
 			name:          "empty roleID",
 			roleID:        "",
 			permissionID:  "perm-1",
-			expectedError: "bad request",
+			expectedError: "unprocessable entity",
 		},
 		{
 			name:          "empty permissionID",
 			roleID:        "role-1",
 			permissionID:  "",
-			expectedError: "bad request",
+			expectedError: "unprocessable entity",
 		},
 		{
 			name:          "system role protection",
@@ -944,7 +1010,6 @@ func TestRemovePermissionFromRole(t *testing.T) {
 	}
 }
 
-// TestReplaceRolePermissions tests the ReplaceRolePermissions method
 func TestReplaceRolePermissions(t *testing.T) {
 	testCases := []struct {
 		name              string
@@ -1020,7 +1085,6 @@ func TestReplaceRolePermissions(t *testing.T) {
 	}
 }
 
-// TestReplaceUserRoles tests the ReplaceUserRoles method
 func TestReplaceUserRoles(t *testing.T) {
 	testCases := []struct {
 		name              string
@@ -1096,7 +1160,6 @@ func TestReplaceUserRoles(t *testing.T) {
 	}
 }
 
-// TestAssignRoleToUser tests the AssignRoleToUser method
 func TestAssignRoleToUser(t *testing.T) {
 	futureTime := time.Now().UTC().Add(24 * time.Hour)
 	pastTime := time.Now().UTC().Add(-24 * time.Hour)
@@ -1130,13 +1193,13 @@ func TestAssignRoleToUser(t *testing.T) {
 			name:          "empty userID",
 			userID:        "",
 			req:           types.AssignUserRoleRequest{RoleID: "role-1"},
-			expectedError: "bad request",
+			expectedError: "unprocessable entity",
 		},
 		{
 			name:          "whitespace userID",
 			userID:        "   ",
 			req:           types.AssignUserRoleRequest{RoleID: "role-1"},
-			expectedError: "bad request",
+			expectedError: "unprocessable entity",
 		},
 		{
 			name:   "empty roleID",
@@ -1144,7 +1207,7 @@ func TestAssignRoleToUser(t *testing.T) {
 			req: types.AssignUserRoleRequest{
 				RoleID: "",
 			},
-			expectedError: "bad request",
+			expectedError: "unprocessable entity",
 		},
 		{
 			name:   "past expiry date",
@@ -1187,7 +1250,6 @@ func TestAssignRoleToUser(t *testing.T) {
 	}
 }
 
-// TestRemoveRoleFromUser tests the RemoveRoleFromUser method
 func TestRemoveRoleFromUser(t *testing.T) {
 	testCases := []struct {
 		name             string

@@ -488,10 +488,32 @@ func matchRoutePath(requestPath, pattern string) bool {
 // getRouteMetadata looks up route metadata for a given request method and path.
 // Returns the metadata, the matched pattern (for dynamic paths), and whether a match was found.
 func (r *Router) getRouteMetadata(method, path string) (map[string]any, string, bool) {
+	normalizedPath := "/" + strings.Trim(path, "/")
+	if path == "/" {
+		normalizedPath = "/"
+	}
+
+	prefixedPath := ""
+	if r.basePath != "" {
+		base := "/" + strings.Trim(r.basePath, "/")
+		if normalizedPath == "/" {
+			prefixedPath = base
+		} else if normalizedPath != base && !strings.HasPrefix(normalizedPath, base+"/") {
+			prefixedPath = base + normalizedPath
+		}
+	}
+
 	// Try exact match first
 	exactKey := method + ":" + path
 	if metadata, exists := r.routeMetadata[exactKey]; exists {
 		return metadata, exactKey, true
+	}
+
+	if prefixedPath != "" {
+		prefixedKey := method + ":" + prefixedPath
+		if metadata, exists := r.routeMetadata[prefixedKey]; exists {
+			return metadata, prefixedKey, true
+		}
 	}
 
 	// Pattern matching for dynamic routes
@@ -508,6 +530,10 @@ func (r *Router) getRouteMetadata(method, path string) (map[string]any, string, 
 		}
 
 		if matchRoutePath(path, pattern) {
+			return metadata, key, true
+		}
+
+		if prefixedPath != "" && matchRoutePath(prefixedPath, pattern) {
 			return metadata, key, true
 		}
 	}
@@ -556,11 +582,8 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	wrappedWriter.SetRequestContext(reqCtx)
 
 	// Lookup route metadata
-	metadata, pattern, exists := r.getRouteMetadata(req.Method, req.URL.Path)
+	metadata, _, exists := r.getRouteMetadata(req.Method, req.URL.Path)
 	if exists {
-		if metadata["_pattern"] == nil {
-			metadata["_pattern"] = pattern
-		}
 		reqCtx.Route = &models.Route{
 			Method:   req.Method,
 			Path:     req.URL.Path,

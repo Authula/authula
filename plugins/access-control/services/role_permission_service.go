@@ -180,18 +180,35 @@ func (s *RolePermissionService) GetAllPermissions(ctx context.Context) ([]types.
 	return s.repo.GetAllPermissions(ctx)
 }
 
+func (s *RolePermissionService) GetRolePermissions(ctx context.Context, roleID string) ([]types.UserPermissionInfo, error) {
+	roleID = strings.TrimSpace(roleID)
+	if roleID == "" {
+		return nil, constants.ErrUnprocessableEntity
+	}
+
+	role, err := s.repo.GetRoleByID(ctx, roleID)
+	if err != nil {
+		return nil, err
+	}
+	if role == nil {
+		return nil, constants.ErrNotFound
+	}
+
+	return s.repo.GetRolePermissions(ctx, roleID)
+}
+
 func (s *RolePermissionService) UpdatePermission(ctx context.Context, permissionID string, req types.UpdatePermissionRequest) (*types.Permission, error) {
 	permissionID = strings.TrimSpace(permissionID)
 	if permissionID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, constants.ErrUnprocessableEntity
 	}
 	if req.Description == nil {
-		return nil, constants.ErrBadRequest
+		return nil, constants.ErrUnprocessableEntity
 	}
 
 	description := strings.TrimSpace(*req.Description)
 	if description == "" {
-		return nil, constants.ErrBadRequest
+		return nil, constants.ErrUnprocessableEntity
 	}
 
 	permission, err := s.repo.GetPermissionByID(ctx, permissionID)
@@ -301,10 +318,10 @@ func (s *RolePermissionService) RemovePermissionFromRole(ctx context.Context, ro
 	permissionID = strings.TrimSpace(permissionID)
 
 	if roleID == "" {
-		return constants.ErrBadRequest
+		return constants.ErrUnprocessableEntity
 	}
 	if permissionID == "" {
-		return constants.ErrBadRequest
+		return constants.ErrUnprocessableEntity
 	}
 
 	role, err := s.repo.GetRoleByID(ctx, roleID)
@@ -379,12 +396,12 @@ func (s *RolePermissionService) ReplaceUserRoles(ctx context.Context, userID str
 func (s *RolePermissionService) AssignRoleToUser(ctx context.Context, userID string, req types.AssignUserRoleRequest, assignedByUserID *string) error {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return constants.ErrBadRequest
+		return constants.ErrUnprocessableEntity
 	}
 
 	roleID := strings.TrimSpace(req.RoleID)
 	if roleID == "" {
-		return constants.ErrBadRequest
+		return constants.ErrUnprocessableEntity
 	}
 
 	if req.ExpiresAt != nil && req.ExpiresAt.Before(time.Now().UTC()) {

@@ -36,15 +36,19 @@ func (s *stubUserAccessRepo) GetUserWithPermissionsByID(_ context.Context, _ str
 	return s.withPermsResult, s.withPermsErr
 }
 
-func TestUserAccessServiceGetUserRolesBadRequest(t *testing.T) {
+func TestUserAccessServiceGetUserRolesUnprocessableEntity(t *testing.T) {
+	t.Parallel()
+
 	svc := NewUserAccessService(&stubUserAccessRepo{})
 	_, err := svc.GetUserRoles(context.Background(), "   ")
-	if !errors.Is(err, constants.ErrBadRequest) {
-		t.Fatalf("expected ErrBadRequest, got %v", err)
+	if !errors.Is(err, constants.ErrUnprocessableEntity) {
+		t.Fatalf("expected ErrUnprocessableEntity, got %v", err)
 	}
 }
 
 func TestUserAccessServiceHasPermissionsMatchesAnyRequiredPermission(t *testing.T) {
+	t.Parallel()
+
 	svc := NewUserAccessService(&stubUserAccessRepo{
 		permissionsResult: []types.UserPermissionInfo{{PermissionKey: "users.read"}, {PermissionKey: "users.write"}},
 	})
@@ -59,6 +63,8 @@ func TestUserAccessServiceHasPermissionsMatchesAnyRequiredPermission(t *testing.
 }
 
 func TestUserAccessServiceGetUserAuthorizationProfileNilUser(t *testing.T) {
+	t.Parallel()
+
 	svc := NewUserAccessService(&stubUserAccessRepo{withRolesResult: nil})
 
 	profile, err := svc.GetUserAuthorizationProfile(context.Background(), "user-1")

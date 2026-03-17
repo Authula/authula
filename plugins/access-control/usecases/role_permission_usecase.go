@@ -43,6 +43,10 @@ func (u RolePermissionUseCase) GetAllPermissions(ctx context.Context) ([]types.P
 	return u.service.GetAllPermissions(ctx)
 }
 
+func (u RolePermissionUseCase) GetRolePermissions(ctx context.Context, roleID string) ([]types.UserPermissionInfo, error) {
+	return u.service.GetRolePermissions(ctx, roleID)
+}
+
 func (u RolePermissionUseCase) UpdatePermission(ctx context.Context, permissionID string, req types.UpdatePermissionRequest) (*types.Permission, error) {
 	return u.service.UpdatePermission(ctx, permissionID, req)
 }

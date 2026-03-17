@@ -53,16 +53,20 @@ func NewUserRolesUseCaseFixture() (usecases.UserRolesUseCase, *mockUserAccessRep
 	return usecases.NewUserRolesUseCase(service), repo
 }
 
-type mockRolePermissionRepository struct {
+type MockRolePermissionRepository struct {
 	mock.Mock
 }
 
-func (m *mockRolePermissionRepository) CreateRole(ctx context.Context, role *types.Role) error {
+func NewMockRolePermissionRepository() *MockRolePermissionRepository {
+	return &MockRolePermissionRepository{}
+}
+
+func (m *MockRolePermissionRepository) CreateRole(ctx context.Context, role *types.Role) error {
 	args := m.Called(ctx, role)
 	return args.Error(0)
 }
 
-func (m *mockRolePermissionRepository) GetAllRoles(ctx context.Context) ([]types.Role, error) {
+func (m *MockRolePermissionRepository) GetAllRoles(ctx context.Context) ([]types.Role, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -70,7 +74,7 @@ func (m *mockRolePermissionRepository) GetAllRoles(ctx context.Context) ([]types
 	return args.Get(0).([]types.Role), args.Error(1)
 }
 
-func (m *mockRolePermissionRepository) GetRoleByID(ctx context.Context, roleID string) (*types.Role, error) {
+func (m *MockRolePermissionRepository) GetRoleByID(ctx context.Context, roleID string) (*types.Role, error) {
 	args := m.Called(ctx, roleID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -78,22 +82,22 @@ func (m *mockRolePermissionRepository) GetRoleByID(ctx context.Context, roleID s
 	return args.Get(0).(*types.Role), args.Error(1)
 }
 
-func (m *mockRolePermissionRepository) UpdateRole(ctx context.Context, roleID string, name *string, description *string) (bool, error) {
+func (m *MockRolePermissionRepository) UpdateRole(ctx context.Context, roleID string, name *string, description *string) (bool, error) {
 	args := m.Called(ctx, roleID, name, description)
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *mockRolePermissionRepository) DeleteRole(ctx context.Context, roleID string) (bool, error) {
+func (m *MockRolePermissionRepository) DeleteRole(ctx context.Context, roleID string) (bool, error) {
 	args := m.Called(ctx, roleID)
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *mockRolePermissionRepository) CountUserAssignmentsByRoleID(ctx context.Context, roleID string) (int, error) {
+func (m *MockRolePermissionRepository) CountUserAssignmentsByRoleID(ctx context.Context, roleID string) (int, error) {
 	args := m.Called(ctx, roleID)
 	return args.Int(0), args.Error(1)
 }
 
-func (m *mockRolePermissionRepository) GetAllPermissions(ctx context.Context) ([]types.Permission, error) {
+func (m *MockRolePermissionRepository) GetAllPermissions(ctx context.Context) ([]types.Permission, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -101,7 +105,7 @@ func (m *mockRolePermissionRepository) GetAllPermissions(ctx context.Context) ([
 	return args.Get(0).([]types.Permission), args.Error(1)
 }
 
-func (m *mockRolePermissionRepository) GetPermissionByID(ctx context.Context, permissionID string) (*types.Permission, error) {
+func (m *MockRolePermissionRepository) GetPermissionByID(ctx context.Context, permissionID string) (*types.Permission, error) {
 	args := m.Called(ctx, permissionID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -109,27 +113,27 @@ func (m *mockRolePermissionRepository) GetPermissionByID(ctx context.Context, pe
 	return args.Get(0).(*types.Permission), args.Error(1)
 }
 
-func (m *mockRolePermissionRepository) CreatePermission(ctx context.Context, permission *types.Permission) error {
+func (m *MockRolePermissionRepository) CreatePermission(ctx context.Context, permission *types.Permission) error {
 	args := m.Called(ctx, permission)
 	return args.Error(0)
 }
 
-func (m *mockRolePermissionRepository) UpdatePermission(ctx context.Context, permissionID string, description *string) (bool, error) {
+func (m *MockRolePermissionRepository) UpdatePermission(ctx context.Context, permissionID string, description *string) (bool, error) {
 	args := m.Called(ctx, permissionID, description)
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *mockRolePermissionRepository) DeletePermission(ctx context.Context, permissionID string) (bool, error) {
+func (m *MockRolePermissionRepository) DeletePermission(ctx context.Context, permissionID string) (bool, error) {
 	args := m.Called(ctx, permissionID)
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *mockRolePermissionRepository) CountRoleAssignmentsByPermissionID(ctx context.Context, permissionID string) (int, error) {
+func (m *MockRolePermissionRepository) CountRoleAssignmentsByPermissionID(ctx context.Context, permissionID string) (int, error) {
 	args := m.Called(ctx, permissionID)
 	return args.Int(0), args.Error(1)
 }
 
-func (m *mockRolePermissionRepository) GetRolePermissions(ctx context.Context, roleID string) ([]types.UserPermissionInfo, error) {
+func (m *MockRolePermissionRepository) GetRolePermissions(ctx context.Context, roleID string) ([]types.UserPermissionInfo, error) {
 	args := m.Called(ctx, roleID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -137,38 +141,38 @@ func (m *mockRolePermissionRepository) GetRolePermissions(ctx context.Context, r
 	return args.Get(0).([]types.UserPermissionInfo), args.Error(1)
 }
 
-func (m *mockRolePermissionRepository) ReplaceRolePermissions(ctx context.Context, roleID string, permissionIDs []string, grantedByUserID *string) error {
+func (m *MockRolePermissionRepository) ReplaceRolePermissions(ctx context.Context, roleID string, permissionIDs []string, grantedByUserID *string) error {
 	args := m.Called(ctx, roleID, permissionIDs, grantedByUserID)
 	return args.Error(0)
 }
 
-func (m *mockRolePermissionRepository) AddRolePermission(ctx context.Context, roleID string, permissionID string, grantedByUserID *string) error {
+func (m *MockRolePermissionRepository) AddRolePermission(ctx context.Context, roleID string, permissionID string, grantedByUserID *string) error {
 	args := m.Called(ctx, roleID, permissionID, grantedByUserID)
 	return args.Error(0)
 }
 
-func (m *mockRolePermissionRepository) RemoveRolePermission(ctx context.Context, roleID string, permissionID string) error {
+func (m *MockRolePermissionRepository) RemoveRolePermission(ctx context.Context, roleID string, permissionID string) error {
 	args := m.Called(ctx, roleID, permissionID)
 	return args.Error(0)
 }
 
-func (m *mockRolePermissionRepository) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error {
+func (m *MockRolePermissionRepository) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error {
 	args := m.Called(ctx, userID, roleIDs, assignedByUserID)
 	return args.Error(0)
 }
 
-func (m *mockRolePermissionRepository) AssignUserRole(ctx context.Context, userID string, roleID string, assignedByUserID *string, expiresAt *time.Time) error {
+func (m *MockRolePermissionRepository) AssignUserRole(ctx context.Context, userID string, roleID string, assignedByUserID *string, expiresAt *time.Time) error {
 	args := m.Called(ctx, userID, roleID, assignedByUserID, expiresAt)
 	return args.Error(0)
 }
 
-func (m *mockRolePermissionRepository) RemoveUserRole(ctx context.Context, userID string, roleID string) error {
+func (m *MockRolePermissionRepository) RemoveUserRole(ctx context.Context, userID string, roleID string) error {
 	args := m.Called(ctx, userID, roleID)
 	return args.Error(0)
 }
 
-func NewRolePermissionUseCaseFixture() (usecases.RolePermissionUseCase, *mockRolePermissionRepository) {
-	repo := &mockRolePermissionRepository{}
+func NewRolePermissionUseCaseFixture() (usecases.RolePermissionUseCase, *MockRolePermissionRepository) {
+	repo := NewMockRolePermissionRepository()
 	service := services.NewRolePermissionService(repo)
 	return usecases.NewRolePermissionUseCase(service), repo
 }

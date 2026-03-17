@@ -36,6 +36,9 @@ func (r *BunUserAccessRepository) GetUserRoles(ctx context.Context, userID strin
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user roles: %w", err)
 	}
+	if rows == nil {
+		return []types.UserRoleInfo{}, nil
+	}
 	return rows, nil
 }
 
@@ -54,6 +57,9 @@ func (r *BunUserAccessRepository) GetUserEffectivePermissions(ctx context.Contex
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user effective permissions: %w", err)
+	}
+	if rows == nil {
+		return []types.UserPermissionInfo{}, nil
 	}
 	return rows, nil
 }

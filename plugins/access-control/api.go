@@ -64,6 +64,10 @@ func (a *API) GetAllPermissions(ctx context.Context) ([]types.Permission, error)
 	return a.useCases.GetAllPermissions(ctx)
 }
 
+func (a *API) GetRolePermissions(ctx context.Context, roleID string) ([]types.UserPermissionInfo, error) {
+	return a.useCases.GetRolePermissions(ctx, roleID)
+}
+
 func (a *API) UpdatePermission(ctx context.Context, permissionID string, req types.UpdatePermissionRequest) (*types.Permission, error) {
 	return a.useCases.UpdatePermission(ctx, permissionID, req)
 }

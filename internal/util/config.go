@@ -151,7 +151,7 @@ func ConvertRouteMetadata(routes []models.RouteMapping) (map[string]map[string]a
 
 // ApplyBasePathToMetadataKey applies a basePath prefix to a metadata key (METHOD:path)
 // If basePath is empty, the key is returned unchanged
-// Example: ApplyBasePathToMetadataKey("GET:/auth/me", "/api") returns "GET:/api/auth/me"
+// Example: ApplyBasePathToMetadataKey("GET:/me", "/api/auth") returns "GET:/api/auth/me"
 func ApplyBasePathToMetadataKey(key, basePath string) string {
 	parts := strings.SplitN(key, ":", 2)
 	if len(parts) != 2 {

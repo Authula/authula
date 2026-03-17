@@ -375,5 +375,5 @@ enabled = true
 # [[route_mappings]]
 # path = "/admin/users"
 # method = "GET"
-# plugins = ["access_control.enforce"]
+# plugins = ["session.auth", "access_control.enforce"]
 # permissions = ["users.read"]

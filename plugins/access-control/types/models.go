@@ -127,10 +127,6 @@ type ReplaceUserRolesRequest struct {
 	RoleIDs []string `json:"role_ids"`
 }
 
-type GetUserRolesResponse struct {
-	Roles []UserRoleInfo `json:"roles"`
-}
-
 type ReplaceUserRolesResponse struct {
 	Message string `json:"message"`
 }

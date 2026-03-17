@@ -2,8 +2,8 @@ package accesscontrol
 
 import (
 	"net/http"
-	"strings"
 
+	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 )
 
@@ -37,7 +37,7 @@ func (p *AccessControlPlugin) requireAccessControl(reqCtx *models.RequestContext
 		return nil
 	}
 
-	requiredPermissions := readStringSliceMetadata(reqCtx, "permissions")
+	requiredPermissions := util.ReadStringSliceMetadata(reqCtx, "permissions")
 	if len(requiredPermissions) == 0 {
 		// Opt-in mode: if no permissions metadata is present, skip access control enforcement.
 		return nil
@@ -54,46 +54,6 @@ func (p *AccessControlPlugin) requireAccessControl(reqCtx *models.RequestContext
 		reqCtx.SetJSONResponse(http.StatusForbidden, map[string]any{"message": "Forbidden"})
 		reqCtx.Handled = true
 		return nil
-	}
-
-	return nil
-}
-
-func readStringSliceMetadata(reqCtx *models.RequestContext, key string) []string {
-	if reqCtx == nil || reqCtx.Route == nil || reqCtx.Route.Metadata == nil {
-		return nil
-	}
-
-	raw, ok := reqCtx.Route.Metadata[key]
-	if !ok || raw == nil {
-		return nil
-	}
-
-	if values, ok := raw.([]string); ok {
-		result := make([]string, 0, len(values))
-		for _, value := range values {
-			trimmed := strings.TrimSpace(value)
-			if trimmed != "" {
-				result = append(result, trimmed)
-			}
-		}
-		return result
-	}
-
-	if valuesAny, ok := raw.([]any); ok {
-		result := make([]string, 0, len(valuesAny))
-		for _, value := range valuesAny {
-			str, ok := value.(string)
-			if !ok {
-				continue
-			}
-
-			trimmed := strings.TrimSpace(str)
-			if trimmed != "" {
-				result = append(result, trimmed)
-			}
-		}
-		return result
 	}
 
 	return nil
