@@ -19,7 +19,7 @@ func (h *DisableHandler) Handler() http.HandlerFunc {
 		userID, ok := models.GetUserIDFromContext(ctx)
 		if !ok {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
-				"message": "authentication required",
+				"message": "Unauthorized",
 			})
 			reqCtx.Handled = true
 			return

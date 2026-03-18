@@ -12,7 +12,7 @@ type TOTPRecord struct {
 	UserID        string    `bun:"column:user_id"`
 	Secret        string    `bun:"column:secret"`
 	BackupCodes   string    `bun:"column:backup_codes"`
-	Enabled       bool      `bun:"column:enabled,default:false"`
+	Enabled       bool      `bun:"column:enabled"`
 	CreatedAt     time.Time `bun:"column:created_at,default:current_timestamp"`
 	UpdatedAt     time.Time `bun:"column:updated_at,default:current_timestamp"`
 }
