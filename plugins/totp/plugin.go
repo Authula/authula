@@ -1,6 +1,7 @@
 package totp
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
@@ -8,6 +9,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/v2/models"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/repository"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/services"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/systems"
 	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/types"
 	rootservices "github.com/GoBetterAuth/go-better-auth/v2/services"
 )
@@ -26,6 +28,7 @@ type TOTPPlugin struct {
 	totpService         *services.TOTPService
 	backupCodeService   *services.BackupCodeService
 	totpRepo            *repository.TOTPRepository
+	cleanupSystem       *systems.TrustedDevicesCleanupSystem
 	Api                 *API
 }
 
@@ -106,13 +109,23 @@ func (p *TOTPPlugin) Init(ctx *models.PluginContext) error {
 
 	p.totpRepo = repository.NewTOTPRepository(ctx.DB)
 
+	p.cleanupSystem = systems.NewTrustedDevicesCleanupSystem(
+		p.logger,
+		p.pluginConfig,
+		p.totpRepo,
+	)
+
+	if err := p.cleanupSystem.Init(context.Background()); err != nil {
+		return fmt.Errorf("failed to initialize trusted devices cleanup system: %w", err)
+	}
+
 	p.Api = BuildAPI(p)
 
 	return nil
 }
 
 func (p *TOTPPlugin) Close() error {
-	return nil
+	return p.cleanupSystem.Close()
 }
 
 func (p *TOTPPlugin) Routes() []models.Route {

@@ -9,14 +9,16 @@ import (
 )
 
 type TOTPPluginConfig struct {
-	Enabled                  bool          `json:"enabled" toml:"enabled"`
-	Issuer                   string        `json:"issuer" toml:"issuer"`
-	SkipVerificationOnEnable bool          `json:"skip_verification_on_enable" toml:"skip_verification_on_enable"`
-	BackupCodeCount          int           `json:"backup_code_count" toml:"backup_code_count"`
-	TrustedDeviceDuration    time.Duration `json:"trusted_device_duration" toml:"trusted_device_duration"`
-	PendingTokenExpiry       time.Duration `json:"pending_token_expiry" toml:"pending_token_expiry"`
-	SecureCookie             bool          `json:"secure_cookie" toml:"secure_cookie"`
-	SameSite                 string        `json:"same_site" toml:"same_site"`
+	Enabled                       bool          `json:"enabled" toml:"enabled"`
+	Issuer                        string        `json:"issuer" toml:"issuer"`
+	SkipVerificationOnEnable      bool          `json:"skip_verification_on_enable" toml:"skip_verification_on_enable"`
+	BackupCodeCount               int           `json:"backup_code_count" toml:"backup_code_count"`
+	TrustedDeviceDuration         time.Duration `json:"trusted_device_duration" toml:"trusted_device_duration"`
+	TrustedDevicesAutoCleanup     bool          `json:"trusted_devices_auto_cleanup" toml:"trusted_devices_auto_cleanup"`
+	TrustedDevicesCleanupInterval time.Duration `json:"trusted_devices_cleanup_interval" toml:"trusted_devices_cleanup_interval"`
+	PendingTokenExpiry            time.Duration `json:"pending_token_expiry" toml:"pending_token_expiry"`
+	SecureCookie                  bool          `json:"secure_cookie" toml:"secure_cookie"`
+	SameSite                      string        `json:"same_site" toml:"same_site"`
 }
 
 func (c *TOTPPluginConfig) ApplyDefaults() {
@@ -25,6 +27,9 @@ func (c *TOTPPluginConfig) ApplyDefaults() {
 	}
 	if c.TrustedDeviceDuration == 0 {
 		c.TrustedDeviceDuration = 30 * 24 * time.Hour
+	}
+	if c.TrustedDevicesAutoCleanup && c.TrustedDevicesCleanupInterval == 0 {
+		c.TrustedDevicesCleanupInterval = time.Hour
 	}
 	if c.PendingTokenExpiry == 0 {
 		c.PendingTokenExpiry = 5 * time.Minute

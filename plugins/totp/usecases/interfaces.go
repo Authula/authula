@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/repository"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/types"
 )
 
 type UseCases struct {
@@ -18,7 +18,7 @@ type UseCases struct {
 }
 
 type TOTPReadRepository interface {
-	GetByUserID(ctx context.Context, userID string) (*repository.TOTPRecord, error)
+	GetByUserID(ctx context.Context, userID string) (*types.TOTPRecord, error)
 }
 
 type TOTPWriteRepository interface {
@@ -29,8 +29,8 @@ type TOTPWriteRepository interface {
 }
 
 type TOTPCreateRepository interface {
-	Create(ctx context.Context, userID, secret, backupCodes string) (*repository.TOTPRecord, error)
-	CreateTrustedDevice(ctx context.Context, userID, token, userAgent string, expiresAt time.Time) (*repository.TrustedDevice, error)
+	Create(ctx context.Context, userID, secret, backupCodes string) (*types.TOTPRecord, error)
+	CreateTrustedDevice(ctx context.Context, userID, token, userAgent string, expiresAt time.Time) (*types.TrustedDevice, error)
 }
 
 type TOTPTrustedDeviceRepository interface {

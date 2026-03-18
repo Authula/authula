@@ -8,6 +8,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/GoBetterAuth/go-better-auth/v2/internal/util"
+	"github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/types"
 )
 
 type TOTPRepository struct {
@@ -22,8 +23,8 @@ func (r *TOTPRepository) WithTx(tx bun.IDB) *TOTPRepository {
 	return &TOTPRepository{db: tx}
 }
 
-func (r *TOTPRepository) GetByUserID(ctx context.Context, userID string) (*TOTPRecord, error) {
-	record := new(TOTPRecord)
+func (r *TOTPRepository) GetByUserID(ctx context.Context, userID string) (*types.TOTPRecord, error) {
+	record := new(types.TOTPRecord)
 	err := r.db.NewSelect().
 		Model(record).
 		Where("user_id = ?", userID).
@@ -35,8 +36,8 @@ func (r *TOTPRepository) GetByUserID(ctx context.Context, userID string) (*TOTPR
 	return record, err
 }
 
-func (r *TOTPRepository) Create(ctx context.Context, userID, secret, backupCodes string) (*TOTPRecord, error) {
-	record := &TOTPRecord{
+func (r *TOTPRepository) Create(ctx context.Context, userID, secret, backupCodes string) (*types.TOTPRecord, error) {
+	record := &types.TOTPRecord{
 		ID:          util.GenerateUUID(),
 		UserID:      userID,
 		Secret:      secret,
@@ -62,7 +63,7 @@ func (r *TOTPRepository) Create(ctx context.Context, userID, secret, backupCodes
 
 func (r *TOTPRepository) UpdateBackupCodes(ctx context.Context, userID, backupCodes string) error {
 	_, err := r.db.NewUpdate().
-		Model(&TOTPRecord{}).
+		Model(&types.TOTPRecord{}).
 		Set("backup_codes = ?", backupCodes).
 		Set("updated_at = ?", time.Now().UTC()).
 		Where("user_id = ?", userID).
@@ -72,7 +73,7 @@ func (r *TOTPRepository) UpdateBackupCodes(ctx context.Context, userID, backupCo
 
 func (r *TOTPRepository) CompareAndSwapBackupCodes(ctx context.Context, userID, expectedBackupCodes, newBackupCodes string) (bool, error) {
 	res, err := r.db.NewUpdate().
-		Model(&TOTPRecord{}).
+		Model(&types.TOTPRecord{}).
 		Set("backup_codes = ?", newBackupCodes).
 		Set("updated_at = ?", time.Now().UTC()).
 		Where("user_id = ?", userID).
@@ -92,14 +93,14 @@ func (r *TOTPRepository) CompareAndSwapBackupCodes(ctx context.Context, userID, 
 
 func (r *TOTPRepository) DeleteByUserID(ctx context.Context, userID string) error {
 	_, err := r.db.NewDelete().
-		Model(&TOTPRecord{}).
+		Model(&types.TOTPRecord{}).
 		Where("user_id = ?", userID).
 		Exec(ctx)
 	return err
 }
 
 func (r *TOTPRepository) IsEnabled(ctx context.Context, userID string) (bool, error) {
-	record := new(TOTPRecord)
+	record := new(types.TOTPRecord)
 	err := r.db.NewSelect().
 		Model(record).
 		Column("enabled").
@@ -117,7 +118,7 @@ func (r *TOTPRepository) IsEnabled(ctx context.Context, userID string) (bool, er
 
 func (r *TOTPRepository) SetEnabled(ctx context.Context, userID string, enabled bool) error {
 	_, err := r.db.NewUpdate().
-		Model(&TOTPRecord{}).
+		Model(&types.TOTPRecord{}).
 		Set("enabled = ?", enabled).
 		Set("updated_at = ?", time.Now().UTC()).
 		Where("user_id = ?", userID).
@@ -125,8 +126,8 @@ func (r *TOTPRepository) SetEnabled(ctx context.Context, userID string, enabled 
 	return err
 }
 
-func (r *TOTPRepository) GetTrustedDeviceByToken(ctx context.Context, token string) (*TrustedDevice, error) {
-	device := new(TrustedDevice)
+func (r *TOTPRepository) GetTrustedDeviceByToken(ctx context.Context, token string) (*types.TrustedDevice, error) {
+	device := new(types.TrustedDevice)
 	err := r.db.NewSelect().
 		Model(device).
 		Where("token = ?", token).
@@ -138,8 +139,8 @@ func (r *TOTPRepository) GetTrustedDeviceByToken(ctx context.Context, token stri
 	return device, err
 }
 
-func (r *TOTPRepository) CreateTrustedDevice(ctx context.Context, userID, token, userAgent string, expiresAt time.Time) (*TrustedDevice, error) {
-	device := &TrustedDevice{
+func (r *TOTPRepository) CreateTrustedDevice(ctx context.Context, userID, token, userAgent string, expiresAt time.Time) (*types.TrustedDevice, error) {
+	device := &types.TrustedDevice{
 		ID:        util.GenerateUUID(),
 		UserID:    userID,
 		Token:     token,
@@ -166,7 +167,7 @@ func (r *TOTPRepository) CreateTrustedDevice(ctx context.Context, userID, token,
 
 func (r *TOTPRepository) RefreshTrustedDevice(ctx context.Context, token string, expiresAt time.Time) error {
 	_, err := r.db.NewUpdate().
-		Model(&TrustedDevice{}).
+		Model(&types.TrustedDevice{}).
 		Set("expires_at = ?", expiresAt).
 		Where("token = ?", token).
 		Exec(ctx)
@@ -175,7 +176,7 @@ func (r *TOTPRepository) RefreshTrustedDevice(ctx context.Context, token string,
 
 func (r *TOTPRepository) DeleteTrustedDevicesByUserID(ctx context.Context, userID string) error {
 	_, err := r.db.NewDelete().
-		Model(&TrustedDevice{}).
+		Model(&types.TrustedDevice{}).
 		Where("user_id = ?", userID).
 		Exec(ctx)
 	return err
@@ -183,7 +184,7 @@ func (r *TOTPRepository) DeleteTrustedDevicesByUserID(ctx context.Context, userI
 
 func (r *TOTPRepository) DeleteExpiredTrustedDevices(ctx context.Context) error {
 	_, err := r.db.NewDelete().
-		Model(&TrustedDevice{}).
+		Model(&types.TrustedDevice{}).
 		Where("expires_at < ?", time.Now().UTC()).
 		Exec(ctx)
 	return err
