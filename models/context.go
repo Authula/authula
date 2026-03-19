@@ -122,8 +122,8 @@ func GetUserIDFromContext(ctx context.Context) (string, bool) {
 	}
 
 	// Fallback: check RequestContext (for custom runtime)
-	if rc, ok := GetRequestContext(ctx); ok && rc.UserID != nil {
-		return *rc.UserID, true
+	if reqCtx, ok := GetRequestContext(ctx); ok && reqCtx.UserID != nil {
+		return *reqCtx.UserID, true
 	}
 
 	return "", false

@@ -24,15 +24,15 @@ type EnableUseCase struct {
 }
 
 func NewEnableUseCase(
+	config *types.TOTPPluginConfig,
+	logger models.Logger,
+	eventBus models.EventBus,
 	userService rootservices.UserService,
 	tokenService rootservices.TokenService,
 	verificationService rootservices.VerificationService,
 	totpService *services.TOTPService,
 	backupCodeService *services.BackupCodeService,
 	totpRepo TOTPRepository,
-	config *types.TOTPPluginConfig,
-	eventBus models.EventBus,
-	logger models.Logger,
 ) *EnableUseCase {
 	return &EnableUseCase{
 		UserService:       userService,
@@ -52,7 +52,7 @@ func (uc *EnableUseCase) Enable(ctx context.Context, userID, issuer string) (*ty
 	if err != nil {
 		return nil, err
 	}
-	if existing != nil {
+	if existing != nil && existing.Enabled {
 		return nil, constants.ErrTOTPAlreadyEnabled
 	}
 

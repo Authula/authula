@@ -31,17 +31,13 @@ func Routes(p *TOTPPlugin) []models.Route {
 		UseCase:      uc.VerifyBackupCode,
 		PluginConfig: p.pluginConfig,
 	}
-	viewBackupCodesHandler := &handlers.ViewBackupCodesHandler{
-		UseCase: uc.ViewBackupCodes,
-	}
 
 	return []models.Route{
-		{Path: "/totp/enable", Method: http.MethodPost, Handler: enableHandler.Handler()},
-		{Path: "/totp/disable", Method: http.MethodPost, Handler: disableHandler.Handler()},
-		{Path: "/totp/get-uri", Method: http.MethodPost, Handler: getTOTPURIHandler.Handler()},
-		{Path: "/totp/verify", Method: http.MethodPost, Handler: verifyTOTPHandler.Handler()},
-		{Path: "/totp/generate-backup-codes", Method: http.MethodPost, Handler: generateBackupCodesHandler.Handler()},
-		{Path: "/totp/verify-backup-code", Method: http.MethodPost, Handler: verifyBackupCodeHandler.Handler()},
-		{Path: "/totp/view-backup-codes", Method: http.MethodPost, Handler: viewBackupCodesHandler.Handler()},
+		{Method: http.MethodPost, Path: "/totp/enable", Handler: enableHandler.Handler()},
+		{Method: http.MethodPost, Path: "/totp/disable", Handler: disableHandler.Handler()},
+		{Method: http.MethodGet, Path: "/totp/get-uri", Handler: getTOTPURIHandler.Handler()},
+		{Method: http.MethodPost, Path: "/totp/verify", Handler: verifyTOTPHandler.Handler()},
+		{Method: http.MethodPost, Path: "/totp/verify-backup-code", Handler: verifyBackupCodeHandler.Handler()},
+		{Method: http.MethodPost, Path: "/totp/generate-backup-codes", Handler: generateBackupCodesHandler.Handler()},
 	}
 }

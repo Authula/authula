@@ -341,3 +341,16 @@ func (m *MockEventBus) Subscribe(topic string, handler models.EventHandler) (mod
 func (m *MockEventBus) Unsubscribe(topic string, subscriptionID models.SubscriptionID) {
 	m.Called(topic, subscriptionID)
 }
+
+type MockServiceRegistry struct {
+	mock.Mock
+}
+
+func (m *MockServiceRegistry) Register(name string, service any) {
+	m.Called(name, service)
+}
+
+func (m *MockServiceRegistry) Get(name string) any {
+	args := m.Called(name)
+	return args.Get(0)
+}

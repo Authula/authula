@@ -84,12 +84,14 @@ func publishEvent(eventBus models.EventBus, logger models.Logger, eventType, use
 
 func createSessionForUser(
 	ctx context.Context,
+	globalConfig *models.Config,
+	userID string,
+	verificationID string,
+	ipAddress *string,
+	userAgent *string,
 	tokenService rootservices.TokenService,
 	sessionService rootservices.SessionService,
 	verificationService rootservices.VerificationService,
-	globalConfig *models.Config,
-	userID, verificationID string,
-	ipAddress, userAgent *string,
 ) (*models.Session, string, error) {
 	token, err := tokenService.Generate()
 	if err != nil {

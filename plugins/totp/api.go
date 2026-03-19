@@ -13,7 +13,6 @@ func BuildAPI(plugin *TOTPPlugin) *API {
 	return &API{useCases: useCases}
 }
 
-// UseCases returns the use cases for external access.
 func (a *API) UseCases() *usecases.UseCases {
 	return a.useCases
 }
@@ -21,15 +20,15 @@ func (a *API) UseCases() *usecases.UseCases {
 func BuildUseCases(p *TOTPPlugin) *usecases.UseCases {
 	return &usecases.UseCases{
 		Enable: usecases.NewEnableUseCase(
+			p.pluginConfig,
+			p.logger,
+			p.ctx.EventBus,
 			p.userService,
 			p.tokenService,
 			p.verificationService,
 			p.totpService,
 			p.backupCodeService,
 			p.totpRepo,
-			p.pluginConfig,
-			p.ctx.EventBus,
-			p.logger,
 		),
 		Disable: usecases.NewDisableUseCase(
 			p.logger,
@@ -69,9 +68,6 @@ func BuildUseCases(p *TOTPPlugin) *usecases.UseCases {
 			p.userService,
 			p.verificationService,
 			p.backupCodeService,
-			p.totpRepo,
-		),
-		ViewBackupCodes: usecases.NewViewBackupCodesUseCase(
 			p.totpRepo,
 		),
 	}

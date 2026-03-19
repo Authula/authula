@@ -9,53 +9,163 @@ import (
 )
 
 func TestGenerateSecret(t *testing.T) {
-	svc := NewTOTPService(6, 30)
-	secret, err := svc.GenerateSecret()
-	require.NoError(t, err)
-	assert.NotEmpty(t, secret)
-	assert.Len(t, secret, 32) // Base32 encoded 20 bytes = 32 chars
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		digits int
+		period int
+	}{
+		{
+			name:   "generates a base32 secret",
+			digits: 6,
+			period: 30,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc := NewTOTPService(tt.digits, tt.period)
+			secret, err := svc.GenerateSecret()
+			require.NoError(t, err)
+			assert.NotEmpty(t, secret)
+			assert.Len(t, secret, 32)
+		})
+	}
 }
 
 func TestGenerateAndVerifyCode(t *testing.T) {
-	svc := NewTOTPService(6, 30)
-	secret, err := svc.GenerateSecret()
-	require.NoError(t, err)
+	t.Parallel()
 
-	code, err := svc.GenerateCode(secret, time.Now())
-	require.NoError(t, err)
-	assert.Len(t, code, 6)
+	tests := []struct {
+		name   string
+		digits int
+		period int
+	}{
+		{
+			name:   "generates and validates a current code",
+			digits: 6,
+			period: 30,
+		},
+	}
 
-	assert.True(t, svc.ValidateCode(secret, code, time.Now()))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc := NewTOTPService(tt.digits, tt.period)
+			secret, err := svc.GenerateSecret()
+			require.NoError(t, err)
+
+			now := time.Now()
+			code, err := svc.GenerateCode(secret, now)
+			require.NoError(t, err)
+			assert.Len(t, code, tt.digits)
+
+			assert.True(t, svc.ValidateCode(secret, code, now))
+		})
+	}
 }
 
 func TestValidateCodeRejectsWrongCode(t *testing.T) {
-	svc := NewTOTPService(6, 30)
-	secret, err := svc.GenerateSecret()
-	require.NoError(t, err)
+	t.Parallel()
 
-	assert.False(t, svc.ValidateCode(secret, "000000", time.Now()))
+	tests := []struct {
+		name   string
+		digits int
+		period int
+		code   string
+	}{
+		{
+			name:   "rejects an incorrect code",
+			digits: 6,
+			period: 30,
+			code:   "000000",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc := NewTOTPService(tt.digits, tt.period)
+			secret, err := svc.GenerateSecret()
+			require.NoError(t, err)
+
+			assert.False(t, svc.ValidateCode(secret, tt.code, time.Now()))
+		})
+	}
 }
 
 func TestValidateCodeAcceptsAdjacentWindows(t *testing.T) {
-	svc := NewTOTPService(6, 30)
-	secret, err := svc.GenerateSecret()
-	require.NoError(t, err)
+	t.Parallel()
 
-	// Generate code for 30 seconds ago (t-1 window)
-	past := time.Now().Add(-30 * time.Second)
-	code, err := svc.GenerateCode(secret, past)
-	require.NoError(t, err)
+	tests := []struct {
+		name   string
+		digits int
+		period int
+		window time.Duration
+	}{
+		{
+			name:   "accepts the previous time window",
+			digits: 6,
+			period: 30,
+			window: 30 * time.Second,
+		},
+	}
 
-	// Should still validate at current time (within ±1 window)
-	assert.True(t, svc.ValidateCode(secret, code, time.Now()))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc := NewTOTPService(tt.digits, tt.period)
+			secret, err := svc.GenerateSecret()
+			require.NoError(t, err)
+
+			now := time.Now()
+			past := now.Add(-tt.window)
+			code, err := svc.GenerateCode(secret, past)
+			require.NoError(t, err)
+
+			assert.True(t, svc.ValidateCode(secret, code, now))
+		})
+	}
 }
 
 func TestBuildURI(t *testing.T) {
-	svc := NewTOTPService(6, 30)
-	uri := svc.BuildURI("JBSWY3DPEHPK3PXP", "MyApp", "user@example.com")
-	assert.Contains(t, uri, "otpauth://totp/")
-	assert.Contains(t, uri, "secret=JBSWY3DPEHPK3PXP")
-	assert.Contains(t, uri, "issuer=MyApp")
-	assert.Contains(t, uri, "digits=6")
-	assert.Contains(t, uri, "period=30")
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		digits int
+		period int
+		secret string
+		issuer string
+		email  string
+	}{
+		{
+			name:   "builds a valid otpauth uri",
+			digits: 6,
+			period: 30,
+			secret: "JBSWY3DPEHPK3PXP",
+			issuer: "MyApp",
+			email:  "user@example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc := NewTOTPService(tt.digits, tt.period)
+			uri := svc.BuildURI(tt.secret, tt.issuer, tt.email)
+			assert.Contains(t, uri, "otpauth://totp/")
+			assert.Contains(t, uri, "secret="+tt.secret)
+			assert.Contains(t, uri, "issuer="+tt.issuer)
+			assert.Contains(t, uri, "digits=6")
+			assert.Contains(t, uri, "period=30")
+		})
+	}
 }

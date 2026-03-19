@@ -14,7 +14,6 @@ type UseCases struct {
 	VerifyTOTP          *VerifyTOTPUseCase
 	GenerateBackupCodes *GenerateBackupCodesUseCase
 	VerifyBackupCode    *VerifyBackupCodeUseCase
-	ViewBackupCodes     *ViewBackupCodesUseCase
 }
 
 type TOTPReadRepository interface {

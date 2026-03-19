@@ -22,7 +22,7 @@ func TestCreateAccountHandler(t *testing.T) {
 
 		useCase, _, _, _, _ := admintests.NewAccountsUseCaseFixture()
 		handler := adminhandlers.NewCreateAccountHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users/u1/accounts", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users/u1/accounts", []byte("{invalid"), nil)
 		req.SetPathValue("user_id", "u1")
 
 		handler.Handler()(w, req)
@@ -41,7 +41,7 @@ func TestCreateAccountHandler(t *testing.T) {
 		passwordSvc.On("Hash", "plain").Return("hashed", nil).Once()
 		accountRepo.On("Create", mock.Anything, mock.AnythingOfType("*models.Account")).Return(&models.Account{ID: "acc-1", UserID: "u1"}, nil).Once()
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users/u1/accounts", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users/u1/accounts", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "u1")
 		handler.Handler()(w, req)
 
@@ -65,7 +65,7 @@ func TestGetAccountByIDHandler(t *testing.T) {
 		handler := adminhandlers.NewGetAccountByIDHandler(useCase)
 
 		accountRepo.On("GetByID", mock.Anything, "acc-1").Return((*models.Account)(nil), nil).Once()
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/accounts/acc-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/accounts/acc-1", nil, nil)
 		req.SetPathValue("id", "acc-1")
 		handler.Handler()(w, req)
 
@@ -79,7 +79,7 @@ func TestGetAccountByIDHandler(t *testing.T) {
 		handler := adminhandlers.NewGetAccountByIDHandler(useCase)
 
 		accountRepo.On("GetByID", mock.Anything, "acc-1").Return(&models.Account{ID: "acc-1"}, nil).Once()
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/accounts/acc-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/accounts/acc-1", nil, nil)
 		req.SetPathValue("id", "acc-1")
 		handler.Handler()(w, req)
 
@@ -102,7 +102,7 @@ func TestGetUserAccountsHandler(t *testing.T) {
 	userRepo.On("GetByID", mock.Anything, "u1").Return(&models.User{ID: "u1"}, nil).Once()
 	accountRepo.On("GetAllByUserID", mock.Anything, "u1").Return([]models.Account{{ID: "a1", UserID: "u1"}}, nil).Once()
 
-	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users/u1/accounts", nil)
+	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users/u1/accounts", nil, nil)
 	req.SetPathValue("user_id", "u1")
 	handler.Handler()(w, req)
 
@@ -123,7 +123,7 @@ func TestUpdateAccountHandler(t *testing.T) {
 
 		useCase, _, _, _, _ := admintests.NewAccountsUseCaseFixture()
 		handler := adminhandlers.NewUpdateAccountHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/accounts/acc-1", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/accounts/acc-1", []byte("{invalid"), nil)
 		req.SetPathValue("id", "acc-1")
 		handler.Handler()(w, req)
 		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid request body")
@@ -137,7 +137,7 @@ func TestUpdateAccountHandler(t *testing.T) {
 		scope := "openid"
 
 		accountRepo.On("GetByID", mock.Anything, "acc-1").Return((*models.Account)(nil), nil).Once()
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/accounts/acc-1", internaltests.MarshalToJSON(t, types.UpdateAccountRequest{Scope: &scope}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/accounts/acc-1", internaltests.MarshalToJSON(t, types.UpdateAccountRequest{Scope: &scope}), nil)
 		req.SetPathValue("id", "acc-1")
 		handler.Handler()(w, req)
 
@@ -156,7 +156,7 @@ func TestDeleteAccountHandler(t *testing.T) {
 
 		accountRepo.On("GetByID", mock.Anything, "acc-1").Return(&models.Account{ID: "acc-1"}, nil).Once()
 		accountRepo.On("Delete", mock.Anything, "acc-1").Return(constants.ErrBadRequest).Once()
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/accounts/acc-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/accounts/acc-1", nil, nil)
 		req.SetPathValue("id", "acc-1")
 		handler.Handler()(w, req)
 
@@ -171,7 +171,7 @@ func TestDeleteAccountHandler(t *testing.T) {
 
 		accountRepo.On("GetByID", mock.Anything, "acc-1").Return(&models.Account{ID: "acc-1"}, nil).Once()
 		accountRepo.On("Delete", mock.Anything, "acc-1").Return(nil).Once()
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/accounts/acc-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/accounts/acc-1", nil, nil)
 		req.SetPathValue("id", "acc-1")
 		handler.Handler()(w, req)
 

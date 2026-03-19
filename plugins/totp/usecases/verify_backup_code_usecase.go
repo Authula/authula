@@ -94,7 +94,7 @@ func (uc *VerifyBackupCodeUseCase) Verify(ctx context.Context, pendingToken, cod
 		return nil, constants.ErrUserNotFound
 	}
 
-	session, token, err := createSessionForUser(ctx, uc.TokenService, uc.SessionService, uc.VerificationService, uc.GlobalConfig, userID, verificationID, ipAddress, userAgent)
+	session, token, err := createSessionForUser(ctx, uc.GlobalConfig, userID, verificationID, ipAddress, userAgent, uc.TokenService, uc.SessionService, uc.VerificationService)
 	if err != nil {
 		return nil, err
 	}
