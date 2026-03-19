@@ -26,7 +26,7 @@ func TestGetAllImpersonationsHandler(t *testing.T) {
 		impRepo.On("GetAllImpersonations", mock.Anything).Return(([]types.Impersonation)(nil), errors.New("internal error")).Once()
 		handler := adminhandlers.NewGetAllImpersonationsHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations", nil, nil)
 		handler.Handler()(w, req)
 
 		internaltests.AssertErrorMessage(t, reqCtx, http.StatusInternalServerError, "internal error")
@@ -41,7 +41,7 @@ func TestGetAllImpersonationsHandler(t *testing.T) {
 		impRepo.On("GetAllImpersonations", mock.Anything).Return([]types.Impersonation{{ID: "imp-1", ActorUserID: "actor-1", TargetUserID: "target-1", StartedAt: now, ExpiresAt: now.Add(time.Minute)}}, nil).Once()
 		handler := adminhandlers.NewGetAllImpersonationsHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations", nil, nil)
 		handler.Handler()(w, req)
 
 		if reqCtx.ResponseStatus != http.StatusOK {
@@ -65,7 +65,7 @@ func TestGetImpersonationByIDHandler(t *testing.T) {
 		impRepo.On("GetImpersonationByID", mock.Anything, "imp-1").Return((*types.Impersonation)(nil), adminconstants.ErrNotFound).Once()
 		handler := adminhandlers.NewGetImpersonationByIDHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations/imp-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations/imp-1", nil, nil)
 		req.SetPathValue("impersonation_id", "imp-1")
 		handler.Handler()(w, req)
 
@@ -81,7 +81,7 @@ func TestGetImpersonationByIDHandler(t *testing.T) {
 		impRepo.On("GetImpersonationByID", mock.Anything, "imp-1").Return(&types.Impersonation{ID: "imp-1", ActorUserID: "actor-1", TargetUserID: "target-1", StartedAt: now, ExpiresAt: now.Add(5 * time.Minute)}, nil).Once()
 		handler := adminhandlers.NewGetImpersonationByIDHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations/imp-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations/imp-1", nil, nil)
 		req.SetPathValue("impersonation_id", "imp-1")
 		handler.Handler()(w, req)
 
@@ -102,7 +102,7 @@ func TestStartImpersonationHandler_Unauthorized(t *testing.T) {
 	useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
 	handler := adminhandlers.NewStartImpersonationHandler(useCase)
 
-	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}))
+	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}), nil)
 
 	handler.Handler()(w, req)
 
@@ -115,7 +115,7 @@ func TestStartImpersonationHandler_InvalidJSON(t *testing.T) {
 	useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
 	handler := adminhandlers.NewStartImpersonationHandler(useCase)
 
-	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", []byte("{invalid"))
+	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", []byte("{invalid"), nil)
 	userID := "actor-1"
 	reqCtx.UserID = &userID
 
@@ -133,7 +133,7 @@ func TestStartImpersonationHandler_UseCaseError(t *testing.T) {
 	tokenSvc.On("Generate").Return("", adminconstants.ErrForbidden).Once()
 	handler := adminhandlers.NewStartImpersonationHandler(useCase)
 
-	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}))
+	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}), nil)
 	userID := "actor-1"
 	reqCtx.UserID = &userID
 
@@ -169,7 +169,7 @@ func TestStartImpersonationHandler_SuccessSetsContextValues(t *testing.T) {
 	sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(nil).Once()
 	handler := adminhandlers.NewStartImpersonationHandler(useCase)
 
-	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}))
+	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}), nil)
 	req.Header.Set("User-Agent", userAgent)
 	actorID := "actor-1"
 	reqCtx.UserID = &actorID
@@ -211,7 +211,7 @@ func TestStopImpersonationHandler(t *testing.T) {
 
 		useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
 		handler := adminhandlers.NewStopImpersonationHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
 		req.SetPathValue("impersonation_id", "imp-1")
 
 		handler.Handler()(w, req)
@@ -224,7 +224,7 @@ func TestStopImpersonationHandler(t *testing.T) {
 
 		useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
 		handler := adminhandlers.NewStopImpersonationHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
 		req.SetPathValue("impersonation_id", "imp-1")
 		actorID := "actor-1"
 		reqCtx.UserID = &actorID
@@ -243,7 +243,7 @@ func TestStopImpersonationHandler(t *testing.T) {
 		impRepo.On("GetActiveImpersonationByID", mock.Anything, "imp-1").Return((*types.Impersonation)(nil), nil).Once()
 		handler := adminhandlers.NewStopImpersonationHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
 		req.SetPathValue("impersonation_id", "imp-1")
 		reqCtx.UserID = &actorID
 		reqCtx.Values[models.ContextSessionID.String()] = "session-1"
@@ -266,7 +266,7 @@ func TestStopImpersonationHandler(t *testing.T) {
 		impRepo.On("EndImpersonation", mock.Anything, "imp-1", mock.AnythingOfType("*string")).Return(nil).Once()
 		handler := adminhandlers.NewStopImpersonationHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
 		req.SetPathValue("impersonation_id", "imp-1")
 		reqCtx.UserID = &actorID
 		reqCtx.Values[models.ContextSessionID.String()] = "session-1"

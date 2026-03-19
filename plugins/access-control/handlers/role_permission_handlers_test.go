@@ -21,7 +21,7 @@ func TestCreateRoleHandler(t *testing.T) {
 
 		useCase, _ := tests.NewRolePermissionUseCaseFixture()
 		handler := NewCreateRoleHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/roles", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/roles", []byte("{invalid"), nil)
 
 		handler.Handler()(w, req)
 
@@ -34,7 +34,7 @@ func TestCreateRoleHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("CreateRole", mock.Anything, mock.AnythingOfType("*types.Role")).Return(accesscontrolconstants.ErrConflict).Once()
 		handler := NewCreateRoleHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/roles", internaltests.MarshalToJSON(t, types.CreateRoleRequest{Name: "admin"}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/roles", internaltests.MarshalToJSON(t, types.CreateRoleRequest{Name: "admin"}), nil)
 
 		handler.Handler()(w, req)
 
@@ -48,7 +48,7 @@ func TestCreateRoleHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("CreateRole", mock.Anything, mock.AnythingOfType("*types.Role")).Return(nil).Once()
 		handler := NewCreateRoleHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/roles", internaltests.MarshalToJSON(t, types.CreateRoleRequest{Name: "admin"}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/roles", internaltests.MarshalToJSON(t, types.CreateRoleRequest{Name: "admin"}), nil)
 
 		handler.Handler()(w, req)
 
@@ -72,7 +72,7 @@ func TestGetAllRolesHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("GetAllRoles", mock.Anything).Return(([]types.Role)(nil), errors.New("internal error")).Once()
 		handler := NewGetAllRolesHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles", nil, nil)
 
 		handler.Handler()(w, req)
 
@@ -86,7 +86,7 @@ func TestGetAllRolesHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("GetAllRoles", mock.Anything).Return([]types.Role{{ID: "role-1", Name: "admin"}}, nil).Once()
 		handler := NewGetAllRolesHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles", nil, nil)
 
 		handler.Handler()(w, req)
 
@@ -110,7 +110,7 @@ func TestGetRoleByIDHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("GetRoleByID", mock.Anything, "role-1").Return((*types.Role)(nil), nil).Once()
 		handler := NewGetRoleByIDHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles/role-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles/role-1", nil, nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -126,7 +126,7 @@ func TestGetRoleByIDHandler(t *testing.T) {
 		repo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "admin"}, nil).Once()
 		repo.On("GetRolePermissions", mock.Anything, "role-1").Return([]types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "users.read"}}, nil).Once()
 		handler := NewGetRoleByIDHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles/role-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles/role-1", nil, nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -150,7 +150,7 @@ func TestUpdateRoleHandler(t *testing.T) {
 
 		useCase, _ := tests.NewRolePermissionUseCaseFixture()
 		handler := NewUpdateRoleHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/access-control/roles/role-1", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/access-control/roles/role-1", []byte("{invalid"), nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -165,7 +165,7 @@ func TestUpdateRoleHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("GetRoleByID", mock.Anything, "role-1").Return((*types.Role)(nil), nil).Once()
 		handler := NewUpdateRoleHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/access-control/roles/role-1", internaltests.MarshalToJSON(t, types.UpdateRoleRequest{Name: &name}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/access-control/roles/role-1", internaltests.MarshalToJSON(t, types.UpdateRoleRequest{Name: &name}), nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -181,7 +181,7 @@ func TestUpdateRoleHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "admin", IsSystem: true}, nil).Once()
 		handler := NewUpdateRoleHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/access-control/roles/role-1", internaltests.MarshalToJSON(t, types.UpdateRoleRequest{Name: &name}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/access-control/roles/role-1", internaltests.MarshalToJSON(t, types.UpdateRoleRequest{Name: &name}), nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -199,7 +199,7 @@ func TestUpdateRoleHandler(t *testing.T) {
 		repo.On("UpdateRole", mock.Anything, "role-1", &name, (*string)(nil)).Return(true, nil).Once()
 		repo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: name}, nil).Once()
 		handler := NewUpdateRoleHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/access-control/roles/role-1", internaltests.MarshalToJSON(t, types.UpdateRoleRequest{Name: &name}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/access-control/roles/role-1", internaltests.MarshalToJSON(t, types.UpdateRoleRequest{Name: &name}), nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -225,7 +225,7 @@ func TestDeleteRoleHandler(t *testing.T) {
 		repo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "admin"}, nil).Once()
 		repo.On("CountUserAssignmentsByRoleID", mock.Anything, "role-1").Return(1, nil).Once()
 		handler := NewDeleteRoleHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/roles/role-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/roles/role-1", nil, nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -242,7 +242,7 @@ func TestDeleteRoleHandler(t *testing.T) {
 		repo.On("CountUserAssignmentsByRoleID", mock.Anything, "role-1").Return(0, nil).Once()
 		repo.On("DeleteRole", mock.Anything, "role-1").Return(true, nil).Once()
 		handler := NewDeleteRoleHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/roles/role-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/roles/role-1", nil, nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -267,7 +267,7 @@ func TestGetAllPermissionsHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("GetAllPermissions", mock.Anything).Return(([]types.Permission)(nil), accesscontrolconstants.ErrForbidden).Once()
 		handler := NewGetAllPermissionsHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/permissions", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/permissions", nil, nil)
 
 		handler.Handler()(w, req)
 
@@ -281,7 +281,7 @@ func TestGetAllPermissionsHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("GetAllPermissions", mock.Anything).Return([]types.Permission{{ID: "perm-1", Key: "users.read"}}, nil).Once()
 		handler := NewGetAllPermissionsHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/permissions", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/permissions", nil, nil)
 
 		handler.Handler()(w, req)
 
@@ -305,7 +305,7 @@ func TestGetRolePermissionsHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("GetRoleByID", mock.Anything, "role-1").Return((*types.Role)(nil), nil).Once()
 		handler := NewGetRolePermissionsHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles/role-1/permissions", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles/role-1/permissions", nil, nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -319,7 +319,7 @@ func TestGetRolePermissionsHandler(t *testing.T) {
 
 		useCase, _ := tests.NewRolePermissionUseCaseFixture()
 		handler := NewGetRolePermissionsHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles/%20%20%20/permissions", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles/%20%20%20/permissions", nil, nil)
 		req.SetPathValue("role_id", "   ")
 
 		handler.Handler()(w, req)
@@ -334,7 +334,7 @@ func TestGetRolePermissionsHandler(t *testing.T) {
 		repo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "admin"}, nil).Once()
 		repo.On("GetRolePermissions", mock.Anything, "role-1").Return([]types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "users.read"}}, nil).Once()
 		handler := NewGetRolePermissionsHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles/role-1/permissions", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/roles/role-1/permissions", nil, nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -358,7 +358,7 @@ func TestCreatePermissionHandler(t *testing.T) {
 
 		useCase, _ := tests.NewRolePermissionUseCaseFixture()
 		handler := NewCreatePermissionHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/permissions", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/permissions", []byte("{invalid"), nil)
 
 		handler.Handler()(w, req)
 
@@ -371,7 +371,7 @@ func TestCreatePermissionHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("CreatePermission", mock.Anything, mock.AnythingOfType("*types.Permission")).Return(accesscontrolconstants.ErrBadRequest).Once()
 		handler := NewCreatePermissionHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/permissions", internaltests.MarshalToJSON(t, types.CreatePermissionRequest{Key: "users.read"}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/permissions", internaltests.MarshalToJSON(t, types.CreatePermissionRequest{Key: "users.read"}), nil)
 
 		handler.Handler()(w, req)
 
@@ -385,7 +385,7 @@ func TestCreatePermissionHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("CreatePermission", mock.Anything, mock.AnythingOfType("*types.Permission")).Return(nil).Once()
 		handler := NewCreatePermissionHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/permissions", internaltests.MarshalToJSON(t, types.CreatePermissionRequest{Key: "users.read"}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/permissions", internaltests.MarshalToJSON(t, types.CreatePermissionRequest{Key: "users.read"}), nil)
 
 		handler.Handler()(w, req)
 
@@ -408,7 +408,7 @@ func TestUpdatePermissionHandler(t *testing.T) {
 
 		useCase, _ := tests.NewRolePermissionUseCaseFixture()
 		handler := NewUpdatePermissionHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/permissions/perm-1", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/permissions/perm-1", []byte("{invalid"), nil)
 		req.SetPathValue("permission_id", "perm-1")
 
 		handler.Handler()(w, req)
@@ -423,7 +423,7 @@ func TestUpdatePermissionHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("GetPermissionByID", mock.Anything, "perm-1").Return((*types.Permission)(nil), nil).Once()
 		handler := NewUpdatePermissionHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/permissions/perm-1", internaltests.MarshalToJSON(t, types.UpdatePermissionRequest{Description: &desc}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/permissions/perm-1", internaltests.MarshalToJSON(t, types.UpdatePermissionRequest{Description: &desc}), nil)
 		req.SetPathValue("permission_id", "perm-1")
 
 		handler.Handler()(w, req)
@@ -441,7 +441,7 @@ func TestUpdatePermissionHandler(t *testing.T) {
 		repo.On("UpdatePermission", mock.Anything, "perm-1", &desc).Return(true, nil).Once()
 		repo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read", Description: &desc}, nil).Once()
 		handler := NewUpdatePermissionHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/permissions/perm-1", internaltests.MarshalToJSON(t, types.UpdatePermissionRequest{Description: &desc}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/permissions/perm-1", internaltests.MarshalToJSON(t, types.UpdatePermissionRequest{Description: &desc}), nil)
 		req.SetPathValue("permission_id", "perm-1")
 
 		handler.Handler()(w, req)
@@ -467,7 +467,7 @@ func TestDeletePermissionHandler(t *testing.T) {
 		repo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
 		repo.On("CountRoleAssignmentsByPermissionID", mock.Anything, "perm-1").Return(1, nil).Once()
 		handler := NewDeletePermissionHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/permissions/perm-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/permissions/perm-1", nil, nil)
 		req.SetPathValue("permission_id", "perm-1")
 
 		handler.Handler()(w, req)
@@ -484,7 +484,7 @@ func TestDeletePermissionHandler(t *testing.T) {
 		repo.On("CountRoleAssignmentsByPermissionID", mock.Anything, "perm-1").Return(0, nil).Once()
 		repo.On("DeletePermission", mock.Anything, "perm-1").Return(true, nil).Once()
 		handler := NewDeletePermissionHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/permissions/perm-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/permissions/perm-1", nil, nil)
 		req.SetPathValue("permission_id", "perm-1")
 
 		handler.Handler()(w, req)
@@ -508,7 +508,7 @@ func TestAddRolePermissionHandler(t *testing.T) {
 
 		useCase, _ := tests.NewRolePermissionUseCaseFixture()
 		handler := NewAddRolePermissionHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/roles/role-1/permissions", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/roles/role-1/permissions", []byte("{invalid"), nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -522,7 +522,7 @@ func TestAddRolePermissionHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("GetRoleByID", mock.Anything, "role-1").Return((*types.Role)(nil), nil).Once()
 		handler := NewAddRolePermissionHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/roles/role-1/permissions", internaltests.MarshalToJSON(t, types.AddRolePermissionRequest{PermissionID: "perm-1"}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/roles/role-1/permissions", internaltests.MarshalToJSON(t, types.AddRolePermissionRequest{PermissionID: "perm-1"}), nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -540,7 +540,7 @@ func TestAddRolePermissionHandler(t *testing.T) {
 		repo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
 		repo.On("AddRolePermission", mock.Anything, "role-1", "perm-1", &actorID).Return(nil).Once()
 		handler := NewAddRolePermissionHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/roles/role-1/permissions", internaltests.MarshalToJSON(t, types.AddRolePermissionRequest{PermissionID: "perm-1"}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/roles/role-1/permissions", internaltests.MarshalToJSON(t, types.AddRolePermissionRequest{PermissionID: "perm-1"}), nil)
 		req.SetPathValue("role_id", "role-1")
 		reqCtx.UserID = &actorID
 
@@ -565,7 +565,7 @@ func TestReplaceRolePermissionsHandler(t *testing.T) {
 
 		useCase, _ := tests.NewRolePermissionUseCaseFixture()
 		handler := NewReplaceRolePermissionsHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/roles/role-1/permissions", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/roles/role-1/permissions", []byte("{invalid"), nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -581,7 +581,7 @@ func TestReplaceRolePermissionsHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("ReplaceRolePermissions", mock.Anything, "role-1", request.PermissionIDs, &actorID).Return(accesscontrolconstants.ErrForbidden).Once()
 		handler := NewReplaceRolePermissionsHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/roles/role-1/permissions", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/roles/role-1/permissions", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("role_id", "role-1")
 		reqCtx.UserID = &actorID
 
@@ -598,7 +598,7 @@ func TestReplaceRolePermissionsHandler(t *testing.T) {
 		useCase, repo := tests.NewRolePermissionUseCaseFixture()
 		repo.On("ReplaceRolePermissions", mock.Anything, "role-1", []string{"perm-1", "perm-2"}, (*string)(nil)).Return(nil).Once()
 		handler := NewReplaceRolePermissionsHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/roles/role-1/permissions", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/roles/role-1/permissions", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("role_id", "role-1")
 
 		handler.Handler()(w, req)
@@ -624,7 +624,7 @@ func TestRemoveRolePermissionHandler(t *testing.T) {
 		repo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "admin"}, nil).Once()
 		repo.On("GetPermissionByID", mock.Anything, "perm-1").Return((*types.Permission)(nil), nil).Once()
 		handler := NewRemoveRolePermissionHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/roles/role-1/permissions/perm-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/roles/role-1/permissions/perm-1", nil, nil)
 		req.SetPathValue("role_id", "role-1")
 		req.SetPathValue("permission_id", "perm-1")
 
@@ -642,7 +642,7 @@ func TestRemoveRolePermissionHandler(t *testing.T) {
 		repo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "admin.read"}, nil).Once()
 		repo.On("RemoveRolePermission", mock.Anything, "role-1", "perm-1").Return(nil).Once()
 		handler := NewRemoveRolePermissionHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/roles/role-1/permissions/perm-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/roles/role-1/permissions/perm-1", nil, nil)
 		req.SetPathValue("role_id", "role-1")
 		req.SetPathValue("permission_id", "perm-1")
 

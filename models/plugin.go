@@ -13,6 +13,7 @@ type PluginID string
 
 const (
 	PluginConfigManager    PluginID = "config_manager"
+	PluginAccessControl    PluginID = "access_control"
 	PluginAdmin            PluginID = "admin"
 	PluginSecondaryStorage PluginID = "secondary_storage"
 	PluginEmail            PluginID = "email"
@@ -24,7 +25,7 @@ const (
 	PluginBearer           PluginID = "bearer"
 	PluginRateLimit        PluginID = "ratelimit"
 	PluginMagicLink        PluginID = "magic_link"
-	PluginAccessControl    PluginID = "access_control"
+	PluginTOTP             PluginID = "totp"
 )
 
 func (id PluginID) String() string {

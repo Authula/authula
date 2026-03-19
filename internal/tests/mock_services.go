@@ -276,6 +276,23 @@ func (m *MockTokenService) Decrypt(encrypted string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+type MockPasswordService struct {
+	mock.Mock
+}
+
+func (m *MockPasswordService) Verify(password, encoded string) bool {
+	args := m.Called(password, encoded)
+	return args.Bool(0)
+}
+
+func (m *MockPasswordService) Hash(password string) (string, error) {
+	args := m.Called(password)
+	if args.Get(0) == nil {
+		return "", args.Error(1)
+	}
+	return args.String(0), args.Error(1)
+}
+
 type MockMailerService struct {
 	mock.Mock
 }
@@ -297,4 +314,43 @@ func (m *MockLogger) WithField(key string, value any) models.Logger {
 }
 func (m *MockLogger) WithFields(fields map[string]any) models.Logger {
 	return m
+}
+
+type MockEventBus struct {
+	mock.Mock
+}
+
+func (m *MockEventBus) Publish(ctx context.Context, event models.Event) error {
+	args := m.Called(ctx, event)
+	return args.Error(0)
+}
+
+func (m *MockEventBus) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *MockEventBus) Subscribe(topic string, handler models.EventHandler) (models.SubscriptionID, error) {
+	args := m.Called(topic, handler)
+	if args.Get(0) == nil {
+		return 0, args.Error(1)
+	}
+	return args.Get(0).(models.SubscriptionID), args.Error(1)
+}
+
+func (m *MockEventBus) Unsubscribe(topic string, subscriptionID models.SubscriptionID) {
+	m.Called(topic, subscriptionID)
+}
+
+type MockServiceRegistry struct {
+	mock.Mock
+}
+
+func (m *MockServiceRegistry) Register(name string, service any) {
+	m.Called(name, service)
+}
+
+func (m *MockServiceRegistry) Get(name string) any {
+	args := m.Called(name)
+	return args.Get(0)
 }

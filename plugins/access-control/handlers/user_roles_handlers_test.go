@@ -21,7 +21,7 @@ func TestGetUserRolesHandler(t *testing.T) {
 
 		useCase, _ := tests.NewUserRolesUseCaseFixture()
 		handler := NewGetUserRolesHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users//roles", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users//roles", nil, nil)
 		req.SetPathValue("user_id", "   ")
 
 		handler.Handler()(w, req)
@@ -35,7 +35,7 @@ func TestGetUserRolesHandler(t *testing.T) {
 		useCase, accessRepo := tests.NewUserRolesUseCaseFixture()
 		accessRepo.On("GetUserRoles", mock.Anything, "user-1").Return(([]types.UserRoleInfo)(nil), accesscontrolconstants.ErrNotFound).Once()
 		handler := NewGetUserRolesHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users/user-1/roles", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users/user-1/roles", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -51,7 +51,7 @@ func TestGetUserRolesHandler(t *testing.T) {
 		expiresAt := time.Now().UTC().Add(time.Hour)
 		accessRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{{RoleID: "role-1", RoleName: "admin", ExpiresAt: &expiresAt}}, nil).Once()
 		handler := NewGetUserRolesHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users/user-1/roles", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users/user-1/roles", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -75,7 +75,7 @@ func TestReplaceUserRolesHandler(t *testing.T) {
 
 		useCase, _ := tests.NewRolePermissionUseCaseFixture()
 		handler := NewReplaceUserRolesHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/users/user-1/roles", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/users/user-1/roles", []byte("{invalid"), nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -92,7 +92,7 @@ func TestReplaceUserRolesHandler(t *testing.T) {
 		roleRepo.On("ReplaceUserRoles", mock.Anything, "user-1", request.RoleIDs, &actorID).Return(accesscontrolconstants.ErrForbidden).Once()
 		handler := NewReplaceUserRolesHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/users/user-1/roles", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/users/user-1/roles", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
 		reqCtx.UserID = &actorID
 
@@ -110,7 +110,7 @@ func TestReplaceUserRolesHandler(t *testing.T) {
 		roleRepo.On("ReplaceUserRoles", mock.Anything, "user-1", request.RoleIDs, (*string)(nil)).Return(nil).Once()
 		handler := NewReplaceUserRolesHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/users/user-1/roles", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/users/user-1/roles", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -134,7 +134,7 @@ func TestAssignUserRoleHandler(t *testing.T) {
 
 		useCase, _ := tests.NewRolePermissionUseCaseFixture()
 		handler := NewAssignUserRoleHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/users/user-1/roles", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/users/user-1/roles", []byte("{invalid"), nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -151,7 +151,7 @@ func TestAssignUserRoleHandler(t *testing.T) {
 		roleRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", &actorID, (*time.Time)(nil)).Return(accesscontrolconstants.ErrBadRequest).Once()
 		handler := NewAssignUserRoleHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/users/user-1/roles", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/users/user-1/roles", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
 		reqCtx.UserID = &actorID
 
@@ -169,7 +169,7 @@ func TestAssignUserRoleHandler(t *testing.T) {
 		roleRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), (*time.Time)(nil)).Return(nil).Once()
 		handler := NewAssignUserRoleHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/users/user-1/roles", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/users/user-1/roles", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -195,7 +195,7 @@ func TestRemoveUserRoleHandler(t *testing.T) {
 		roleRepo.On("RemoveUserRole", mock.Anything, "user-1", "role-1").Return(accesscontrolconstants.ErrNotFound).Once()
 		handler := NewRemoveUserRoleHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/users/user-1/roles/role-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/users/user-1/roles/role-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 		req.SetPathValue("role_id", "role-1")
 
@@ -212,7 +212,7 @@ func TestRemoveUserRoleHandler(t *testing.T) {
 		roleRepo.On("RemoveUserRole", mock.Anything, "user-1", "role-1").Return(nil).Once()
 		handler := NewRemoveUserRoleHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/users/user-1/roles/role-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/users/user-1/roles/role-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 		req.SetPathValue("role_id", "role-1")
 
@@ -238,7 +238,7 @@ func TestGetUserEffectivePermissionsHandler(t *testing.T) {
 		useCase, _ := tests.NewUserRolesUseCaseFixture()
 		handler := NewGetUserEffectivePermissionsHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users//permissions", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users//permissions", nil, nil)
 		req.SetPathValue("user_id", "")
 
 		handler.Handler()(w, req)
@@ -253,7 +253,7 @@ func TestGetUserEffectivePermissionsHandler(t *testing.T) {
 		accessRepo.On("GetUserEffectivePermissions", mock.Anything, "user-1").Return(([]types.UserPermissionInfo)(nil), accesscontrolconstants.ErrUnauthorized).Once()
 		handler := NewGetUserEffectivePermissionsHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users/user-1/permissions", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users/user-1/permissions", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -269,7 +269,7 @@ func TestGetUserEffectivePermissionsHandler(t *testing.T) {
 		accessRepo.On("GetUserEffectivePermissions", mock.Anything, "user-1").Return([]types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "admin.read"}}, nil).Once()
 		handler := NewGetUserEffectivePermissionsHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users/user-1/permissions", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users/user-1/permissions", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)

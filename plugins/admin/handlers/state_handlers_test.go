@@ -26,7 +26,7 @@ func TestGetUserStateHandler(t *testing.T) {
 		userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return((*types.AdminUserState)(nil), constants.ErrBadRequest).Once()
 		handler := adminhandlers.NewGetUserStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/user-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/user-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 		handler.Handler()(w, req)
 
@@ -41,7 +41,7 @@ func TestGetUserStateHandler(t *testing.T) {
 		userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return((*types.AdminUserState)(nil), nil).Once()
 		handler := adminhandlers.NewGetUserStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/user-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/user-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 		handler.Handler()(w, req)
 
@@ -56,7 +56,7 @@ func TestGetUserStateHandler(t *testing.T) {
 		userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(&types.AdminUserState{UserID: "user-1", Banned: false}, nil).Once()
 		handler := adminhandlers.NewGetUserStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/user-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/user-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 		handler.Handler()(w, req)
 
@@ -79,7 +79,7 @@ func TestUpsertUserStateHandler(t *testing.T) {
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
 		handler := adminhandlers.NewUpsertUserStateHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/users/user-1", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/users/user-1", []byte("{invalid"), nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -97,7 +97,7 @@ func TestUpsertUserStateHandler(t *testing.T) {
 		userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(constants.ErrBadRequest).Once()
 		handler := adminhandlers.NewUpsertUserStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/users/user-1", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/users/user-1", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
 		reqCtx.UserID = &actorID
 		handler.Handler()(w, req)
@@ -118,7 +118,7 @@ func TestUpsertUserStateHandler(t *testing.T) {
 		userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(result, nil).Once()
 		handler := adminhandlers.NewUpsertUserStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/users/user-1", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/users/user-1", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
 		actorID := "actor-1"
 		reqCtx.UserID = &actorID
@@ -145,7 +145,7 @@ func TestDeleteUserStateHandler(t *testing.T) {
 		userStateRepo.On("Delete", mock.Anything, "user-1").Return(constants.ErrNotFound).Once()
 		handler := adminhandlers.NewDeleteUserStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/states/users/user-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/states/users/user-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 		handler.Handler()(w, req)
 
@@ -160,7 +160,7 @@ func TestDeleteUserStateHandler(t *testing.T) {
 		userStateRepo.On("Delete", mock.Anything, "user-1").Return(nil).Once()
 		handler := adminhandlers.NewDeleteUserStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/states/users/user-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/states/users/user-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 		handler.Handler()(w, req)
 
@@ -185,7 +185,7 @@ func TestGetBannedUserStatesHandler(t *testing.T) {
 		userStateRepo.On("GetBanned", mock.Anything).Return(([]types.AdminUserState)(nil), errors.New("internal error")).Once()
 		handler := adminhandlers.NewGetBannedUserStatesHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/banned", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/banned", nil, nil)
 		handler.Handler()(w, req)
 
 		internaltests.AssertErrorMessage(t, reqCtx, http.StatusInternalServerError, "internal error")
@@ -199,7 +199,7 @@ func TestGetBannedUserStatesHandler(t *testing.T) {
 		userStateRepo.On("GetBanned", mock.Anything).Return([]types.AdminUserState{{UserID: "user-1", Banned: true}}, nil).Once()
 		handler := adminhandlers.NewGetBannedUserStatesHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/banned", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/banned", nil, nil)
 		handler.Handler()(w, req)
 
 		if reqCtx.ResponseStatus != http.StatusOK {
@@ -221,7 +221,7 @@ func TestBanUserHandler(t *testing.T) {
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
 		handler := adminhandlers.NewBanUserHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/ban", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/ban", []byte("{invalid"), nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -239,7 +239,7 @@ func TestBanUserHandler(t *testing.T) {
 		userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(constants.ErrBadRequest).Once()
 		handler := adminhandlers.NewBanUserHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/ban", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/ban", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
 		reqCtx.UserID = &actorID
 		handler.Handler()(w, req)
@@ -260,7 +260,7 @@ func TestBanUserHandler(t *testing.T) {
 		userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(result, nil).Once()
 		handler := adminhandlers.NewBanUserHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/ban", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/ban", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
 		actorID := "actor-1"
 		reqCtx.UserID = &actorID
@@ -289,7 +289,7 @@ func TestUnbanUserHandler(t *testing.T) {
 		userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(constants.ErrNotFound).Once()
 		handler := adminhandlers.NewUnbanUserHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/unban", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/unban", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 		handler.Handler()(w, req)
 
@@ -308,7 +308,7 @@ func TestUnbanUserHandler(t *testing.T) {
 		userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(result, nil).Once()
 		handler := adminhandlers.NewUnbanUserHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/unban", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/unban", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 		actorID := "actor-1"
 		reqCtx.UserID = &actorID
@@ -336,7 +336,7 @@ func TestGetSessionStateHandler(t *testing.T) {
 		sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return((*types.AdminSessionState)(nil), constants.ErrForbidden).Once()
 		handler := adminhandlers.NewGetSessionStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/sessions/session-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/sessions/session-1", nil, nil)
 		req.SetPathValue("session_id", "session-1")
 		handler.Handler()(w, req)
 
@@ -351,7 +351,7 @@ func TestGetSessionStateHandler(t *testing.T) {
 		sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return((*types.AdminSessionState)(nil), nil).Once()
 		handler := adminhandlers.NewGetSessionStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/sessions/session-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/sessions/session-1", nil, nil)
 		req.SetPathValue("session_id", "session-1")
 		handler.Handler()(w, req)
 
@@ -366,7 +366,7 @@ func TestGetSessionStateHandler(t *testing.T) {
 		sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return(&types.AdminSessionState{SessionID: "session-1"}, nil).Once()
 		handler := adminhandlers.NewGetSessionStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/sessions/session-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/sessions/session-1", nil, nil)
 		req.SetPathValue("session_id", "session-1")
 		handler.Handler()(w, req)
 
@@ -389,7 +389,7 @@ func TestUpsertSessionStateHandler(t *testing.T) {
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
 		handler := adminhandlers.NewUpsertSessionStateHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/sessions/session-1", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/sessions/session-1", []byte("{invalid"), nil)
 		req.SetPathValue("session_id", "session-1")
 
 		handler.Handler()(w, req)
@@ -407,7 +407,7 @@ func TestUpsertSessionStateHandler(t *testing.T) {
 		sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(constants.ErrBadRequest).Once()
 		handler := adminhandlers.NewUpsertSessionStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/sessions/session-1", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/sessions/session-1", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("session_id", "session-1")
 		reqCtx.UserID = &actorID
 		handler.Handler()(w, req)
@@ -426,7 +426,7 @@ func TestUpsertSessionStateHandler(t *testing.T) {
 		sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return(&types.AdminSessionState{SessionID: "session-1"}, nil).Once()
 		handler := adminhandlers.NewUpsertSessionStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/sessions/session-1", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/sessions/session-1", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("session_id", "session-1")
 		actorID := "actor-1"
 		reqCtx.UserID = &actorID
@@ -453,7 +453,7 @@ func TestDeleteSessionStateHandler(t *testing.T) {
 		sessionStateRepo.On("Delete", mock.Anything, "session-1").Return(constants.ErrNotFound).Once()
 		handler := adminhandlers.NewDeleteSessionStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/states/sessions/session-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/states/sessions/session-1", nil, nil)
 		req.SetPathValue("session_id", "session-1")
 		handler.Handler()(w, req)
 
@@ -468,7 +468,7 @@ func TestDeleteSessionStateHandler(t *testing.T) {
 		sessionStateRepo.On("Delete", mock.Anything, "session-1").Return(nil).Once()
 		handler := adminhandlers.NewDeleteSessionStateHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/states/sessions/session-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/states/sessions/session-1", nil, nil)
 		req.SetPathValue("session_id", "session-1")
 		handler.Handler()(w, req)
 
@@ -493,7 +493,7 @@ func TestGetRevokedSessionStatesHandler(t *testing.T) {
 		sessionStateRepo.On("GetRevoked", mock.Anything).Return(([]types.AdminSessionState)(nil), errors.New("internal error")).Once()
 		handler := adminhandlers.NewGetRevokedSessionStatesHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/sessions/revoked", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/sessions/revoked", nil, nil)
 		handler.Handler()(w, req)
 
 		internaltests.AssertErrorMessage(t, reqCtx, http.StatusInternalServerError, "internal error")
@@ -507,7 +507,7 @@ func TestGetRevokedSessionStatesHandler(t *testing.T) {
 		sessionStateRepo.On("GetRevoked", mock.Anything).Return([]types.AdminSessionState{{SessionID: "session-1"}}, nil).Once()
 		handler := adminhandlers.NewGetRevokedSessionStatesHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/sessions/revoked", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/sessions/revoked", nil, nil)
 		handler.Handler()(w, req)
 
 		if reqCtx.ResponseStatus != http.StatusOK {
@@ -532,7 +532,7 @@ func TestGetUserAdminSessionsHandler(t *testing.T) {
 		sessionStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(([]types.AdminUserSession)(nil), constants.ErrNotFound).Once()
 		handler := adminhandlers.NewGetUserAdminSessionsHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/user-1/sessions", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/user-1/sessions", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 		handler.Handler()(w, req)
 
@@ -550,7 +550,7 @@ func TestGetUserAdminSessionsHandler(t *testing.T) {
 		sessionStateRepo.On("GetByUserID", mock.Anything, "user-1").Return([]types.AdminUserSession{{Session: models.Session{ID: "session-1", UserID: "user-1", ExpiresAt: expiresAt}}}, nil).Once()
 		handler := adminhandlers.NewGetUserAdminSessionsHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/user-1/sessions", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/user-1/sessions", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 		handler.Handler()(w, req)
 
@@ -575,7 +575,7 @@ func TestRevokeSessionHandler(t *testing.T) {
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
 		handler := adminhandlers.NewRevokeSessionHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/sessions/session-1/revoke", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/sessions/session-1/revoke", []byte("{invalid"), nil)
 		req.SetPathValue("session_id", "session-1")
 		handler.Handler()(w, req)
 
@@ -591,7 +591,7 @@ func TestRevokeSessionHandler(t *testing.T) {
 		sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(constants.ErrForbidden).Once()
 		handler := adminhandlers.NewRevokeSessionHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/sessions/session-1/revoke", internaltests.MarshalToJSON(t, types.RevokeSessionRequest{Reason: &reason}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/sessions/session-1/revoke", internaltests.MarshalToJSON(t, types.RevokeSessionRequest{Reason: &reason}), nil)
 		req.SetPathValue("session_id", "session-1")
 		handler.Handler()(w, req)
 
@@ -609,7 +609,7 @@ func TestRevokeSessionHandler(t *testing.T) {
 		sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return(&types.AdminSessionState{SessionID: "session-1", RevokedReason: &reason}, nil).Once()
 		handler := adminhandlers.NewRevokeSessionHandler(useCase)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/sessions/session-1/revoke", internaltests.MarshalToJSON(t, types.RevokeSessionRequest{Reason: &reason}))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/sessions/session-1/revoke", internaltests.MarshalToJSON(t, types.RevokeSessionRequest{Reason: &reason}), nil)
 		req.SetPathValue("session_id", "session-1")
 		actorID := "actor-1"
 		reqCtx.UserID = &actorID

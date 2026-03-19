@@ -74,6 +74,7 @@ GoBetterAuth comes with a variety of plugins that provide essential authenticati
 
 - 📧 Email & Password: Authentication, Email Verification & Password Reset
 - 🌐 OAuth providers
+- 🔐 TOTP: Authenticator app support, backup codes, trusted devices for two-factor authentication
 - 💾 Multiple database backends
 - 🗄️ Secondary storage (Redis, memory, DB)
 - ⚡ Rate limiting

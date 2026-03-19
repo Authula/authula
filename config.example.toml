@@ -144,19 +144,19 @@ buffer_size = 100
 
 # --- Config Manager Plugin (allows runtime configuration changes via the Admin API) ---
 
-[plugins.config_manager]
-enabled = false
+# [plugins.config_manager]
+# enabled = true
 
 # --- Access Control Plugin (role based access control) ---
 
-[plugins.access_control]
-enabled = false
+# [plugins.access_control]
+# enabled = true
 
 # --- Admin Plugin (user, state, and impersonation operations) ---
 
-[plugins.admin]
-enabled = false
-impersonation_max_expires_in = "15m"
+# [plugins.admin]
+# enabled = true
+# impersonation_max_expires_in = "15m"
 
 # --- Secondary Storage Plugin (provides secondary storage backends for other plugins) ---
 
@@ -339,6 +339,19 @@ enabled = true
 # expires_in = "15m"
 # disable_sign_up = false
 
+# --- TOTP Plugin (Time-based One-Time Password) ---
+
+# [plugins.totp]
+# enabled = true
+# skip_verification_on_enable = false
+# backup_code_count = 10
+# trusted_device_duration = "720h"
+# trusted_devices_auto_cleanup = true
+# trusted_devices_cleanup_interval = "1h"
+# pending_token_expiry = "10m"
+# secure_cookie = false
+# same_site = "lax"  # Options: "lax", "strict", "none"
+
 # -----------------------------------
 # - Route-to-Plugin Mappings (Standalone Mode)
 # -----------------------------------
@@ -356,6 +369,19 @@ enabled = true
 # [[route_mappings]]
 # path = "/sign-in"
 # method = "POST"
+# plugins = ["session.auth.optional", "totp.intercept"]
+
+# If using TOTP plugin, keep /totp/verify and /totp/verify-backup-code accessible
+# to the pending-token flow (do not require an existing session cookie).
+# [[route_mappings]]
+# path = "/totp/verify"
+# method = "POST"
+# plugins = ["session.auth.optional"]
+
+# [[route_mappings]]
+# path = "/totp/verify-backup-code"
+# method = "POST"
+# plugins = ["session.auth.optional"]
 
 # [[route_mappings]]
 # path = "/sign-up"

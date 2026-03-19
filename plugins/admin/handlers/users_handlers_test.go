@@ -22,7 +22,7 @@ func TestCreateUserHandler(t *testing.T) {
 
 		useCase, _ := admintests.NewUsersUseCaseFixture()
 		handler := adminhandlers.NewCreateUserHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users", []byte("{invalid"), nil)
 
 		handler.Handler()(w, req)
 
@@ -36,7 +36,7 @@ func TestCreateUserHandler(t *testing.T) {
 		request := types.CreateUserRequest{Name: "User", Email: "user@example.com"}
 		repo.On("GetByEmail", mock.Anything, "user@example.com").Return(&models.User{ID: "existing", Email: "user@example.com"}, nil).Once()
 		handler := adminhandlers.NewCreateUserHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users", internaltests.MarshalToJSON(t, request), nil)
 
 		handler.Handler()(w, req)
 
@@ -56,7 +56,7 @@ func TestCreateUserHandler(t *testing.T) {
 			Email: "user@example.com",
 		}, nil).Once()
 		handler := adminhandlers.NewCreateUserHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users", internaltests.MarshalToJSON(t, request), nil)
 
 		handler.Handler()(w, req)
 
@@ -79,7 +79,7 @@ func TestGetAllUsersHandler(t *testing.T) {
 
 		useCase, _ := admintests.NewUsersUseCaseFixture()
 		handler := adminhandlers.NewGetAllUsersHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users?limit=invalid", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users?limit=invalid", nil, nil)
 
 		handler.Handler()(w, req)
 
@@ -92,7 +92,7 @@ func TestGetAllUsersHandler(t *testing.T) {
 		useCase, repo := admintests.NewUsersUseCaseFixture()
 		repo.On("GetAll", mock.Anything, (*string)(nil), 10).Return(([]models.User)(nil), (*string)(nil), constants.ErrForbidden).Once()
 		handler := adminhandlers.NewGetAllUsersHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users", nil, nil)
 
 		handler.Handler()(w, req)
 
@@ -108,7 +108,7 @@ func TestGetAllUsersHandler(t *testing.T) {
 		queryCursor := "cur-1"
 		repo.On("GetAll", mock.Anything, &queryCursor, 5).Return([]models.User{{ID: "user-1", Email: "u1@example.com"}}, &cursor, nil).Once()
 		handler := adminhandlers.NewGetAllUsersHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users?cursor=cur-1&limit=5", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users?cursor=cur-1&limit=5", nil, nil)
 
 		handler.Handler()(w, req)
 
@@ -138,7 +138,7 @@ func TestGetUserByIDHandler(t *testing.T) {
 		useCase, repo := admintests.NewUsersUseCaseFixture()
 		repo.On("GetByID", mock.Anything, "user-1").Return((*models.User)(nil), constants.ErrUnauthorized).Once()
 		handler := adminhandlers.NewGetUserByIDHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users/user-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users/user-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -153,7 +153,7 @@ func TestGetUserByIDHandler(t *testing.T) {
 		useCase, repo := admintests.NewUsersUseCaseFixture()
 		repo.On("GetByID", mock.Anything, "user-1").Return((*models.User)(nil), nil).Once()
 		handler := adminhandlers.NewGetUserByIDHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users/user-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users/user-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -168,7 +168,7 @@ func TestGetUserByIDHandler(t *testing.T) {
 		useCase, repo := admintests.NewUsersUseCaseFixture()
 		repo.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil).Once()
 		handler := adminhandlers.NewGetUserByIDHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users/user-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users/user-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -192,7 +192,7 @@ func TestUpdateUserHandler(t *testing.T) {
 
 		useCase, _ := admintests.NewUsersUseCaseFixture()
 		handler := adminhandlers.NewUpdateUserHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/users/user-1", []byte("{invalid"))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/users/user-1", []byte("{invalid"), nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -208,7 +208,7 @@ func TestUpdateUserHandler(t *testing.T) {
 		request := types.UpdateUserRequest{Name: &name}
 		repo.On("GetByID", mock.Anything, "user-1").Return((*models.User)(nil), constants.ErrBadRequest).Once()
 		handler := adminhandlers.NewUpdateUserHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/users/user-1", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/users/user-1", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -226,7 +226,7 @@ func TestUpdateUserHandler(t *testing.T) {
 		repo.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Name: "Old"}, nil).Once()
 		repo.On("Update", mock.Anything, mock.AnythingOfType("*models.User")).Return(&models.User{ID: "user-1", Name: "Updated"}, nil).Once()
 		handler := adminhandlers.NewUpdateUserHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/users/user-1", internaltests.MarshalToJSON(t, request))
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/users/user-1", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -252,7 +252,7 @@ func TestDeleteUserHandler(t *testing.T) {
 		repo.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1"}, nil).Once()
 		repo.On("Delete", mock.Anything, "user-1").Return(constants.ErrBadRequest).Once()
 		handler := adminhandlers.NewDeleteUserHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/users/user-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/users/user-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)
@@ -268,7 +268,7 @@ func TestDeleteUserHandler(t *testing.T) {
 		repo.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1"}, nil).Once()
 		repo.On("Delete", mock.Anything, "user-1").Return(nil).Once()
 		handler := adminhandlers.NewDeleteUserHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/users/user-1", nil)
+		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/users/user-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 
 		handler.Handler()(w, req)

@@ -26,6 +26,8 @@ import (
 	ratelimitplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/rate-limit"
 	secondarystorageplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/secondary-storage"
 	sessionplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/session"
+	totpplugin "github.com/GoBetterAuth/go-better-auth/v2/plugins/totp"
+	totplugintypes "github.com/GoBetterAuth/go-better-auth/v2/plugins/totp/types"
 )
 
 // PluginFactory defines a factory function for creating a plugin instance from typed config data.
@@ -244,6 +246,22 @@ var pluginFactories = []PluginFactory{
 		},
 		Constructor: func(typedConfig any) models.Plugin {
 			return accesscontrolplugin.New(typedConfig.(accesscontrolplugintypes.AccessControlPluginConfig))
+		},
+	},
+	{
+		ID:                models.PluginTOTP.String(),
+		RequiredByDefault: false,
+		ConfigParser: func(rawConfig any) (any, error) {
+			config := totplugintypes.TOTPPluginConfig{}
+			if rawConfig != nil {
+				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
+					return nil, fmt.Errorf("failed to parse totp plugin config: %w", err)
+				}
+			}
+			return config, nil
+		},
+		Constructor: func(typedConfig any) models.Plugin {
+			return totpplugin.New(typedConfig.(totplugintypes.TOTPPluginConfig))
 		},
 	},
 }
