@@ -203,12 +203,12 @@ func TestTodoRepository_TableDriven(t *testing.T) {
 	}{
 		{
 			name:    "simple title",
-			title:   "Buy milk",
+			title:   "Read documentation",
 			wantErr: false,
 		},
 		{
 			name:    "long title",
-			title:   "Call mom about the party on Saturday",
+			title:   "This is a very long title that should still work fine",
 			wantErr: false,
 		},
 		{
