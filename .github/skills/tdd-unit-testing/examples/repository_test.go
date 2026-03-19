@@ -10,6 +10,32 @@ import (
 	"github.com/uptake/go-bun/driver/sqliteshim"
 )
 
+// ================== TEST FIXTURE ==================
+
+// setupTestDB creates an in-memory SQLite database with Bun ORM.
+func setupTestDB(t *testing.T) bun.IDB {
+	// Open in-memory SQLite
+	sqldb, err := sql.Open(sqliteshim.ShimName, "file::memory:?cache=shared")
+	assert.NoError(t, err)
+
+	// Create Bun database instance
+	db := bun.NewDB(sqldb)
+
+	t.Cleanup(func() {
+		db.Close()
+	})
+
+	// Register models for schema creation
+	db.RegisterModel((*Todo)(nil))
+
+	// Create todos table using Bun schema
+	ctx := context.Background()
+	_, err = db.NewCreateTable().Model((*Todo)(nil)).Exec(ctx)
+	assert.NoError(t, err)
+
+	return db
+}
+
 // Todo represents the table structure (Bun model).
 type Todo struct {
 	ID        string `bun:"id,pk"`
@@ -62,66 +88,108 @@ func randomID() string {
 
 // ================== REAL DATABASE TESTS ==================
 
-// TestTodoRepository_Create_Success tests CREATE against real SQLite via Bun.
-func TestTodoRepository_Create_Success(t *testing.T) {
+func TestTodoRepository_Create(t *testing.T) {
 	t.Parallel()
 
-	// Arrange: Set up in-memory SQLite database with Bun
-	db := setupTestDB(t)
-	repo := NewTodoRepository(db)
+	tests := []struct {
+		name          string
+		title         string
+		wantTitle     string
+		wantCompleted bool
+	}{
+		{
+			name:          "creates todo successfully",
+			title:         "Learn Go testing",
+			wantTitle:     "Learn Go testing",
+			wantCompleted: false,
+		},
+	}
 
-	// Act
-	ctx := context.Background()
-	todoID, err := repo.Create(ctx, "Learn Go testing")
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	// Assert
-	assert.NoError(t, err)
-	assert.NotEmpty(t, todoID)
+			db := setupTestDB(t)
+			repo := NewTodoRepository(db)
+			ctx := context.Background()
 
-	// Verify it was actually inserted
-	title, completed, err := repo.GetByID(ctx, todoID)
-	assert.NoError(t, err)
-	assert.Equal(t, "Learn Go testing", title)
-	assert.False(t, completed)
+			todoID, err := repo.Create(ctx, tt.title)
+
+			assert.NoError(t, err)
+			assert.NotEmpty(t, todoID)
+
+			title, completed, err := repo.GetByID(ctx, todoID)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantTitle, title)
+			assert.Equal(t, tt.wantCompleted, completed)
+		})
+	}
 }
 
-// TestTodoRepository_GetByID_NotFound shows testing error cases.
-func TestTodoRepository_GetByID_NotFound(t *testing.T) {
+func TestTodoRepository_GetByID(t *testing.T) {
 	t.Parallel()
 
-	db := setupTestDB(t)
-	repo := NewTodoRepository(db)
+	tests := []struct {
+		name string
+		id   string
+	}{
+		{
+			name: "returns error for missing todo",
+			id:   "nonexistent",
+		},
+	}
 
-	// Act: Retrieve non-existent todo
-	ctx := context.Background()
-	_, _, err := repo.GetByID(ctx, "nonexistent")
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	// Assert: Should get error
-	assert.Error(t, err)
+			db := setupTestDB(t)
+			repo := NewTodoRepository(db)
+			ctx := context.Background()
+
+			_, _, err := repo.GetByID(ctx, tt.id)
+			assert.Error(t, err)
+		})
+	}
 }
 
-// TestTodoRepository_MarkComplete tests UPDATE operation.
 func TestTodoRepository_MarkComplete(t *testing.T) {
 	t.Parallel()
 
-	db := setupTestDB(t)
-	repo := NewTodoRepository(db)
-	ctx := context.Background()
+	tests := []struct {
+		name     string
+		title    string
+		wantDone bool
+	}{
+		{
+			name:     "marks todo complete",
+			title:    "Fix bug",
+			wantDone: true,
+		},
+	}
 
-	// Arrange: Create a todo first
-	todoID, err := repo.Create(ctx, "Fix bug")
-	assert.NoError(t, err)
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	// Act: Mark complete
-	err = repo.MarkComplete(ctx, todoID)
+			db := setupTestDB(t)
+			repo := NewTodoRepository(db)
+			ctx := context.Background()
 
-	// Assert
-	assert.NoError(t, err)
+			todoID, err := repo.Create(ctx, tt.title)
+			assert.NoError(t, err)
 
-	// Verify update succeeded
-	_, completed, err := repo.GetByID(ctx, todoID)
-	assert.NoError(t, err)
-	assert.True(t, completed)
+			err = repo.MarkComplete(ctx, todoID)
+			assert.NoError(t, err)
+
+			_, completed, err := repo.GetByID(ctx, todoID)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantDone, completed)
+		})
+	}
 }
 
 // TestTodoRepository_TableDriven shows multiple operations in one test.
@@ -133,9 +201,21 @@ func TestTodoRepository_TableDriven(t *testing.T) {
 		title   string
 		wantErr bool
 	}{
-		{name: "simple title", title: "Buy milk", wantErr: false},
-		{name: "long title", title: "Call mom about the party on Saturday", wantErr: false},
-		{name: "empty title", title: "", wantErr: false}, // DB allows empty, validation in service layer
+		{
+			name:    "simple title",
+			title:   "Buy milk",
+			wantErr: false,
+		},
+		{
+			name:    "long title",
+			title:   "Call mom about the party on Saturday",
+			wantErr: false,
+		},
+		{
+			name:    "empty title",
+			title:   "",
+			wantErr: false, // DB allows empty, validation in service layer
+		},
 	}
 
 	for _, tt := range tests {
@@ -164,30 +244,4 @@ func TestTodoRepository_TableDriven(t *testing.T) {
 			}
 		})
 	}
-}
-
-// ================== TEST FIXTURE ==================
-
-// setupTestDB creates an in-memory SQLite database with Bun ORM.
-func setupTestDB(t *testing.T) bun.IDB {
-	// Open in-memory SQLite
-	sqldb, err := sql.Open(sqliteshim.ShimName, "file::memory:?cache=shared")
-	assert.NoError(t, err)
-
-	// Create Bun database instance
-	db := bun.NewDB(sqldb)
-
-	t.Cleanup(func() {
-		db.Close()
-	})
-
-	// Register models for schema creation
-	db.RegisterModel((*Todo)(nil))
-
-	// Create todos table using Bun schema
-	ctx := context.Background()
-	_, err = db.NewCreateTable().Model((*Todo)(nil)).Exec(ctx)
-	assert.NoError(t, err)
-
-	return db
 }

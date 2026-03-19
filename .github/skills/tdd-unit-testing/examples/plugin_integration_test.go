@@ -41,149 +41,191 @@ func (f *todosFixture) JSONRequest(method, path string, body any) *http.Response
 func (f *todosFixture) CreateTodo(title string) string { return "" }
 
 func TestCreateTodo(t *testing.T) {
-	t.Run("authenticated - creates todo successfully", func(t *testing.T) {
-		// Arrange: Set up fixtures and seed data
-		f := newTodosFixture(t) // Helper that initializes plugin and router
-		f.SeedUser("alice", "alice@example.com")
-		f.AuthenticateAs("alice")
+	tests := []struct {
+		name            string
+		seedUserID      string
+		seedEmail       string
+		authenticatedAs string
+		payload         map[string]any
+		wantStatus      int
+		checkResponse   func(t *testing.T, w *http.Response)
+	}{
+		{
+			name:            "authenticated - creates todo successfully",
+			seedUserID:      "alice",
+			seedEmail:       "alice@example.com",
+			authenticatedAs: "alice",
+			payload:         map[string]any{"title": "Learn testing"},
+			wantStatus:      http.StatusCreated,
+			checkResponse: func(t *testing.T, w *http.Response) {
+				var response map[string]any
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.NotEmpty(t, response["id"])
+			},
+		},
+		{
+			name:       "unauthenticated - returns 401",
+			payload:    map[string]any{"title": "Learn testing"},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:            "invalid payload - returns validation error",
+			seedUserID:      "charlie",
+			seedEmail:       "charlie@example.com",
+			authenticatedAs: "charlie",
+			payload:         map[string]any{},
+			wantStatus:      http.StatusBadRequest,
+		},
+	}
 
-		// Act: Make HTTP request
-		payload := map[string]any{"title": "Learn testing"}
-		w := f.JSONRequest(http.MethodPost, "/todos", payload)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newTodosFixture(t)
+			if tt.seedUserID != "" {
+				f.SeedUser(tt.seedUserID, tt.seedEmail)
+			}
+			if tt.authenticatedAs != "" {
+				f.AuthenticateAs(tt.authenticatedAs)
+			}
 
-		// Assert
-		assert.Equal(t, http.StatusCreated, w.Code)
-
-		var response map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.NotEmpty(t, response["id"])
-	})
-
-	t.Run("unauthenticated - returns 401", func(t *testing.T) {
-		// Arrange: No authentication set
-		f := newTodosFixture(t)
-
-		// Act: Make HTTP request without auth
-		payload := map[string]any{"title": "Learn testing"}
-		w := f.JSONRequest(http.MethodPost, "/todos", payload)
-
-		// Assert
-		assert.Equal(t, http.StatusUnauthorized, w.Code)
-	})
-
-	t.Run("invalid payload - returns validation error", func(t *testing.T) {
-		// Arrange
-		f := newTodosFixture(t)
-		f.SeedUser("charlie", "charlie@example.com")
-		f.AuthenticateAs("charlie")
-
-		// Act: Request with missing required field
-		payload := map[string]any{} // missing title
-		w := f.JSONRequest(http.MethodPost, "/todos", payload)
-
-		// Assert
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-	})
+			w := f.JSONRequest(http.MethodPost, "/todos", tt.payload)
+			assert.Equal(t, tt.wantStatus, w.Code)
+			if tt.checkResponse != nil {
+				tt.checkResponse(t, w)
+			}
+		})
+	}
 }
 
 func TestGetTodo(t *testing.T) {
-	t.Run("authenticated - returns todo", func(t *testing.T) {
-		// Arrange
-		f := newTodosFixture(t)
-		f.SeedUser("alice", "alice@example.com")
-		f.AuthenticateAs("alice")
-		todoID := f.CreateTodo("Read documentation")
+	tests := []struct {
+		name            string
+		seedUserID      string
+		seedEmail       string
+		authenticatedAs string
+		createTodo      string
+		path            string
+		wantStatus      int
+		checkResponse   func(t *testing.T, w *http.Response)
+	}{
+		{
+			name:            "authenticated - returns todo",
+			seedUserID:      "alice",
+			seedEmail:       "alice@example.com",
+			authenticatedAs: "alice",
+			createTodo:      "Read documentation",
+			path:            "/todos/{todoID}",
+			wantStatus:      http.StatusOK,
+			checkResponse: func(t *testing.T, w *http.Response) {
+				var response map[string]any
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Equal(t, "Read documentation", response["title"])
+			},
+		},
+		{
+			name:       "unauthenticated - returns 401",
+			path:       "/todos/todo-1",
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:            "not found - returns 404",
+			seedUserID:      "bob",
+			seedEmail:       "bob@example.com",
+			authenticatedAs: "bob",
+			path:            "/todos/nonexistent-id",
+			wantStatus:      http.StatusNotFound,
+		},
+	}
 
-		// Act
-		w := f.JSONRequest(http.MethodGet, "/todos/"+todoID, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newTodosFixture(t)
+			if tt.seedUserID != "" {
+				f.SeedUser(tt.seedUserID, tt.seedEmail)
+			}
+			if tt.authenticatedAs != "" {
+				f.AuthenticateAs(tt.authenticatedAs)
+			}
 
-		// Assert
-		assert.Equal(t, http.StatusOK, w.Code)
+			path := tt.path
+			if tt.createTodo != "" {
+				todoID := f.CreateTodo(tt.createTodo)
+				path = "/todos/" + todoID
+			}
 
-		var response map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.Equal(t, "Read documentation", response["title"])
-	})
-
-	t.Run("unauthenticated - returns 401", func(t *testing.T) {
-		// Arrange: Plugin requires authentication
-		f := newTodosFixture(t)
-
-		// Act: No authentication set
-		w := f.JSONRequest(http.MethodGet, "/todos/todo-1", nil)
-
-		// Assert
-		assert.Equal(t, http.StatusUnauthorized, w.Code)
-	})
-
-	t.Run("not found - returns 404", func(t *testing.T) {
-		// Arrange
-		f := newTodosFixture(t)
-		f.SeedUser("bob", "bob@example.com")
-		f.AuthenticateAs("bob")
-
-		// Act: Request non-existent todo
-		w := f.JSONRequest(http.MethodGet, "/todos/nonexistent-id", nil)
-
-		// Assert
-		assert.Equal(t, http.StatusNotFound, w.Code)
-	})
+			w := f.JSONRequest(http.MethodGet, path, nil)
+			assert.Equal(t, tt.wantStatus, w.Code)
+			if tt.checkResponse != nil {
+				tt.checkResponse(t, w)
+			}
+		})
+	}
 }
 
 func TestMarkComplete(t *testing.T) {
-	t.Run("success - marks todo complete", func(t *testing.T) {
-		// Arrange
-		f := newTodosFixture(t)
-		f.SeedUser("bob", "bob@example.com")
-		f.AuthenticateAs("bob")
-		todoID := f.CreateTodo("Fix bug")
+	tests := []struct {
+		name            string
+		seedUsers       []struct{ id, email string }
+		authenticatedAs string
+		createTodo      string
+		path            string
+		requestAs       string
+		wantStatus      int
+	}{
+		{
+			name:            "success - marks todo complete",
+			seedUsers:       []struct{ id, email string }{{id: "bob", email: "bob@example.com"}},
+			authenticatedAs: "bob",
+			createTodo:      "Fix bug",
+			path:            "/todos/{todoID}/complete",
+			wantStatus:      http.StatusOK,
+		},
+		{
+			name:       "unauthenticated - returns 401",
+			path:       "/todos/todo-1/complete",
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:            "not found - returns 404",
+			seedUsers:       []struct{ id, email string }{{id: "alice", email: "alice@example.com"}},
+			authenticatedAs: "alice",
+			path:            "/todos/nonexistent-id/complete",
+			wantStatus:      http.StatusNotFound,
+		},
+		{
+			name:            "forbidden - marks other user's todo",
+			seedUsers:       []struct{ id, email string }{{id: "alice", email: "alice@example.com"}, {id: "bob", email: "bob@example.com"}},
+			authenticatedAs: "alice",
+			createTodo:      "Alice's task",
+			requestAs:       "bob",
+			path:            "/todos/{todoID}/complete",
+			wantStatus:      http.StatusForbidden,
+		},
+	}
 
-		// Act
-		w := f.JSONRequest(http.MethodPut, "/todos/"+todoID+"/complete", nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newTodosFixture(t)
+			for _, user := range tt.seedUsers {
+				f.SeedUser(user.id, user.email)
+			}
+			if tt.authenticatedAs != "" {
+				f.AuthenticateAs(tt.authenticatedAs)
+			}
 
-		// Assert
-		assert.Equal(t, http.StatusOK, w.Code)
-	})
+			path := tt.path
+			if tt.createTodo != "" {
+				todoID := f.CreateTodo(tt.createTodo)
+				path = "/todos/" + todoID + "/complete"
+			}
+			if tt.requestAs != "" {
+				f.AuthenticateAs(tt.requestAs)
+			}
 
-	t.Run("unauthenticated - returns 401", func(t *testing.T) {
-		// Arrange
-		f := newTodosFixture(t)
-
-		// Act
-		w := f.JSONRequest(http.MethodPut, "/todos/todo-1/complete", nil)
-
-		// Assert
-		assert.Equal(t, http.StatusUnauthorized, w.Code)
-	})
-
-	t.Run("not found - returns 404", func(t *testing.T) {
-		// Arrange
-		f := newTodosFixture(t)
-		f.SeedUser("alice", "alice@example.com")
-		f.AuthenticateAs("alice")
-
-		// Act
-		w := f.JSONRequest(http.MethodPut, "/todos/nonexistent-id/complete", nil)
-
-		// Assert
-		assert.Equal(t, http.StatusNotFound, w.Code)
-	})
-
-	t.Run("forbidden - marks other user's todo", func(t *testing.T) {
-		// Arrange
-		f := newTodosFixture(t)
-		f.SeedUser("alice", "alice@example.com")
-		f.SeedUser("bob", "bob@example.com")
-		f.AuthenticateAs("alice")
-		todoID := f.CreateTodo("Alice's task")
-
-		// Act: Bob tries to complete Alice's todo
-		f.AuthenticateAs("bob")
-		w := f.JSONRequest(http.MethodPut, "/todos/"+todoID+"/complete", nil)
-
-		// Assert
-		assert.Equal(t, http.StatusForbidden, w.Code)
-	})
+			w := f.JSONRequest(http.MethodPut, path, nil)
+			assert.Equal(t, tt.wantStatus, w.Code)
+		})
+	}
 }
