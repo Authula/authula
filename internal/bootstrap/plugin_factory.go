@@ -23,6 +23,8 @@ import (
 	magiclinkplugintypes "github.com/Authula/authula/plugins/magic-link/types"
 	oauth2plugin "github.com/Authula/authula/plugins/oauth2"
 	oauth2plugintypes "github.com/Authula/authula/plugins/oauth2/types"
+	organizationsplugin "github.com/Authula/authula/plugins/organizations"
+	organizationsplugintypes "github.com/Authula/authula/plugins/organizations/types"
 	ratelimitplugin "github.com/Authula/authula/plugins/rate-limit"
 	secondarystorageplugin "github.com/Authula/authula/plugins/secondary-storage"
 	sessionplugin "github.com/Authula/authula/plugins/session"
@@ -246,6 +248,22 @@ var pluginFactories = []PluginFactory{
 		},
 		Constructor: func(typedConfig any) models.Plugin {
 			return accesscontrolplugin.New(typedConfig.(accesscontrolplugintypes.AccessControlPluginConfig))
+		},
+	},
+	{
+		ID:                models.PluginOrganizations.String(),
+		RequiredByDefault: false,
+		ConfigParser: func(rawConfig any) (any, error) {
+			config := organizationsplugintypes.OrganizationsPluginConfig{}
+			if rawConfig != nil {
+				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
+					return nil, fmt.Errorf("failed to parse organizations plugin config: %w", err)
+				}
+			}
+			return config, nil
+		},
+		Constructor: func(typedConfig any) models.Plugin {
+			return organizationsplugin.New(typedConfig.(organizationsplugintypes.OrganizationsPluginConfig))
 		},
 	},
 	{

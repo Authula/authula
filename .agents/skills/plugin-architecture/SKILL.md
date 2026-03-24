@@ -26,6 +26,7 @@ description: Build pluggable authentication features using the plugin system wit
 ## Pattern
 
 Plugin lifecycle:
+
 - Define metadata (ID, name, version)
 - Implement Init to retrieve services, create repositories/services
 - Implement optional Routes, Migrations, Middleware
@@ -34,8 +35,9 @@ Plugin lifecycle:
 
 ## Example
 
-See [examples/todo_plugin.go](examples/todo_plugin.go) for:
-- TodosPlugin metadata and Init pattern
+See [plugins/email-password/plugin.go](../../../plugins/email-password/plugin.go) for:
+
+- EmailPasswordPlugin metadata and Init pattern
 - Service retrieval and registration
 - Routes definition and handler wiring
 - Lifecycle management (Close)
@@ -52,7 +54,6 @@ See [examples/todo_plugin.go](examples/todo_plugin.go) for:
 
 ## References
 
-- [models/plugin.go](../../../models/plugin.go) - Plugin interface definitions
 - [plugins/email-password/plugin.go](../../../plugins/email-password/plugin.go) - Email-password plugin
 - [plugins/jwt/plugin.go](../../../plugins/jwt/plugin.go) - JWT plugin
 - [internal/bootstrap/plugin_factory.go](../../../internal/bootstrap/plugin_factory.go) - Plugin factory

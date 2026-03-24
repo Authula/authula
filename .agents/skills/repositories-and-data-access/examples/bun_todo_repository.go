@@ -8,14 +8,14 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// TodoRepository interface definition
-type TodoRepository interface {
+// ITodoRepository interface definition
+type ITodoRepository interface {
 	Create(ctx context.Context, todo *Todo) (*Todo, error)
 	GetByID(ctx context.Context, id string) (*Todo, error)
 	Update(ctx context.Context, todo *Todo) (*Todo, error)
 	Delete(ctx context.Context, id string) error
 	GetAllByUserID(ctx context.Context, userID string) ([]Todo, error)
-	WithTx(tx bun.IDB) TodoRepository
+	WithTx(tx bun.IDB) ITodoRepository
 }
 
 type Todo struct {
@@ -30,7 +30,7 @@ type bunTodoRepository struct {
 	db bun.IDB
 }
 
-func NewBunTodoRepository(db bun.IDB) TodoRepository {
+func NewBunTodoRepository(db bun.IDB) ITodoRepository {
 	return &bunTodoRepository{db: db}
 }
 
@@ -73,6 +73,6 @@ func (r *bunTodoRepository) GetAllByUserID(ctx context.Context, userID string) (
 	return todos, nil
 }
 
-func (r *bunTodoRepository) WithTx(tx bun.IDB) TodoRepository {
+func (r *bunTodoRepository) WithTx(tx bun.IDB) ITodoRepository {
 	return &bunTodoRepository{db: tx}
 }

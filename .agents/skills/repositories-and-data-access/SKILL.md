@@ -23,6 +23,7 @@ description: Implement repository interfaces for data persistence and abstractio
 ## Pattern
 
 Repositories are data access only:
+
 - Define interface with CRUD operations (Create, GetByID, Update, Delete)
 - Implement with Bun in `bun_*.go` files
 - Accept `bun.IDB` at construction (not concrete `*bun.DB`)
@@ -31,8 +32,9 @@ Repositories are data access only:
 
 ## Example
 
-See [examples/todo_repository.go](examples/todo_repository.go) for:
-- TodoRepository interface definition
+See [examples/bun_todo_repository.go](examples/bun_todo_repository.go) for:
+
+- ITodoRepository interface definition
 - bunTodoRepository Bun implementation
 - CRUD and batch query patterns
 

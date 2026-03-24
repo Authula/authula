@@ -119,14 +119,14 @@ func TestVerifyHandler_UntrustedCallbackURL(t *testing.T) {
 
 func TestVerifyHandler_UseCaseError(t *testing.T) {
 	useCase := &mockVerifyUseCase{}
-	useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("", errors.New("boom")).Once()
+	useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("", errors.New("some error")).Once()
 
 	handler := &VerifyHandler{UseCase: useCase}
 	req, reqCtx, w := newCallbackRequest(t, "/magic-link/verify?token=abc")
 
 	handler.Handler()(w, req)
 
-	assertErrorResponse(t, reqCtx, http.StatusBadRequest, "boom")
+	assertErrorResponse(t, reqCtx, http.StatusBadRequest, "some error")
 	useCase.AssertExpectations(t)
 }
 
