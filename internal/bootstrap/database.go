@@ -52,14 +52,16 @@ func InitDatabase(opts DatabaseOptions, logger models.Logger, logLevel string) (
 
 	switch opts.Provider {
 	case "sqlite":
-		if !filepath.IsAbs(databaseURL) {
+		if databaseURL != ":memory:" && !filepath.IsAbs(databaseURL) {
 			cwd, _ := os.Getwd()
 			databaseURL = filepath.Join(cwd, databaseURL)
 		}
 
-		dbDir := filepath.Dir(databaseURL)
-		if err := os.MkdirAll(dbDir, 0755); err != nil {
-			return nil, fmt.Errorf("failed to create database directory: %w", err)
+		if databaseURL != ":memory:" {
+			dbDir := filepath.Dir(databaseURL)
+			if err := os.MkdirAll(dbDir, 0755); err != nil {
+				return nil, fmt.Errorf("failed to create database directory: %w", err)
+			}
 		}
 
 		sqlDB, err = sql.Open("sqlite3", databaseURL)
