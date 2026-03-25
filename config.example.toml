@@ -68,6 +68,11 @@ cleanup_interval = "1m" # Interval for automatic cleanup of expired verification
 trusted_origins = []
 trusted_headers = [] # e.g., ["X-Real-IP", "CF-Connecting-IP" (cloudflare), ...]
 trusted_proxies = []
+# IMPORTANT CORS NOTE: If using the session plugin, the CORS plugin must specify exact allowed_origins.
+# Setting allowed_origins = ["*"] with allow_credentials = true is NOT allowed by browsers and will fail.
+# Example CORS configuration when using sessions:
+# allow_credentials = true
+# allowed_origins = ["https://yourdomain.com", "https://api.yourdomain.com"]
 [security.cors]
 allow_credentials = true
 allowed_origins = ["*"] # If using session plugin, specify exact origins instead of "*"
@@ -76,11 +81,6 @@ allowed_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 allowed_headers = ["Authorization", "Content-Type", "Cookie", "Set-Cookie"]
 exposed_headers = []
 max_age = "24h"
-# IMPORTANT CORS NOTE: If using the session plugin, the CORS plugin must specify exact allowed_origins.
-# Setting allowed_origins = ["*"] with allow_credentials = true is NOT allowed by browsers and will fail.
-# Example CORS configuration when using sessions:
-# allow_credentials = true
-# allowed_origins = ["https://yourdomain.com", "https://api.yourdomain.com"]
 
 # -----------------------------------
 # - Event Bus Configuration
@@ -369,18 +369,6 @@ enabled = true
 # [[route_mappings]]
 # path = "/sign-in"
 # method = "POST"
-# plugins = ["session.auth.optional", "totp.intercept"]
-
-# If using TOTP plugin, keep /totp/verify and /totp/verify-backup-code accessible
-# to the pending-token flow (do not require an existing session cookie).
-# [[route_mappings]]
-# path = "/totp/verify"
-# method = "POST"
-# plugins = ["session.auth.optional"]
-
-# [[route_mappings]]
-# path = "/totp/verify-backup-code"
-# method = "POST"
 # plugins = ["session.auth.optional"]
 
 # [[route_mappings]]
@@ -403,3 +391,15 @@ enabled = true
 # method = "GET"
 # plugins = ["session.auth", "access_control.enforce"]
 # permissions = ["users.read"]
+
+# If using TOTP plugin, keep /totp/verify and /totp/verify-backup-code accessible
+# to the pending-token flow (do not require an existing session cookie).
+# [[route_mappings]]
+# path = "/totp/verify"
+# method = "POST"
+# plugins = ["session.auth.optional"]
+
+# [[route_mappings]]
+# path = "/totp/verify-backup-code"
+# method = "POST"
+# plugins = ["session.auth.optional"]
