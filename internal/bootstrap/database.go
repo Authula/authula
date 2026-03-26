@@ -22,7 +22,6 @@ import (
 	"github.com/Authula/authula/models"
 )
 
-// DatabaseOptions configures database initialization
 type DatabaseOptions struct {
 	Provider        string
 	URL             string
@@ -31,7 +30,6 @@ type DatabaseOptions struct {
 	ConnMaxLifetime time.Duration
 }
 
-// InitDatabase creates a Bun database connection
 func InitDatabase(opts DatabaseOptions, logger models.Logger, logLevel string) (bun.IDB, error) {
 	if opts.Provider == "" {
 		return nil, fmt.Errorf("database provider must be specified")
@@ -47,19 +45,24 @@ func InitDatabase(opts DatabaseOptions, logger models.Logger, logLevel string) (
 
 	var (
 		sqlDB *sql.DB
+		db    *bun.DB
 		err   error
 	)
 
 	switch opts.Provider {
 	case "sqlite":
-		if !filepath.IsAbs(databaseURL) {
-			cwd, _ := os.Getwd()
-			databaseURL = filepath.Join(cwd, databaseURL)
-		}
+		isMemory := databaseURL == ":memory:"
 
-		dbDir := filepath.Dir(databaseURL)
-		if err := os.MkdirAll(dbDir, 0755); err != nil {
-			return nil, fmt.Errorf("failed to create database directory: %w", err)
+		if !isMemory {
+			if !filepath.IsAbs(databaseURL) {
+				cwd, _ := os.Getwd()
+				databaseURL = filepath.Join(cwd, databaseURL)
+			}
+
+			dbDir := filepath.Dir(databaseURL)
+			if err := os.MkdirAll(dbDir, 0755); err != nil {
+				return nil, fmt.Errorf("failed to create database directory: %w", err)
+			}
 		}
 
 		sqlDB, err = sql.Open("sqlite3", databaseURL)
@@ -67,10 +70,7 @@ func InitDatabase(opts DatabaseOptions, logger models.Logger, logLevel string) (
 			return nil, err
 		}
 
-		db := bun.NewDB(sqlDB, sqlitedialect.New())
-		configurePool(sqlDB, opts)
-		enableDebugging(db, logLevel)
-		return db, nil
+		db = bun.NewDB(sqlDB, sqlitedialect.New())
 
 	case "postgres":
 		sqlDB, err = sql.Open("postgres", databaseURL)
@@ -78,10 +78,7 @@ func InitDatabase(opts DatabaseOptions, logger models.Logger, logLevel string) (
 			return nil, err
 		}
 
-		db := bun.NewDB(sqlDB, pgdialect.New())
-		configurePool(sqlDB, opts)
-		enableDebugging(db, logLevel)
-		return db, nil
+		db = bun.NewDB(sqlDB, pgdialect.New())
 
 	case "mysql":
 		sqlDB, err = sql.Open("mysql", databaseURL)
@@ -89,14 +86,16 @@ func InitDatabase(opts DatabaseOptions, logger models.Logger, logLevel string) (
 			return nil, err
 		}
 
-		db := bun.NewDB(sqlDB, mysqldialect.New())
-		configurePool(sqlDB, opts)
-		enableDebugging(db, logLevel)
-		return db, nil
+		db = bun.NewDB(sqlDB, mysqldialect.New())
 
 	default:
 		return nil, fmt.Errorf("unsupported database provider: %s", opts.Provider)
 	}
+
+	configurePool(sqlDB, opts)
+	enableDebugging(db, logLevel)
+
+	return db, nil
 }
 
 func configurePool(sqlDB *sql.DB, opts DatabaseOptions) {
