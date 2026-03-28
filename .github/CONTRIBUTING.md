@@ -4,7 +4,7 @@
 
 This project is committed to fostering a welcoming and inclusive community. As a contributor,
 you agree to uphold the principles outlined in the [Code of Conduct](./CODE_OF_CONDUCT.md). If
-you have concerns or encounter any unacceptable behavior, please reach out to mta.coder97@gmail.com.
+you have concerns or encounter any unacceptable behavior, please reach out to authula.tech@gmail.com.
 
 ---
 
@@ -22,7 +22,7 @@ We rely on bug reports to enhance this project for all users. To assist us, we h
 
 ### Reporting security issues
 
-Avoid creating a public GitHub issue for security concerns. If you discover a security vulnerability, contact us directly via email at mta.coder97@gmail.com rather than opening an issue.
+Avoid creating a public GitHub issue for security concerns. If you discover a security vulnerability, contact us directly via email at authula.tech@gmail.com rather than opening an issue.
 
 ### Requesting new features
 
