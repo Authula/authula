@@ -3,38 +3,19 @@ package accesscontrol
 import (
 	"context"
 
-	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
 	"github.com/Authula/authula/plugins/access-control/usecases"
 )
 
 type API struct {
-	useCases           *usecases.UseCases
-	rolePermissionRepo repositories.RolePermissionRepository
-	userAccessRepo     repositories.UserAccessRepository
+	useCases *usecases.UseCases
 }
 
-func NewAPI(
-	useCases *usecases.UseCases,
-	rolePermissionRepo repositories.RolePermissionRepository,
-	userAccessRepo repositories.UserAccessRepository,
-) *API {
-	return &API{
-		useCases:           useCases,
-		rolePermissionRepo: rolePermissionRepo,
-		userAccessRepo:     userAccessRepo,
-	}
+func NewAPI(useCases *usecases.UseCases) *API {
+	return &API{useCases: useCases}
 }
 
-func (a *API) RolePermissionRepository() repositories.RolePermissionRepository {
-	return a.rolePermissionRepo
-}
-
-func (a *API) UserAccessRepository() repositories.UserAccessRepository {
-	return a.userAccessRepo
-}
-
-// Roles and permissions
+// Roles
 
 func (a *API) GetAllRoles(ctx context.Context) ([]types.Role, error) {
 	return a.useCases.GetAllRoles(ctx)
@@ -56,12 +37,18 @@ func (a *API) DeleteRole(ctx context.Context, roleID string) error {
 	return a.useCases.DeleteRole(ctx, roleID)
 }
 
+// Permissions
+
 func (a *API) CreatePermission(ctx context.Context, req types.CreatePermissionRequest) (*types.Permission, error) {
 	return a.useCases.CreatePermission(ctx, req)
 }
 
 func (a *API) GetAllPermissions(ctx context.Context) ([]types.Permission, error) {
 	return a.useCases.GetAllPermissions(ctx)
+}
+
+func (a *API) GetPermissionByID(ctx context.Context, permissionID string) (*types.Permission, error) {
+	return a.useCases.GetPermissionByID(ctx, permissionID)
 }
 
 func (a *API) GetRolePermissions(ctx context.Context, roleID string) ([]types.UserPermissionInfo, error) {
@@ -76,6 +63,8 @@ func (a *API) DeletePermission(ctx context.Context, permissionID string) error {
 	return a.useCases.DeletePermission(ctx, permissionID)
 }
 
+// Role permissions
+
 func (a *API) AddPermissionToRole(ctx context.Context, roleID string, permissionID string, grantedByUserID *string) error {
 	return a.useCases.AddPermissionToRole(ctx, roleID, permissionID, grantedByUserID)
 }
@@ -88,10 +77,14 @@ func (a *API) ReplaceRolePermissions(ctx context.Context, roleID string, permiss
 	return a.useCases.ReplaceRolePermissions(ctx, roleID, permissionIDs, grantedByUserID)
 }
 
-// User roles and permissions
+// User roles
 
 func (a *API) GetUserRoles(ctx context.Context, userID string) ([]types.UserRoleInfo, error) {
 	return a.useCases.GetUserRoles(ctx, userID)
+}
+
+func (a *API) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
+	return a.useCases.GetUserWithRolesByID(ctx, userID)
 }
 
 func (a *API) AssignRoleToUser(ctx context.Context, userID string, req types.AssignUserRoleRequest, assignedByUserID *string) error {
@@ -106,20 +99,20 @@ func (a *API) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []str
 	return a.useCases.ReplaceUserRoles(ctx, userID, roleIDs, assignedByUserID)
 }
 
+// User access
+
+func (a *API) GetUserWithPermissionsByID(ctx context.Context, userID string) (*types.UserWithPermissions, error) {
+	return a.useCases.GetUserWithPermissionsByID(ctx, userID)
+}
+
+func (a *API) GetUserAuthorizationProfile(ctx context.Context, userID string) (*types.UserAuthorizationProfile, error) {
+	return a.useCases.GetUserAuthorizationProfile(ctx, userID)
+}
+
 func (a *API) GetUserEffectivePermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
 	return a.useCases.GetUserEffectivePermissions(ctx, userID)
 }
 
-// User access and permissions
-
 func (a *API) HasPermissions(ctx context.Context, userID string, requiredPermissions []string) (bool, error) {
 	return a.useCases.HasPermissions(ctx, userID, requiredPermissions)
-}
-
-func (a *API) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
-	return a.useCases.GetUserWithRolesByID(ctx, userID)
-}
-
-func (a *API) GetUserWithPermissionsByID(ctx context.Context, userID string) (*types.UserWithPermissions, error) {
-	return a.useCases.GetUserWithPermissionsByID(ctx, userID)
 }

@@ -7,34 +7,26 @@ import (
 	"github.com/Authula/authula/plugins/access-control/types"
 )
 
-type UserRolesUseCase struct {
+type UserAccessUseCase struct {
 	service *services.UserAccessService
 }
 
-func NewUserRolesUseCase(service *services.UserAccessService) UserRolesUseCase {
-	return UserRolesUseCase{service: service}
+func NewUserAccessUseCase(service *services.UserAccessService) *UserAccessUseCase {
+	return &UserAccessUseCase{service: service}
 }
 
-func (u UserRolesUseCase) GetUserRoles(ctx context.Context, userID string) ([]types.UserRoleInfo, error) {
-	return u.service.GetUserRoles(ctx, userID)
-}
-
-func (u UserRolesUseCase) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
-	return u.service.GetUserWithRolesByID(ctx, userID)
-}
-
-func (u UserRolesUseCase) GetUserWithPermissionsByID(ctx context.Context, userID string) (*types.UserWithPermissions, error) {
+func (u *UserAccessUseCase) GetUserWithPermissionsByID(ctx context.Context, userID string) (*types.UserWithPermissions, error) {
 	return u.service.GetUserWithPermissionsByID(ctx, userID)
 }
 
-func (u UserRolesUseCase) GetUserAuthorizationProfile(ctx context.Context, userID string) (*types.UserAuthorizationProfile, error) {
+func (u *UserAccessUseCase) GetUserAuthorizationProfile(ctx context.Context, userID string) (*types.UserAuthorizationProfile, error) {
 	return u.service.GetUserAuthorizationProfile(ctx, userID)
 }
 
-func (u UserRolesUseCase) GetUserEffectivePermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
+func (u *UserAccessUseCase) GetUserEffectivePermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
 	return u.service.GetUserEffectivePermissions(ctx, userID)
 }
 
-func (u UserRolesUseCase) HasPermissions(ctx context.Context, userID string, requiredPermissions []string) (bool, error) {
+func (u *UserAccessUseCase) HasPermissions(ctx context.Context, userID string, requiredPermissions []string) (bool, error) {
 	return u.service.HasPermissions(ctx, userID, requiredPermissions)
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -8,279 +9,598 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	internaltests "github.com/Authula/authula/internal/tests"
-	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
-	"github.com/Authula/authula/plugins/access-control/tests"
+	authmodels "github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/access-control/constants"
+	"github.com/Authula/authula/plugins/access-control/services"
+	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
+	"github.com/Authula/authula/plugins/access-control/usecases"
 )
 
 func TestGetUserRolesHandler(t *testing.T) {
 	t.Parallel()
 
-	t.Run("missing user id", func(t *testing.T) {
-		t.Parallel()
+	fixedTime := time.Date(2026, 3, 29, 12, 0, 0, 0, time.UTC)
+	description := new(string)
+	*description = "editor role"
+	assignedByUserID := new(string)
+	*assignedByUserID = "user-2"
 
-		useCase, _ := tests.NewUserRolesUseCaseFixture()
-		handler := NewGetUserRolesHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users//roles", nil, nil)
-		req.SetPathValue("user_id", "   ")
+	tests := []struct {
+		name           string
+		userID         string
+		setupMock      func(*accesscontroltests.MockUserRolesRepository)
+		expectedStatus int
+		expectedBody   any
+	}{
+		{
+			name:           "blank user id",
+			userID:         "",
+			expectedStatus: http.StatusUnprocessableEntity,
+			expectedBody:   map[string]string{"message": "unprocessable entity"},
+		},
+		{
+			name:   "use case error",
+			userID: "user-404",
+			setupMock: func(m *accesscontroltests.MockUserRolesRepository) {
+				m.On("GetUserRoles", mock.Anything, "user-404").Return(([]types.UserRoleInfo)(nil), constants.ErrNotFound).Once()
+			},
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   map[string]string{"message": "not found"},
+		},
+		{
+			name:   "success",
+			userID: "user-1",
+			setupMock: func(m *accesscontroltests.MockUserRolesRepository) {
+				m.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{{
+					RoleID:           "role-1",
+					RoleName:         "Editor",
+					RoleDescription:  description,
+					AssignedByUserID: assignedByUserID,
+					AssignedAt:       &fixedTime,
+					ExpiresAt:        &fixedTime,
+				}}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody: []types.UserRoleInfo{{
+				RoleID:           "role-1",
+				RoleName:         "Editor",
+				RoleDescription:  description,
+				AssignedByUserID: assignedByUserID,
+				AssignedAt:       &fixedTime,
+				ExpiresAt:        &fixedTime,
+			}},
+		},
+	}
 
-		handler.Handler()(w, req)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "unprocessable entity")
-	})
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
+			rolesRepo := &accesscontroltests.MockRolesRepository{}
+			if tc.setupMock != nil {
+				tc.setupMock(userRolesRepo)
+			}
 
-	t.Run("error", func(t *testing.T) {
-		t.Parallel()
+			useCase := newUserRolesUseCase(rolesRepo, userRolesRepo)
+			handler := NewGetUserRolesHandler(useCase)
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/users/"+tc.userID+"/roles", nil, nil)
+			req.SetPathValue("user_id", tc.userID)
 
-		useCase, accessRepo := tests.NewUserRolesUseCaseFixture()
-		accessRepo.On("GetUserRoles", mock.Anything, "user-1").Return(([]types.UserRoleInfo)(nil), accesscontrolconstants.ErrNotFound).Once()
-		handler := NewGetUserRolesHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users/user-1/roles", nil, nil)
-		req.SetPathValue("user_id", "user-1")
+			handler.Handler()(w, req)
 
-		handler.Handler()(w, req)
+			if tc.expectedStatus != http.StatusOK {
+				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
+				userRolesRepo.AssertExpectations(t)
+				rolesRepo.AssertExpectations(t)
+				return
+			}
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusNotFound, "not found")
-		accessRepo.AssertExpectations(t)
-	})
+			if reqCtx.ResponseStatus != tc.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tc.expectedStatus, reqCtx.ResponseStatus)
+			}
 
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
+			payload := internaltests.DecodeResponseJSON[[]types.UserRoleInfo](t, reqCtx)
+			assertUserRoleInfosEqual(t, payload, tc.expectedBody.([]types.UserRoleInfo))
 
-		useCase, accessRepo := tests.NewUserRolesUseCaseFixture()
-		expiresAt := time.Now().UTC().Add(time.Hour)
-		accessRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{{RoleID: "role-1", RoleName: "admin", ExpiresAt: &expiresAt}}, nil).Once()
-		handler := NewGetUserRolesHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users/user-1/roles", nil, nil)
-		req.SetPathValue("user_id", "user-1")
+			userRolesRepo.AssertExpectations(t)
+			rolesRepo.AssertExpectations(t)
+		})
+	}
+}
 
-		handler.Handler()(w, req)
+func TestGetUserWithRolesHandler(t *testing.T) {
+	t.Parallel()
 
-		if reqCtx.ResponseStatus != http.StatusOK {
-			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
-		}
-		payload := internaltests.DecodeResponseJSON[[]types.UserRoleInfo](t, reqCtx)
-		if len(payload) != 1 {
-			t.Fatalf("expected 1 role, got %d", len(payload))
-		}
-		accessRepo.AssertExpectations(t)
-	})
+	fixedTime := time.Date(2026, 3, 29, 12, 0, 0, 0, time.UTC)
+	description := new(string)
+	*description = "platform user"
+
+	tests := []struct {
+		name           string
+		userID         string
+		setupMock      func(*accesscontroltests.MockUserRolesRepository)
+		expectedStatus int
+		expectedBody   any
+	}{
+		{
+			name:           "blank user id",
+			userID:         "",
+			expectedStatus: http.StatusUnprocessableEntity,
+			expectedBody:   map[string]string{"message": "unprocessable entity"},
+		},
+		{
+			name:   "use case error",
+			userID: "user-404",
+			setupMock: func(m *accesscontroltests.MockUserRolesRepository) {
+				m.On("GetUserWithRolesByID", mock.Anything, "user-404").Return((*types.UserWithRoles)(nil), constants.ErrNotFound).Once()
+			},
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   map[string]string{"message": "not found"},
+		},
+		{
+			name:   "success",
+			userID: "user-1",
+			setupMock: func(m *accesscontroltests.MockUserRolesRepository) {
+				m.On("GetUserWithRolesByID", mock.Anything, "user-1").Return(&types.UserWithRoles{
+					User: authmodels.User{
+						ID:            "user-1",
+						Name:          "Pat",
+						Email:         "pat@example.com",
+						EmailVerified: true,
+						Metadata:      json.RawMessage("null"),
+						CreatedAt:     fixedTime,
+						UpdatedAt:     fixedTime,
+					},
+					Roles: []types.UserRoleInfo{{
+						RoleID:           "role-1",
+						RoleName:         "Editor",
+						RoleDescription:  description,
+						AssignedByUserID: nil,
+						AssignedAt:       &fixedTime,
+						ExpiresAt:        nil,
+					}},
+				}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody: &types.UserWithRoles{
+				User: authmodels.User{
+					ID:            "user-1",
+					Name:          "Pat",
+					Email:         "pat@example.com",
+					EmailVerified: true,
+					Metadata:      json.RawMessage("null"),
+					CreatedAt:     fixedTime,
+					UpdatedAt:     fixedTime,
+				},
+				Roles: []types.UserRoleInfo{{
+					RoleID:           "role-1",
+					RoleName:         "Editor",
+					RoleDescription:  description,
+					AssignedByUserID: nil,
+					AssignedAt:       &fixedTime,
+					ExpiresAt:        nil,
+				}},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
+			rolesRepo := &accesscontroltests.MockRolesRepository{}
+			if tc.setupMock != nil {
+				tc.setupMock(userRolesRepo)
+			}
+
+			useCase := newUserRolesUseCase(rolesRepo, userRolesRepo)
+			handler := NewGetUserWithRolesHandler(useCase)
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/users/"+tc.userID+"/roles/details", nil, nil)
+			req.SetPathValue("user_id", tc.userID)
+
+			handler.Handler()(w, req)
+
+			if tc.expectedStatus != http.StatusOK {
+				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
+				userRolesRepo.AssertExpectations(t)
+				rolesRepo.AssertExpectations(t)
+				return
+			}
+
+			if reqCtx.ResponseStatus != tc.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tc.expectedStatus, reqCtx.ResponseStatus)
+			}
+
+			payload := internaltests.DecodeResponseJSON[types.UserWithRoles](t, reqCtx)
+			assertUserWithRolesEqual(t, payload, *tc.expectedBody.(*types.UserWithRoles))
+
+			userRolesRepo.AssertExpectations(t)
+			rolesRepo.AssertExpectations(t)
+		})
+	}
 }
 
 func TestReplaceUserRolesHandler(t *testing.T) {
 	t.Parallel()
 
-	t.Run("invalid json", func(t *testing.T) {
-		t.Parallel()
+	actorUserID := "user-1"
+	actorUserIDPtr := &actorUserID
 
-		useCase, _ := tests.NewRolePermissionUseCaseFixture()
-		handler := NewReplaceUserRolesHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/users/user-1/roles", []byte("{invalid"), nil)
-		req.SetPathValue("user_id", "user-1")
+	tests := []struct {
+		name           string
+		userID         string
+		body           []byte
+		userIDPtr      *string
+		setupMock      func(*accesscontroltests.MockRolesRepository, *accesscontroltests.MockUserRolesRepository)
+		expectedStatus int
+		expectedBody   any
+	}{
+		{
+			name:           "invalid request body",
+			userID:         "user-1",
+			body:           []byte("{invalid json"),
+			expectedStatus: http.StatusUnprocessableEntity,
+			expectedBody:   map[string]string{"message": "invalid request body"},
+		},
+		{
+			name:           "blank user id",
+			userID:         "",
+			body:           internaltests.MarshalToJSON(t, types.ReplaceUserRolesRequest{RoleIDs: []string{"role-1"}}),
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   map[string]string{"message": "bad request"},
+		},
+		{
+			name:   "success",
+			userID: "user-1",
+			body:   internaltests.MarshalToJSON(t, types.ReplaceUserRolesRequest{RoleIDs: []string{"role-1", "role-2"}}),
+			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor"}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-2").Return(&types.Role{ID: "role-2", Name: "Viewer"}, nil).Once()
+				userRolesRepo.On("ReplaceUserRoles", mock.Anything, "user-1", []string{"role-1", "role-2"}, (*string)(nil)).Return(nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody:   types.ReplaceUserRolesResponse{Message: "user roles replaced"},
+		},
+		{
+			name:      "success with actor user id",
+			userID:    "user-1",
+			userIDPtr: actorUserIDPtr,
+			body:      internaltests.MarshalToJSON(t, types.ReplaceUserRolesRequest{RoleIDs: []string{"role-3", "role-4"}}),
+			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-3").Return(&types.Role{ID: "role-3", Name: "Reviewer"}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-4").Return(&types.Role{ID: "role-4", Name: "Commenter"}, nil).Once()
+				userRolesRepo.On("ReplaceUserRoles", mock.Anything, "user-1", []string{"role-3", "role-4"}, actorUserIDPtr).Return(nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody:   types.ReplaceUserRolesResponse{Message: "user roles replaced"},
+		},
+	}
 
-		handler.Handler()(w, req)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid request body")
-	})
+			rolesRepo := &accesscontroltests.MockRolesRepository{}
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
+			if tc.setupMock != nil {
+				tc.setupMock(rolesRepo, userRolesRepo)
+			}
 
-	t.Run("error", func(t *testing.T) {
-		t.Parallel()
+			useCase := newUserRolesUseCase(rolesRepo, userRolesRepo)
+			handler := NewReplaceUserRolesHandler(useCase)
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/users/"+tc.userID+"/roles", tc.body, tc.userIDPtr)
+			req.SetPathValue("user_id", tc.userID)
 
-		useCase, roleRepo := tests.NewRolePermissionUseCaseFixture()
-		request := types.ReplaceUserRolesRequest{RoleIDs: []string{"role-1"}}
-		actorID := "actor-1"
-		roleRepo.On("ReplaceUserRoles", mock.Anything, "user-1", request.RoleIDs, &actorID).Return(accesscontrolconstants.ErrForbidden).Once()
-		handler := NewReplaceUserRolesHandler(useCase)
+			handler.Handler()(w, req)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/users/user-1/roles", internaltests.MarshalToJSON(t, request), nil)
-		req.SetPathValue("user_id", "user-1")
-		reqCtx.UserID = &actorID
+			if tc.expectedStatus != http.StatusOK {
+				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
+				rolesRepo.AssertExpectations(t)
+				userRolesRepo.AssertExpectations(t)
+				return
+			}
 
-		handler.Handler()(w, req)
+			if reqCtx.ResponseStatus != tc.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tc.expectedStatus, reqCtx.ResponseStatus)
+			}
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusForbidden, "forbidden")
-		roleRepo.AssertExpectations(t)
-	})
+			payload := internaltests.DecodeResponseJSON[types.ReplaceUserRolesResponse](t, reqCtx)
+			assertReplaceUserRolesResponseEqual(t, payload, tc.expectedBody.(types.ReplaceUserRolesResponse))
 
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
-
-		useCase, roleRepo := tests.NewRolePermissionUseCaseFixture()
-		request := types.ReplaceUserRolesRequest{RoleIDs: []string{"role-1", "role-2"}}
-		roleRepo.On("ReplaceUserRoles", mock.Anything, "user-1", request.RoleIDs, (*string)(nil)).Return(nil).Once()
-		handler := NewReplaceUserRolesHandler(useCase)
-
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/access-control/users/user-1/roles", internaltests.MarshalToJSON(t, request), nil)
-		req.SetPathValue("user_id", "user-1")
-
-		handler.Handler()(w, req)
-
-		if reqCtx.ResponseStatus != http.StatusOK {
-			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
-		}
-		payload := internaltests.DecodeResponseJSON[types.ReplaceUserRolesResponse](t, reqCtx)
-		if payload.Message != "user roles replaced" {
-			t.Fatalf("expected message user roles replaced, got %v", payload.Message)
-		}
-		roleRepo.AssertExpectations(t)
-	})
+			rolesRepo.AssertExpectations(t)
+			userRolesRepo.AssertExpectations(t)
+		})
+	}
 }
 
 func TestAssignUserRoleHandler(t *testing.T) {
 	t.Parallel()
 
-	t.Run("invalid json", func(t *testing.T) {
-		t.Parallel()
+	futureTime := time.Date(2030, 3, 29, 13, 0, 0, 0, time.UTC)
+	actorUserID := "user-1"
+	actorUserIDPtr := &actorUserID
 
-		useCase, _ := tests.NewRolePermissionUseCaseFixture()
-		handler := NewAssignUserRoleHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/users/user-1/roles", []byte("{invalid"), nil)
-		req.SetPathValue("user_id", "user-1")
+	tests := []struct {
+		name           string
+		userID         string
+		body           []byte
+		userIDPtr      *string
+		setupMock      func(*accesscontroltests.MockRolesRepository, *accesscontroltests.MockUserRolesRepository)
+		expectedStatus int
+		expectedBody   any
+	}{
+		{
+			name:           "invalid request body",
+			userID:         "user-1",
+			body:           []byte("{invalid json"),
+			expectedStatus: http.StatusUnprocessableEntity,
+			expectedBody:   map[string]string{"message": "invalid request body"},
+		},
+		{
+			name:           "blank user id",
+			userID:         "",
+			body:           internaltests.MarshalToJSON(t, types.AssignUserRoleRequest{RoleID: "role-1"}),
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   map[string]string{"message": "bad request"},
+		},
+		{
+			name:   "use case error",
+			userID: "user-1",
+			body:   internaltests.MarshalToJSON(t, types.AssignUserRoleRequest{RoleID: "role-1"}),
+			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor"}, nil).Once()
+				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), (*time.Time)(nil)).Return(constants.ErrUnauthorized).Once()
+			},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   map[string]string{"message": "unauthorized"},
+		},
+		{
+			name:   "success",
+			userID: "user-1",
+			body:   internaltests.MarshalToJSON(t, types.AssignUserRoleRequest{RoleID: "role-1", ExpiresAt: &futureTime}),
+			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor"}, nil).Once()
+				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), &futureTime).Return(nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody:   types.AssignUserRoleResponse{Message: "role assigned"},
+		},
+		{
+			name:      "success with actor user id",
+			userID:    "user-1",
+			userIDPtr: actorUserIDPtr,
+			body:      internaltests.MarshalToJSON(t, types.AssignUserRoleRequest{RoleID: "role-2"}),
+			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-2").Return(&types.Role{ID: "role-2", Name: "Reviewer"}, nil).Once()
+				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-2", actorUserIDPtr, (*time.Time)(nil)).Return(nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody:   types.AssignUserRoleResponse{Message: "role assigned"},
+		},
+	}
 
-		handler.Handler()(w, req)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid request body")
-	})
+			rolesRepo := &accesscontroltests.MockRolesRepository{}
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
+			if tc.setupMock != nil {
+				tc.setupMock(rolesRepo, userRolesRepo)
+			}
 
-	t.Run("error", func(t *testing.T) {
-		t.Parallel()
+			useCase := newUserRolesUseCase(rolesRepo, userRolesRepo)
+			handler := NewAssignUserRoleHandler(useCase)
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/users/"+tc.userID+"/roles", tc.body, tc.userIDPtr)
+			req.SetPathValue("user_id", tc.userID)
 
-		useCase, roleRepo := tests.NewRolePermissionUseCaseFixture()
-		request := types.AssignUserRoleRequest{RoleID: "role-1"}
-		actorID := "actor-1"
-		roleRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", &actorID, (*time.Time)(nil)).Return(accesscontrolconstants.ErrBadRequest).Once()
-		handler := NewAssignUserRoleHandler(useCase)
+			handler.Handler()(w, req)
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/users/user-1/roles", internaltests.MarshalToJSON(t, request), nil)
-		req.SetPathValue("user_id", "user-1")
-		reqCtx.UserID = &actorID
+			if tc.expectedStatus != http.StatusOK {
+				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
+				rolesRepo.AssertExpectations(t)
+				userRolesRepo.AssertExpectations(t)
+				return
+			}
 
-		handler.Handler()(w, req)
+			if reqCtx.ResponseStatus != tc.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tc.expectedStatus, reqCtx.ResponseStatus)
+			}
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusBadRequest, "bad request")
-		roleRepo.AssertExpectations(t)
-	})
+			payload := internaltests.DecodeResponseJSON[types.AssignUserRoleResponse](t, reqCtx)
+			assertAssignUserRoleResponseEqual(t, payload, tc.expectedBody.(types.AssignUserRoleResponse))
 
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
-
-		useCase, roleRepo := tests.NewRolePermissionUseCaseFixture()
-		request := types.AssignUserRoleRequest{RoleID: "role-1"}
-		roleRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), (*time.Time)(nil)).Return(nil).Once()
-		handler := NewAssignUserRoleHandler(useCase)
-
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/access-control/users/user-1/roles", internaltests.MarshalToJSON(t, request), nil)
-		req.SetPathValue("user_id", "user-1")
-
-		handler.Handler()(w, req)
-
-		if reqCtx.ResponseStatus != http.StatusOK {
-			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
-		}
-		payload := internaltests.DecodeResponseJSON[types.AssignUserRoleResponse](t, reqCtx)
-		if payload.Message != "role assigned" {
-			t.Fatalf("expected role assigned message, got %v", payload.Message)
-		}
-		roleRepo.AssertExpectations(t)
-	})
+			rolesRepo.AssertExpectations(t)
+			userRolesRepo.AssertExpectations(t)
+		})
+	}
 }
 
 func TestRemoveUserRoleHandler(t *testing.T) {
 	t.Parallel()
 
-	t.Run("error", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name           string
+		userID         string
+		roleID         string
+		setupMock      func(*accesscontroltests.MockUserRolesRepository)
+		expectedStatus int
+		expectedBody   any
+	}{
+		{
+			name:           "blank role id",
+			userID:         "user-1",
+			roleID:         "",
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   map[string]string{"message": "bad request"},
+		},
+		{
+			name:   "use case error",
+			userID: "user-1",
+			roleID: "role-1",
+			setupMock: func(m *accesscontroltests.MockUserRolesRepository) {
+				m.On("RemoveUserRole", mock.Anything, "user-1", "role-1").Return(constants.ErrNotFound).Once()
+			},
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   map[string]string{"message": "not found"},
+		},
+		{
+			name:   "success",
+			userID: "user-1",
+			roleID: "role-1",
+			setupMock: func(m *accesscontroltests.MockUserRolesRepository) {
+				m.On("RemoveUserRole", mock.Anything, "user-1", "role-1").Return(nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody:   types.RemoveUserRoleResponse{Message: "role removed"},
+		},
+	}
 
-		useCase, roleRepo := tests.NewRolePermissionUseCaseFixture()
-		roleRepo.On("RemoveUserRole", mock.Anything, "user-1", "role-1").Return(accesscontrolconstants.ErrNotFound).Once()
-		handler := NewRemoveUserRoleHandler(useCase)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/users/user-1/roles/role-1", nil, nil)
-		req.SetPathValue("user_id", "user-1")
-		req.SetPathValue("role_id", "role-1")
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
+			if tc.setupMock != nil {
+				tc.setupMock(userRolesRepo)
+			}
 
-		handler.Handler()(w, req)
+			rolesRepo := &accesscontroltests.MockRolesRepository{}
+			useCase := newUserRolesUseCase(rolesRepo, userRolesRepo)
+			handler := NewRemoveUserRoleHandler(useCase)
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/users/"+tc.userID+"/roles/"+tc.roleID, nil, nil)
+			req.SetPathValue("user_id", tc.userID)
+			req.SetPathValue("role_id", tc.roleID)
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusNotFound, "not found")
-		roleRepo.AssertExpectations(t)
-	})
+			handler.Handler()(w, req)
 
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
+			if tc.expectedStatus != http.StatusOK {
+				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
+				userRolesRepo.AssertExpectations(t)
+				rolesRepo.AssertExpectations(t)
+				return
+			}
 
-		useCase, roleRepo := tests.NewRolePermissionUseCaseFixture()
-		roleRepo.On("RemoveUserRole", mock.Anything, "user-1", "role-1").Return(nil).Once()
-		handler := NewRemoveUserRoleHandler(useCase)
+			if reqCtx.ResponseStatus != tc.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tc.expectedStatus, reqCtx.ResponseStatus)
+			}
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/access-control/users/user-1/roles/role-1", nil, nil)
-		req.SetPathValue("user_id", "user-1")
-		req.SetPathValue("role_id", "role-1")
+			payload := internaltests.DecodeResponseJSON[types.RemoveUserRoleResponse](t, reqCtx)
+			assertRemoveUserRoleResponseEqual(t, payload, tc.expectedBody.(types.RemoveUserRoleResponse))
 
-		handler.Handler()(w, req)
-
-		if reqCtx.ResponseStatus != http.StatusOK {
-			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
-		}
-		payload := internaltests.DecodeResponseJSON[types.RemoveUserRoleResponse](t, reqCtx)
-		if payload.Message != "role removed" {
-			t.Fatalf("expected role removed message, got %v", payload.Message)
-		}
-		roleRepo.AssertExpectations(t)
-	})
+			userRolesRepo.AssertExpectations(t)
+			rolesRepo.AssertExpectations(t)
+		})
+	}
 }
 
-func TestGetUserEffectivePermissionsHandler(t *testing.T) {
-	t.Parallel()
+func newUserRolesUseCase(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) *usecases.UserRolesUseCase {
+	return usecases.NewUserRolesUseCase(services.NewUserRolesService(userRolesRepo, rolesRepo))
+}
 
-	t.Run("missing user id", func(t *testing.T) {
-		t.Parallel()
+func newUserAccessUseCase(userRolesRepo *accesscontroltests.MockUserRolesRepository, userAccessRepo *accesscontroltests.MockUserAccessRepository) *usecases.UserAccessUseCase {
+	return usecases.NewUserAccessUseCase(services.NewUserAccessService(userRolesRepo, userAccessRepo))
+}
 
-		useCase, _ := tests.NewUserRolesUseCaseFixture()
-		handler := NewGetUserEffectivePermissionsHandler(useCase)
+func assertUserRoleInfosEqual(t *testing.T, got []types.UserRoleInfo, want []types.UserRoleInfo) {
+	t.Helper()
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users//permissions", nil, nil)
-		req.SetPathValue("user_id", "")
+	if len(got) != len(want) {
+		t.Fatalf("expected %d roles, got %d", len(want), len(got))
+	}
 
-		handler.Handler()(w, req)
+	for i := range want {
+		assertUserRoleInfoEqual(t, got[i], want[i])
+	}
+}
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "unprocessable entity")
-	})
+func assertUserRoleInfoEqual(t *testing.T, got types.UserRoleInfo, want types.UserRoleInfo) {
+	t.Helper()
 
-	t.Run("error", func(t *testing.T) {
-		t.Parallel()
+	if got.RoleID != want.RoleID || got.RoleName != want.RoleName {
+		t.Fatalf("unexpected role info: %#v", got)
+	}
+	if !stringsEqualPtr(got.RoleDescription, want.RoleDescription) {
+		t.Fatalf("unexpected role description: %#v", got)
+	}
+	if !stringsEqualPtr(got.AssignedByUserID, want.AssignedByUserID) {
+		t.Fatalf("unexpected assigned_by_user_id: %#v", got)
+	}
+	if !timesEqualPtr(got.AssignedAt, want.AssignedAt) {
+		t.Fatalf("unexpected assigned_at: %#v", got)
+	}
+	if !timesEqualPtr(got.ExpiresAt, want.ExpiresAt) {
+		t.Fatalf("unexpected expires_at: %#v", got)
+	}
+}
 
-		useCase, accessRepo := tests.NewUserRolesUseCaseFixture()
-		accessRepo.On("GetUserEffectivePermissions", mock.Anything, "user-1").Return(([]types.UserPermissionInfo)(nil), accesscontrolconstants.ErrUnauthorized).Once()
-		handler := NewGetUserEffectivePermissionsHandler(useCase)
+func assertUserWithRolesEqual(t *testing.T, got types.UserWithRoles, want types.UserWithRoles) {
+	t.Helper()
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users/user-1/permissions", nil, nil)
-		req.SetPathValue("user_id", "user-1")
+	assertUserEqual(t, got.User, want.User)
+	assertUserRoleInfosEqual(t, got.Roles, want.Roles)
+}
 
-		handler.Handler()(w, req)
+func assertGetUserEffectivePermissionsResponseEqual(t *testing.T, got types.GetUserEffectivePermissionsResponse, want types.GetUserEffectivePermissionsResponse) {
+	t.Helper()
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnauthorized, "unauthorized")
-		accessRepo.AssertExpectations(t)
-	})
+	assertUserPermissionInfosEqual(t, got.Permissions, want.Permissions)
+}
 
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
+func assertUserAuthorizationProfileEqual(t *testing.T, got types.UserAuthorizationProfile, want types.UserAuthorizationProfile) {
+	t.Helper()
 
-		useCase, accessRepo := tests.NewUserRolesUseCaseFixture()
-		accessRepo.On("GetUserEffectivePermissions", mock.Anything, "user-1").Return([]types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "admin.read"}}, nil).Once()
-		handler := NewGetUserEffectivePermissionsHandler(useCase)
+	assertUserEqual(t, got.User, want.User)
+	assertUserRoleInfosEqual(t, got.Roles, want.Roles)
+	assertUserPermissionInfosEqual(t, got.Permissions, want.Permissions)
+}
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/access-control/users/user-1/permissions", nil, nil)
-		req.SetPathValue("user_id", "user-1")
+func assertUserEqual(t *testing.T, got authmodels.User, want authmodels.User) {
+	t.Helper()
 
-		handler.Handler()(w, req)
+	if got.ID != want.ID {
+		t.Fatalf("expected id %q, got %q", want.ID, got.ID)
+	}
+	if got.Name != want.Name {
+		t.Fatalf("expected name %q, got %q", want.Name, got.Name)
+	}
+	if got.Email != want.Email {
+		t.Fatalf("expected email %q, got %q", want.Email, got.Email)
+	}
+	if got.EmailVerified != want.EmailVerified {
+		t.Fatalf("expected email_verified %v, got %v", want.EmailVerified, got.EmailVerified)
+	}
+	if string(got.Metadata) != string(want.Metadata) {
+		t.Fatalf("expected metadata %s, got %s", string(want.Metadata), string(got.Metadata))
+	}
+	if !timesEqual(got.CreatedAt, want.CreatedAt) {
+		t.Fatalf("expected created_at %v, got %v", want.CreatedAt, got.CreatedAt)
+	}
+	if !timesEqual(got.UpdatedAt, want.UpdatedAt) {
+		t.Fatalf("expected updated_at %v, got %v", want.UpdatedAt, got.UpdatedAt)
+	}
+}
 
-		if reqCtx.ResponseStatus != http.StatusOK {
-			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
-		}
-		payload := internaltests.DecodeResponseJSON[types.GetUserEffectivePermissionsResponse](t, reqCtx)
-		if len(payload.Permissions) != 1 {
-			t.Fatalf("expected 1 permission, got %d", len(payload.Permissions))
-		}
-		accessRepo.AssertExpectations(t)
-	})
+func assertReplaceUserRolesResponseEqual(t *testing.T, got types.ReplaceUserRolesResponse, want types.ReplaceUserRolesResponse) {
+	t.Helper()
+	if got.Message != want.Message {
+		t.Fatalf("expected message %q, got %q", want.Message, got.Message)
+	}
+}
+
+func assertAssignUserRoleResponseEqual(t *testing.T, got types.AssignUserRoleResponse, want types.AssignUserRoleResponse) {
+	t.Helper()
+	if got.Message != want.Message {
+		t.Fatalf("expected message %q, got %q", want.Message, got.Message)
+	}
+}
+
+func assertRemoveUserRoleResponseEqual(t *testing.T, got types.RemoveUserRoleResponse, want types.RemoveUserRoleResponse) {
+	t.Helper()
+	if got.Message != want.Message {
+		t.Fatalf("expected message %q, got %q", want.Message, got.Message)
+	}
 }

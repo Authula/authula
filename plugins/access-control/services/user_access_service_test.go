@@ -2,76 +2,80 @@ package services
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	"github.com/Authula/authula/plugins/access-control/constants"
+	"github.com/stretchr/testify/mock"
+
+	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
+	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
 
-type stubUserAccessRepo struct {
-	rolesResult       []types.UserRoleInfo
-	rolesErr          error
-	permissionsResult []types.UserPermissionInfo
-	permissionsErr    error
-	withRolesResult   *types.UserWithRoles
-	withRolesErr      error
-	withPermsResult   *types.UserWithPermissions
-	withPermsErr      error
-}
-
-func (s *stubUserAccessRepo) GetUserRoles(_ context.Context, _ string) ([]types.UserRoleInfo, error) {
-	return s.rolesResult, s.rolesErr
-}
-
-func (s *stubUserAccessRepo) GetUserEffectivePermissions(_ context.Context, _ string) ([]types.UserPermissionInfo, error) {
-	return s.permissionsResult, s.permissionsErr
-}
-
-func (s *stubUserAccessRepo) GetUserWithRolesByID(_ context.Context, _ string) (*types.UserWithRoles, error) {
-	return s.withRolesResult, s.withRolesErr
-}
-
-func (s *stubUserAccessRepo) GetUserWithPermissionsByID(_ context.Context, _ string) (*types.UserWithPermissions, error) {
-	return s.withPermsResult, s.withPermsErr
-}
-
-func TestUserAccessServiceGetUserRolesUnprocessableEntity(t *testing.T) {
+func TestUserAccessServiceHasPermissions(t *testing.T) {
 	t.Parallel()
 
-	svc := NewUserAccessService(&stubUserAccessRepo{})
-	_, err := svc.GetUserRoles(context.Background(), "   ")
-	if !errors.Is(err, constants.ErrUnprocessableEntity) {
-		t.Fatalf("expected ErrUnprocessableEntity, got %v", err)
-	}
-}
+	userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
+	userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+	userAccessRepo.On("GetUserEffectivePermissions", mock.Anything, "user-1").Return([]types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "users.read"}}, nil).Once()
 
-func TestUserAccessServiceHasPermissionsMatchesAnyRequiredPermission(t *testing.T) {
-	t.Parallel()
-
-	svc := NewUserAccessService(&stubUserAccessRepo{
-		permissionsResult: []types.UserPermissionInfo{{PermissionKey: "users.read"}, {PermissionKey: "users.write"}},
-	})
-
-	ok, err := svc.HasPermissions(context.Background(), "user-1", []string{"billing.read", "users.write"})
+	service := NewUserAccessService(userRolesRepo, userAccessRepo)
+	ok, err := service.HasPermissions(context.Background(), "user-1", []string{"users.write", "users.read"})
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("expected nil err, got %v", err)
 	}
 	if !ok {
-		t.Fatal("expected permission check to pass when any required permission matches")
+		t.Fatal("expected permission check to pass")
 	}
+
+	userAccessRepo.AssertExpectations(t)
 }
 
-func TestUserAccessServiceGetUserAuthorizationProfileNilUser(t *testing.T) {
+func TestUserAccessServiceGetUserAuthorizationProfile(t *testing.T) {
 	t.Parallel()
 
-	svc := NewUserAccessService(&stubUserAccessRepo{withRolesResult: nil})
-
-	profile, err := svc.GetUserAuthorizationProfile(context.Background(), "user-1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	tests := []struct {
+		name    string
+		userID  string
+		setup   func(*accesscontroltests.MockUserRolesRepository, *accesscontroltests.MockUserAccessRepository)
+		wantErr error
+		wantNil bool
+	}{
+		{
+			name:    "blank user id",
+			userID:  "",
+			wantErr: accesscontrolconstants.ErrUnprocessableEntity,
+		},
+		{
+			name:   "composes profile",
+			userID: "user-1",
+			setup: func(userRolesRepo *accesscontroltests.MockUserRolesRepository, userAccessRepo *accesscontroltests.MockUserAccessRepository) {
+				userRolesRepo.On("GetUserWithRolesByID", mock.Anything, "user-1").Return(&types.UserWithRoles{Roles: []types.UserRoleInfo{{RoleID: "role-1", RoleName: "admin"}}}, nil).Once()
+				userAccessRepo.On("GetUserWithPermissionsByID", mock.Anything, "user-1").Return(&types.UserWithPermissions{Permissions: []types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "users.read"}}}, nil).Once()
+			},
+		},
 	}
-	if profile != nil {
-		t.Fatalf("expected nil profile, got %+v", profile)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
+			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			if tc.setup != nil {
+				tc.setup(userRolesRepo, userAccessRepo)
+			}
+
+			service := NewUserAccessService(userRolesRepo, userAccessRepo)
+			profile, err := service.GetUserAuthorizationProfile(context.Background(), tc.userID)
+			if err != tc.wantErr {
+				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
+			}
+			if tc.wantErr == nil && profile == nil {
+				t.Fatal("expected profile, got nil")
+			}
+
+			userRolesRepo.AssertExpectations(t)
+			userAccessRepo.AssertExpectations(t)
+		})
 	}
 }

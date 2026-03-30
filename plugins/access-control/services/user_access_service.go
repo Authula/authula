@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"strings"
 
 	"github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/repositories"
@@ -10,36 +9,28 @@ import (
 )
 
 type UserAccessService struct {
+	userRolesRepo  repositories.UserRolesRepository
 	userAccessRepo repositories.UserAccessRepository
 }
 
-func NewUserAccessService(repo repositories.UserAccessRepository) *UserAccessService {
-	return &UserAccessService{userAccessRepo: repo}
-}
-
-func (s *UserAccessService) GetUserRoles(ctx context.Context, userID string) ([]types.UserRoleInfo, error) {
-	if strings.TrimSpace(userID) == "" {
-		return nil, constants.ErrUnprocessableEntity
-	}
-	return s.userAccessRepo.GetUserRoles(ctx, userID)
-}
-
-func (s *UserAccessService) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
-	if strings.TrimSpace(userID) == "" {
-		return nil, constants.ErrUnprocessableEntity
-	}
-	return s.userAccessRepo.GetUserWithRolesByID(ctx, userID)
+func NewUserAccessService(userRolesRepo repositories.UserRolesRepository, userAccessRepo repositories.UserAccessRepository) *UserAccessService {
+	return &UserAccessService{userRolesRepo: userRolesRepo, userAccessRepo: userAccessRepo}
 }
 
 func (s *UserAccessService) GetUserWithPermissionsByID(ctx context.Context, userID string) (*types.UserWithPermissions, error) {
-	if strings.TrimSpace(userID) == "" {
+	if userID == "" {
 		return nil, constants.ErrUnprocessableEntity
 	}
+
 	return s.userAccessRepo.GetUserWithPermissionsByID(ctx, userID)
 }
 
 func (s *UserAccessService) GetUserAuthorizationProfile(ctx context.Context, userID string) (*types.UserAuthorizationProfile, error) {
-	withRoles, err := s.GetUserWithRolesByID(ctx, userID)
+	if userID == "" {
+		return nil, constants.ErrUnprocessableEntity
+	}
+
+	withRoles, err := s.userRolesRepo.GetUserWithRolesByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -64,13 +55,18 @@ func (s *UserAccessService) GetUserAuthorizationProfile(ctx context.Context, use
 }
 
 func (s *UserAccessService) GetUserEffectivePermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
-	if strings.TrimSpace(userID) == "" {
+	if userID == "" {
 		return nil, constants.ErrUnprocessableEntity
 	}
+
 	return s.userAccessRepo.GetUserEffectivePermissions(ctx, userID)
 }
 
 func (s *UserAccessService) HasPermissions(ctx context.Context, userID string, requiredPermissions []string) (bool, error) {
+	if userID == "" {
+		return false, constants.ErrUnprocessableEntity
+	}
+
 	permissions, err := s.GetUserEffectivePermissions(ctx, userID)
 	if err != nil {
 		return false, err
@@ -82,7 +78,6 @@ func (s *UserAccessService) HasPermissions(ctx context.Context, userID string, r
 	}
 
 	for _, required := range requiredPermissions {
-		required = strings.TrimSpace(required)
 		if required == "" {
 			continue
 		}

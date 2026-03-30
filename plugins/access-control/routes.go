@@ -9,14 +9,20 @@ import (
 )
 
 type routeUseCases struct {
-	rolePermission usecases.RolePermissionUseCase
-	userAccess     usecases.UserRolesUseCase
+	roles           *usecases.RolesUseCase
+	permissions     *usecases.PermissionsUseCase
+	rolePermissions *usecases.RolePermissionsUseCase
+	userRoles       *usecases.UserRolesUseCase
+	userAccess      *usecases.UserAccessUseCase
 }
 
 func newRouteUseCases(api *API) routeUseCases {
 	return routeUseCases{
-		rolePermission: api.useCases.RolePermissionUseCase(),
-		userAccess:     api.useCases.UserAccessUseCase(),
+		roles:           api.useCases.RolesUseCase(),
+		permissions:     api.useCases.PermissionsUseCase(),
+		rolePermissions: api.useCases.RolePermissionsUseCase(),
+		userRoles:       api.useCases.UserRolesUseCase(),
+		userAccess:      api.useCases.UserAccessUseCase(),
 	}
 }
 
@@ -25,25 +31,27 @@ func Routes(api *API) []models.Route {
 
 	return []models.Route{
 		// Roles and permissions
-		{Method: http.MethodPost, Path: "/access-control/roles", Handler: handlers.NewCreateRoleHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodGet, Path: "/access-control/roles", Handler: handlers.NewGetAllRolesHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodGet, Path: "/access-control/roles/{role_id}", Handler: handlers.NewGetRoleByIDHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodPatch, Path: "/access-control/roles/{role_id}", Handler: handlers.NewUpdateRoleHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodDelete, Path: "/access-control/roles/{role_id}", Handler: handlers.NewDeleteRoleHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodPost, Path: "/access-control/permissions", Handler: handlers.NewCreatePermissionHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodGet, Path: "/access-control/permissions", Handler: handlers.NewGetAllPermissionsHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodPatch, Path: "/access-control/permissions/{permission_id}", Handler: handlers.NewUpdatePermissionHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodDelete, Path: "/access-control/permissions/{permission_id}", Handler: handlers.NewDeletePermissionHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodPost, Path: "/access-control/roles/{role_id}/permissions", Handler: handlers.NewAddRolePermissionHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodGet, Path: "/access-control/roles/{role_id}/permissions", Handler: handlers.NewGetRolePermissionsHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodPut, Path: "/access-control/roles/{role_id}/permissions", Handler: handlers.NewReplaceRolePermissionsHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodDelete, Path: "/access-control/roles/{role_id}/permissions/{permission_id}", Handler: handlers.NewRemoveRolePermissionHandler(usecases.rolePermission).Handler()},
+		{Method: http.MethodPost, Path: "/access-control/roles", Handler: handlers.NewCreateRoleHandler(usecases.roles).Handler()},
+		{Method: http.MethodGet, Path: "/access-control/roles", Handler: handlers.NewGetAllRolesHandler(usecases.roles).Handler()},
+		{Method: http.MethodGet, Path: "/access-control/roles/{role_id}", Handler: handlers.NewGetRoleByIDHandler(usecases.roles).Handler()},
+		{Method: http.MethodPatch, Path: "/access-control/roles/{role_id}", Handler: handlers.NewUpdateRoleHandler(usecases.roles).Handler()},
+		{Method: http.MethodDelete, Path: "/access-control/roles/{role_id}", Handler: handlers.NewDeleteRoleHandler(usecases.roles).Handler()},
+		{Method: http.MethodPost, Path: "/access-control/permissions", Handler: handlers.NewCreatePermissionHandler(usecases.permissions).Handler()},
+		{Method: http.MethodGet, Path: "/access-control/permissions", Handler: handlers.NewGetAllPermissionsHandler(usecases.permissions).Handler()},
+		{Method: http.MethodGet, Path: "/access-control/permissions/{permission_id}", Handler: handlers.NewGetPermissionByIDHandler(usecases.permissions).Handler()},
+		{Method: http.MethodPatch, Path: "/access-control/permissions/{permission_id}", Handler: handlers.NewUpdatePermissionHandler(usecases.permissions).Handler()},
+		{Method: http.MethodDelete, Path: "/access-control/permissions/{permission_id}", Handler: handlers.NewDeletePermissionHandler(usecases.permissions).Handler()},
+		{Method: http.MethodPost, Path: "/access-control/roles/{role_id}/permissions", Handler: handlers.NewAddRolePermissionHandler(usecases.rolePermissions).Handler()},
+		{Method: http.MethodGet, Path: "/access-control/roles/{role_id}/permissions", Handler: handlers.NewGetRolePermissionsHandler(usecases.rolePermissions).Handler()},
+		{Method: http.MethodPut, Path: "/access-control/roles/{role_id}/permissions", Handler: handlers.NewReplaceRolePermissionsHandler(usecases.rolePermissions).Handler()},
+		{Method: http.MethodDelete, Path: "/access-control/roles/{role_id}/permissions/{permission_id}", Handler: handlers.NewRemoveRolePermissionHandler(usecases.rolePermissions).Handler()},
 
 		// User roles and permissions
-		{Method: http.MethodGet, Path: "/access-control/users/{user_id}/roles", Handler: handlers.NewGetUserRolesHandler(usecases.userAccess).Handler()},
-		{Method: http.MethodPost, Path: "/access-control/users/{user_id}/roles", Handler: handlers.NewAssignUserRoleHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodPut, Path: "/access-control/users/{user_id}/roles", Handler: handlers.NewReplaceUserRolesHandler(usecases.rolePermission).Handler()},
-		{Method: http.MethodDelete, Path: "/access-control/users/{user_id}/roles/{role_id}", Handler: handlers.NewRemoveUserRoleHandler(usecases.rolePermission).Handler()},
+		{Method: http.MethodGet, Path: "/access-control/users/{user_id}/roles", Handler: handlers.NewGetUserRolesHandler(usecases.userRoles).Handler()},
+		{Method: http.MethodGet, Path: "/access-control/users/{user_id}/authorization-profile", Handler: handlers.NewGetUserAuthorizationProfileHandler(usecases.userAccess).Handler()},
+		{Method: http.MethodPost, Path: "/access-control/users/{user_id}/roles", Handler: handlers.NewAssignUserRoleHandler(usecases.userRoles).Handler()},
+		{Method: http.MethodPut, Path: "/access-control/users/{user_id}/roles", Handler: handlers.NewReplaceUserRolesHandler(usecases.userRoles).Handler()},
+		{Method: http.MethodDelete, Path: "/access-control/users/{user_id}/roles/{role_id}", Handler: handlers.NewRemoveUserRoleHandler(usecases.userRoles).Handler()},
 		{Method: http.MethodGet, Path: "/access-control/users/{user_id}/permissions", Handler: handlers.NewGetUserEffectivePermissionsHandler(usecases.userAccess).Handler()},
 	}
 }

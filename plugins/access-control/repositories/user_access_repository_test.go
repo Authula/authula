@@ -3,145 +3,270 @@ package repositories
 import (
 	"context"
 	"testing"
-	"testing/synctest"
 	"time"
 
-	internaltests "github.com/Authula/authula/internal/tests"
+	plugintests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
 
-func TestBunUserAccessRepositoryGetUserRolesIncludesExpiredWithMetadata(t *testing.T) {
-	db := setupRepoDB(t)
-	rpRepo := NewBunRolePermissionRepository(db)
-	uaRepo := NewBunUserAccessRepository(db)
-	ctx := context.Background()
+func TestBunUserAccessRepositoryCounts(t *testing.T) {
+	t.Parallel()
 
-	if err := rpRepo.CreateRole(ctx, &types.Role{ID: "r-active", Name: "active"}); err != nil {
-		t.Fatalf("failed to create active role: %v", err)
-	}
-	if err := rpRepo.CreateRole(ctx, &types.Role{ID: "r-expired", Name: "expired"}); err != nil {
-		t.Fatalf("failed to create expired role: %v", err)
+	tests := []struct {
+		name                string
+		seed                func(*BunRolesRepository, *BunPermissionsRepository, *BunRolePermissionsRepository, *BunUserRolesRepository, context.Context)
+		roleID              string
+		permissionID        string
+		wantRoleCount       int
+		wantPermissionCount int
+	}{
+		{
+			name:                "empty counts",
+			roleID:              "role-missing",
+			permissionID:        "perm-missing",
+			wantRoleCount:       0,
+			wantPermissionCount: 0,
+		},
+		{
+			name:         "counts assigned records",
+			roleID:       "role-1",
+			permissionID: "perm-1",
+			seed: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor"}); err != nil {
+					panic(err)
+				}
+				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read"}); err != nil {
+					panic(err)
+				}
+				if err := rolePermissionsRepo.AddRolePermission(ctx, "role-1", "perm-1", nil); err != nil {
+					panic(err)
+				}
+				if err := userRolesRepo.AssignUserRole(ctx, "u1", "role-1", nil, nil); err != nil {
+					panic(err)
+				}
+			},
+			wantRoleCount:       1,
+			wantPermissionCount: 1,
+		},
 	}
 
-	assignerID := "u2"
-	if err := rpRepo.AssignUserRole(ctx, "u1", "r-active", &assignerID, nil); err != nil {
-		t.Fatalf("failed to assign active role: %v", err)
-	}
-	if err := rpRepo.AssignUserRole(ctx, "u1", "r-expired", &assignerID, internaltests.PtrTime(time.Now().UTC().Add(-1*time.Hour))); err != nil {
-		t.Fatalf("failed to assign expired role: %v", err)
-	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	roles, err := uaRepo.GetUserRoles(ctx, "u1")
-	if err != nil {
-		t.Fatalf("failed to get user roles: %v", err)
-	}
-	if len(roles) != 2 {
-		t.Fatalf("expected 2 roles including expired, got %d", len(roles))
-	}
-	if roles[0].RoleID != "r-active" {
-		t.Fatalf("expected role sorted by name, got %s", roles[0].RoleID)
-	}
-	if roles[0].AssignedByUserID == nil || *roles[0].AssignedByUserID != assignerID {
-		t.Fatalf("expected assigned_by_user_id=%s", assignerID)
-	}
-	if roles[0].AssignedAt == nil {
-		t.Fatal("expected assigned_at to be populated")
-	}
-	if roles[1].RoleID != "r-expired" {
-		t.Fatalf("expected expired role included, got %s", roles[1].RoleID)
-	}
-	if roles[1].ExpiresAt == nil {
-		t.Fatal("expected expired role to include expires_at")
-	}
-}
+			db := plugintests.SetupRepoDB(t)
+			rolesRepo := NewBunRolesRepository(db)
+			permissionsRepo := NewBunPermissionsRepository(db)
+			rolePermissionsRepo := NewBunRolePermissionsRepository(db)
+			userRolesRepo := NewBunUserRolesRepository(db)
+			repo := NewBunUserAccessRepository(db)
+			ctx := context.Background()
 
-func TestBunUserAccessRepositoryGetUserRolesReturnsEmptyArrayWhenNoRoles(t *testing.T) {
-	db := setupRepoDB(t)
-	uaRepo := NewBunUserAccessRepository(db)
+			if tc.seed != nil {
+				tc.seed(rolesRepo, permissionsRepo, rolePermissionsRepo, userRolesRepo, ctx)
+			}
 
-	roles, err := uaRepo.GetUserRoles(context.Background(), "missing-user")
-	if err != nil {
-		t.Fatalf("failed to get user roles: %v", err)
-	}
-	if roles == nil {
-		t.Fatal("expected empty roles slice, got nil")
-	}
-	if len(roles) != 0 {
-		t.Fatalf("expected 0 roles, got %d", len(roles))
+			roleCount, err := repo.CountUserAssignmentsByRoleID(ctx, tc.roleID)
+			if err != nil {
+				t.Fatalf("failed to count role assignments: %v", err)
+			}
+			permissionCount, err := repo.CountRoleAssignmentsByPermissionID(ctx, tc.permissionID)
+			if err != nil {
+				t.Fatalf("failed to count permission assignments: %v", err)
+			}
+
+			if roleCount != tc.wantRoleCount {
+				t.Fatalf("expected role count %d, got %d", tc.wantRoleCount, roleCount)
+			}
+			if permissionCount != tc.wantPermissionCount {
+				t.Fatalf("expected permission count %d, got %d", tc.wantPermissionCount, permissionCount)
+			}
+		})
 	}
 }
 
 func TestBunUserAccessRepositoryGetUserEffectivePermissions(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		db := setupRepoDB(t)
-		rpRepo := NewBunRolePermissionRepository(db)
-		uaRepo := NewBunUserAccessRepository(db)
-		ctx := context.Background()
+	t.Parallel()
 
-		if err := rpRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor"}); err != nil {
-			t.Fatalf("failed to create role: %v", err)
-		}
-		if err := rpRepo.CreateRole(ctx, &types.Role{ID: "r2", Name: "viewer"}); err != nil {
-			t.Fatalf("failed to create second role: %v", err)
-		}
-		if err := rpRepo.CreatePermission(ctx, &types.Permission{ID: "p1", Key: "posts.read", Description: internaltests.PtrString("Read posts")}); err != nil {
-			t.Fatalf("failed to create permission: %v", err)
-		}
-		grantedBy := "u2"
-		if err := rpRepo.AddRolePermission(ctx, "r1", "p1", &grantedBy); err != nil {
-			t.Fatalf("failed to add role permission: %v", err)
-		}
-		time.Sleep(10 * time.Millisecond)
-		if err := rpRepo.AddRolePermission(ctx, "r2", "p1", &grantedBy); err != nil {
-			t.Fatalf("failed to add second role permission: %v", err)
-		}
-		if err := rpRepo.AssignUserRole(ctx, "u1", "r1", nil, nil); err != nil {
-			t.Fatalf("failed to assign role: %v", err)
-		}
-		if err := rpRepo.AssignUserRole(ctx, "u1", "r2", nil, nil); err != nil {
-			t.Fatalf("failed to assign second role: %v", err)
-		}
+	activeUntil := time.Now().UTC().Add(1 * time.Hour)
+	expiredAt := time.Now().UTC().Add(-1 * time.Hour)
+	description := new("Read users")
+	grantedBy := "u2"
 
-		perms, err := uaRepo.GetUserEffectivePermissions(ctx, "u1")
-		if err != nil {
-			t.Fatalf("failed to get effective permissions: %v", err)
-		}
-		if len(perms) != 1 {
-			t.Fatalf("expected 1 deduplicated permission, got %d", len(perms))
-		}
-		if perms[0].PermissionKey != "posts.read" {
-			t.Fatalf("expected posts.read, got %s", perms[0].PermissionKey)
-		}
-		if perms[0].PermissionDescription == nil || *perms[0].PermissionDescription != "Read posts" {
-			t.Fatal("expected permission description to be populated")
-		}
-		if len(perms[0].Sources) != 2 {
-			t.Fatalf("expected 2 permission sources, got %d", len(perms[0].Sources))
-		}
-		if perms[0].Sources[0].RoleName != "editor" || perms[0].Sources[1].RoleName != "viewer" {
-			t.Fatalf("expected deterministic source ordering by role_name, got %s then %s", perms[0].Sources[0].RoleName, perms[0].Sources[1].RoleName)
-		}
-		if perms[0].Sources[0].GrantedByUserID == nil || *perms[0].Sources[0].GrantedByUserID != grantedBy {
-			t.Fatal("expected source granted_by_user_id to be populated")
-		}
-		if perms[0].Sources[0].GrantedAt == nil || perms[0].Sources[1].GrantedAt == nil {
-			t.Fatal("expected source granted_at timestamps to be populated")
-		}
-	})
+	tests := []struct {
+		name        string
+		seed        func(*BunRolesRepository, *BunPermissionsRepository, *BunRolePermissionsRepository, *BunUserRolesRepository, context.Context)
+		userID      string
+		wantKeys    []string
+		wantSources int
+	}{
+		{
+			name:     "empty result",
+			userID:   "missing-user",
+			wantKeys: []string{},
+		},
+		{
+			name:   "aggregates active permissions and ignores expired roles",
+			userID: "u1",
+			seed: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor"}); err != nil {
+					panic(err)
+				}
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r2", Name: "viewer"}); err != nil {
+					panic(err)
+				}
+				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "p1", Key: "posts.read", Description: description}); err != nil {
+					panic(err)
+				}
+				if err := rolePermissionsRepo.AddRolePermission(ctx, "r1", "p1", &grantedBy); err != nil {
+					panic(err)
+				}
+				if err := rolePermissionsRepo.AddRolePermission(ctx, "r2", "p1", &grantedBy); err != nil {
+					panic(err)
+				}
+				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r1", nil, &activeUntil); err != nil {
+					panic(err)
+				}
+				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r2", nil, &expiredAt); err != nil {
+					panic(err)
+				}
+			},
+			wantKeys:    []string{"posts.read"},
+			wantSources: 1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := plugintests.SetupRepoDB(t)
+			rolesRepo := NewBunRolesRepository(db)
+			permissionsRepo := NewBunPermissionsRepository(db)
+			rolePermissionsRepo := NewBunRolePermissionsRepository(db)
+			userRolesRepo := NewBunUserRolesRepository(db)
+			repo := NewBunUserAccessRepository(db)
+			ctx := context.Background()
+
+			if tc.seed != nil {
+				tc.seed(rolesRepo, permissionsRepo, rolePermissionsRepo, userRolesRepo, ctx)
+			}
+
+			permissions, err := repo.GetUserEffectivePermissions(ctx, tc.userID)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if permissions == nil {
+				t.Fatal("expected permissions slice, got nil")
+			}
+			if len(permissions) != len(tc.wantKeys) {
+				t.Fatalf("expected %d permissions, got %d", len(tc.wantKeys), len(permissions))
+			}
+			for i, wantKey := range tc.wantKeys {
+				if permissions[i].PermissionKey != wantKey {
+					t.Fatalf("expected permission key %s at index %d, got %#v", wantKey, i, permissions[i])
+				}
+				if len(permissions[i].Sources) != tc.wantSources {
+					t.Fatalf("expected %d sources, got %d", tc.wantSources, len(permissions[i].Sources))
+				}
+				if permissions[i].PermissionDescription == nil || *permissions[i].PermissionDescription != "Read users" {
+					t.Fatalf("expected permission description to be populated, got %#v", permissions[i].PermissionDescription)
+				}
+			}
+		})
+	}
 }
 
-func TestBunUserAccessRepositoryGetUserEffectivePermissionsReturnsEmptyArrayWhenNoPermissions(t *testing.T) {
-	db := setupRepoDB(t)
-	uaRepo := NewBunUserAccessRepository(db)
+func TestBunUserAccessRepositoryGetUserWithPermissionsByID(t *testing.T) {
+	t.Parallel()
 
-	perms, err := uaRepo.GetUserEffectivePermissions(context.Background(), "missing-user")
-	if err != nil {
-		t.Fatalf("failed to get effective permissions: %v", err)
+	permissionDescription := new("Read users")
+
+	tests := []struct {
+		name               string
+		seed               func(*BunRolesRepository, *BunPermissionsRepository, *BunRolePermissionsRepository, *BunUserRolesRepository, context.Context)
+		userID             string
+		wantNil            bool
+		wantPermissionKeys []string
+	}{
+		{
+			name:    "not found",
+			userID:  "missing-user",
+			wantNil: true,
+		},
+		{
+			name:   "success",
+			userID: "u1",
+			seed: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor"}); err != nil {
+					panic(err)
+				}
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r2", Name: "viewer"}); err != nil {
+					panic(err)
+				}
+				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "p1", Key: "posts.read", Description: permissionDescription}); err != nil {
+					panic(err)
+				}
+				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "p2", Key: "posts.write"}); err != nil {
+					panic(err)
+				}
+				if err := rolePermissionsRepo.AddRolePermission(ctx, "r1", "p1", nil); err != nil {
+					panic(err)
+				}
+				if err := rolePermissionsRepo.AddRolePermission(ctx, "r2", "p2", nil); err != nil {
+					panic(err)
+				}
+				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r1", nil, nil); err != nil {
+					panic(err)
+				}
+				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r2", nil, nil); err != nil {
+					panic(err)
+				}
+			},
+			wantPermissionKeys: []string{"posts.read", "posts.write"},
+		},
 	}
-	if perms == nil {
-		t.Fatal("expected empty permissions slice, got nil")
-	}
-	if len(perms) != 0 {
-		t.Fatalf("expected 0 permissions, got %d", len(perms))
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := plugintests.SetupRepoDB(t)
+			rolesRepo := NewBunRolesRepository(db)
+			permissionsRepo := NewBunPermissionsRepository(db)
+			rolePermissionsRepo := NewBunRolePermissionsRepository(db)
+			userRolesRepo := NewBunUserRolesRepository(db)
+			repo := NewBunUserAccessRepository(db)
+			ctx := context.Background()
+
+			if tc.seed != nil {
+				tc.seed(rolesRepo, permissionsRepo, rolePermissionsRepo, userRolesRepo, ctx)
+			}
+
+			userWithPermissions, err := repo.GetUserWithPermissionsByID(ctx, tc.userID)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantNil {
+				if userWithPermissions != nil {
+					t.Fatalf("expected nil user, got %#v", userWithPermissions)
+				}
+				return
+			}
+			if userWithPermissions == nil {
+				t.Fatal("expected user, got nil")
+			}
+			if userWithPermissions.User.ID != tc.userID {
+				t.Fatalf("expected user ID %s, got %s", tc.userID, userWithPermissions.User.ID)
+			}
+			if len(userWithPermissions.Permissions) != len(tc.wantPermissionKeys) {
+				t.Fatalf("expected %d permissions, got %d", len(tc.wantPermissionKeys), len(userWithPermissions.Permissions))
+			}
+			for i, wantKey := range tc.wantPermissionKeys {
+				if userWithPermissions.Permissions[i].PermissionKey != wantKey {
+					t.Fatalf("expected permission key %s at index %d, got %#v", wantKey, i, userWithPermissions.Permissions[i])
+				}
+			}
+		})
 	}
 }
