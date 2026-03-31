@@ -46,20 +46,20 @@ func (p *AccessControlPlugin) Init(ctx *models.PluginContext) error {
 	permissionsRepo := repositories.NewBunPermissionsRepository(ctx.DB)
 	rolePermissionsRepo := repositories.NewBunRolePermissionsRepository(ctx.DB)
 	userRolesRepo := repositories.NewBunUserRolesRepository(ctx.DB)
-	userAccessRepo := repositories.NewBunUserAccessRepository(ctx.DB)
+	userPermissionsRepo := repositories.NewBunUserPermissionsRepository(ctx.DB)
 
-	rolesService := services.NewRolesService(rolesRepo, rolePermissionsRepo, userAccessRepo)
-	permissionsService := services.NewPermissionsService(permissionsRepo, userAccessRepo)
+	rolesService := services.NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
+	permissionsService := services.NewPermissionsService(permissionsRepo, rolePermissionsRepo)
 	rolePermissionsService := services.NewRolePermissionsService(rolesRepo, permissionsRepo, rolePermissionsRepo)
 	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo)
-	userAccessService := services.NewUserAccessService(userRolesRepo, userAccessRepo)
+	userPermissionsService := services.NewUserPermissionsService(userPermissionsRepo)
 
 	useCases := usecases.NewAccessControlUseCases(
 		usecases.NewRolesUseCase(rolesService),
 		usecases.NewPermissionsUseCase(permissionsService),
 		usecases.NewRolePermissionsUseCase(rolePermissionsService),
 		usecases.NewUserRolesUseCase(userRolesService),
-		usecases.NewUserAccessUseCase(userAccessService),
+		usecases.NewUserPermissionsUseCase(userPermissionsService),
 	)
 	p.Api = NewAPI(useCases)
 

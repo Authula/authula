@@ -87,12 +87,12 @@ func TestCreateRoleHandler(t *testing.T) {
 
 			rolesRepo := &accesscontroltests.MockRolesRepository{}
 			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
 			if tc.setupMock != nil {
 				tc.setupMock(rolesRepo)
 			}
 
-			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userAccessRepo)
+			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			handler := NewCreateRoleHandler(useCase)
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/roles", tc.body, nil)
 
@@ -102,7 +102,7 @@ func TestCreateRoleHandler(t *testing.T) {
 				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
 				rolesRepo.AssertExpectations(t)
 				rolePermissionsRepo.AssertExpectations(t)
-				userAccessRepo.AssertExpectations(t)
+				userRolesRepo.AssertExpectations(t)
 				return
 			}
 
@@ -115,7 +115,7 @@ func TestCreateRoleHandler(t *testing.T) {
 
 			rolesRepo.AssertExpectations(t)
 			rolePermissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
+			userRolesRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -191,12 +191,12 @@ func TestGetAllRolesHandler(t *testing.T) {
 
 			rolesRepo := &accesscontroltests.MockRolesRepository{}
 			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
 			if tc.setupMock != nil {
 				tc.setupMock(rolesRepo)
 			}
 
-			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userAccessRepo)
+			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			handler := NewGetAllRolesHandler(useCase)
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/roles", nil, nil)
 
@@ -206,7 +206,7 @@ func TestGetAllRolesHandler(t *testing.T) {
 				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
 				rolesRepo.AssertExpectations(t)
 				rolePermissionsRepo.AssertExpectations(t)
-				userAccessRepo.AssertExpectations(t)
+				userRolesRepo.AssertExpectations(t)
 				return
 			}
 
@@ -219,7 +219,7 @@ func TestGetAllRolesHandler(t *testing.T) {
 
 			rolesRepo.AssertExpectations(t)
 			rolePermissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
+			userRolesRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -301,12 +301,12 @@ func TestGetRoleByIDHandler(t *testing.T) {
 
 			rolesRepo := &accesscontroltests.MockRolesRepository{}
 			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
 			if tc.setupMock != nil {
 				tc.setupMock(rolesRepo, rolePermissionsRepo)
 			}
 
-			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userAccessRepo)
+			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			handler := NewGetRoleByIDHandler(useCase)
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/roles/"+tc.roleID, nil, nil)
 			req.SetPathValue("role_id", tc.roleID)
@@ -317,7 +317,7 @@ func TestGetRoleByIDHandler(t *testing.T) {
 				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
 				rolesRepo.AssertExpectations(t)
 				rolePermissionsRepo.AssertExpectations(t)
-				userAccessRepo.AssertExpectations(t)
+				userRolesRepo.AssertExpectations(t)
 				return
 			}
 
@@ -330,7 +330,95 @@ func TestGetRoleByIDHandler(t *testing.T) {
 
 			rolesRepo.AssertExpectations(t)
 			rolePermissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
+			userRolesRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestGetRoleByNameHandler(t *testing.T) {
+	t.Parallel()
+
+	fixedTime := time.Date(2026, 3, 29, 12, 0, 0, 0, time.UTC)
+	description := new(string)
+	*description = "platform administrator"
+
+	tests := []struct {
+		name           string
+		roleName       string
+		setupMock      func(*accesscontroltests.MockRolesRepository)
+		expectedStatus int
+		expectedBody   any
+	}{
+		{
+			name:     "service error",
+			roleName: "missing",
+			setupMock: func(m *accesscontroltests.MockRolesRepository) {
+				m.On("GetRoleByName", mock.Anything, "missing").Return((*types.Role)(nil), constants.ErrNotFound).Once()
+			},
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   map[string]string{"message": "not found"},
+		},
+		{
+			name:     "success",
+			roleName: "Administrator",
+			setupMock: func(m *accesscontroltests.MockRolesRepository) {
+				m.On("GetRoleByName", mock.Anything, "Administrator").Return(&types.Role{
+					ID:          "role-1",
+					Name:        "Administrator",
+					Description: description,
+					IsSystem:    true,
+					CreatedAt:   fixedTime,
+					UpdatedAt:   fixedTime,
+				}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody: types.Role{
+				ID:          "role-1",
+				Name:        "Administrator",
+				Description: description,
+				IsSystem:    true,
+				CreatedAt:   fixedTime,
+				UpdatedAt:   fixedTime,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			rolesRepo := &accesscontroltests.MockRolesRepository{}
+			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
+			if tc.setupMock != nil {
+				tc.setupMock(rolesRepo)
+			}
+
+			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userRolesRepo)
+			handler := NewGetRoleByNameHandler(useCase)
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/roles/by-name/"+tc.roleName, nil, nil)
+			req.SetPathValue("role_name", tc.roleName)
+
+			handler.Handler()(w, req)
+
+			if tc.expectedStatus != http.StatusOK {
+				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
+				rolesRepo.AssertExpectations(t)
+				rolePermissionsRepo.AssertExpectations(t)
+				userRolesRepo.AssertExpectations(t)
+				return
+			}
+
+			if reqCtx.ResponseStatus != tc.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tc.expectedStatus, reqCtx.ResponseStatus)
+			}
+
+			payload := internaltests.DecodeResponseJSON[types.Role](t, reqCtx)
+			assertRoleEqual(t, payload, tc.expectedBody.(types.Role))
+
+			rolesRepo.AssertExpectations(t)
+			rolePermissionsRepo.AssertExpectations(t)
+			userRolesRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -410,12 +498,12 @@ func TestUpdateRoleHandler(t *testing.T) {
 
 			rolesRepo := &accesscontroltests.MockRolesRepository{}
 			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
 			if tc.setupMock != nil {
 				tc.setupMock(rolesRepo)
 			}
 
-			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userAccessRepo)
+			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			handler := NewUpdateRoleHandler(useCase)
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/roles/role-1", tc.body, nil)
 			req.SetPathValue("role_id", "role-1")
@@ -426,7 +514,7 @@ func TestUpdateRoleHandler(t *testing.T) {
 				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
 				rolesRepo.AssertExpectations(t)
 				rolePermissionsRepo.AssertExpectations(t)
-				userAccessRepo.AssertExpectations(t)
+				userRolesRepo.AssertExpectations(t)
 				return
 			}
 
@@ -439,7 +527,7 @@ func TestUpdateRoleHandler(t *testing.T) {
 
 			rolesRepo.AssertExpectations(t)
 			rolePermissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
+			userRolesRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -450,14 +538,14 @@ func TestDeleteRoleHandler(t *testing.T) {
 	tests := []struct {
 		name           string
 		roleID         string
-		setupMock      func(*accesscontroltests.MockRolesRepository, *accesscontroltests.MockUserAccessRepository)
+		setupMock      func(*accesscontroltests.MockRolesRepository)
 		expectedStatus int
 		expectedBody   any
 	}{
 		{
 			name:   "service error",
 			roleID: "role-1",
-			setupMock: func(m *accesscontroltests.MockRolesRepository, _ *accesscontroltests.MockUserAccessRepository) {
+			setupMock: func(m *accesscontroltests.MockRolesRepository) {
 				m.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Administrator", IsSystem: true}, nil).Once()
 			},
 			expectedStatus: http.StatusForbidden,
@@ -466,9 +554,8 @@ func TestDeleteRoleHandler(t *testing.T) {
 		{
 			name:   "success",
 			roleID: "role-1",
-			setupMock: func(m *accesscontroltests.MockRolesRepository, u *accesscontroltests.MockUserAccessRepository) {
+			setupMock: func(m *accesscontroltests.MockRolesRepository) {
 				m.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Administrator", IsSystem: false}, nil).Once()
-				u.On("CountUserAssignmentsByRoleID", mock.Anything, "role-1").Return(0, nil).Once()
 				m.On("DeleteRole", mock.Anything, "role-1").Return(true, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
@@ -482,12 +569,18 @@ func TestDeleteRoleHandler(t *testing.T) {
 
 			rolesRepo := &accesscontroltests.MockRolesRepository{}
 			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
 			if tc.setupMock != nil {
-				tc.setupMock(rolesRepo, userAccessRepo)
+				tc.setupMock(rolesRepo)
+			}
+			if tc.roleID == "role-1" && tc.expectedStatus == http.StatusOK {
+				userRolesRepo.On("CountUsersByRole", mock.Anything, "role-1").Return(0, nil).Once()
+			}
+			if tc.roleID == "role-1" && tc.expectedStatus == http.StatusForbidden {
+				userRolesRepo.On("CountUsersByRole", mock.Anything, "role-1").Return(0, nil).Maybe()
 			}
 
-			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userAccessRepo)
+			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			handler := NewDeleteRoleHandler(useCase)
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/roles/"+tc.roleID, nil, nil)
 			req.SetPathValue("role_id", tc.roleID)
@@ -498,7 +591,7 @@ func TestDeleteRoleHandler(t *testing.T) {
 				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
 				rolesRepo.AssertExpectations(t)
 				rolePermissionsRepo.AssertExpectations(t)
-				userAccessRepo.AssertExpectations(t)
+				userRolesRepo.AssertExpectations(t)
 				return
 			}
 
@@ -511,13 +604,13 @@ func TestDeleteRoleHandler(t *testing.T) {
 
 			rolesRepo.AssertExpectations(t)
 			rolePermissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
+			userRolesRepo.AssertExpectations(t)
 		})
 	}
 }
 
-func newRolesUseCase(rolesRepo *accesscontroltests.MockRolesRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository, userAccessRepo *accesscontroltests.MockUserAccessRepository) *usecases.RolesUseCase {
-	return usecases.NewRolesUseCase(services.NewRolesService(rolesRepo, rolePermissionsRepo, userAccessRepo))
+func newRolesUseCase(rolesRepo *accesscontroltests.MockRolesRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) *usecases.RolesUseCase {
+	return usecases.NewRolesUseCase(services.NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo))
 }
 
 func assertRolesEqual(t *testing.T, got []types.Role, want []types.Role) {

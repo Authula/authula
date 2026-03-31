@@ -26,14 +26,6 @@ func (s *UserRolesService) GetUserRoles(ctx context.Context, userID string) ([]t
 	return s.userRolesRepo.GetUserRoles(ctx, userID)
 }
 
-func (s *UserRolesService) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
-	if userID == "" {
-		return nil, constants.ErrUnprocessableEntity
-	}
-
-	return s.userRolesRepo.GetUserWithRolesByID(ctx, userID)
-}
-
 func (s *UserRolesService) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error {
 	if userID == "" {
 		return constants.ErrBadRequest

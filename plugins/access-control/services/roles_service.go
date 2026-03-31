@@ -12,11 +12,11 @@ import (
 type RolesService struct {
 	rolesRepo           repositories.RolesRepository
 	rolePermissionsRepo repositories.RolePermissionsRepository
-	userAccessRepo      repositories.UserAccessRepository
+	userRolesRepo       repositories.UserRolesRepository
 }
 
-func NewRolesService(rolesRepo repositories.RolesRepository, rolePermissionsRepo repositories.RolePermissionsRepository, userAccessRepo repositories.UserAccessRepository) *RolesService {
-	return &RolesService{rolesRepo: rolesRepo, rolePermissionsRepo: rolePermissionsRepo, userAccessRepo: userAccessRepo}
+func NewRolesService(rolesRepo repositories.RolesRepository, rolePermissionsRepo repositories.RolePermissionsRepository, userRolesRepo repositories.UserRolesRepository) *RolesService {
+	return &RolesService{rolesRepo: rolesRepo, rolePermissionsRepo: rolePermissionsRepo, userRolesRepo: userRolesRepo}
 }
 
 func (s *RolesService) CreateRole(ctx context.Context, req types.CreateRoleRequest) (*types.Role, error) {
@@ -45,6 +45,22 @@ func (s *RolesService) CreateRole(ctx context.Context, req types.CreateRoleReque
 
 func (s *RolesService) GetAllRoles(ctx context.Context) ([]types.Role, error) {
 	return s.rolesRepo.GetAllRoles(ctx)
+}
+
+func (s *RolesService) GetRoleByName(ctx context.Context, roleName string) (*types.Role, error) {
+	if roleName == "" {
+		return nil, constants.ErrBadRequest
+	}
+
+	role, err := s.rolesRepo.GetRoleByName(ctx, roleName)
+	if err != nil {
+		return nil, err
+	}
+	if role == nil {
+		return nil, constants.ErrNotFound
+	}
+
+	return role, nil
 }
 
 func (s *RolesService) GetRoleByID(ctx context.Context, roleID string) (*types.RoleDetails, error) {
@@ -136,11 +152,11 @@ func (s *RolesService) DeleteRole(ctx context.Context, roleID string) error {
 		return constants.ErrCannotUpdateSystemRole
 	}
 
-	assignmentsCount, err := s.userAccessRepo.CountUserAssignmentsByRoleID(ctx, roleID)
+	totalUsersByRole, err := s.userRolesRepo.CountUsersByRole(ctx, roleID)
 	if err != nil {
 		return err
 	}
-	if assignmentsCount > 0 {
+	if totalUsersByRole > 0 {
 		return constants.ErrConflict
 	}
 

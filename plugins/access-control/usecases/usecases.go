@@ -11,7 +11,7 @@ type UseCases struct {
 	permissions     *PermissionsUseCase
 	rolePermissions *RolePermissionsUseCase
 	userRoles       *UserRolesUseCase
-	userAccess      *UserAccessUseCase
+	userPermissions *UserPermissionsUseCase
 }
 
 func NewAccessControlUseCases(
@@ -19,14 +19,14 @@ func NewAccessControlUseCases(
 	permissions *PermissionsUseCase,
 	rolePermissions *RolePermissionsUseCase,
 	userRoles *UserRolesUseCase,
-	userAccess *UserAccessUseCase,
+	userPermissions *UserPermissionsUseCase,
 ) *UseCases {
 	return &UseCases{
 		roles:           roles,
 		permissions:     permissions,
 		rolePermissions: rolePermissions,
 		userRoles:       userRoles,
-		userAccess:      userAccess,
+		userPermissions: userPermissions,
 	}
 }
 
@@ -46,8 +46,8 @@ func (u *UseCases) UserRolesUseCase() *UserRolesUseCase {
 	return u.userRoles
 }
 
-func (u *UseCases) UserAccessUseCase() *UserAccessUseCase {
-	return u.userAccess
+func (u *UseCases) UserPermissionsUseCase() *UserPermissionsUseCase {
+	return u.userPermissions
 }
 
 // Roles
@@ -58,6 +58,10 @@ func (u *UseCases) CreateRole(ctx context.Context, req types.CreateRoleRequest) 
 
 func (u *UseCases) GetAllRoles(ctx context.Context) ([]types.Role, error) {
 	return u.roles.GetAllRoles(ctx)
+}
+
+func (u *UseCases) GetRoleByName(ctx context.Context, roleName string) (*types.Role, error) {
+	return u.roles.GetRoleByName(ctx, roleName)
 }
 
 func (u *UseCases) GetRoleByID(ctx context.Context, roleID string) (*types.RoleDetails, error) {
@@ -130,24 +134,12 @@ func (u *UseCases) RemoveRoleFromUser(ctx context.Context, userID string, roleID
 	return u.userRoles.RemoveRoleFromUser(ctx, userID, roleID)
 }
 
-func (u *UseCases) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
-	return u.userRoles.GetUserWithRolesByID(ctx, userID)
+// User Permissions
+
+func (u *UseCases) GetUserPermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
+	return u.userPermissions.GetUserPermissions(ctx, userID)
 }
 
-// User Access
-
-func (u *UseCases) GetUserEffectivePermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
-	return u.userAccess.GetUserEffectivePermissions(ctx, userID)
-}
-
-func (u *UseCases) HasPermissions(ctx context.Context, userID string, requiredPermissions []string) (bool, error) {
-	return u.userAccess.HasPermissions(ctx, userID, requiredPermissions)
-}
-
-func (u *UseCases) GetUserWithPermissionsByID(ctx context.Context, userID string) (*types.UserWithPermissions, error) {
-	return u.userAccess.GetUserWithPermissionsByID(ctx, userID)
-}
-
-func (u *UseCases) GetUserAuthorizationProfile(ctx context.Context, userID string) (*types.UserAuthorizationProfile, error) {
-	return u.userAccess.GetUserAuthorizationProfile(ctx, userID)
+func (u *UseCases) HasPermissions(ctx context.Context, userID string, permissionKeys []string) (bool, error) {
+	return u.userPermissions.HasPermissions(ctx, userID, permissionKeys)
 }

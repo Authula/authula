@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -56,56 +55,6 @@ type userWithRoleRow struct {
 	RoleName      *string   `bun:"role_name"`
 }
 
-func (r *BunUserRolesRepository) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
-	var rows []userWithRoleRow
-	now := time.Now().UTC()
-	err := r.db.NewSelect().
-		TableExpr("users u").
-		ColumnExpr("u.id AS user_id").
-		ColumnExpr("u.name AS user_name").
-		ColumnExpr("u.email AS user_email").
-		ColumnExpr("u.email_verified AS email_verified").
-		ColumnExpr("u.image AS image").
-		ColumnExpr("u.metadata AS metadata").
-		ColumnExpr("u.created_at AS created_at").
-		ColumnExpr("u.updated_at AS updated_at").
-		ColumnExpr("pr.id AS role_id").
-		ColumnExpr("pr.name AS role_name").
-		Join("LEFT JOIN access_control_user_roles pur ON pur.user_id = u.id AND (pur.expires_at IS NULL OR pur.expires_at > ?)", now).
-		Join("LEFT JOIN access_control_roles pr ON pr.id = pur.role_id").
-		Where("u.id = ?", userID).
-		OrderExpr("pr.name ASC").
-		Scan(ctx, &rows)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to get user with roles: %w", err)
-	}
-	if len(rows) == 0 {
-		return nil, nil
-	}
-
-	result := &types.UserWithRoles{User: mapRowToUser(rows[0])}
-	seen := make(map[string]struct{})
-	for _, row := range rows {
-		if row.RoleID == nil || *row.RoleID == "" {
-			continue
-		}
-		if _, ok := seen[*row.RoleID]; ok {
-			continue
-		}
-		seen[*row.RoleID] = struct{}{}
-		roleName := ""
-		if row.RoleName != nil {
-			roleName = *row.RoleName
-		}
-		result.Roles = append(result.Roles, types.UserRoleInfo{RoleID: *row.RoleID, RoleName: roleName})
-	}
-
-	return result, nil
-}
-
 func (r *BunUserRolesRepository) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.NewDelete().Model((*types.UserRole)(nil)).Where("user_id = ?", userID).Exec(ctx); err != nil {
@@ -121,7 +70,7 @@ func (r *BunUserRolesRepository) ReplaceUserRoles(ctx context.Context, userID st
 				AssignedAt:       now,
 			}
 			if _, err := tx.NewInsert().Model(ur).Exec(ctx); err != nil {
-				return wrapRepositoryError("insert user role", err)
+				return err
 			}
 		}
 
@@ -139,7 +88,10 @@ func (r *BunUserRolesRepository) AssignUserRole(ctx context.Context, userID stri
 	}
 
 	_, err := r.db.NewInsert().Model(ur).Exec(ctx)
-	return wrapRepositoryError("assign user role", err)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *BunUserRolesRepository) RemoveUserRole(ctx context.Context, userID string, roleID string) error {
@@ -149,10 +101,21 @@ func (r *BunUserRolesRepository) RemoveUserRole(ctx context.Context, userID stri
 		Where("role_id = ?", roleID).
 		Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to remove user role: %w", err)
+		return err
 	}
 
 	return nil
+}
+
+func (r *BunUserRolesRepository) CountUsersByRole(ctx context.Context, roleID string) (int, error) {
+	count, err := r.db.NewSelect().
+		Model((*types.UserRole)(nil)).
+		Where("role_id = ?", roleID).
+		Count(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count users by role: %w", err)
+	}
+	return count, nil
 }
 
 type userRow interface {

@@ -23,6 +23,10 @@ func (u *RolesUseCase) GetAllRoles(ctx context.Context) ([]types.Role, error) {
 	return u.service.GetAllRoles(ctx)
 }
 
+func (u *RolesUseCase) GetRoleByName(ctx context.Context, roleName string) (*types.Role, error) {
+	return u.service.GetRoleByName(ctx, roleName)
+}
+
 func (u *RolesUseCase) GetRoleByID(ctx context.Context, roleID string) (*types.RoleDetails, error) {
 	return u.service.GetRoleByID(ctx, roleID)
 }

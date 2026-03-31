@@ -74,12 +74,13 @@ func TestPermissionsServiceCreatePermission(t *testing.T) {
 			t.Parallel()
 
 			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
+			_ = rolePermissionsRepo
 			if tc.setup != nil {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, userAccessRepo)
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
 			permission, err := service.CreatePermission(context.Background(), tc.req)
 			if tc.wantErr == nil {
 				if err != nil {
@@ -94,7 +95,6 @@ func TestPermissionsServiceCreatePermission(t *testing.T) {
 			}
 
 			permissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -129,12 +129,13 @@ func TestPermissionsServiceGetAllPermissions(t *testing.T) {
 			t.Parallel()
 
 			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
+			_ = rolePermissionsRepo
 			if tc.setup != nil {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, userAccessRepo)
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
 			permissions, err := service.GetAllPermissions(context.Background())
 			if tc.wantErr == nil {
 				if err != nil {
@@ -148,7 +149,6 @@ func TestPermissionsServiceGetAllPermissions(t *testing.T) {
 			}
 
 			permissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -191,12 +191,13 @@ func TestPermissionsServiceGetPermissionByID(t *testing.T) {
 			t.Parallel()
 
 			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
+			_ = rolePermissionsRepo
 			if tc.setup != nil {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, userAccessRepo)
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
 			permission, err := service.GetPermissionByID(context.Background(), tc.id)
 			if tc.wantErr == nil {
 				if err != nil {
@@ -210,7 +211,6 @@ func TestPermissionsServiceGetPermissionByID(t *testing.T) {
 			}
 
 			permissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -292,12 +292,12 @@ func TestPermissionsServiceUpdatePermission(t *testing.T) {
 			t.Parallel()
 
 			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
 			if tc.setup != nil {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, userAccessRepo)
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
 			permission, err := service.UpdatePermission(context.Background(), tc.id, tc.req)
 			if tc.wantErr == nil {
 				if err != nil {
@@ -311,7 +311,6 @@ func TestPermissionsServiceUpdatePermission(t *testing.T) {
 			}
 
 			permissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -322,7 +321,7 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 	tests := []struct {
 		name    string
 		id      string
-		setup   func(*accesscontroltests.MockPermissionsRepository, *accesscontroltests.MockUserAccessRepository)
+		setup   func(*accesscontroltests.MockPermissionsRepository, *accesscontroltests.MockRolePermissionsRepository)
 		wantErr error
 	}{
 		{
@@ -333,7 +332,7 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 		{
 			name: "not found",
 			id:   "perm-1",
-			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, userAccessRepo *accesscontroltests.MockUserAccessRepository) {
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return((*types.Permission)(nil), nil).Once()
 			},
 			wantErr: accesscontrolconstants.ErrNotFound,
@@ -341,7 +340,7 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 		{
 			name: "system permission",
 			id:   "perm-1",
-			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, userAccessRepo *accesscontroltests.MockUserAccessRepository) {
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read", IsSystem: true}, nil).Once()
 			},
 			wantErr: accesscontrolconstants.ErrBadRequest,
@@ -349,18 +348,18 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 		{
 			name: "permission in use",
 			id:   "perm-1",
-			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, userAccessRepo *accesscontroltests.MockUserAccessRepository) {
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
-				userAccessRepo.On("CountRoleAssignmentsByPermissionID", mock.Anything, "perm-1").Return(2, nil).Once()
+				rolePermissionsRepo.On("CountRolesByPermission", mock.Anything, "perm-1").Return(2, nil).Once()
 			},
 			wantErr: accesscontrolconstants.ErrConflict,
 		},
 		{
 			name: "delete returns false",
 			id:   "perm-1",
-			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, userAccessRepo *accesscontroltests.MockUserAccessRepository) {
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
-				userAccessRepo.On("CountRoleAssignmentsByPermissionID", mock.Anything, "perm-1").Return(0, nil).Once()
+				rolePermissionsRepo.On("CountRolesByPermission", mock.Anything, "perm-1").Return(0, nil).Once()
 				permissionsRepo.On("DeletePermission", mock.Anything, "perm-1").Return(false, nil).Once()
 			},
 			wantErr: accesscontrolconstants.ErrNotFound,
@@ -368,9 +367,9 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 		{
 			name: "success",
 			id:   "perm-1",
-			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, userAccessRepo *accesscontroltests.MockUserAccessRepository) {
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
-				userAccessRepo.On("CountRoleAssignmentsByPermissionID", mock.Anything, "perm-1").Return(0, nil).Once()
+				rolePermissionsRepo.On("CountRolesByPermission", mock.Anything, "perm-1").Return(0, nil).Once()
 				permissionsRepo.On("DeletePermission", mock.Anything, "perm-1").Return(true, nil).Once()
 			},
 		},
@@ -381,12 +380,12 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 			t.Parallel()
 
 			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
 			if tc.setup != nil {
-				tc.setup(permissionsRepo, userAccessRepo)
+				tc.setup(permissionsRepo, rolePermissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, userAccessRepo)
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
 			err := service.DeletePermission(context.Background(), tc.id)
 			if tc.wantErr == nil {
 				if err != nil {
@@ -397,7 +396,7 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 			}
 
 			permissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
+			rolePermissionsRepo.AssertExpectations(t)
 		})
 	}
 }

@@ -15,7 +15,6 @@ type BunRolePermissionRepository struct {
 	PermissionsRepository
 	RolePermissionsRepository
 	UserRolesRepository
-	UserAccessRepository
 }
 
 func NewBunRolePermissionRepository(db bun.IDB) *BunRolePermissionRepository {
@@ -24,7 +23,6 @@ func NewBunRolePermissionRepository(db bun.IDB) *BunRolePermissionRepository {
 		PermissionsRepository:     NewBunPermissionsRepository(db),
 		RolePermissionsRepository: NewBunRolePermissionsRepository(db),
 		UserRolesRepository:       NewBunUserRolesRepository(db),
-		UserAccessRepository:      NewBunUserAccessRepository(db),
 	}
 }
 
@@ -90,8 +88,9 @@ func (r *BunRolePermissionsRepository) ReplaceRolePermissions(ctx context.Contex
 				GrantedByUserID: grantedByUserID,
 				GrantedAt:       now,
 			}
-			if _, err := tx.NewInsert().Model(rp).Exec(ctx); err != nil {
-				return wrapRepositoryError("insert role permission", err)
+			_, err := tx.NewInsert().Model(rp).Exec(ctx)
+			if err != nil {
+				return err
 			}
 		}
 
@@ -108,7 +107,10 @@ func (r *BunRolePermissionsRepository) AddRolePermission(ctx context.Context, ro
 	}
 
 	_, err := r.db.NewInsert().Model(rp).Exec(ctx)
-	return wrapRepositoryError("add role permission", err)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *BunRolePermissionsRepository) RemoveRolePermission(ctx context.Context, roleID string, permissionID string) error {
@@ -118,8 +120,19 @@ func (r *BunRolePermissionsRepository) RemoveRolePermission(ctx context.Context,
 		Where("permission_id = ?", permissionID).
 		Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to remove role permission: %w", err)
+		return err
 	}
 
 	return nil
+}
+
+func (r *BunRolePermissionsRepository) CountRolesByPermission(ctx context.Context, permissionID string) (int, error) {
+	count, err := r.db.NewSelect().
+		Model((*types.RolePermission)(nil)).
+		Where("permission_id = ?", permissionID).
+		Count(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count roles by permission: %w", err)
+	}
+	return count, nil
 }

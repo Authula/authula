@@ -20,8 +20,10 @@ func NewBunPermissionsRepository(db bun.IDB) *BunPermissionsRepository {
 }
 
 func (r *BunPermissionsRepository) CreatePermission(ctx context.Context, permission *types.Permission) error {
-	_, err := r.db.NewInsert().Model(permission).Exec(ctx)
-	return wrapRepositoryError("create permission", err)
+	if _, err := r.db.NewInsert().Model(permission).Exec(ctx); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *BunPermissionsRepository) GetAllPermissions(ctx context.Context) ([]types.Permission, error) {
@@ -46,6 +48,19 @@ func (r *BunPermissionsRepository) GetPermissionByID(ctx context.Context, permis
 	return permission, nil
 }
 
+func (r *BunPermissionsRepository) GetPermissionByKey(ctx context.Context, permissionKey string) (*types.Permission, error) {
+	permission := new(types.Permission)
+	err := r.db.NewSelect().Model(permission).Where("key = ?", permissionKey).Scan(ctx)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get permission by key: %w", err)
+	}
+
+	return permission, nil
+}
+
 func (r *BunPermissionsRepository) UpdatePermission(ctx context.Context, permissionID string, description *string) (bool, error) {
 	query := r.db.NewUpdate().
 		Model((*types.Permission)(nil)).
@@ -58,7 +73,7 @@ func (r *BunPermissionsRepository) UpdatePermission(ctx context.Context, permiss
 
 	result, err := query.Exec(ctx)
 	if err != nil {
-		return false, wrapRepositoryError("update permission", err)
+		return false, err
 	}
 
 	affected, err := result.RowsAffected()
@@ -72,7 +87,7 @@ func (r *BunPermissionsRepository) UpdatePermission(ctx context.Context, permiss
 func (r *BunPermissionsRepository) DeletePermission(ctx context.Context, permissionID string) (bool, error) {
 	result, err := r.db.NewDelete().Model((*types.Permission)(nil)).Where("id = ?", permissionID).Exec(ctx)
 	if err != nil {
-		return false, fmt.Errorf("failed to delete permission: %w", err)
+		return false, err
 	}
 
 	affected, err := result.RowsAffected()

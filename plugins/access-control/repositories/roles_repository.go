@@ -21,7 +21,7 @@ func NewBunRolesRepository(db bun.IDB) *BunRolesRepository {
 
 func (r *BunRolesRepository) CreateRole(ctx context.Context, role *types.Role) error {
 	_, err := r.db.NewInsert().Model(role).Exec(ctx)
-	return wrapRepositoryError("create role", err)
+	return err
 }
 
 func (r *BunRolesRepository) GetAllRoles(ctx context.Context) ([]types.Role, error) {
@@ -46,6 +46,19 @@ func (r *BunRolesRepository) GetRoleByID(ctx context.Context, roleID string) (*t
 	return role, nil
 }
 
+func (r *BunRolesRepository) GetRoleByName(ctx context.Context, roleName string) (*types.Role, error) {
+	role := new(types.Role)
+	err := r.db.NewSelect().Model(role).Where("name = ?", roleName).Scan(ctx)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get role by name: %w", err)
+	}
+
+	return role, nil
+}
+
 func (r *BunRolesRepository) UpdateRole(ctx context.Context, roleID string, name *string, description *string) (bool, error) {
 	query := r.db.NewUpdate().
 		Model((*types.Role)(nil)).
@@ -62,7 +75,7 @@ func (r *BunRolesRepository) UpdateRole(ctx context.Context, roleID string, name
 
 	result, err := query.Exec(ctx)
 	if err != nil {
-		return false, wrapRepositoryError("update role", err)
+		return false, err
 	}
 
 	affected, err := result.RowsAffected()
@@ -76,7 +89,7 @@ func (r *BunRolesRepository) UpdateRole(ctx context.Context, roleID string, name
 func (r *BunRolesRepository) DeleteRole(ctx context.Context, roleID string) (bool, error) {
 	result, err := r.db.NewDelete().Model((*types.Role)(nil)).Where("id = ?", roleID).Exec(ctx)
 	if err != nil {
-		return false, fmt.Errorf("failed to delete role: %w", err)
+		return false, err
 	}
 
 	affected, err := result.RowsAffected()

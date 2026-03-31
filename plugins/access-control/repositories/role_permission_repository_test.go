@@ -2,9 +2,9 @@ package repositories
 
 import (
 	"context"
+	"strings"
 	"testing"
 
-	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
 	plugintests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -125,7 +125,6 @@ func TestBunRolePermissionsRepositoryAddRolePermission(t *testing.T) {
 					panic(err)
 				}
 			},
-			wantErr: accesscontrolconstants.ErrConflict,
 		},
 	}
 
@@ -144,6 +143,15 @@ func TestBunRolePermissionsRepositoryAddRolePermission(t *testing.T) {
 			}
 
 			err := rolePermissionsRepo.AddRolePermission(ctx, tc.roleID, tc.permissionID, tc.grantedByUserID)
+			if tc.name == "duplicate grant returns conflict" {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if !strings.Contains(err.Error(), "UNIQUE constraint failed: access_control_role_permissions.role_id, access_control_role_permissions.permission_id") {
+					t.Fatalf("expected raw unique constraint error, got %v", err)
+				}
+				return
+			}
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
 			}

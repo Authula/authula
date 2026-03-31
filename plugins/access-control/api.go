@@ -21,6 +21,10 @@ func (a *API) GetAllRoles(ctx context.Context) ([]types.Role, error) {
 	return a.useCases.GetAllRoles(ctx)
 }
 
+func (a *API) GetRoleByName(ctx context.Context, roleName string) (*types.Role, error) {
+	return a.useCases.GetRoleByName(ctx, roleName)
+}
+
 func (a *API) GetRoleByID(ctx context.Context, roleID string) (*types.RoleDetails, error) {
 	return a.useCases.GetRoleByID(ctx, roleID)
 }
@@ -83,10 +87,6 @@ func (a *API) GetUserRoles(ctx context.Context, userID string) ([]types.UserRole
 	return a.useCases.GetUserRoles(ctx, userID)
 }
 
-func (a *API) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
-	return a.useCases.GetUserWithRolesByID(ctx, userID)
-}
-
 func (a *API) AssignRoleToUser(ctx context.Context, userID string, req types.AssignUserRoleRequest, assignedByUserID *string) error {
 	return a.useCases.AssignRoleToUser(ctx, userID, req, assignedByUserID)
 }
@@ -99,20 +99,12 @@ func (a *API) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []str
 	return a.useCases.ReplaceUserRoles(ctx, userID, roleIDs, assignedByUserID)
 }
 
-// User access
+// User permissions
 
-func (a *API) GetUserWithPermissionsByID(ctx context.Context, userID string) (*types.UserWithPermissions, error) {
-	return a.useCases.GetUserWithPermissionsByID(ctx, userID)
+func (a *API) GetUserPermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
+	return a.useCases.GetUserPermissions(ctx, userID)
 }
 
-func (a *API) GetUserAuthorizationProfile(ctx context.Context, userID string) (*types.UserAuthorizationProfile, error) {
-	return a.useCases.GetUserAuthorizationProfile(ctx, userID)
-}
-
-func (a *API) GetUserEffectivePermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
-	return a.useCases.GetUserEffectivePermissions(ctx, userID)
-}
-
-func (a *API) HasPermissions(ctx context.Context, userID string, requiredPermissions []string) (bool, error) {
-	return a.useCases.HasPermissions(ctx, userID, requiredPermissions)
+func (a *API) HasPermissions(ctx context.Context, userID string, permissionNames []string) (bool, error) {
+	return a.useCases.HasPermissions(ctx, userID, permissionNames)
 }

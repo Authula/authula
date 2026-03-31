@@ -27,6 +27,10 @@ func (u *PermissionsUseCase) GetPermissionByID(ctx context.Context, permissionID
 	return u.service.GetPermissionByID(ctx, permissionID)
 }
 
+func (u *PermissionsUseCase) GetPermissionByKey(ctx context.Context, permissionKey string) (*types.Permission, error) {
+	return u.service.GetPermissionByKey(ctx, permissionKey)
+}
+
 func (u *PermissionsUseCase) UpdatePermission(ctx context.Context, permissionID string, req types.UpdatePermissionRequest) (*types.Permission, error) {
 	return u.service.UpdatePermission(ctx, permissionID, req)
 }

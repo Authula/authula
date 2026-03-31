@@ -43,6 +43,14 @@ func (m *MockRolesRepository) GetRoleByID(ctx context.Context, roleID string) (*
 	return args.Get(0).(*types.Role), args.Error(1)
 }
 
+func (m *MockRolesRepository) GetRoleByName(ctx context.Context, roleName string) (*types.Role, error) {
+	args := m.Called(ctx, roleName)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*types.Role), args.Error(1)
+}
+
 func (m *MockRolesRepository) UpdateRole(ctx context.Context, roleID string, name *string, description *string) (bool, error) {
 	args := m.Called(ctx, roleID, name, description)
 	return args.Bool(0), args.Error(1)
@@ -67,6 +75,14 @@ func (m *MockPermissionsRepository) GetAllPermissions(ctx context.Context) ([]ty
 
 func (m *MockPermissionsRepository) GetPermissionByID(ctx context.Context, permissionID string) (*types.Permission, error) {
 	args := m.Called(ctx, permissionID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*types.Permission), args.Error(1)
+}
+
+func (m *MockPermissionsRepository) GetPermissionByKey(ctx context.Context, permissionKey string) (*types.Permission, error) {
+	args := m.Called(ctx, permissionKey)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -115,6 +131,11 @@ func (m *MockRolePermissionsRepository) RemoveRolePermission(ctx context.Context
 	return args.Error(0)
 }
 
+func (m *MockRolePermissionsRepository) CountRolesByPermission(ctx context.Context, permissionID string) (int, error) {
+	args := m.Called(ctx, permissionID)
+	return args.Int(0), args.Error(1)
+}
+
 type MockUserRolesRepository struct {
 	mock.Mock
 }
@@ -125,14 +146,6 @@ func (m *MockUserRolesRepository) GetUserRoles(ctx context.Context, userID strin
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]types.UserRoleInfo), args.Error(1)
-}
-
-func (m *MockUserRolesRepository) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
-	args := m.Called(ctx, userID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*types.UserWithRoles), args.Error(1)
 }
 
 func (m *MockUserRolesRepository) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error {
@@ -150,21 +163,16 @@ func (m *MockUserRolesRepository) RemoveUserRole(ctx context.Context, userID str
 	return args.Error(0)
 }
 
-type MockUserAccessRepository struct {
-	mock.Mock
-}
-
-func (m *MockUserAccessRepository) CountUserAssignmentsByRoleID(ctx context.Context, roleID string) (int, error) {
+func (m *MockUserRolesRepository) CountUsersByRole(ctx context.Context, roleID string) (int, error) {
 	args := m.Called(ctx, roleID)
 	return args.Int(0), args.Error(1)
 }
 
-func (m *MockUserAccessRepository) CountRoleAssignmentsByPermissionID(ctx context.Context, permissionID string) (int, error) {
-	args := m.Called(ctx, permissionID)
-	return args.Int(0), args.Error(1)
+type MockUserPermissionsRepository struct {
+	mock.Mock
 }
 
-func (m *MockUserAccessRepository) GetUserEffectivePermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
+func (m *MockUserPermissionsRepository) GetUserPermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -172,12 +180,9 @@ func (m *MockUserAccessRepository) GetUserEffectivePermissions(ctx context.Conte
 	return args.Get(0).([]types.UserPermissionInfo), args.Error(1)
 }
 
-func (m *MockUserAccessRepository) GetUserWithPermissionsByID(ctx context.Context, userID string) (*types.UserWithPermissions, error) {
-	args := m.Called(ctx, userID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*types.UserWithPermissions), args.Error(1)
+func (m *MockUserPermissionsRepository) HasPermissions(ctx context.Context, userID string, permissionKeys []string) (bool, error) {
+	args := m.Called(ctx, userID, permissionKeys)
+	return args.Bool(0), args.Error(1)
 }
 
 func SetupRepoDB(t *testing.T) *bun.DB {

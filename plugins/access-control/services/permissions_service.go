@@ -10,12 +10,12 @@ import (
 )
 
 type PermissionsService struct {
-	permissionsRepo repositories.PermissionsRepository
-	userAccessRepo  repositories.UserAccessRepository
+	permissionsRepo     repositories.PermissionsRepository
+	rolePermissionsRepo repositories.RolePermissionsRepository
 }
 
-func NewPermissionsService(permissionsRepo repositories.PermissionsRepository, userAccessRepo repositories.UserAccessRepository) *PermissionsService {
-	return &PermissionsService{permissionsRepo: permissionsRepo, userAccessRepo: userAccessRepo}
+func NewPermissionsService(permissionsRepo repositories.PermissionsRepository, rolePermissionsRepo repositories.RolePermissionsRepository) *PermissionsService {
+	return &PermissionsService{permissionsRepo: permissionsRepo, rolePermissionsRepo: rolePermissionsRepo}
 }
 
 func (s *PermissionsService) CreatePermission(ctx context.Context, req types.CreatePermissionRequest) (*types.Permission, error) {
@@ -52,6 +52,22 @@ func (s *PermissionsService) GetPermissionByID(ctx context.Context, permissionID
 	}
 
 	permission, err := s.permissionsRepo.GetPermissionByID(ctx, permissionID)
+	if err != nil {
+		return nil, err
+	}
+	if permission == nil {
+		return nil, constants.ErrNotFound
+	}
+
+	return permission, nil
+}
+
+func (s *PermissionsService) GetPermissionByKey(ctx context.Context, permissionKey string) (*types.Permission, error) {
+	if permissionKey == "" {
+		return nil, constants.ErrBadRequest
+	}
+
+	permission, err := s.permissionsRepo.GetPermissionByKey(ctx, permissionKey)
 	if err != nil {
 		return nil, err
 	}
@@ -121,11 +137,11 @@ func (s *PermissionsService) DeletePermission(ctx context.Context, permissionID 
 		return constants.ErrBadRequest
 	}
 
-	assignmentsCount, err := s.userAccessRepo.CountRoleAssignmentsByPermissionID(ctx, permissionID)
+	totalCountOfRolesByPermission, err := s.rolePermissionsRepo.CountRolesByPermission(ctx, permissionID)
 	if err != nil {
 		return err
 	}
-	if assignmentsCount > 0 {
+	if totalCountOfRolesByPermission > 0 {
 		return constants.ErrConflict
 	}
 

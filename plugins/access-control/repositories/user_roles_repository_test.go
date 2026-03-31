@@ -3,10 +3,10 @@ package repositories
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
-	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
 	plugintests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -14,7 +14,8 @@ import (
 func TestBunUserRolesRepositoryGetUserRoles(t *testing.T) {
 	t.Parallel()
 
-	futureExpiry := time.Date(2026, 3, 30, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC()
+	futureExpiry := time.Unix(now.Add(24*time.Hour).Unix(), 0).UTC()
 	roleDescription := new("Editor role")
 	assignedBy := new("u2")
 
@@ -106,98 +107,6 @@ func TestBunUserRolesRepositoryGetUserRoles(t *testing.T) {
 	}
 }
 
-func TestBunUserRolesRepositoryGetUserWithRolesByID(t *testing.T) {
-	t.Parallel()
-
-	activeExpiry := time.Date(2026, 3, 30, 12, 0, 0, 0, time.UTC)
-
-	tests := []struct {
-		name      string
-		seed      func(*BunRolesRepository, *BunUserRolesRepository, context.Context)
-		userID    string
-		wantNil   bool
-		wantRoles []types.UserRoleInfo
-	}{
-		{
-			name:    "not found",
-			userID:  "missing-user",
-			wantNil: true,
-		},
-		{
-			name:   "returns user with active roles only",
-			userID: "u1",
-			seed: func(rolesRepo *BunRolesRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor"}); err != nil {
-					panic(err)
-				}
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r2", Name: "viewer"}); err != nil {
-					panic(err)
-				}
-				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r1", nil, &activeExpiry); err != nil {
-					panic(err)
-				}
-				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r2", nil, new(time.Date(2026, 3, 28, 12, 0, 0, 0, time.UTC))); err != nil {
-					panic(err)
-				}
-			},
-			wantRoles: []types.UserRoleInfo{
-				{
-					RoleID:   "r1",
-					RoleName: "editor",
-				},
-			},
-		},
-		{
-			name:      "returns user with no roles",
-			userID:    "u2",
-			wantRoles: []types.UserRoleInfo{},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			db := plugintests.SetupRepoDB(t)
-			rolesRepo := NewBunRolesRepository(db)
-			userRolesRepo := NewBunUserRolesRepository(db)
-			ctx := context.Background()
-
-			if tc.seed != nil {
-				tc.seed(rolesRepo, userRolesRepo, ctx)
-			}
-
-			userWithRoles, err := userRolesRepo.GetUserWithRolesByID(ctx, tc.userID)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if tc.wantNil {
-				if userWithRoles != nil {
-					t.Fatalf("expected nil user, got %#v", userWithRoles)
-				}
-				return
-			}
-			if userWithRoles == nil {
-				t.Fatal("expected user, got nil")
-			}
-			if userWithRoles.User.ID != tc.userID {
-				t.Fatalf("expected user ID %s, got %s", tc.userID, userWithRoles.User.ID)
-			}
-			if userWithRoles.User.Name == "" || userWithRoles.User.Email == "" {
-				t.Fatalf("expected user fields to be populated, got %#v", userWithRoles.User)
-			}
-			if len(userWithRoles.Roles) != len(tc.wantRoles) {
-				t.Fatalf("expected %d roles, got %#v", len(tc.wantRoles), userWithRoles.Roles)
-			}
-			for i := range tc.wantRoles {
-				if userWithRoles.Roles[i].RoleID != tc.wantRoles[i].RoleID || userWithRoles.Roles[i].RoleName != tc.wantRoles[i].RoleName {
-					t.Fatalf("unexpected role at %d: %#v", i, userWithRoles.Roles[i])
-				}
-			}
-		})
-	}
-}
-
 func TestBunUserRolesRepositoryReplaceUserRoles(t *testing.T) {
 	t.Parallel()
 
@@ -269,7 +178,8 @@ func TestBunUserRolesRepositoryReplaceUserRoles(t *testing.T) {
 func TestBunUserRolesRepositoryAssignUserRole(t *testing.T) {
 	t.Parallel()
 
-	futureExpiry := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC()
+	futureExpiry := time.Unix(now.Add(24*time.Hour).Unix(), 0).UTC()
 
 	tests := []struct {
 		name      string
@@ -302,7 +212,6 @@ func TestBunUserRolesRepositoryAssignUserRole(t *testing.T) {
 					panic(err)
 				}
 			},
-			wantErr: accesscontrolconstants.ErrConflict,
 		},
 	}
 
@@ -320,6 +229,15 @@ func TestBunUserRolesRepositoryAssignUserRole(t *testing.T) {
 			}
 
 			err := userRolesRepo.AssignUserRole(ctx, tc.userID, tc.roleID, nil, tc.expiresAt)
+			if tc.name == "duplicate assignment returns conflict" {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if !strings.Contains(err.Error(), "UNIQUE constraint failed: access_control_user_roles.user_id, access_control_user_roles.role_id") {
+					t.Fatalf("expected raw unique constraint error, got %v", err)
+				}
+				return
+			}
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
 			}

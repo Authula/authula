@@ -64,6 +64,30 @@ func (h *GetAllRolesHandler) Handler() http.HandlerFunc {
 	}
 }
 
+type GetRoleByNameHandler struct {
+	useCase *usecases.RolesUseCase
+}
+
+func NewGetRoleByNameHandler(useCase *usecases.RolesUseCase) *GetRoleByNameHandler {
+	return &GetRoleByNameHandler{useCase: useCase}
+}
+
+func (h *GetRoleByNameHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
+		roleName := r.PathValue("role_name")
+
+		role, err := h.useCase.GetRoleByName(r.Context(), roleName)
+		if err != nil {
+			respondRolePermissionError(reqCtx, err)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusOK, role)
+	}
+}
+
 type GetRoleByIDHandler struct {
 	useCase *usecases.RolesUseCase
 }

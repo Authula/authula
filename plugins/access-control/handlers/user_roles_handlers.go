@@ -35,30 +35,6 @@ func (h *GetUserRolesHandler) Handler() http.HandlerFunc {
 	}
 }
 
-type GetUserWithRolesHandler struct {
-	useCase *usecases.UserRolesUseCase
-}
-
-func NewGetUserWithRolesHandler(useCase *usecases.UserRolesUseCase) *GetUserWithRolesHandler {
-	return &GetUserWithRolesHandler{useCase: useCase}
-}
-
-func (h *GetUserWithRolesHandler) Handler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
-		userID := r.PathValue("user_id")
-
-		userWithRoles, err := h.useCase.GetUserWithRolesByID(r.Context(), userID)
-		if err != nil {
-			respondUserHandlerError(reqCtx, err)
-			return
-		}
-
-		reqCtx.SetJSONResponse(http.StatusOK, userWithRoles)
-	}
-}
-
 type ReplaceUserRolesHandler struct {
 	useCase *usecases.UserRolesUseCase
 }

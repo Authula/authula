@@ -19,10 +19,6 @@ func (u *UserRolesUseCase) GetUserRoles(ctx context.Context, userID string) ([]t
 	return u.service.GetUserRoles(ctx, userID)
 }
 
-func (u *UserRolesUseCase) GetUserWithRolesByID(ctx context.Context, userID string) (*types.UserWithRoles, error) {
-	return u.service.GetUserWithRolesByID(ctx, userID)
-}
-
 func (u *UserRolesUseCase) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error {
 	return u.service.ReplaceUserRoles(ctx, userID, roleIDs, assignedByUserID)
 }

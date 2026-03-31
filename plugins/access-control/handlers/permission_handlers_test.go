@@ -86,12 +86,12 @@ func TestGetAllPermissionsHandler(t *testing.T) {
 			t.Parallel()
 
 			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
 			if tc.setupMock != nil {
 				tc.setupMock(permissionsRepo)
 			}
 
-			useCase := newPermissionsUseCase(permissionsRepo, userAccessRepo)
+			useCase := newPermissionsUseCase(permissionsRepo, rolePermissionsRepo)
 			handler := NewGetAllPermissionsHandler(useCase)
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/permissions", nil, nil)
 
@@ -100,7 +100,6 @@ func TestGetAllPermissionsHandler(t *testing.T) {
 			if tc.expectedStatus != http.StatusOK {
 				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
 				permissionsRepo.AssertExpectations(t)
-				userAccessRepo.AssertExpectations(t)
 				return
 			}
 
@@ -112,7 +111,6 @@ func TestGetAllPermissionsHandler(t *testing.T) {
 			assertPermissionsEqual(t, payload, tc.expectedBody.([]types.Permission))
 
 			permissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -188,12 +186,12 @@ func TestCreatePermissionHandler(t *testing.T) {
 			t.Parallel()
 
 			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
 			if tc.setupMock != nil {
 				tc.setupMock(permissionsRepo)
 			}
 
-			useCase := newPermissionsUseCase(permissionsRepo, userAccessRepo)
+			useCase := newPermissionsUseCase(permissionsRepo, rolePermissionsRepo)
 			handler := NewCreatePermissionHandler(useCase)
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/permissions", tc.body, nil)
 
@@ -202,7 +200,6 @@ func TestCreatePermissionHandler(t *testing.T) {
 			if tc.expectedStatus != http.StatusCreated {
 				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
 				permissionsRepo.AssertExpectations(t)
-				userAccessRepo.AssertExpectations(t)
 				return
 			}
 
@@ -214,7 +211,6 @@ func TestCreatePermissionHandler(t *testing.T) {
 			assertCreatePermissionResponseEqual(t, payload, tc.expectedBody.(types.CreatePermissionResponse))
 
 			permissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -272,12 +268,12 @@ func TestGetPermissionByIDHandler(t *testing.T) {
 			t.Parallel()
 
 			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
 			if tc.setupMock != nil {
 				tc.setupMock(permissionsRepo)
 			}
 
-			useCase := newPermissionsUseCase(permissionsRepo, userAccessRepo)
+			useCase := newPermissionsUseCase(permissionsRepo, rolePermissionsRepo)
 			handler := NewGetPermissionByIDHandler(useCase)
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/permissions/"+tc.permissionID, nil, nil)
 			req.SetPathValue("permission_id", tc.permissionID)
@@ -287,7 +283,6 @@ func TestGetPermissionByIDHandler(t *testing.T) {
 			if tc.expectedStatus != http.StatusOK {
 				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
 				permissionsRepo.AssertExpectations(t)
-				userAccessRepo.AssertExpectations(t)
 				return
 			}
 
@@ -299,7 +294,6 @@ func TestGetPermissionByIDHandler(t *testing.T) {
 			assertPermissionEqual(t, payload, *tc.expectedBody.(*types.Permission))
 
 			permissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -378,12 +372,12 @@ func TestUpdatePermissionHandler(t *testing.T) {
 			t.Parallel()
 
 			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
 			if tc.setupMock != nil {
 				tc.setupMock(permissionsRepo)
 			}
 
-			useCase := newPermissionsUseCase(permissionsRepo, userAccessRepo)
+			useCase := newPermissionsUseCase(permissionsRepo, rolePermissionsRepo)
 			handler := NewUpdatePermissionHandler(useCase)
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/permissions/"+tc.permissionID, tc.body, nil)
 			req.SetPathValue("permission_id", tc.permissionID)
@@ -393,7 +387,6 @@ func TestUpdatePermissionHandler(t *testing.T) {
 			if tc.expectedStatus != http.StatusOK {
 				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
 				permissionsRepo.AssertExpectations(t)
-				userAccessRepo.AssertExpectations(t)
 				return
 			}
 
@@ -405,7 +398,6 @@ func TestUpdatePermissionHandler(t *testing.T) {
 			assertUpdatePermissionResponseEqual(t, payload, tc.expectedBody.(types.UpdatePermissionResponse))
 
 			permissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -416,16 +408,16 @@ func TestDeletePermissionHandler(t *testing.T) {
 	tests := []struct {
 		name           string
 		permissionID   string
-		setupMock      func(*accesscontroltests.MockPermissionsRepository, *accesscontroltests.MockUserAccessRepository)
+		setupMock      func(*accesscontroltests.MockPermissionsRepository, *accesscontroltests.MockRolePermissionsRepository)
 		expectedStatus int
 		expectedBody   any
 	}{
 		{
 			name:         "service error",
 			permissionID: "perm-1",
-			setupMock: func(m *accesscontroltests.MockPermissionsRepository, userAccessRepo *accesscontroltests.MockUserAccessRepository) {
+			setupMock: func(m *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
 				m.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read", IsSystem: false}, nil).Once()
-				userAccessRepo.On("CountRoleAssignmentsByPermissionID", mock.Anything, "perm-1").Return(0, nil).Once()
+				rolePermissionsRepo.On("CountRolesByPermission", mock.Anything, "perm-1").Return(0, nil).Once()
 				m.On("DeletePermission", mock.Anything, "perm-1").Return(false, errors.New("database error")).Once()
 			},
 			expectedStatus: http.StatusInternalServerError,
@@ -434,9 +426,9 @@ func TestDeletePermissionHandler(t *testing.T) {
 		{
 			name:         "success",
 			permissionID: "perm-1",
-			setupMock: func(m *accesscontroltests.MockPermissionsRepository, u *accesscontroltests.MockUserAccessRepository) {
+			setupMock: func(m *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
 				m.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read", IsSystem: false}, nil).Once()
-				u.On("CountRoleAssignmentsByPermissionID", mock.Anything, "perm-1").Return(0, nil).Once()
+				rolePermissionsRepo.On("CountRolesByPermission", mock.Anything, "perm-1").Return(0, nil).Once()
 				m.On("DeletePermission", mock.Anything, "perm-1").Return(true, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
@@ -449,12 +441,12 @@ func TestDeletePermissionHandler(t *testing.T) {
 			t.Parallel()
 
 			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
-			userAccessRepo := &accesscontroltests.MockUserAccessRepository{}
+			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
 			if tc.setupMock != nil {
-				tc.setupMock(permissionsRepo, userAccessRepo)
+				tc.setupMock(permissionsRepo, rolePermissionsRepo)
 			}
 
-			useCase := newPermissionsUseCase(permissionsRepo, userAccessRepo)
+			useCase := newPermissionsUseCase(permissionsRepo, rolePermissionsRepo)
 			handler := NewDeletePermissionHandler(useCase)
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/permissions/"+tc.permissionID, nil, nil)
 			req.SetPathValue("permission_id", tc.permissionID)
@@ -464,7 +456,7 @@ func TestDeletePermissionHandler(t *testing.T) {
 			if tc.expectedStatus != http.StatusOK {
 				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
 				permissionsRepo.AssertExpectations(t)
-				userAccessRepo.AssertExpectations(t)
+				rolePermissionsRepo.AssertExpectations(t)
 				return
 			}
 
@@ -476,13 +468,13 @@ func TestDeletePermissionHandler(t *testing.T) {
 			assertDeletePermissionResponseEqual(t, payload, tc.expectedBody.(types.DeletePermissionResponse))
 
 			permissionsRepo.AssertExpectations(t)
-			userAccessRepo.AssertExpectations(t)
+			rolePermissionsRepo.AssertExpectations(t)
 		})
 	}
 }
 
-func newPermissionsUseCase(permissionsRepo *accesscontroltests.MockPermissionsRepository, userAccessRepo *accesscontroltests.MockUserAccessRepository) *usecases.PermissionsUseCase {
-	return usecases.NewPermissionsUseCase(services.NewPermissionsService(permissionsRepo, userAccessRepo))
+func newPermissionsUseCase(permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) *usecases.PermissionsUseCase {
+	return usecases.NewPermissionsUseCase(services.NewPermissionsService(permissionsRepo, rolePermissionsRepo))
 }
 
 func assertPermissionsEqual(t *testing.T, got []types.Permission, want []types.Permission) {

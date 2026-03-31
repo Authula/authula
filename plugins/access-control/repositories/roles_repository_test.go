@@ -2,9 +2,9 @@ package repositories
 
 import (
 	"context"
+	"strings"
 	"testing"
 
-	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
 	plugintests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -32,7 +32,12 @@ func TestBunRolesRepositoryCreateRole(t *testing.T) {
 			name:    "duplicate name returns conflict",
 			role:    &types.Role{ID: "r2", Name: "editor", Description: new("Duplicate role"), IsSystem: false},
 			seed:    &types.Role{ID: "r1", Name: "editor", Description: new("Original role"), IsSystem: false},
-			wantErr: accesscontrolconstants.ErrConflict,
+			wantErr: nil,
+		},
+		{
+			name:    "query error returns wrapped error",
+			role:    &types.Role{ID: "r3", Name: "reviewer", Description: new("Reviewer role"), IsSystem: false},
+			wantErr: nil,
 		},
 	}
 
@@ -50,7 +55,31 @@ func TestBunRolesRepositoryCreateRole(t *testing.T) {
 				}
 			}
 
+			if tc.name == "query error returns wrapped error" {
+				if err := db.Close(); err != nil {
+					t.Fatalf("failed to close db: %v", err)
+				}
+			}
+
 			err := repo.CreateRole(ctx, tc.role)
+			if tc.name == "query error returns wrapped error" {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if err.Error() != "sql: database is closed" {
+					t.Fatalf("expected direct db error, got %v", err)
+				}
+				return
+			}
+			if tc.name == "duplicate name returns conflict" {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if !strings.Contains(err.Error(), "UNIQUE constraint failed: access_control_roles.name") {
+					t.Fatalf("expected raw unique constraint error, got %v", err)
+				}
+				return
+			}
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
 			}
@@ -83,11 +112,12 @@ func TestBunRolesRepositoryGetAllRoles(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		seedRoles []*types.Role
-		wantIDs   []string
-		wantNames []string
-		wantDescs []*string
+		name       string
+		seedRoles  []*types.Role
+		wantIDs    []string
+		wantNames  []string
+		wantDescs  []*string
+		wantErrMsg string
 	}{
 		{
 			name:      "empty result",
@@ -105,6 +135,10 @@ func TestBunRolesRepositoryGetAllRoles(t *testing.T) {
 			wantNames: []string{"viewer", "editor"},
 			wantDescs: []*string{new("Viewer role"), new("Editor role")},
 		},
+		{
+			name:       "query error",
+			wantErrMsg: "failed to get roles",
+		},
 	}
 
 	for _, tc := range tests {
@@ -121,7 +155,25 @@ func TestBunRolesRepositoryGetAllRoles(t *testing.T) {
 				}
 			}
 
+			if tc.wantErrMsg != "" {
+				if err := db.Close(); err != nil {
+					t.Fatalf("failed to close db: %v", err)
+				}
+			}
+
 			roles, err := repo.GetAllRoles(ctx)
+			if tc.wantErrMsg != "" {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if !strings.Contains(err.Error(), tc.wantErrMsg) {
+					t.Fatalf("expected direct db error, got %v", err)
+				}
+				if roles != nil {
+					t.Fatalf("expected nil roles on error, got %#v", roles)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("failed to get roles: %v", err)
 			}
@@ -157,6 +209,7 @@ func TestBunRolesRepositoryGetRoleByID(t *testing.T) {
 		wantName   string
 		wantDesc   *string
 		wantSystem bool
+		wantErrMsg string
 	}{
 		{
 			name:    "not found",
@@ -170,6 +223,11 @@ func TestBunRolesRepositoryGetRoleByID(t *testing.T) {
 			wantName:   "editor",
 			wantDesc:   new("Editor role"),
 			wantSystem: true,
+		},
+		{
+			name:       "query error",
+			roleID:     "r1",
+			wantErrMsg: "failed to get role by id",
 		},
 	}
 
@@ -187,7 +245,25 @@ func TestBunRolesRepositoryGetRoleByID(t *testing.T) {
 				}
 			}
 
+			if tc.wantErrMsg != "" {
+				if err := db.Close(); err != nil {
+					t.Fatalf("failed to close db: %v", err)
+				}
+			}
+
 			role, err := repo.GetRoleByID(ctx, tc.roleID)
+			if tc.wantErrMsg != "" {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if role != nil {
+					t.Fatalf("expected nil role on error, got %#v", role)
+				}
+				if !strings.Contains(err.Error(), tc.wantErrMsg) {
+					t.Fatalf("expected direct db error, got %v", err)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -210,6 +286,97 @@ func TestBunRolesRepositoryGetRoleByID(t *testing.T) {
 	}
 }
 
+func TestBunRolesRepositoryGetRoleByName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		roleName   string
+		seedRole   *types.Role
+		wantNil    bool
+		wantName   string
+		wantDesc   *string
+		wantSystem bool
+		wantErr    bool
+		wantErrMsg string
+	}{
+		{
+			name:     "not found",
+			roleName: "missing",
+			wantNil:  true,
+		},
+		{
+			name:       "success",
+			roleName:   "editor",
+			seedRole:   &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), IsSystem: true},
+			wantName:   "editor",
+			wantDesc:   new("Editor role"),
+			wantSystem: true,
+		},
+		{
+			name:       "query error",
+			roleName:   "editor",
+			seedRole:   &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), IsSystem: false},
+			wantErr:    true,
+			wantErrMsg: "failed to get role by name",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := plugintests.SetupRepoDB(t)
+			repo := NewBunRolesRepository(db)
+			ctx := context.Background()
+
+			if tc.seedRole != nil {
+				if err := repo.CreateRole(ctx, tc.seedRole); err != nil {
+					t.Fatalf("failed to seed role: %v", err)
+				}
+			}
+
+			if tc.wantErr {
+				if err := db.Close(); err != nil {
+					t.Fatalf("failed to close db: %v", err)
+				}
+			}
+
+			role, err := repo.GetRoleByName(ctx, tc.roleName)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if role != nil {
+					t.Fatalf("expected nil role on error, got %#v", role)
+				}
+				if !strings.Contains(err.Error(), tc.wantErrMsg) {
+					t.Fatalf("expected direct db error, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantNil {
+				if role != nil {
+					t.Fatalf("expected nil role, got %#v", role)
+				}
+				return
+			}
+			if role == nil {
+				t.Fatal("expected role, got nil")
+			}
+			if role.Name != tc.wantName || role.IsSystem != tc.wantSystem {
+				t.Fatalf("unexpected role: %#v", role)
+			}
+			if !stringPtrEqual(role.Description, tc.wantDesc) {
+				t.Fatalf("expected description %#v, got %#v", tc.wantDesc, role.Description)
+			}
+		})
+	}
+}
+
 func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 	t.Parallel()
 
@@ -222,6 +389,7 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 		wantUpdated bool
 		wantName    *string
 		wantDesc    *string
+		wantErrMsg  string
 	}{
 		{
 			name:        "missing role",
@@ -266,6 +434,12 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 			wantName:    new("reviewer"),
 			wantDesc:    new("Reviewer role"),
 		},
+		{
+			name:       "query error",
+			roleID:     "r5",
+			nameValue:  new("updated"),
+			wantErrMsg: "sql: database is closed",
+		},
 	}
 
 	for _, tc := range tests {
@@ -282,7 +456,25 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 				}
 			}
 
+			if tc.wantErrMsg != "" {
+				if err := db.Close(); err != nil {
+					t.Fatalf("failed to close db: %v", err)
+				}
+			}
+
 			updated, err := repo.UpdateRole(ctx, tc.roleID, tc.nameValue, tc.description)
+			if tc.wantErrMsg != "" {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if updated {
+					t.Fatal("expected updated=false on error")
+				}
+				if !strings.Contains(err.Error(), tc.wantErrMsg) {
+					t.Fatalf("expected direct db error, got %v", err)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -322,6 +514,7 @@ func TestBunRolesRepositoryDeleteRole(t *testing.T) {
 		seedRole    *types.Role
 		roleID      string
 		wantDeleted bool
+		wantErrMsg  string
 	}{
 		{
 			name:        "missing role",
@@ -333,6 +526,11 @@ func TestBunRolesRepositoryDeleteRole(t *testing.T) {
 			seedRole:    &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), IsSystem: false},
 			roleID:      "r1",
 			wantDeleted: true,
+		},
+		{
+			name:       "query error",
+			roleID:     "r5",
+			wantErrMsg: "sql: database is closed",
 		},
 	}
 
@@ -350,7 +548,25 @@ func TestBunRolesRepositoryDeleteRole(t *testing.T) {
 				}
 			}
 
+			if tc.wantErrMsg != "" {
+				if err := db.Close(); err != nil {
+					t.Fatalf("failed to close db: %v", err)
+				}
+			}
+
 			deleted, err := repo.DeleteRole(ctx, tc.roleID)
+			if tc.wantErrMsg != "" {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if deleted {
+					t.Fatal("expected deleted=false on error")
+				}
+				if !strings.Contains(err.Error(), tc.wantErrMsg) {
+					t.Fatalf("expected direct db error, got %v", err)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
