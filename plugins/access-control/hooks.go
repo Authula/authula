@@ -1,10 +1,12 @@
 package accesscontrol
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/access-control/types"
 )
 
 type AccessControlHookID string
@@ -25,6 +27,83 @@ func (p *AccessControlPlugin) Hooks() []models.Hook {
 			Handler:  p.requireAccessControl,
 			Order:    20,
 		},
+		{
+			Stage:   models.HookAfter,
+			Handler: p.assignRoleFromContextHook,
+			Order:   20,
+		},
+	}
+}
+
+func (p *AccessControlPlugin) assignRoleFromContextHook(reqCtx *models.RequestContext) error {
+	if p == nil || p.Api == nil || reqCtx == nil || reqCtx.Request == nil {
+		return nil
+	}
+
+	rawValue, ok := reqCtx.Values[models.ContextAccessControlAssignRole.String()]
+	if !ok || rawValue == nil {
+		return nil
+	}
+
+	assignCtx, ok := accessControlAssignRoleContext(rawValue)
+	if !ok || assignCtx.UserID == "" || assignCtx.RoleName == "" {
+		return nil
+	}
+
+	ctx := reqCtx.Request.Context()
+	userRoles, err := p.Api.GetUserRoles(ctx, assignCtx.UserID)
+	if err != nil {
+		p.logAssignRoleHookError("failed to load user roles", assignCtx, err)
+		return nil
+	}
+
+	for _, userRole := range userRoles {
+		if userRole.RoleName == assignCtx.RoleName {
+			return nil
+		}
+	}
+
+	role, err := p.Api.GetRoleByName(ctx, assignCtx.RoleName)
+	if err != nil {
+		p.logAssignRoleHookError("failed to resolve role", assignCtx, err)
+		return nil
+	}
+	if role == nil || role.ID == "" {
+		p.logAssignRoleHookError("resolved role is empty", assignCtx, fmt.Errorf("role not found"))
+		return nil
+	}
+
+	if err := p.Api.AssignRoleToUser(ctx, assignCtx.UserID, types.AssignUserRoleRequest{RoleID: role.ID}, nil); err != nil {
+		p.logAssignRoleHookError("failed to assign role", assignCtx, err)
+	}
+
+	return nil
+}
+
+func (p *AccessControlPlugin) logAssignRoleHookError(message string, assignCtx models.AccessControlAssignRoleContext, err error) {
+	if p == nil || p.logger == nil {
+		return
+	}
+
+	p.logger.Error(
+		message,
+		"user_id", assignCtx.UserID,
+		"role_name", assignCtx.RoleName,
+		"error", err,
+	)
+}
+
+func accessControlAssignRoleContext(value any) (models.AccessControlAssignRoleContext, bool) {
+	switch typed := value.(type) {
+	case models.AccessControlAssignRoleContext:
+		return typed, true
+	case *models.AccessControlAssignRoleContext:
+		if typed == nil {
+			return models.AccessControlAssignRoleContext{}, false
+		}
+		return *typed, true
+	default:
+		return models.AccessControlAssignRoleContext{}, false
 	}
 }
 
