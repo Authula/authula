@@ -1,6 +1,10 @@
 # Authula Project Guidelines
 
-### Code Style Guide
+**Authula** is an open-source authentication solution that scales with you. Embed it as a library in your Go app, or run it as a standalone auth server with any tech stack. It simplifies adding robust authentication to backend services, empowering developers to build secure applications faster.
+
+---
+
+## Code Style Guide
 
 - Always write clean code that is easy to read and maintain.
 - Follow consistent naming conventions for variables, functions, and structs.
@@ -14,7 +18,9 @@
 - Use interfaces to define behavior and promote decoupling. Never code to implementations. When writing services, make sure they implement an interface of a repository e.g. `UserService` imports `UserRepository`. This ensures that the service can be easily tested and swapped out with different implementations if needed.
 - For other services, define interfaces in the `interfaces.go` file within the `services` package and implement them in separate files just like the password service is an interface which has an argon2 implementation. So now it can easily be swapped out for another implementation if needed without changing the rest of the code that depends on it.
 
-# Testing Guidelines
+---
+
+## Testing Guidelines
 
 - Write unit tests for as many components as possible to ensure reliability such as repositories, services and handlers as well as plugins.
 - Use descriptive names for test cases to clearly indicate their purpose.
@@ -26,7 +32,9 @@
 - Run `make build` to ensure the project builds successfully after changes.
 - Then run `make test` to run all tests in the project.
 
-### Documentation Guidelines
+---
+
+## Documentation Guidelines
 
 - Keep documentation up to date with code changes.
 - Use clear and concise language in documentation.
@@ -38,7 +46,9 @@
 - When updating a feature, ensure that any related documentation is also updated to reflect the changes.
 - Create all docs in markdown format and within a top level docs/ directory.
 
-### Security Guidelines
+---
+
+## Security Guidelines
 
 - Follow best practices for secure coding to prevent vulnerabilities.
 - Regularly review and update dependencies to address security issues.
@@ -48,6 +58,8 @@
 - Take into account the principle of least privilege when designing access controls.
 - Always take into consideration edge cases and loopholes that could be exploited by attackers and implement safeguards against them.
 
-### Final Notes
+---
+
+## Agent Skills
 
 Always follow the Agent Skills located in the folder `.github/skills/` as it contains all the skills and playbooks you need to follow to make sure you are adhering to the project guidelines and best practices.

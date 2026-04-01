@@ -22,24 +22,20 @@ func (id AccessControlHookID) String() string {
 func (p *AccessControlPlugin) Hooks() []models.Hook {
 	return []models.Hook{
 		{
+			Stage:   models.HookAfter,
+			Handler: p.assignRoleFromContextHook,
+			Order:   20,
+		},
+		{
 			Stage:    models.HookBefore,
 			PluginID: HookIDAccessControlEnforce.String(),
 			Handler:  p.requireAccessControl,
 			Order:    20,
 		},
-		{
-			Stage:   models.HookAfter,
-			Handler: p.assignRoleFromContextHook,
-			Order:   20,
-		},
 	}
 }
 
 func (p *AccessControlPlugin) assignRoleFromContextHook(reqCtx *models.RequestContext) error {
-	if p == nil || p.Api == nil || reqCtx == nil || reqCtx.Request == nil {
-		return nil
-	}
-
 	rawValue, ok := reqCtx.Values[models.ContextAccessControlAssignRole.String()]
 	if !ok || rawValue == nil {
 		return nil
@@ -81,10 +77,6 @@ func (p *AccessControlPlugin) assignRoleFromContextHook(reqCtx *models.RequestCo
 }
 
 func (p *AccessControlPlugin) logAssignRoleHookError(message string, assignCtx models.AccessControlAssignRoleContext, err error) {
-	if p == nil || p.logger == nil {
-		return
-	}
-
 	p.logger.Error(
 		message,
 		"user_id", assignCtx.UserID,
