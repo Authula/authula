@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	internaltests "github.com/Authula/authula/internal/tests"
-	authmodels "github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/services"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
@@ -416,32 +415,6 @@ func assertUserRoleInfoEqual(t *testing.T, got types.UserRoleInfo, want types.Us
 	}
 	if !timesEqualPtr(got.ExpiresAt, want.ExpiresAt) {
 		t.Fatalf("unexpected expires_at: %#v", got)
-	}
-}
-
-func assertUserEqual(t *testing.T, got authmodels.User, want authmodels.User) {
-	t.Helper()
-
-	if got.ID != want.ID {
-		t.Fatalf("expected id %q, got %q", want.ID, got.ID)
-	}
-	if got.Name != want.Name {
-		t.Fatalf("expected name %q, got %q", want.Name, got.Name)
-	}
-	if got.Email != want.Email {
-		t.Fatalf("expected email %q, got %q", want.Email, got.Email)
-	}
-	if got.EmailVerified != want.EmailVerified {
-		t.Fatalf("expected email_verified %v, got %v", want.EmailVerified, got.EmailVerified)
-	}
-	if string(got.Metadata) != string(want.Metadata) {
-		t.Fatalf("expected metadata %s, got %s", string(want.Metadata), string(got.Metadata))
-	}
-	if !timesEqual(got.CreatedAt, want.CreatedAt) {
-		t.Fatalf("expected created_at %v, got %v", want.CreatedAt, got.CreatedAt)
-	}
-	if !timesEqual(got.UpdatedAt, want.UpdatedAt) {
-		t.Fatalf("expected updated_at %v, got %v", want.UpdatedAt, got.UpdatedAt)
 	}
 }
 

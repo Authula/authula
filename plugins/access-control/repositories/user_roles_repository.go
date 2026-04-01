@@ -7,7 +7,6 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
 
@@ -40,19 +39,6 @@ func (r *BunUserRolesRepository) GetUserRoles(ctx context.Context, userID string
 		return []types.UserRoleInfo{}, nil
 	}
 	return rows, nil
-}
-
-type userWithRoleRow struct {
-	UserID        string `bun:"user_id"`
-	UserName      string `bun:"user_name"`
-	UserEmail     string `bun:"user_email"`
-	EmailVerified bool   `bun:"email_verified"`
-	Image         *string
-	Metadata      []byte
-	CreatedAt     time.Time `bun:"created_at"`
-	UpdatedAt     time.Time `bun:"updated_at"`
-	RoleID        *string   `bun:"role_id"`
-	RoleName      *string   `bun:"role_name"`
 }
 
 func (r *BunUserRolesRepository) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error {
@@ -117,36 +103,3 @@ func (r *BunUserRolesRepository) CountUsersByRole(ctx context.Context, roleID st
 	}
 	return count, nil
 }
-
-type userRow interface {
-	GetUserID() string
-	GetUserName() string
-	GetUserEmail() string
-	GetEmailVerified() bool
-	GetImage() *string
-	GetMetadata() []byte
-	GetCreatedAt() time.Time
-	GetUpdatedAt() time.Time
-}
-
-func mapRowToUser(row userRow) models.User {
-	return models.User{
-		ID:            row.GetUserID(),
-		Name:          row.GetUserName(),
-		Email:         row.GetUserEmail(),
-		EmailVerified: row.GetEmailVerified(),
-		Image:         row.GetImage(),
-		Metadata:      row.GetMetadata(),
-		CreatedAt:     row.GetCreatedAt(),
-		UpdatedAt:     row.GetUpdatedAt(),
-	}
-}
-
-func (r userWithRoleRow) GetUserID() string       { return r.UserID }
-func (r userWithRoleRow) GetUserName() string     { return r.UserName }
-func (r userWithRoleRow) GetUserEmail() string    { return r.UserEmail }
-func (r userWithRoleRow) GetEmailVerified() bool  { return r.EmailVerified }
-func (r userWithRoleRow) GetImage() *string       { return r.Image }
-func (r userWithRoleRow) GetMetadata() []byte     { return r.Metadata }
-func (r userWithRoleRow) GetCreatedAt() time.Time { return r.CreatedAt }
-func (r userWithRoleRow) GetUpdatedAt() time.Time { return r.UpdatedAt }
