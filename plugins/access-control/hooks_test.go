@@ -5,200 +5,131 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
-	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/access-control/tests"
+	internaltests "github.com/Authula/authula/internal/tests"
+	authmodels "github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/access-control/services"
+	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 	"github.com/Authula/authula/plugins/access-control/usecases"
 )
 
-func newHookTestPluginWithUserAccessRepoMock(t *testing.T) (*AccessControlPlugin, interface {
-	On(string, ...any) *mock.Call
-	AssertExpectations(mock.TestingT) bool
-}) {
-	t.Helper()
+func newAccessControlHookTestPlugin(logger authmodels.Logger, rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) *AccessControlPlugin {
+	rolePermissionsService := services.NewRolePermissionsService(nil, nil, nil)
+	useCases := usecases.NewAccessControlUseCases(
+		usecases.NewRolesUseCase(services.NewRolesService(rolesRepo, nil, userRolesRepo)),
+		usecases.NewPermissionsUseCase(nil),
+		usecases.NewRolePermissionsUseCase(rolePermissionsService),
+		usecases.NewUserRolesUseCase(services.NewUserRolesService(userRolesRepo, rolesRepo)),
+		usecases.NewUserPermissionsUseCase(nil),
+	)
 
-	userAccessUseCase, userAccessRepo := tests.NewUserRolesUseCaseFixture()
-	useCases := usecases.NewAccessControlUseCases(usecases.RolePermissionUseCase{}, userAccessUseCase)
-	plugin := &AccessControlPlugin{Api: &API{useCases: useCases}}
-
-	return plugin, userAccessRepo
+	return &AccessControlPlugin{
+		Api:    NewAPI(useCases),
+		logger: logger,
+	}
 }
 
-func TestRequireAccessControlHook(t *testing.T) {
+func TestAccessControlPluginHooksIncludesGlobalAssignRoleHook(t *testing.T) {
 	t.Parallel()
 
-	t.Run("unauthorized without user", func(t *testing.T) {
-		t.Parallel()
+	hooks := (&AccessControlPlugin{}).Hooks()
+	if len(hooks) != 2 {
+		t.Fatalf("expected 2 hooks, got %d", len(hooks))
+	}
 
-		plugin := &AccessControlPlugin{}
-		req := httptest.NewRequest(http.MethodGet, "/resource", nil)
-		reqCtx := &models.RequestContext{Request: req}
-
-		err := plugin.requireAccessControl(reqCtx)
-		require.NoError(t, err)
-		require.True(t, reqCtx.Handled, "expected request to be handled")
-		require.Equal(t, http.StatusUnauthorized, reqCtx.ResponseStatus)
-	})
-
-	t.Run("unauthorized with empty user id", func(t *testing.T) {
-		t.Parallel()
-
-		plugin := &AccessControlPlugin{}
-		userID := ""
-		req := httptest.NewRequest(http.MethodGet, "/resource", nil)
-		reqCtx := &models.RequestContext{
-			Request: req,
-			UserID:  &userID,
+	var foundGlobal bool
+	for _, hook := range hooks {
+		if hook.Stage == authmodels.HookAfter && hook.PluginID == "" && hook.Handler != nil {
+			foundGlobal = true
 		}
+	}
 
-		err := plugin.requireAccessControl(reqCtx)
-		require.NoError(t, err)
-		require.True(t, reqCtx.Handled, "expected request to be handled")
-		require.Equal(t, http.StatusUnauthorized, reqCtx.ResponseStatus)
-	})
+	if !foundGlobal {
+		t.Fatal("expected a global HookAfter assignment hook")
+	}
+}
 
-	t.Run("opt in skips when no permissions metadata", func(t *testing.T) {
-		t.Parallel()
+func TestAccessControlPluginAssignRoleFromContextHook(t *testing.T) {
+	t.Parallel()
 
-		plugin := &AccessControlPlugin{}
-		userID := "user-1"
-		req := httptest.NewRequest(http.MethodGet, "/resource", nil)
-		reqCtx := &models.RequestContext{
-			Request: req,
-			Route: &models.Route{
-				Metadata: map[string]any{},
+	tests := []struct {
+		name         string
+		contextValue any
+		setup        func(*accesscontroltests.MockRolesRepository, *accesscontroltests.MockUserRolesRepository)
+	}{
+		{
+			name:         "missing context is a no-op",
+			contextValue: nil,
+		},
+		{
+			name:         "already assigned role is skipped",
+			contextValue: authmodels.AccessControlAssignRoleContext{UserID: "user-1", RoleName: "Editor"},
+			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{{RoleID: "role-1", RoleName: "Editor"}}, nil).Once()
 			},
-			UserID: &userID,
-		}
-
-		err := plugin.requireAccessControl(reqCtx)
-		require.NoError(t, err)
-		require.False(t, reqCtx.Handled, "expected request not to be handled when no permissions metadata is set")
-	})
-
-	t.Run("internal error when HasPermissions fails", func(t *testing.T) {
-		t.Parallel()
-
-		plugin, userAccessRepo := newHookTestPluginWithUserAccessRepoMock(t)
-		userID := "user-1"
-		userAccessRepo.On("GetUserEffectivePermissions", mock.Anything, userID).Return(nil, errors.New("database error")).Once()
-
-		req := httptest.NewRequest(http.MethodGet, "/resource", nil)
-		reqCtx := &models.RequestContext{
-			Request: req,
-			Route: &models.Route{
-				Metadata: map[string]any{
-					"permissions": []string{"admin"},
-				},
+		},
+		{
+			name:         "assigns role when missing",
+			contextValue: authmodels.AccessControlAssignRoleContext{UserID: "user-1", RoleName: "Editor"},
+			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{}, nil).Once()
+				rolesRepo.On("GetRoleByName", mock.Anything, "Editor").Return(&types.Role{ID: "role-1", Name: "Editor"}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor"}, nil).Once()
+				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), (*time.Time)(nil)).Return(nil).Once()
 			},
-			UserID: &userID,
-		}
-
-		err := plugin.requireAccessControl(reqCtx)
-		require.NoError(t, err)
-		require.True(t, reqCtx.Handled)
-		require.Equal(t, http.StatusInternalServerError, reqCtx.ResponseStatus)
-		userAccessRepo.AssertExpectations(t)
-	})
-
-	t.Run("forbidden when user lacks permissions", func(t *testing.T) {
-		t.Parallel()
-
-		plugin, userAccessRepo := newHookTestPluginWithUserAccessRepoMock(t)
-		userID := "user-1"
-		userAccessRepo.On("GetUserEffectivePermissions", mock.Anything, userID).Return([]types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "profiles.read"}}, nil).Once()
-
-		req := httptest.NewRequest(http.MethodGet, "/resource", nil)
-		reqCtx := &models.RequestContext{
-			Request: req,
-			Route: &models.Route{
-				Metadata: map[string]any{
-					"permissions": []string{"users.read"},
-				},
+		},
+		{
+			name:         "role lookup failure is logged and ignored",
+			contextValue: authmodels.AccessControlAssignRoleContext{UserID: "user-1", RoleName: "Editor"},
+			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{}, nil).Once()
+				rolesRepo.On("GetRoleByName", mock.Anything, "Editor").Return((*types.Role)(nil), errors.New("lookup failed")).Once()
 			},
-			UserID: &userID,
-		}
-
-		err := plugin.requireAccessControl(reqCtx)
-		require.NoError(t, err)
-		require.True(t, reqCtx.Handled, "expected request to be handled")
-		require.Equal(t, http.StatusForbidden, reqCtx.ResponseStatus)
-		userAccessRepo.AssertExpectations(t)
-	})
-
-	t.Run("allowed when user has permissions", func(t *testing.T) {
-		t.Parallel()
-
-		plugin, userAccessRepo := newHookTestPluginWithUserAccessRepoMock(t)
-		userID := "user-1"
-		userAccessRepo.On("GetUserEffectivePermissions", mock.Anything, userID).Return([]types.UserPermissionInfo{{PermissionKey: "users.read"}}, nil).Once()
-
-		req := httptest.NewRequest(http.MethodGet, "/resource", nil)
-		reqCtx := &models.RequestContext{
-			Request: req,
-			Route: &models.Route{
-				Metadata: map[string]any{
-					"permissions": []string{"users.read"},
-				},
+		},
+		{
+			name:         "assignment failure is logged and ignored",
+			contextValue: authmodels.AccessControlAssignRoleContext{UserID: "user-1", RoleName: "Editor"},
+			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{}, nil).Once()
+				rolesRepo.On("GetRoleByName", mock.Anything, "Editor").Return(&types.Role{ID: "role-1", Name: "Editor"}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor"}, nil).Once()
+				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), (*time.Time)(nil)).Return(errors.New("assign failed")).Once()
 			},
-			UserID: &userID,
-		}
+		},
+	}
 
-		err := plugin.requireAccessControl(reqCtx)
-		require.NoError(t, err)
-		require.False(t, reqCtx.Handled, "expected request not to be handled when user has permissions")
-		userAccessRepo.AssertExpectations(t)
-	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("multiple permissions allow when user has any one required permission", func(t *testing.T) {
-		t.Parallel()
+			rolesRepo := &accesscontroltests.MockRolesRepository{}
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
+			if tc.setup != nil {
+				tc.setup(rolesRepo, userRolesRepo)
+			}
 
-		plugin, userAccessRepo := newHookTestPluginWithUserAccessRepoMock(t)
-		userID := "user-1"
-		userAccessRepo.On("GetUserEffectivePermissions", mock.Anything, userID).Return([]types.UserPermissionInfo{{PermissionKey: "users.read"}}, nil).Once()
+			plugin := newAccessControlHookTestPlugin(&internaltests.MockLogger{}, rolesRepo, userRolesRepo)
 
-		req := httptest.NewRequest(http.MethodGet, "/resource", nil)
-		reqCtx := &models.RequestContext{
-			Request: req,
-			Route: &models.Route{
-				Metadata: map[string]any{
-					"permissions": []string{"users.read", "users.write"},
-				},
-			},
-			UserID: &userID,
-		}
+			req := httptest.NewRequest(http.MethodPost, "/test", nil)
+			reqCtx := &authmodels.RequestContext{
+				Request: req,
+				Values:  map[string]any{},
+			}
+			if tc.contextValue != nil {
+				reqCtx.Values[authmodels.ContextAccessControlAssignRole.String()] = tc.contextValue
+			}
 
-		err := plugin.requireAccessControl(reqCtx)
-		require.NoError(t, err)
-		require.False(t, reqCtx.Handled, "expected request not to be handled when user has at least one required permission")
-		userAccessRepo.AssertExpectations(t)
-	})
+			err := plugin.assignRoleFromContextHook(reqCtx)
+			if err != nil {
+				t.Fatalf("expected nil error, got %v", err)
+			}
 
-	t.Run("permissions metadata with whitespace trimming", func(t *testing.T) {
-		t.Parallel()
-
-		plugin, userAccessRepo := newHookTestPluginWithUserAccessRepoMock(t)
-		userID := "user-1"
-		userAccessRepo.On("GetUserEffectivePermissions", mock.Anything, userID).Return([]types.UserPermissionInfo{{PermissionKey: "users.read"}}, nil).Once()
-
-		req := httptest.NewRequest(http.MethodGet, "/resource", nil)
-		reqCtx := &models.RequestContext{
-			Request: req,
-			Route: &models.Route{
-				Metadata: map[string]any{
-					"permissions": []string{"  users.read  ", "   ", ""},
-				},
-			},
-			UserID: &userID,
-		}
-
-		err := plugin.requireAccessControl(reqCtx)
-		require.NoError(t, err)
-		require.False(t, reqCtx.Handled, "expected request not to be handled when user has permissions (after trimming)")
-		userAccessRepo.AssertExpectations(t)
-	})
+			rolesRepo.AssertExpectations(t)
+			userRolesRepo.AssertExpectations(t)
+		})
+	}
 }

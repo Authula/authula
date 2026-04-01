@@ -10,10 +10,10 @@ import (
 )
 
 type GetUserRolesHandler struct {
-	useCase usecases.UserRolesUseCase
+	useCase *usecases.UserRolesUseCase
 }
 
-func NewGetUserRolesHandler(useCase usecases.UserRolesUseCase) *GetUserRolesHandler {
+func NewGetUserRolesHandler(useCase *usecases.UserRolesUseCase) *GetUserRolesHandler {
 	return &GetUserRolesHandler{
 		useCase: useCase,
 	}
@@ -36,10 +36,10 @@ func (h *GetUserRolesHandler) Handler() http.HandlerFunc {
 }
 
 type ReplaceUserRolesHandler struct {
-	useCase usecases.RolePermissionUseCase
+	useCase *usecases.UserRolesUseCase
 }
 
-func NewReplaceUserRolesHandler(useCase usecases.RolePermissionUseCase) *ReplaceUserRolesHandler {
+func NewReplaceUserRolesHandler(useCase *usecases.UserRolesUseCase) *ReplaceUserRolesHandler {
 	return &ReplaceUserRolesHandler{
 		useCase: useCase,
 	}
@@ -68,10 +68,10 @@ func (h *ReplaceUserRolesHandler) Handler() http.HandlerFunc {
 }
 
 type AssignUserRoleHandler struct {
-	useCase usecases.RolePermissionUseCase
+	useCase *usecases.UserRolesUseCase
 }
 
-func NewAssignUserRoleHandler(useCase usecases.RolePermissionUseCase) *AssignUserRoleHandler {
+func NewAssignUserRoleHandler(useCase *usecases.UserRolesUseCase) *AssignUserRoleHandler {
 	return &AssignUserRoleHandler{useCase: useCase}
 }
 
@@ -98,10 +98,10 @@ func (h *AssignUserRoleHandler) Handler() http.HandlerFunc {
 }
 
 type RemoveUserRoleHandler struct {
-	useCase usecases.RolePermissionUseCase
+	useCase *usecases.UserRolesUseCase
 }
 
-func NewRemoveUserRoleHandler(useCase usecases.RolePermissionUseCase) *RemoveUserRoleHandler {
+func NewRemoveUserRoleHandler(useCase *usecases.UserRolesUseCase) *RemoveUserRoleHandler {
 	return &RemoveUserRoleHandler{useCase: useCase}
 }
 
@@ -119,50 +119,4 @@ func (h *RemoveUserRoleHandler) Handler() http.HandlerFunc {
 
 		reqCtx.SetJSONResponse(http.StatusOK, &types.RemoveUserRoleResponse{Message: "role removed"})
 	}
-}
-
-type GetUserEffectivePermissionsHandler struct {
-	useCase usecases.UserRolesUseCase
-}
-
-func NewGetUserEffectivePermissionsHandler(useCase usecases.UserRolesUseCase) *GetUserEffectivePermissionsHandler {
-	return &GetUserEffectivePermissionsHandler{
-		useCase: useCase,
-	}
-}
-
-func (h *GetUserEffectivePermissionsHandler) Handler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
-		userID := r.PathValue("user_id")
-
-		permissions, err := h.useCase.GetUserEffectivePermissions(r.Context(), userID)
-		if err != nil {
-			respondUserHandlerError(reqCtx, err)
-			return
-		}
-
-		reqCtx.SetJSONResponse(http.StatusOK, &types.GetUserEffectivePermissionsResponse{Permissions: permissions})
-	}
-}
-
-func userActorUserID(reqCtx *models.RequestContext) *string {
-	if reqCtx == nil || reqCtx.UserID == nil || *reqCtx.UserID == "" {
-		return nil
-	}
-	return reqCtx.UserID
-}
-
-func respondUserHandlerError(reqCtx *models.RequestContext, err error) {
-	if reqCtx == nil {
-		return
-	}
-
-	reqCtx.SetJSONResponse(mapUserHandlerErrorStatus(err), map[string]any{"message": mapHttpErrorMessage(err)})
-	reqCtx.Handled = true
-}
-
-func mapUserHandlerErrorStatus(err error) int {
-	return mapHttpErrorStatus(err)
 }
