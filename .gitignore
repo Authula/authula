@@ -51,3 +51,9 @@ temp/
 # Custom
 config.toml
 events.db*
+# Exclude each agent's skills folders
+.github/skills
+.claude/skills
+.gemini/skills
+.qwen/skills
+.opencode/skills
