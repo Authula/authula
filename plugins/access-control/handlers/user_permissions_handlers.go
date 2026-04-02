@@ -29,7 +29,7 @@ func (h *GetUserPermissionsHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, &types.GetUserEffectivePermissionsResponse{Permissions: permissions})
+		reqCtx.SetJSONResponse(http.StatusOK, &types.GetUserPermissionsResponse{Permissions: permissions})
 	}
 }
 

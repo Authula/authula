@@ -37,7 +37,7 @@ func TestGetUserPermissionsHandler(t *testing.T) {
 				m.On("GetUserPermissions", mock.Anything, "u1").Return([]types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "users.read"}}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
-			expectedBody:   types.GetUserEffectivePermissionsResponse{Permissions: []types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "users.read"}}},
+			expectedBody:   types.GetUserPermissionsResponse{Permissions: []types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "users.read"}}},
 		},
 		{
 			name:   "repo error",
@@ -75,8 +75,8 @@ func TestGetUserPermissionsHandler(t *testing.T) {
 				t.Fatalf("expected status %d, got %d", tc.expectedStatus, reqCtx.ResponseStatus)
 			}
 
-			payload := internaltests.DecodeResponseJSON[types.GetUserEffectivePermissionsResponse](t, reqCtx)
-			assertUserPermissionInfosEqual(t, payload.Permissions, tc.expectedBody.(types.GetUserEffectivePermissionsResponse).Permissions)
+			payload := internaltests.DecodeResponseJSON[types.GetUserPermissionsResponse](t, reqCtx)
+			assertUserPermissionInfosEqual(t, payload.Permissions, tc.expectedBody.(types.GetUserPermissionsResponse).Permissions)
 			repo.AssertExpectations(t)
 		})
 	}

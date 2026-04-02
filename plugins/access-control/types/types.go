@@ -100,7 +100,7 @@ type CheckUserPermissionsResponse struct {
 	HasPermissions bool `json:"has_permissions"`
 }
 
-type GetUserEffectivePermissionsResponse struct {
+type GetUserPermissionsResponse struct {
 	Permissions []UserPermissionInfo `json:"permissions"`
 }
 
