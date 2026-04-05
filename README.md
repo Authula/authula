@@ -113,7 +113,76 @@ Build your own plugins for:
 
 ### Deployment Modes
 
-`Embedded Mode (Go Library)`
+`Standalone Mode:`
+
+Configure server settings via `config.toml`:
+
+```toml
+app_name = "Authula"
+base_url = "http://localhost:8080"
+base_path = "/api/auth"
+
+[database]
+provider = "postgres"
+# ...
+
+[logger]
+level = "info"
+
+[session]
+cookie_name = "authula.session_token"
+# ...
+
+# and other core settings you can configure...
+
+# finally, configure powerful plugins...
+[plugins]
+
+[plugins.secondary_storage]
+enabled = true
+provider = "redis"
+# ...
+
+[plugins.email]
+enabled = true
+provider = "smtp"
+# ...
+
+[plugins.csrf]
+enabled = true
+# ...
+
+[plugins.email_password]
+enabled = true
+# ...
+
+[plugins.session]
+enabled = true
+# ...
+
+# and much more...
+```
+
+Then run Authula standalone via Docker:
+
+```bash
+docker run -itd -p 8080:8080 \
+  -v $(pwd)/config.toml:/home/appuser/config.toml \
+  -e AUTHULA_BASE_URL=http://localhost:8080 \
+  -e AUTHULA_SECRET=my-app-secret \
+  -e AUTHULA_DATABASE_URL=<your_connection_string> \
+  # other env vars depending on plugins used...
+  ghcr.io/authula/authula:latest
+```
+
+You get:
+
+- Auth microservice
+- Driven by file-based config
+- Deployable using Docker
+- Use it alongside any tech stack over HTTP.
+
+`Embedded Mode (Go Library):`
 
 Embed Authula directly into your Go application:
 
@@ -148,28 +217,10 @@ http.ListenAndServe(":8080", auth.Handler())
 
 You get:
 
-- zero network overhead
-- full type safety
-- native integration
-- maximum performance
-
----
-
-`Standalone Mode`
-
-Run Authula as a standalone authentication server via Docker:
-
-```bash
-docker run -itd -p 8080:8080 \
-  -v $(pwd)/config.toml:/home/appuser/config.toml \
-  -e AUTHULA_BASE_URL=http://localhost:8080 \
-  -e AUTHULA_SECRET=my-app-secret \
-  -e AUTHULA_DATABASE_URL=<your_connection_string> \
-  # other env vars depending on plugins used...
-  ghcr.io/authula/authula:latest
-```
-
-Use it from any language or framework over HTTP.
+- Zero network overhead
+- Full type safety
+- Native integration
+- Maximum performance
 
 ---
 
