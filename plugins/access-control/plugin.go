@@ -63,6 +63,9 @@ func (p *AccessControlPlugin) Init(ctx *models.PluginContext) error {
 	)
 	p.Api = NewAPI(useCases)
 
+	accessControlService := NewAccessControlService(p.Api)
+	ctx.ServiceRegistry.Register(models.ServiceAccessControl.String(), accessControlService)
+
 	return nil
 }
 
