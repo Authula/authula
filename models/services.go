@@ -9,20 +9,15 @@ const (
 	ServiceSession      ServiceID = "session_service"
 	ServiceVerification ServiceID = "verification_service"
 	ServiceToken        ServiceID = "token_service"
+	ServicePassword     ServiceID = "password_service"
 
-	// EMAIL
-	ServicePassword ServiceID = "password_service"
-	ServiceMailer   ServiceID = "mailer_service"
-
-	// JWT
-	ServiceJWT ServiceID = "jwt_service"
-
-	// CONFIG
-	ServiceConfigManager ServiceID = "config_manager_service"
-	ServiceAdmin         ServiceID = "admin_service"
-
-	// STORAGE
+	// Plugins
+	ServiceAccessControl    ServiceID = "access_control_service"
+	ServiceAdmin            ServiceID = "admin_service"
 	ServiceSecondaryStorage ServiceID = "secondary_storage_service"
+	ServiceMailer           ServiceID = "mailer_service"
+	ServiceJWT              ServiceID = "jwt_service"
+	ServiceConfigManager    ServiceID = "config_manager_service"
 )
 
 func (id ServiceID) String() string {

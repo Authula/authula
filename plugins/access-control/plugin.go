@@ -54,6 +54,8 @@ func (p *AccessControlPlugin) Init(ctx *models.PluginContext) error {
 	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo)
 	userPermissionsService := services.NewUserPermissionsService(userPermissionsRepo)
 
+	accessControlService := services.NewAccessControlService(rolesService)
+
 	useCases := usecases.NewAccessControlUseCases(
 		usecases.NewRolesUseCase(rolesService),
 		usecases.NewPermissionsUseCase(permissionsService),
@@ -62,6 +64,8 @@ func (p *AccessControlPlugin) Init(ctx *models.PluginContext) error {
 		usecases.NewUserPermissionsUseCase(userPermissionsService),
 	)
 	p.Api = NewAPI(useCases)
+
+	ctx.ServiceRegistry.Register(models.ServiceAccessControl.String(), accessControlService)
 
 	return nil
 }
