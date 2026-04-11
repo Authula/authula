@@ -29,6 +29,7 @@ func accessControlSQLiteInitial() migrations.Migration {
           id TEXT PRIMARY KEY,
           name VARCHAR(255) NOT NULL UNIQUE,
           description TEXT,
+          weight INTEGER NOT NULL,
           is_system BOOLEAN NOT NULL DEFAULT 0,
           created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -104,6 +105,7 @@ func accessControlPostgresInitial() migrations.Migration {
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           name VARCHAR(255) NOT NULL UNIQUE,
           description TEXT,
+          weight INTEGER NOT NULL,
           is_system BOOLEAN NOT NULL DEFAULT FALSE,
           created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
@@ -184,6 +186,7 @@ func accessControlMySQLInitial() migrations.Migration {
           id BINARY(16) NOT NULL PRIMARY KEY,
           name VARCHAR(255) NOT NULL UNIQUE,
           description TEXT,
+          weight INT NOT NULL,
           is_system TINYINT(1) NOT NULL DEFAULT 0,
           created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

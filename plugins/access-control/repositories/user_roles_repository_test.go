@@ -34,10 +34,10 @@ func TestBunUserRolesRepositoryGetUserRoles(t *testing.T) {
 			name:   "returns assigned roles ordered by role name",
 			userID: "u1",
 			seed: func(rolesRepo *BunRolesRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r2", Name: "viewer"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r2", Name: "viewer", Weight: 10}); err != nil {
 					panic(err)
 				}
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor", Description: roleDescription}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor", Description: roleDescription, Weight: 30}); err != nil {
 					panic(err)
 				}
 				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r1", assignedBy, &futureExpiry); err != nil {
@@ -52,6 +52,7 @@ func TestBunUserRolesRepositoryGetUserRoles(t *testing.T) {
 					RoleID:           "r1",
 					RoleName:         "editor",
 					RoleDescription:  roleDescription,
+					RoleWeight:       30,
 					AssignedByUserID: assignedBy,
 					ExpiresAt:        &futureExpiry,
 				},
@@ -59,6 +60,7 @@ func TestBunUserRolesRepositoryGetUserRoles(t *testing.T) {
 					RoleID:           "r2",
 					RoleName:         "viewer",
 					RoleDescription:  nil,
+					RoleWeight:       10,
 					AssignedByUserID: nil,
 					ExpiresAt:        nil,
 				},
@@ -122,17 +124,17 @@ func TestBunUserRolesRepositoryReplaceUserRoles(t *testing.T) {
 			userID:  "u1",
 			roleIDs: []string{"r2", "r1"},
 			seed: func(rolesRepo *BunRolesRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r2", Name: "viewer"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r2", Name: "viewer", Weight: 20}); err != nil {
 					panic(err)
 				}
 				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r1", nil, nil); err != nil {
 					panic(err)
 				}
 			},
-			wantRoleIDs: []string{"r1", "r2"},
+			wantRoleIDs: []string{"r2", "r1"},
 		},
 		{
 			name:        "empty list clears roles",
@@ -170,6 +172,9 @@ func TestBunUserRolesRepositoryReplaceUserRoles(t *testing.T) {
 				if roles[i].RoleID != wantRoleID {
 					t.Fatalf("expected role %s at index %d, got %#v", wantRoleID, i, roles[i])
 				}
+				if roles[i].RoleWeight == 0 {
+					t.Fatalf("expected role weight to be populated at index %d", i)
+				}
 			}
 		})
 	}
@@ -195,7 +200,7 @@ func TestBunUserRolesRepositoryAssignUserRole(t *testing.T) {
 			roleID:    "r1",
 			expiresAt: &futureExpiry,
 			seed: func(rolesRepo *BunRolesRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
 			},
@@ -205,7 +210,7 @@ func TestBunUserRolesRepositoryAssignUserRole(t *testing.T) {
 			userID: "u1",
 			roleID: "r1",
 			seed: func(rolesRepo *BunRolesRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
 				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r1", nil, nil); err != nil {
@@ -253,6 +258,9 @@ func TestBunUserRolesRepositoryAssignUserRole(t *testing.T) {
 			if len(roles) != 1 || roles[0].RoleID != tc.roleID || roles[0].RoleName != "editor" {
 				t.Fatalf("unexpected roles after assign: %#v", roles)
 			}
+			if roles[0].RoleWeight != 10 {
+				t.Fatalf("expected role weight 10, got %#v", roles[0])
+			}
 			if roles[0].AssignedAt == nil {
 				t.Fatal("expected assigned_at to be populated")
 			}
@@ -278,7 +286,7 @@ func TestBunUserRolesRepositoryRemoveUserRole(t *testing.T) {
 			userID: "u1",
 			roleID: "r1",
 			seed: func(rolesRepo *BunRolesRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
 				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r1", nil, nil); err != nil {

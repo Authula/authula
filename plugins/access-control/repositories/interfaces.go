@@ -12,7 +12,7 @@ type RolesRepository interface {
 	GetAllRoles(ctx context.Context) ([]types.Role, error)
 	GetRoleByID(ctx context.Context, roleID string) (*types.Role, error)
 	GetRoleByName(ctx context.Context, roleName string) (*types.Role, error)
-	UpdateRole(ctx context.Context, roleID string, name *string, description *string) (bool, error)
+	UpdateRole(ctx context.Context, roleID string, name *string, description *string, weight *int) (bool, error)
 	DeleteRole(ctx context.Context, roleID string) (bool, error)
 }
 

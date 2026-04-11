@@ -26,7 +26,7 @@ func (r *BunRolesRepository) CreateRole(ctx context.Context, role *types.Role) e
 
 func (r *BunRolesRepository) GetAllRoles(ctx context.Context) ([]types.Role, error) {
 	roles := make([]types.Role, 0)
-	err := r.db.NewSelect().Model(&roles).Order("created_at ASC").Scan(ctx)
+	err := r.db.NewSelect().Model(&roles).OrderExpr("weight DESC, created_at ASC").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get roles: %w", err)
 	}
@@ -59,7 +59,7 @@ func (r *BunRolesRepository) GetRoleByName(ctx context.Context, roleName string)
 	return role, nil
 }
 
-func (r *BunRolesRepository) UpdateRole(ctx context.Context, roleID string, name *string, description *string) (bool, error) {
+func (r *BunRolesRepository) UpdateRole(ctx context.Context, roleID string, name *string, description *string, weight *int) (bool, error) {
 	query := r.db.NewUpdate().
 		Model((*types.Role)(nil)).
 		Set("updated_at = ?", time.Now().UTC()).
@@ -71,6 +71,10 @@ func (r *BunRolesRepository) UpdateRole(ctx context.Context, roleID string, name
 
 	if description != nil {
 		query = query.Set("description = ?", *description)
+	}
+
+	if weight != nil {
+		query = query.Set("weight = ?", *weight)
 	}
 
 	result, err := query.Exec(ctx)

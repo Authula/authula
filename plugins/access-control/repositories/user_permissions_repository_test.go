@@ -31,10 +31,10 @@ func TestBunUserPermissionsRepositoryGetUserPermissions(t *testing.T) {
 			name:   "aggregates permissions across roles and ignores expired roles",
 			userID: "u1",
 			seed: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-2", Name: "viewer"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-2", Name: "viewer", Weight: 10}); err != nil {
 					panic(err)
 				}
 				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read", Description: description}); err != nil {
@@ -136,7 +136,7 @@ func TestBunUserPermissionsRepositoryHasPermissions(t *testing.T) {
 			userID:         "u1",
 			permissionKeys: []string{"users.read", "users.delete"},
 			seed: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
 				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read"}); err != nil {
@@ -156,7 +156,7 @@ func TestBunUserPermissionsRepositoryHasPermissions(t *testing.T) {
 			userID:         "u1",
 			permissionKeys: []string{"users.read"},
 			seed: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
 				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read"}); err != nil {

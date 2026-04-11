@@ -9,6 +9,7 @@ import (
 type CreateRoleRequest struct {
 	Name        string  `json:"name"`
 	Description *string `json:"description,omitempty"`
+	Weight      *int    `json:"weight,omitempty"`
 	IsSystem    bool    `json:"is_system"`
 }
 
@@ -19,6 +20,7 @@ type CreateRoleResponse struct {
 type UpdateRoleRequest struct {
 	Name        *string `json:"name,omitempty"`
 	Description *string `json:"description,omitempty"`
+	Weight      *int    `json:"weight,omitempty"`
 }
 
 type UpdateRoleResponse struct {
@@ -108,6 +110,7 @@ type UserRoleInfo struct {
 	RoleID           string     `json:"role_id"`
 	RoleName         string     `json:"role_name"`
 	RoleDescription  *string    `json:"role_description,omitempty"`
+	RoleWeight       int        `json:"role_weight"`
 	AssignedByUserID *string    `json:"assigned_by_user_id,omitempty"`
 	AssignedAt       *time.Time `json:"assigned_at,omitempty"`
 	ExpiresAt        *time.Time `json:"expires_at,omitempty"`

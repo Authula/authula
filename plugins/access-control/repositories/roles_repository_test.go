@@ -13,30 +13,32 @@ func TestBunRolesRepositoryCreateRole(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		role     *types.Role
-		seed     *types.Role
-		wantErr  error
-		wantID   string
-		wantName string
-		wantDesc *string
+		name       string
+		role       *types.Role
+		seed       *types.Role
+		wantErr    error
+		wantID     string
+		wantName   string
+		wantDesc   *string
+		wantWeight int
 	}{
 		{
-			name:     "success",
-			role:     &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), IsSystem: false},
-			wantID:   "r1",
-			wantName: "editor",
-			wantDesc: new("Editor role"),
+			name:       "success",
+			role:       &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), Weight: 10, IsSystem: false},
+			wantID:     "r1",
+			wantName:   "editor",
+			wantDesc:   new("Editor role"),
+			wantWeight: 10,
 		},
 		{
 			name:    "duplicate name returns conflict",
-			role:    &types.Role{ID: "r2", Name: "editor", Description: new("Duplicate role"), IsSystem: false},
-			seed:    &types.Role{ID: "r1", Name: "editor", Description: new("Original role"), IsSystem: false},
+			role:    &types.Role{ID: "r2", Name: "editor", Description: new("Duplicate role"), Weight: 10, IsSystem: false},
+			seed:    &types.Role{ID: "r1", Name: "editor", Description: new("Original role"), Weight: 10, IsSystem: false},
 			wantErr: nil,
 		},
 		{
 			name:    "query error returns wrapped error",
-			role:    &types.Role{ID: "r3", Name: "reviewer", Description: new("Reviewer role"), IsSystem: false},
+			role:    &types.Role{ID: "r3", Name: "reviewer", Description: new("Reviewer role"), Weight: 10, IsSystem: false},
 			wantErr: nil,
 		},
 	}
@@ -101,6 +103,9 @@ func TestBunRolesRepositoryCreateRole(t *testing.T) {
 			if !stringPtrEqual(stored.Description, tc.wantDesc) {
 				t.Fatalf("expected description %#v, got %#v", tc.wantDesc, stored.Description)
 			}
+			if stored.Weight != tc.wantWeight {
+				t.Fatalf("expected weight %d, got %d", tc.wantWeight, stored.Weight)
+			}
 			if stored.CreatedAt.IsZero() || stored.UpdatedAt.IsZero() {
 				t.Fatal("expected timestamps to be populated")
 			}
@@ -112,28 +117,31 @@ func TestBunRolesRepositoryGetAllRoles(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		seedRoles  []*types.Role
-		wantIDs    []string
-		wantNames  []string
-		wantDescs  []*string
-		wantErrMsg string
+		name        string
+		seedRoles   []*types.Role
+		wantIDs     []string
+		wantNames   []string
+		wantDescs   []*string
+		wantWeights []int
+		wantErrMsg  string
 	}{
 		{
-			name:      "empty result",
-			wantIDs:   []string{},
-			wantNames: []string{},
-			wantDescs: []*string{},
+			name:        "empty result",
+			wantIDs:     []string{},
+			wantNames:   []string{},
+			wantDescs:   []*string{},
+			wantWeights: []int{},
 		},
 		{
-			name: "returns roles ordered by creation time",
+			name: "returns roles ordered by weight",
 			seedRoles: []*types.Role{
-				{ID: "r2", Name: "viewer", Description: new("Viewer role")},
-				{ID: "r1", Name: "editor", Description: new("Editor role")},
+				{ID: "r2", Name: "viewer", Description: new("Viewer role"), Weight: 10},
+				{ID: "r1", Name: "editor", Description: new("Editor role"), Weight: 30},
 			},
-			wantIDs:   []string{"r2", "r1"},
-			wantNames: []string{"viewer", "editor"},
-			wantDescs: []*string{new("Viewer role"), new("Editor role")},
+			wantIDs:     []string{"r1", "r2"},
+			wantNames:   []string{"editor", "viewer"},
+			wantDescs:   []*string{new("Editor role"), new("Viewer role")},
+			wantWeights: []int{30, 10},
 		},
 		{
 			name:       "query error",
@@ -190,6 +198,9 @@ func TestBunRolesRepositoryGetAllRoles(t *testing.T) {
 				if !stringPtrEqual(roles[i].Description, tc.wantDescs[i]) {
 					t.Fatalf("unexpected description at %d: %#v", i, roles[i])
 				}
+				if roles[i].Weight != tc.wantWeights[i] {
+					t.Fatalf("unexpected weight at %d: %#v", i, roles[i])
+				}
 				if roles[i].CreatedAt.IsZero() || roles[i].UpdatedAt.IsZero() {
 					t.Fatalf("expected timestamps to be populated at %d", i)
 				}
@@ -209,6 +220,7 @@ func TestBunRolesRepositoryGetRoleByID(t *testing.T) {
 		wantName   string
 		wantDesc   *string
 		wantSystem bool
+		wantWeight int
 		wantErrMsg string
 	}{
 		{
@@ -219,10 +231,11 @@ func TestBunRolesRepositoryGetRoleByID(t *testing.T) {
 		{
 			name:       "success",
 			roleID:     "r1",
-			seedRole:   &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), IsSystem: true},
+			seedRole:   &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), IsSystem: true, Weight: 20},
 			wantName:   "editor",
 			wantDesc:   new("Editor role"),
 			wantSystem: true,
+			wantWeight: 20,
 		},
 		{
 			name:       "query error",
@@ -282,6 +295,9 @@ func TestBunRolesRepositoryGetRoleByID(t *testing.T) {
 			if !stringPtrEqual(role.Description, tc.wantDesc) {
 				t.Fatalf("expected description %#v, got %#v", tc.wantDesc, role.Description)
 			}
+			if role.Weight != tc.wantWeight {
+				t.Fatalf("expected weight %d, got %d", tc.wantWeight, role.Weight)
+			}
 		})
 	}
 }
@@ -297,6 +313,7 @@ func TestBunRolesRepositoryGetRoleByName(t *testing.T) {
 		wantName   string
 		wantDesc   *string
 		wantSystem bool
+		wantWeight int
 		wantErr    bool
 		wantErrMsg string
 	}{
@@ -308,15 +325,16 @@ func TestBunRolesRepositoryGetRoleByName(t *testing.T) {
 		{
 			name:       "success",
 			roleName:   "editor",
-			seedRole:   &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), IsSystem: true},
+			seedRole:   &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), Weight: 20, IsSystem: true},
 			wantName:   "editor",
 			wantDesc:   new("Editor role"),
 			wantSystem: true,
+			wantWeight: 20,
 		},
 		{
 			name:       "query error",
 			roleName:   "editor",
-			seedRole:   &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), IsSystem: false},
+			seedRole:   &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), Weight: 10, IsSystem: false},
 			wantErr:    true,
 			wantErrMsg: "failed to get role by name",
 		},
@@ -373,6 +391,9 @@ func TestBunRolesRepositoryGetRoleByName(t *testing.T) {
 			if !stringPtrEqual(role.Description, tc.wantDesc) {
 				t.Fatalf("expected description %#v, got %#v", tc.wantDesc, role.Description)
 			}
+			if role.Weight != tc.wantWeight {
+				t.Fatalf("expected weight %d, got %d", tc.wantWeight, role.Weight)
+			}
 		})
 	}
 }
@@ -386,9 +407,11 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 		roleID      string
 		nameValue   *string
 		description *string
+		weight      *int
 		wantUpdated bool
 		wantName    *string
 		wantDesc    *string
+		wantWeight  *int
 		wantErrMsg  string
 	}{
 		{
@@ -400,39 +423,43 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 		},
 		{
 			name:        "update name only",
-			seedRole:    &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), IsSystem: false},
+			seedRole:    &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), IsSystem: false, Weight: 10},
 			roleID:      "r1",
 			nameValue:   new("editor-updated"),
 			wantUpdated: true,
 			wantName:    new("editor-updated"),
 			wantDesc:    new("Editor role"),
+			wantWeight:  new(10),
 		},
 		{
 			name:        "update description only",
-			seedRole:    &types.Role{ID: "r2", Name: "viewer", Description: new("Viewer role"), IsSystem: false},
+			seedRole:    &types.Role{ID: "r2", Name: "viewer", Description: new("Viewer role"), IsSystem: false, Weight: 10},
 			roleID:      "r2",
 			description: new("Viewer role updated"),
 			wantUpdated: true,
 			wantName:    new("viewer"),
 			wantDesc:    new("Viewer role updated"),
+			wantWeight:  new(10),
 		},
 		{
 			name:        "update name and description",
-			seedRole:    &types.Role{ID: "r3", Name: "author", Description: new("Author role"), IsSystem: false},
+			seedRole:    &types.Role{ID: "r3", Name: "author", Description: new("Author role"), IsSystem: false, Weight: 10},
 			roleID:      "r3",
 			nameValue:   new("author-updated"),
 			description: new("Author role updated"),
 			wantUpdated: true,
 			wantName:    new("author-updated"),
 			wantDesc:    new("Author role updated"),
+			wantWeight:  new(10),
 		},
 		{
 			name:        "update with no fields still updates timestamp",
-			seedRole:    &types.Role{ID: "r4", Name: "reviewer", Description: new("Reviewer role"), IsSystem: false},
+			seedRole:    &types.Role{ID: "r4", Name: "reviewer", Description: new("Reviewer role"), IsSystem: false, Weight: 10},
 			roleID:      "r4",
 			wantUpdated: true,
 			wantName:    new("reviewer"),
 			wantDesc:    new("Reviewer role"),
+			wantWeight:  new(10),
 		},
 		{
 			name:       "query error",
@@ -462,7 +489,7 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 				}
 			}
 
-			updated, err := repo.UpdateRole(ctx, tc.roleID, tc.nameValue, tc.description)
+			updated, err := repo.UpdateRole(ctx, tc.roleID, tc.nameValue, tc.description, tc.weight)
 			if tc.wantErrMsg != "" {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -499,6 +526,9 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 			if !stringPtrEqual(role.Description, tc.wantDesc) {
 				t.Fatalf("expected description %#v, got %#v", tc.wantDesc, role.Description)
 			}
+			if tc.wantWeight != nil && role.Weight != *tc.wantWeight {
+				t.Fatalf("expected weight %d, got %d", *tc.wantWeight, role.Weight)
+			}
 			if role.UpdatedAt.IsZero() {
 				t.Fatal("expected updated_at to be populated")
 			}
@@ -523,7 +553,7 @@ func TestBunRolesRepositoryDeleteRole(t *testing.T) {
 		},
 		{
 			name:        "success",
-			seedRole:    &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), IsSystem: false},
+			seedRole:    &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), Weight: 10, IsSystem: false},
 			roleID:      "r1",
 			wantDeleted: true,
 		},

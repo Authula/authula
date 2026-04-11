@@ -54,6 +54,7 @@ func TestGetUserRolesHandler(t *testing.T) {
 					RoleID:           "role-1",
 					RoleName:         "Editor",
 					RoleDescription:  description,
+					RoleWeight:       20,
 					AssignedByUserID: assignedByUserID,
 					AssignedAt:       &fixedTime,
 					ExpiresAt:        &fixedTime,
@@ -64,6 +65,7 @@ func TestGetUserRolesHandler(t *testing.T) {
 				RoleID:           "role-1",
 				RoleName:         "Editor",
 				RoleDescription:  description,
+				RoleWeight:       20,
 				AssignedByUserID: assignedByUserID,
 				AssignedAt:       &fixedTime,
 				ExpiresAt:        &fixedTime,
@@ -142,8 +144,8 @@ func TestReplaceUserRolesHandler(t *testing.T) {
 			userID: "user-1",
 			body:   internaltests.MarshalToJSON(t, types.ReplaceUserRolesRequest{RoleIDs: []string{"role-1", "role-2"}}),
 			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
-				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor"}, nil).Once()
-				rolesRepo.On("GetRoleByID", mock.Anything, "role-2").Return(&types.Role{ID: "role-2", Name: "Viewer"}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 20}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-2").Return(&types.Role{ID: "role-2", Name: "Viewer", Weight: 10}, nil).Once()
 				userRolesRepo.On("ReplaceUserRoles", mock.Anything, "user-1", []string{"role-1", "role-2"}, (*string)(nil)).Return(nil).Once()
 			},
 			expectedStatus: http.StatusOK,
@@ -155,8 +157,9 @@ func TestReplaceUserRolesHandler(t *testing.T) {
 			userIDPtr: actorUserIDPtr,
 			body:      internaltests.MarshalToJSON(t, types.ReplaceUserRolesRequest{RoleIDs: []string{"role-3", "role-4"}}),
 			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
-				rolesRepo.On("GetRoleByID", mock.Anything, "role-3").Return(&types.Role{ID: "role-3", Name: "Reviewer"}, nil).Once()
-				rolesRepo.On("GetRoleByID", mock.Anything, "role-4").Return(&types.Role{ID: "role-4", Name: "Commenter"}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-3").Return(&types.Role{ID: "role-3", Name: "Reviewer", Weight: 15}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-4").Return(&types.Role{ID: "role-4", Name: "Commenter", Weight: 10}, nil).Once()
+				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{{RoleID: "role-admin", RoleName: "Admin", RoleWeight: 40}}, nil).Once()
 				userRolesRepo.On("ReplaceUserRoles", mock.Anything, "user-1", []string{"role-3", "role-4"}, actorUserIDPtr).Return(nil).Once()
 			},
 			expectedStatus: http.StatusOK,
@@ -236,7 +239,7 @@ func TestAssignUserRoleHandler(t *testing.T) {
 			userID: "user-1",
 			body:   internaltests.MarshalToJSON(t, types.AssignUserRoleRequest{RoleID: "role-1"}),
 			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
-				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor"}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 20}, nil).Once()
 				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), (*time.Time)(nil)).Return(constants.ErrUnauthorized).Once()
 			},
 			expectedStatus: http.StatusUnauthorized,
@@ -247,7 +250,7 @@ func TestAssignUserRoleHandler(t *testing.T) {
 			userID: "user-1",
 			body:   internaltests.MarshalToJSON(t, types.AssignUserRoleRequest{RoleID: "role-1", ExpiresAt: &futureTime}),
 			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
-				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor"}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 20}, nil).Once()
 				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), &futureTime).Return(nil).Once()
 			},
 			expectedStatus: http.StatusOK,
@@ -259,7 +262,8 @@ func TestAssignUserRoleHandler(t *testing.T) {
 			userIDPtr: actorUserIDPtr,
 			body:      internaltests.MarshalToJSON(t, types.AssignUserRoleRequest{RoleID: "role-2"}),
 			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
-				rolesRepo.On("GetRoleByID", mock.Anything, "role-2").Return(&types.Role{ID: "role-2", Name: "Reviewer"}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-2").Return(&types.Role{ID: "role-2", Name: "Reviewer", Weight: 15}, nil).Once()
+				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{{RoleID: "role-admin", RoleName: "Admin", RoleWeight: 40}}, nil).Once()
 				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-2", actorUserIDPtr, (*time.Time)(nil)).Return(nil).Once()
 			},
 			expectedStatus: http.StatusOK,
@@ -406,6 +410,9 @@ func assertUserRoleInfoEqual(t *testing.T, got types.UserRoleInfo, want types.Us
 	}
 	if !stringsEqualPtr(got.RoleDescription, want.RoleDescription) {
 		t.Fatalf("unexpected role description: %#v", got)
+	}
+	if got.RoleWeight != want.RoleWeight {
+		t.Fatalf("unexpected role weight: %#v", got)
 	}
 	if !stringsEqualPtr(got.AssignedByUserID, want.AssignedByUserID) {
 		t.Fatalf("unexpected assigned_by_user_id: %#v", got)
