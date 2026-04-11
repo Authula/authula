@@ -28,11 +28,16 @@ func (s *RolesService) CreateRole(ctx context.Context, req types.CreateRoleReque
 	if req.Description != nil {
 		description = req.Description
 	}
+	weight := 10
+	if req.Weight != nil {
+		weight = *req.Weight
+	}
 
 	role := &types.Role{
 		ID:          util.GenerateUUID(),
 		Name:        req.Name,
 		Description: description,
+		Weight:      weight,
 		IsSystem:    req.IsSystem,
 	}
 
@@ -89,7 +94,7 @@ func (s *RolesService) UpdateRole(ctx context.Context, roleID string, req types.
 		return nil, constants.ErrBadRequest
 	}
 
-	if req.Name == nil && req.Description == nil {
+	if req.Name == nil && req.Description == nil && req.Weight == nil {
 		return nil, constants.ErrUnprocessableEntity
 	}
 
@@ -117,7 +122,12 @@ func (s *RolesService) UpdateRole(ctx context.Context, roleID string, req types.
 		description = req.Description
 	}
 
-	updated, err := s.rolesRepo.UpdateRole(ctx, roleID, name, description)
+	var weight *int
+	if req.Weight != nil {
+		weight = req.Weight
+	}
+
+	updated, err := s.rolesRepo.UpdateRole(ctx, roleID, name, description, weight)
 	if err != nil {
 		return nil, err
 	}

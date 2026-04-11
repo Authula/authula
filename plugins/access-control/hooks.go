@@ -69,7 +69,7 @@ func (p *AccessControlPlugin) assignRoleFromContextHook(reqCtx *models.RequestCo
 		return nil
 	}
 
-	if err := p.Api.AssignRoleToUser(ctx, assignCtx.UserID, types.AssignUserRoleRequest{RoleID: role.ID}, nil); err != nil {
+	if err := p.Api.AssignRoleToUser(ctx, assignCtx.UserID, types.AssignUserRoleRequest{RoleID: role.ID}, assignCtx.AssignerUserID); err != nil {
 		p.logAssignRoleHookError("failed to assign role", assignCtx, err)
 	}
 

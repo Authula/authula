@@ -31,7 +31,7 @@ func TestBunRolePermissionsRepositoryGetRolePermissions(t *testing.T) {
 			name:   "success",
 			roleID: "role-1",
 			seed: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
 				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-2", Key: "users.write", Description: new("Write users")}); err != nil {
@@ -102,7 +102,7 @@ func TestBunRolePermissionsRepositoryAddRolePermission(t *testing.T) {
 			roleID:       "role-1",
 			permissionID: "perm-1",
 			setup: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
 				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read"}); err != nil {
@@ -115,7 +115,7 @@ func TestBunRolePermissionsRepositoryAddRolePermission(t *testing.T) {
 			roleID:       "role-1",
 			permissionID: "perm-1",
 			setup: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
 				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read"}); err != nil {
@@ -189,7 +189,7 @@ func TestBunRolePermissionsRepositoryReplaceRolePermissions(t *testing.T) {
 			roleID:        "role-1",
 			permissionIDs: []string{"perm-2", "perm-1"},
 			seed: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
 				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read"}); err != nil {
@@ -255,7 +255,7 @@ func TestBunRolePermissionsRepositoryRemoveRolePermission(t *testing.T) {
 			roleID:       "role-1",
 			permissionID: "perm-1",
 			seed: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor"}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
 				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read"}); err != nil {

@@ -12,6 +12,7 @@ type Role struct {
 	ID          string    `json:"id" bun:"column:id,pk"`
 	Name        string    `json:"name" bun:"column:name"`
 	Description *string   `json:"description" bun:"column:description"`
+	Weight      int       `json:"weight" bun:"column:weight"`
 	IsSystem    bool      `json:"is_system" bun:"column:is_system"`
 	CreatedAt   time.Time `json:"created_at" bun:"column:created_at,default:current_timestamp"`
 	UpdatedAt   time.Time `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`

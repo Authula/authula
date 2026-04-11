@@ -32,6 +32,7 @@ func (s *UserRolesService) ReplaceUserRoles(ctx context.Context, userID string, 
 	}
 
 	normalized := make([]string, 0, len(roleIDs))
+	targetRoles := make([]*types.Role, 0, len(roleIDs))
 	seen := make(map[string]struct{}, len(roleIDs))
 	for _, roleID := range roleIDs {
 		if roleID == "" {
@@ -51,6 +52,20 @@ func (s *UserRolesService) ReplaceUserRoles(ctx context.Context, userID string, 
 
 		seen[roleID] = struct{}{}
 		normalized = append(normalized, roleID)
+		targetRoles = append(targetRoles, role)
+	}
+
+	if assignedByUserID != nil && *assignedByUserID != "" {
+		highestWeight, err := s.highestActiveRoleWeight(ctx, *assignedByUserID)
+		if err != nil {
+			return err
+		}
+
+		for _, role := range targetRoles {
+			if role.Weight > highestWeight {
+				return constants.ErrForbidden
+			}
+		}
 	}
 
 	return s.userRolesRepo.ReplaceUserRoles(ctx, userID, normalized, assignedByUserID)
@@ -78,6 +93,10 @@ func (s *UserRolesService) AssignRoleToUser(ctx context.Context, userID string, 
 		return constants.ErrNotFound
 	}
 
+	if err := s.ensureRoleAssignable(ctx, role, assignedByUserID); err != nil {
+		return err
+	}
+
 	return s.userRolesRepo.AssignUserRole(ctx, userID, roleID, assignedByUserID, req.ExpiresAt)
 }
 
@@ -87,4 +106,41 @@ func (s *UserRolesService) RemoveRoleFromUser(ctx context.Context, userID string
 	}
 
 	return s.userRolesRepo.RemoveUserRole(ctx, userID, roleID)
+}
+
+func (s *UserRolesService) ensureRoleAssignable(ctx context.Context, role *types.Role, assignedByUserID *string) error {
+	if assignedByUserID == nil || *assignedByUserID == "" {
+		return nil
+	}
+
+	highestWeight, err := s.highestActiveRoleWeight(ctx, *assignedByUserID)
+	if err != nil {
+		return err
+	}
+
+	if role.Weight > highestWeight {
+		return constants.ErrForbidden
+	}
+
+	return nil
+}
+
+func (s *UserRolesService) highestActiveRoleWeight(ctx context.Context, userID string) (int, error) {
+	roles, err := s.userRolesRepo.GetUserRoles(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+
+	highestWeight := 0
+	now := time.Now().UTC()
+	for _, userRole := range roles {
+		if userRole.ExpiresAt != nil && userRole.ExpiresAt.Before(now) {
+			continue
+		}
+		if userRole.RoleWeight > highestWeight {
+			highestWeight = userRole.RoleWeight
+		}
+	}
+
+	return highestWeight, nil
 }

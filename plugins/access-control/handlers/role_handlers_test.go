@@ -40,11 +40,12 @@ func TestCreateRoleHandler(t *testing.T) {
 			body: internaltests.MarshalToJSON(t, types.CreateRoleRequest{
 				Name:        "Administrator",
 				Description: description,
+				Weight:      new(25),
 				IsSystem:    true,
 			}),
 			setupMock: func(m *accesscontroltests.MockRolesRepository) {
 				m.On("CreateRole", mock.Anything, mock.MatchedBy(func(role *types.Role) bool {
-					return role != nil && role.Name == "Administrator" && role.Description != nil && *role.Description == *description && role.IsSystem && role.ID != ""
+					return role != nil && role.Name == "Administrator" && role.Description != nil && *role.Description == *description && role.Weight == 25 && role.IsSystem && role.ID != ""
 				})).Return(constants.ErrUnauthorized).Once()
 			},
 			expectedStatus: http.StatusUnauthorized,
@@ -55,11 +56,12 @@ func TestCreateRoleHandler(t *testing.T) {
 			body: internaltests.MarshalToJSON(t, types.CreateRoleRequest{
 				Name:        "Administrator",
 				Description: description,
+				Weight:      new(25),
 				IsSystem:    true,
 			}),
 			setupMock: func(m *accesscontroltests.MockRolesRepository) {
 				m.On("CreateRole", mock.Anything, mock.MatchedBy(func(role *types.Role) bool {
-					return role != nil && role.Name == "Administrator" && role.Description != nil && *role.Description == *description && role.IsSystem && role.ID != ""
+					return role != nil && role.Name == "Administrator" && role.Description != nil && *role.Description == *description && role.Weight == 25 && role.IsSystem && role.ID != ""
 				})).Run(func(args mock.Arguments) {
 					role := args.Get(1).(*types.Role)
 					role.ID = "role-1"
@@ -73,6 +75,7 @@ func TestCreateRoleHandler(t *testing.T) {
 					ID:          "role-1",
 					Name:        "Administrator",
 					Description: description,
+					Weight:      25,
 					IsSystem:    true,
 					CreatedAt:   fixedTime,
 					UpdatedAt:   fixedTime,
@@ -149,6 +152,7 @@ func TestGetAllRolesHandler(t *testing.T) {
 						ID:          "role-1",
 						Name:        "Administrator",
 						Description: description,
+						Weight:      30,
 						IsSystem:    true,
 						CreatedAt:   fixedTime,
 						UpdatedAt:   fixedTime,
@@ -157,6 +161,7 @@ func TestGetAllRolesHandler(t *testing.T) {
 						ID:          "role-2",
 						Name:        "Editor",
 						Description: nil,
+						Weight:      20,
 						IsSystem:    false,
 						CreatedAt:   fixedTime,
 						UpdatedAt:   fixedTime,
@@ -169,6 +174,7 @@ func TestGetAllRolesHandler(t *testing.T) {
 					ID:          "role-1",
 					Name:        "Administrator",
 					Description: description,
+					Weight:      30,
 					IsSystem:    true,
 					CreatedAt:   fixedTime,
 					UpdatedAt:   fixedTime,
@@ -177,6 +183,7 @@ func TestGetAllRolesHandler(t *testing.T) {
 					ID:          "role-2",
 					Name:        "Editor",
 					Description: nil,
+					Weight:      20,
 					IsSystem:    false,
 					CreatedAt:   fixedTime,
 					UpdatedAt:   fixedTime,
@@ -258,6 +265,7 @@ func TestGetRoleByIDHandler(t *testing.T) {
 					ID:          "role-1",
 					Name:        "Administrator",
 					Description: description,
+					Weight:      30,
 					IsSystem:    true,
 					CreatedAt:   fixedTime,
 					UpdatedAt:   fixedTime,
@@ -278,6 +286,7 @@ func TestGetRoleByIDHandler(t *testing.T) {
 					ID:          "role-1",
 					Name:        "Administrator",
 					Description: description,
+					Weight:      30,
 					IsSystem:    true,
 					CreatedAt:   fixedTime,
 					UpdatedAt:   fixedTime,
@@ -366,6 +375,7 @@ func TestGetRoleByNameHandler(t *testing.T) {
 					ID:          "role-1",
 					Name:        "Administrator",
 					Description: description,
+					Weight:      30,
 					IsSystem:    true,
 					CreatedAt:   fixedTime,
 					UpdatedAt:   fixedTime,
@@ -376,6 +386,7 @@ func TestGetRoleByNameHandler(t *testing.T) {
 				ID:          "role-1",
 				Name:        "Administrator",
 				Description: description,
+				Weight:      30,
 				IsSystem:    true,
 				CreatedAt:   fixedTime,
 				UpdatedAt:   fixedTime,
@@ -449,9 +460,10 @@ func TestUpdateRoleHandler(t *testing.T) {
 			body: internaltests.MarshalToJSON(t, types.UpdateRoleRequest{
 				Name:        &updatedName,
 				Description: description,
+				Weight:      new(40),
 			}),
 			setupMock: func(m *accesscontroltests.MockRolesRepository) {
-				m.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Administrator", IsSystem: true}, nil).Once()
+				m.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Administrator", IsSystem: true, Weight: 30}, nil).Once()
 			},
 			expectedStatus: http.StatusForbidden,
 			expectedBody:   map[string]string{"message": "cannot update system role"},
@@ -461,18 +473,22 @@ func TestUpdateRoleHandler(t *testing.T) {
 			body: internaltests.MarshalToJSON(t, types.UpdateRoleRequest{
 				Name:        &updatedName,
 				Description: description,
+				Weight:      new(40),
 			}),
 			setupMock: func(m *accesscontroltests.MockRolesRepository) {
-				m.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Administrator", Description: description, IsSystem: false}, nil).Once()
+				m.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Administrator", Description: description, IsSystem: false, Weight: 20}, nil).Once()
 				m.On("UpdateRole", mock.Anything, "role-1", mock.MatchedBy(func(name *string) bool {
 					return name != nil && *name == "Administrator"
 				}), mock.MatchedBy(func(desc *string) bool {
 					return desc != nil && *desc == *description
+				}), mock.MatchedBy(func(weight *int) bool {
+					return weight != nil && *weight == 40
 				})).Return(true, nil).Once()
 				m.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{
 					ID:          "role-1",
 					Name:        "Administrator",
 					Description: description,
+					Weight:      40,
 					IsSystem:    false,
 					CreatedAt:   fixedTime,
 					UpdatedAt:   fixedTime,
@@ -484,6 +500,7 @@ func TestUpdateRoleHandler(t *testing.T) {
 					ID:          "role-1",
 					Name:        "Administrator",
 					Description: description,
+					Weight:      40,
 					IsSystem:    false,
 					CreatedAt:   fixedTime,
 					UpdatedAt:   fixedTime,
@@ -633,6 +650,9 @@ func assertRoleEqual(t *testing.T, got types.Role, want types.Role) {
 	}
 	if got.Name != want.Name {
 		t.Fatalf("expected name %q, got %q", want.Name, got.Name)
+	}
+	if got.Weight != want.Weight {
+		t.Fatalf("expected weight %d, got %d", want.Weight, got.Weight)
 	}
 	if got.IsSystem != want.IsSystem {
 		t.Fatalf("expected is_system %v, got %v", want.IsSystem, got.IsSystem)

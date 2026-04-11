@@ -51,8 +51,8 @@ func (m *MockRolesRepository) GetRoleByName(ctx context.Context, roleName string
 	return args.Get(0).(*types.Role), args.Error(1)
 }
 
-func (m *MockRolesRepository) UpdateRole(ctx context.Context, roleID string, name *string, description *string) (bool, error) {
-	args := m.Called(ctx, roleID, name, description)
+func (m *MockRolesRepository) UpdateRole(ctx context.Context, roleID string, name *string, description *string, weight *int) (bool, error) {
+	args := m.Called(ctx, roleID, name, description, weight)
 	return args.Bool(0), args.Error(1)
 }
 

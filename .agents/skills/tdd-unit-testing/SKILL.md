@@ -20,7 +20,7 @@ description: Write unit tests in Go following Red-Green-Refactor TDD principles.
 4. **One behavior per test**: Keep tests focused and small
 5. **100% coverage target**: Test success and error paths
 6. **Descriptive names**: `TestTodoService_CreateTodo_ReturnsID_OnSuccess`
-7. **Temporary variables**: Utilise the `new()` function in Go 1.26+ to initialise reference type values instead of creating pointer functions that return a reference type. For example, use `new("user-1")` instead of a function such as `ptrString("user-1")` that returns `*string` to create a pointer to a string value.
+7. **Temporary variables**: Utilise the `new()` function in Go 1.26+ to initialise reference type values instead of creating pointer functions that return a reference type. For example, use `new("user-1")` instead of a function such as `ptrString("user-1")` that returns `*string` to create a pointer to a string value. This also includes all other reference types such as `new(10)` for `*int`, `new(true)` for `*bool`, etc.
 
 ## Testing strategy
 

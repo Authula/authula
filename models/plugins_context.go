@@ -7,6 +7,7 @@ const (
 // Access Control
 
 type AccessControlAssignRoleContext struct {
-	UserID   string
-	RoleName string
+	UserID         string
+	RoleName       string
+	AssignerUserID *string
 }

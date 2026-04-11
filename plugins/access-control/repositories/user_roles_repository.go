@@ -25,12 +25,13 @@ func (r *BunUserRolesRepository) GetUserRoles(ctx context.Context, userID string
 		ColumnExpr("acur.role_id AS role_id").
 		ColumnExpr("acr.name AS role_name").
 		ColumnExpr("acr.description AS role_description").
+		ColumnExpr("acr.weight AS role_weight").
 		ColumnExpr("acur.assigned_by_user_id AS assigned_by_user_id").
 		ColumnExpr("acur.assigned_at AS assigned_at").
 		ColumnExpr("acur.expires_at AS expires_at").
 		Join("JOIN access_control_roles acr ON acr.id = acur.role_id").
 		Where("acur.user_id = ?", userID).
-		OrderExpr("acr.name ASC, acur.assigned_at DESC").
+		OrderExpr("acr.weight DESC, acr.name ASC, acur.assigned_at DESC").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user roles: %w", err)
