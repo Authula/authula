@@ -131,16 +131,24 @@ func (s *UserRolesService) highestActiveRoleWeight(ctx context.Context, userID s
 		return 0, err
 	}
 
+	highestWeight, _ := determineHighestActiveRoleWeight(roles, time.Now().UTC())
+
+	return highestWeight, nil
+}
+
+func determineHighestActiveRoleWeight(userRoles []types.UserRoleInfo, now time.Time) (int, int) {
 	highestWeight := 0
-	now := time.Now().UTC()
-	for _, userRole := range roles {
+	activeCount := 0
+
+	for _, userRole := range userRoles {
 		if userRole.ExpiresAt != nil && userRole.ExpiresAt.Before(now) {
 			continue
 		}
+		activeCount++
 		if userRole.RoleWeight > highestWeight {
 			highestWeight = userRole.RoleWeight
 		}
 	}
 
-	return highestWeight, nil
+	return highestWeight, activeCount
 }

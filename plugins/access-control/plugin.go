@@ -11,10 +11,11 @@ import (
 )
 
 type AccessControlPlugin struct {
-	config types.AccessControlPluginConfig
-	ctx    *models.PluginContext
-	logger models.Logger
-	Api    *API
+	config               types.AccessControlPluginConfig
+	ctx                  *models.PluginContext
+	logger               models.Logger
+	accessControlService *services.AccessControlService
+	Api                  *API
 }
 
 func New(config types.AccessControlPluginConfig) *AccessControlPlugin {
@@ -54,7 +55,8 @@ func (p *AccessControlPlugin) Init(ctx *models.PluginContext) error {
 	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo)
 	userPermissionsService := services.NewUserPermissionsService(userPermissionsRepo)
 
-	accessControlService := services.NewAccessControlService(rolesService)
+	accessControlService := services.NewAccessControlService(rolesService, userRolesService)
+	p.accessControlService = accessControlService
 
 	useCases := usecases.NewAccessControlUseCases(
 		usecases.NewRolesUseCase(rolesService),
