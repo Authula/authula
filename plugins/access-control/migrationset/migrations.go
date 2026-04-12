@@ -34,6 +34,12 @@ func accessControlSQLiteInitial() migrations.Migration {
           created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         );`,
+				`DROP TRIGGER IF EXISTS update_roles_updated_at_trigger;`,
+				`CREATE TRIGGER update_roles_updated_at_trigger 
+        AFTER UPDATE ON access_control_roles
+        BEGIN
+          UPDATE access_control_roles SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+        END;`,
 				// -------------------------------
 				`CREATE TABLE IF NOT EXISTS access_control_permissions (
           id TEXT PRIMARY KEY,
@@ -43,6 +49,12 @@ func accessControlSQLiteInitial() migrations.Migration {
           created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         );`,
+				`DROP TRIGGER IF EXISTS update_permissions_updated_at_trigger;`,
+				`CREATE TRIGGER update_permissions_updated_at_trigger
+        AFTER UPDATE ON access_control_permissions
+        BEGIN
+          UPDATE access_control_permissions SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+        END;`,
 				// -------------------------------
 				`CREATE TABLE IF NOT EXISTS access_control_role_permissions (
           role_id TEXT NOT NULL,
