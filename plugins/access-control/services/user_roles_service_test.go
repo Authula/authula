@@ -85,11 +85,11 @@ func TestUserRolesServiceReplaceUserRoles(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		roleIDs        []string
-		assignerUserID *string
-		setup          func(*accesscontroltests.MockUserRolesRepository, *accesscontroltests.MockRolesRepository)
-		wantErr        error
+		name             string
+		roleIDs          []string
+		assignedByUserID *string
+		setup            func(*accesscontroltests.MockUserRolesRepository, *accesscontroltests.MockRolesRepository)
+		wantErr          error
 	}{
 		{
 			name:    "dedupes role ids",
@@ -101,9 +101,9 @@ func TestUserRolesServiceReplaceUserRoles(t *testing.T) {
 			},
 		},
 		{
-			name:           "forbidden when assigner lacks sufficient weight",
-			roleIDs:        []string{"role-1", "role-2"},
-			assignerUserID: func() *string { value := "assigner-1"; return &value }(),
+			name:             "forbidden when assigner lacks sufficient weight",
+			roleIDs:          []string{"role-1", "role-2"},
+			assignedByUserID: func() *string { value := "assigner-1"; return &value }(),
 			setup: func(userRolesRepo *accesscontroltests.MockUserRolesRepository, rolesRepo *accesscontroltests.MockRolesRepository) {
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "admin", Weight: 20}, nil).Once()
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-2").Return(&types.Role{ID: "role-2", Name: "editor", Weight: 10}, nil).Once()
@@ -124,7 +124,7 @@ func TestUserRolesServiceReplaceUserRoles(t *testing.T) {
 			}
 
 			service := NewUserRolesService(userRolesRepo, rolesRepo)
-			err := service.ReplaceUserRoles(context.Background(), "user-1", tc.roleIDs, tc.assignerUserID)
+			err := service.ReplaceUserRoles(context.Background(), "user-1", tc.roleIDs, tc.assignedByUserID)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
 			}

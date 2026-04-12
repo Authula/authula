@@ -18,18 +18,22 @@ import (
 )
 
 func newAccessControlHookTestPlugin(logger authmodels.Logger, rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) *AccessControlPlugin {
+	rolesService := services.NewRolesService(rolesRepo, nil, userRolesRepo)
+	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo)
+	accessControlService := services.NewAccessControlService(rolesService, userRolesService)
 	rolePermissionsService := services.NewRolePermissionsService(nil, nil, nil)
 	useCases := usecases.NewAccessControlUseCases(
-		usecases.NewRolesUseCase(services.NewRolesService(rolesRepo, nil, userRolesRepo)),
+		usecases.NewRolesUseCase(rolesService),
 		usecases.NewPermissionsUseCase(nil),
 		usecases.NewRolePermissionsUseCase(rolePermissionsService),
-		usecases.NewUserRolesUseCase(services.NewUserRolesService(userRolesRepo, rolesRepo)),
+		usecases.NewUserRolesUseCase(userRolesService),
 		usecases.NewUserPermissionsUseCase(nil),
 	)
 
 	return &AccessControlPlugin{
-		Api:    NewAPI(useCases),
-		logger: logger,
+		Api:                  NewAPI(useCases),
+		logger:               logger,
+		accessControlService: accessControlService,
 	}
 }
 
@@ -69,6 +73,7 @@ func TestAccessControlPluginAssignRoleFromContextHook(t *testing.T) {
 			name:         "already assigned role is skipped",
 			contextValue: authmodels.AccessControlAssignRoleContext{UserID: "user-1", RoleName: "Editor"},
 			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				rolesRepo.On("GetRoleByName", mock.Anything, "Editor").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 10}, nil).Once()
 				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{{RoleID: "role-1", RoleName: "Editor", RoleWeight: 10}}, nil).Once()
 			},
 		},
@@ -76,9 +81,9 @@ func TestAccessControlPluginAssignRoleFromContextHook(t *testing.T) {
 			name:         "assigns role when missing",
 			contextValue: authmodels.AccessControlAssignRoleContext{UserID: "user-1", RoleName: "Editor", AssignerUserID: func() *string { v := "assigner-1"; return &v }()},
 			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				rolesRepo.On("GetRoleByName", mock.Anything, "Editor").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 10}, nil).Once()
 				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{}, nil).Once()
 				userRolesRepo.On("GetUserRoles", mock.Anything, "assigner-1").Return([]types.UserRoleInfo{{RoleID: "role-owner", RoleName: "Owner", RoleWeight: 50}}, nil).Once()
-				rolesRepo.On("GetRoleByName", mock.Anything, "Editor").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 10}, nil).Once()
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 10}, nil).Once()
 				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", mock.MatchedBy(func(userID *string) bool {
 					return userID != nil && *userID == "assigner-1"
@@ -87,9 +92,8 @@ func TestAccessControlPluginAssignRoleFromContextHook(t *testing.T) {
 		},
 		{
 			name:         "role lookup failure is logged and ignored",
-			contextValue: authmodels.AccessControlAssignRoleContext{UserID: "user-1", RoleName: "Editor"},
+			contextValue: authmodels.AccessControlAssignRoleContext{UserID: "user-1", RoleName: "Editor", AssignerUserID: func() *string { v := "assigner-1"; return &v }()},
 			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
-				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{}, nil).Once()
 				rolesRepo.On("GetRoleByName", mock.Anything, "Editor").Return((*types.Role)(nil), errors.New("lookup failed")).Once()
 			},
 		},
@@ -97,8 +101,8 @@ func TestAccessControlPluginAssignRoleFromContextHook(t *testing.T) {
 			name:         "assignment failure is logged and ignored",
 			contextValue: authmodels.AccessControlAssignRoleContext{UserID: "user-1", RoleName: "Editor"},
 			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
-				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{}, nil).Once()
 				rolesRepo.On("GetRoleByName", mock.Anything, "Editor").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 10}, nil).Once()
+				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{}, nil).Once()
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 10}, nil).Once()
 				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), (*time.Time)(nil)).Return(errors.New("assign failed")).Once()
 			},
