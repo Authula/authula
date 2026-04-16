@@ -11,5 +11,4 @@ type OrganizationInvitationCreatedEvent struct {
 	InviterID        string    `json:"inviter_id"`
 	Role             string    `json:"role"`
 	ExpiresAt        time.Time `json:"expires_at"`
-	RedirectURL      string    `json:"redirect_url,omitempty"`
 }

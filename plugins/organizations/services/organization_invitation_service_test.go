@@ -1114,7 +1114,6 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation_SideEffects(
 				require.Equal(t, "org-1", payload.OrganizationID)
 				require.Equal(t, "Acme", payload.OrganizationName)
 				require.Equal(t, "user@example.com", payload.InviteeEmail)
-				require.Equal(t, "https://app.example.com/welcome", payload.RedirectURL)
 				require.Empty(t, logger.warnings)
 			},
 		},

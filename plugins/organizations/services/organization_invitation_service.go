@@ -159,13 +159,13 @@ func (s *OrganizationInvitationService) CreateOrganizationInvitation(ctx context
 		return nil, err
 	}
 
-	s.publishOrganizationInvitationCreatedEvent(created, organization, request.RedirectURL)
+	s.publishOrganizationInvitationCreatedEvent(created, organization)
 	s.sendOrganizationInvitationEmailAsync(ctx, created, organization, request.RedirectURL)
 
 	return created, nil
 }
 
-func (s *OrganizationInvitationService) publishOrganizationInvitationCreatedEvent(invitation *types.OrganizationInvitation, organization *types.Organization, redirectURL string) {
+func (s *OrganizationInvitationService) publishOrganizationInvitationCreatedEvent(invitation *types.OrganizationInvitation, organization *types.Organization) {
 	payload, err := json.Marshal(orgevents.OrganizationInvitationCreatedEvent{
 		ID:               util.GenerateUUID(),
 		InvitationID:     invitation.ID,
@@ -175,7 +175,6 @@ func (s *OrganizationInvitationService) publishOrganizationInvitationCreatedEven
 		InviterID:        invitation.InviterID,
 		Role:             invitation.Role,
 		ExpiresAt:        invitation.ExpiresAt,
-		RedirectURL:      redirectURL,
 	})
 	if err != nil {
 		s.logger.Error("failed to marshal organization invitation created event", "error", err)
