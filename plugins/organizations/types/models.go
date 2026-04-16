@@ -72,6 +72,6 @@ type OrganizationTeamMember struct {
 
 	ID        string    `json:"id" bun:"column:id,pk"`
 	TeamID    string    `json:"team_id" bun:"column:team_id"`
-	UserID    string    `json:"user_id" bun:"column:user_id"`
+	MemberID  string    `json:"member_id" bun:"column:member_id"`
 	CreatedAt time.Time `json:"created_at" bun:"column:created_at,default:current_timestamp"`
 }

@@ -85,9 +85,9 @@ func SeedOrganizationInvitation(t *testing.T, db bun.IDB, invitationID, email, i
 	require.NoError(t, err)
 }
 
-func SeedOrganizationTeamMember(t *testing.T, db bun.IDB, id, teamID, userID string) {
+func SeedOrganizationTeamMember(t *testing.T, db bun.IDB, id, teamID, memberID string) {
 	t.Helper()
 
-	_, err := db.ExecContext(context.Background(), `INSERT INTO organization_team_members (id, team_id, user_id) VALUES (?, ?, ?)`, id, teamID, userID)
+	_, err := db.ExecContext(context.Background(), `INSERT INTO organization_team_members (id, team_id, member_id) VALUES (?, ?, ?)`, id, teamID, memberID)
 	require.NoError(t, err)
 }

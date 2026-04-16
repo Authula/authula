@@ -91,9 +91,9 @@ func (s *organizationTeamService) CreateTeam(ctx context.Context, actorUserID st
 		}
 
 		teamMember := &types.OrganizationTeamMember{
-			ID:     util.GenerateUUID(),
-			TeamID: createdTeam.ID,
-			UserID: actorUserID,
+			ID:       util.GenerateUUID(),
+			TeamID:   createdTeam.ID,
+			MemberID: actorMember.ID,
 		}
 
 		_, err = teamMemberRepo.Create(ctx, teamMember)

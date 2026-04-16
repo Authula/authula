@@ -47,7 +47,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
-				teamMemberRepo.On("GetAllByTeamID", mock.Anything, "team-1", 1, 10).Return([]types.OrganizationTeamMember{{ID: "tm-1", TeamID: "team-1", UserID: "member-1"}}, nil).Once()
+				teamMemberRepo.On("GetAllByTeamID", mock.Anything, "team-1", 1, 10).Return([]types.OrganizationTeamMember{{ID: "tm-1", TeamID: "team-1", MemberID: "member-1"}}, nil).Once()
 			},
 			expectLen:    1,
 			expectCalled: true,
@@ -61,7 +61,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(&types.OrganizationMember{ID: "org-member-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
-				teamMemberRepo.On("GetAllByTeamID", mock.Anything, "team-1", 1, 10).Return([]types.OrganizationTeamMember{{ID: "tm-1", TeamID: "team-1", UserID: "member-1"}}, nil).Once()
+				teamMemberRepo.On("GetAllByTeamID", mock.Anything, "team-1", 1, 10).Return([]types.OrganizationTeamMember{{ID: "tm-1", TeamID: "team-1", MemberID: "member-1"}}, nil).Once()
 			},
 			expectLen:    1,
 			expectCalled: true,
@@ -208,8 +208,8 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 				memberRepo.On("GetByID", mock.Anything, "member-1").Return(&types.OrganizationMember{ID: "member-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
 				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(nil, nil).Once()
 				teamMemberRepo.On("Create", mock.Anything, mock.MatchedBy(func(teamMember *types.OrganizationTeamMember) bool {
-					return teamMember != nil && teamMember.TeamID == "team-1" && teamMember.UserID == "member-1"
-				})).Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"}, nil).Once()
+					return teamMember != nil && teamMember.TeamID == "team-1" && teamMember.MemberID == "member-1"
+				})).Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"}, nil).Once()
 			},
 			expectCalled: true,
 		},
@@ -226,8 +226,8 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 				memberRepo.On("GetByID", mock.Anything, "member-1").Return(&types.OrganizationMember{ID: "member-1", OrganizationID: "org-1", UserID: "user-3", Role: "member"}, nil).Once()
 				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(nil, nil).Once()
 				teamMemberRepo.On("Create", mock.Anything, mock.MatchedBy(func(teamMember *types.OrganizationTeamMember) bool {
-					return teamMember != nil && teamMember.TeamID == "team-1" && teamMember.UserID == "member-1"
-				})).Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"}, nil).Once()
+					return teamMember != nil && teamMember.TeamID == "team-1" && teamMember.MemberID == "member-1"
+				})).Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"}, nil).Once()
 			},
 			expectCalled: true,
 		},
@@ -408,7 +408,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 				memberRepo.On("GetByID", mock.Anything, "member-1").Return(&types.OrganizationMember{ID: "member-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
 				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(nil, nil).Once()
 				teamMemberRepo.On("Create", mock.Anything, mock.MatchedBy(func(teamMember *types.OrganizationTeamMember) bool {
-					return teamMember != nil && teamMember.TeamID == "team-1" && teamMember.UserID == "member-1"
+					return teamMember != nil && teamMember.TeamID == "team-1" && teamMember.MemberID == "member-1"
 				})).Return((*types.OrganizationTeamMember)(nil), createErr).Once()
 			},
 			expectErr:    createErr,
@@ -482,8 +482,9 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 			memberID:       "member-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByID", mock.Anything, "member-1").Return(&types.OrganizationMember{ID: "member-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
-				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(&types.OrganizationTeamMember{ID: "tm-1", TeamID: "team-1", UserID: "member-1"}, nil).Once()
+				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(&types.OrganizationTeamMember{ID: "tm-1", TeamID: "team-1", MemberID: "member-1"}, nil).Once()
 			},
 			expectID:     "tm-1",
 			expectCalled: true,
@@ -497,8 +498,9 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(&types.OrganizationMember{ID: "org-member-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
+				memberRepo.On("GetByID", mock.Anything, "member-1").Return(&types.OrganizationMember{ID: "member-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
-				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(&types.OrganizationTeamMember{ID: "tm-1", TeamID: "team-1", UserID: "member-1"}, nil).Once()
+				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(&types.OrganizationTeamMember{ID: "tm-1", TeamID: "team-1", MemberID: "member-1"}, nil).Once()
 			},
 			expectID:     "tm-1",
 			expectCalled: true,
@@ -583,6 +585,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 			memberID:       "member-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByID", mock.Anything, "member-1").Return(&types.OrganizationMember{ID: "member-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
 				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return((*types.OrganizationTeamMember)(nil), repoErr).Once()
 			},
@@ -597,8 +600,8 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 			memberID:       "member-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByID", mock.Anything, "member-1").Return(nil, nil).Once()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
-				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(nil, nil).Once()
 			},
 			expectErr:    internalerrors.ErrNotFound,
 			expectCalled: true,
@@ -611,8 +614,8 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 			memberID:       "",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByID", mock.Anything, "").Return(nil, nil).Once()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
-				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "").Return(nil, nil).Once()
 			},
 			expectErr:    internalerrors.ErrNotFound,
 			expectCalled: true,
@@ -678,8 +681,9 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 			memberID:       "member-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByID", mock.Anything, "member-1").Return(&types.OrganizationMember{ID: "member-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
-				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(&types.OrganizationTeamMember{ID: "tm-1", TeamID: "team-1", UserID: "member-1"}, nil).Once()
+				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(&types.OrganizationTeamMember{ID: "tm-1", TeamID: "team-1", MemberID: "member-1"}, nil).Once()
 				teamMemberRepo.On("DeleteByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(nil).Once()
 			},
 			expectCalled: true,
@@ -693,8 +697,9 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(&types.OrganizationMember{ID: "org-member-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
+				memberRepo.On("GetByID", mock.Anything, "member-1").Return(&types.OrganizationMember{ID: "member-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
-				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(&types.OrganizationTeamMember{ID: "tm-1", TeamID: "team-1", UserID: "member-1"}, nil).Once()
+				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(&types.OrganizationTeamMember{ID: "tm-1", TeamID: "team-1", MemberID: "member-1"}, nil).Once()
 				teamMemberRepo.On("DeleteByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(nil).Once()
 			},
 			expectCalled: true,
@@ -779,6 +784,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 			memberID:       "member-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByID", mock.Anything, "member-1").Return(&types.OrganizationMember{ID: "member-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
 				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return((*types.OrganizationTeamMember)(nil), repoErr).Once()
 			},
@@ -793,8 +799,8 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 			memberID:       "member-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByID", mock.Anything, "member-1").Return(nil, nil).Once()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
-				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(nil, nil).Once()
 			},
 			expectErr:    internalerrors.ErrNotFound,
 			expectCalled: true,
@@ -807,8 +813,9 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 			memberID:       "member-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByID", mock.Anything, "member-1").Return(&types.OrganizationMember{ID: "member-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
-				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(&types.OrganizationTeamMember{ID: "tm-1", TeamID: "team-1", UserID: "member-1"}, nil).Once()
+				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(&types.OrganizationTeamMember{ID: "tm-1", TeamID: "team-1", MemberID: "member-1"}, nil).Once()
 				teamMemberRepo.On("DeleteByTeamIDAndMemberID", mock.Anything, "team-1", "member-1").Return(deleteErr).Once()
 			},
 			expectErr:    deleteErr,

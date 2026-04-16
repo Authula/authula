@@ -123,14 +123,14 @@ func TestAddOrganizationTeamMemberHandler(t *testing.T) {
 			teamID:         "team-1",
 			body:           internaltests.MarshalToJSON(t, orgtypes.AddOrganizationTeamMemberRequest{MemberID: "mem-2"}),
 			prepare: func(fixture *organizationTeamMemberHandlerFixture) {
-				fixture.service.On("AddTeamMember", mock.Anything, "user-1", "org-1", "team-1", mock.Anything).Return(&orgtypes.OrganizationTeamMember{ID: "team-mem-1", TeamID: "team-1", UserID: "mem-2"}, nil).Once()
+				fixture.service.On("AddTeamMember", mock.Anything, "user-1", "org-1", "team-1", mock.Anything).Return(&orgtypes.OrganizationTeamMember{ID: "team-mem-1", TeamID: "team-1", MemberID: "mem-2"}, nil).Once()
 			},
 			expectedStatus: http.StatusCreated,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
 				teamMember := internaltests.DecodeResponseJSON[orgtypes.OrganizationTeamMember](t, reqCtx)
 				assert.Equal(t, "team-mem-1", teamMember.ID)
 				assert.Equal(t, "team-1", teamMember.TeamID)
-				assert.Equal(t, "mem-2", teamMember.UserID)
+				assert.Equal(t, "mem-2", teamMember.MemberID)
 			},
 		},
 	})
@@ -166,7 +166,7 @@ func TestGetAllOrganizationTeamMembersHandler(t *testing.T) {
 			organizationID: "org-1",
 			teamID:         "team-1",
 			prepare: func(fixture *organizationTeamMemberHandlerFixture) {
-				fixture.service.On("GetAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", 1, 10).Return([]orgtypes.OrganizationTeamMember{{ID: "team-mem-1", TeamID: "team-1", UserID: "mem-2"}}, nil).Once()
+				fixture.service.On("GetAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", 1, 10).Return([]orgtypes.OrganizationTeamMember{{ID: "team-mem-1", TeamID: "team-1", MemberID: "mem-2"}}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
@@ -211,7 +211,7 @@ func TestGetOrganizationTeamMemberHandler(t *testing.T) {
 			teamID:         "team-1",
 			memberID:       "mem-1",
 			prepare: func(fixture *organizationTeamMemberHandlerFixture) {
-				fixture.service.On("GetTeamMember", mock.Anything, "user-1", "org-1", "team-1", "mem-1").Return(&orgtypes.OrganizationTeamMember{ID: "team-mem-1", TeamID: "team-1", UserID: "mem-2"}, nil).Once()
+				fixture.service.On("GetTeamMember", mock.Anything, "user-1", "org-1", "team-1", "mem-1").Return(&orgtypes.OrganizationTeamMember{ID: "team-mem-1", TeamID: "team-1", MemberID: "mem-2"}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {

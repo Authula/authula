@@ -48,7 +48,7 @@ func TestOrganizationTeamService_CreateTeam(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository, hooks *orgtests.MockOrganizationTeamHooks, serviceUtils *ServiceUtils) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 				teamRepo.On("GetByOrganizationIDAndSlug", mock.Anything, "org-1", "acme-platform").Return(nil, nil).Once()
-				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return((*types.OrganizationMember)(nil), nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Once()
 				teamRepo.On("Create", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 					team := args.Get(1).(*types.OrganizationTeam)
 					require.NotNil(t, team)
@@ -58,8 +58,8 @@ func TestOrganizationTeamService_CreateTeam(t *testing.T) {
 					require.Equal(t, "{}", string(team.Metadata))
 				}).Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Acme Platform", Slug: "acme-platform", Metadata: []byte(`{}`)}, nil).Once()
 				teamMemberRepo.On("Create", mock.Anything, mock.MatchedBy(func(teamMember *types.OrganizationTeamMember) bool {
-					return teamMember != nil && teamMember.TeamID == "team-1" && teamMember.UserID == "user-1"
-				})).Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "user-1"}, nil).Once()
+					return teamMember != nil && teamMember.TeamID == "team-1" && teamMember.MemberID == "mem-1"
+				})).Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "mem-1"}, nil).Once()
 			},
 			expectCalled:     true,
 			expectTeamMember: true,
@@ -82,8 +82,8 @@ func TestOrganizationTeamService_CreateTeam(t *testing.T) {
 					require.Equal(t, "{}", string(team.Metadata))
 				}).Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Acme Platform", Slug: "acme-platform", Metadata: []byte(`{}`)}, nil).Once()
 				teamMemberRepo.On("Create", mock.Anything, mock.MatchedBy(func(teamMember *types.OrganizationTeamMember) bool {
-					return teamMember != nil && teamMember.TeamID == "team-1" && teamMember.UserID == "user-2"
-				})).Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "user-2"}, nil).Once()
+					return teamMember != nil && teamMember.TeamID == "team-1" && teamMember.MemberID == "mem-1"
+				})).Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "mem-1"}, nil).Once()
 			},
 			expectCalled:     true,
 			expectTeamMember: true,

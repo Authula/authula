@@ -60,9 +60,9 @@ func (s *organizationTeamMemberService) AddTeamMember(ctx context.Context, actor
 	}
 
 	teamMember := &types.OrganizationTeamMember{
-		ID:     util.GenerateUUID(),
-		TeamID: teamID,
-		UserID: orgMemberID,
+		ID:       util.GenerateUUID(),
+		TeamID:   teamID,
+		MemberID: orgMember.ID,
 	}
 
 	created, err := s.orgTeamMemberRepo.Create(ctx, teamMember)
@@ -102,7 +102,15 @@ func (s *organizationTeamMemberService) GetTeamMember(ctx context.Context, actor
 		return nil, internalerrors.ErrNotFound
 	}
 
-	teamMember, err := s.orgTeamMemberRepo.GetByTeamIDAndMemberID(ctx, teamID, memberID)
+	orgMember, err := s.orgMemberRepo.GetByID(ctx, memberID)
+	if err != nil {
+		return nil, err
+	}
+	if orgMember == nil || orgMember.OrganizationID != organizationID {
+		return nil, internalerrors.ErrNotFound
+	}
+
+	teamMember, err := s.orgTeamMemberRepo.GetByTeamIDAndMemberID(ctx, teamID, orgMember.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +134,15 @@ func (s *organizationTeamMemberService) RemoveTeamMember(ctx context.Context, ac
 		return internalerrors.ErrNotFound
 	}
 
-	teamMember, err := s.orgTeamMemberRepo.GetByTeamIDAndMemberID(ctx, teamID, memberID)
+	orgMember, err := s.orgMemberRepo.GetByID(ctx, memberID)
+	if err != nil {
+		return err
+	}
+	if orgMember == nil || orgMember.OrganizationID != organizationID {
+		return internalerrors.ErrNotFound
+	}
+
+	teamMember, err := s.orgTeamMemberRepo.GetByTeamIDAndMemberID(ctx, teamID, orgMember.ID)
 	if err != nil {
 		return err
 	}
@@ -134,7 +150,7 @@ func (s *organizationTeamMemberService) RemoveTeamMember(ctx context.Context, ac
 		return internalerrors.ErrNotFound
 	}
 
-	if err := s.orgTeamMemberRepo.DeleteByTeamIDAndMemberID(ctx, teamID, memberID); err != nil {
+	if err := s.orgTeamMemberRepo.DeleteByTeamIDAndMemberID(ctx, teamID, orgMember.ID); err != nil {
 		return err
 	}
 

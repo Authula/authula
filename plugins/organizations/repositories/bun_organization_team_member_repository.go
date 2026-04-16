@@ -66,7 +66,7 @@ func (r *BunOrganizationTeamMemberRepository) GetByID(ctx context.Context, teamM
 func (r *BunOrganizationTeamMemberRepository) GetByTeamIDAndMemberID(ctx context.Context, teamID, memberID string) (*types.OrganizationTeamMember, error) {
 	teamMember := new(types.OrganizationTeamMember)
 	err := r.db.NewSelect().Model(teamMember).
-		Where("team_id = ? AND user_id = ?", teamID, memberID).
+		Where("team_id = ? AND member_id = ?", teamID, memberID).
 		Scan(ctx)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -104,7 +104,7 @@ func (r *BunOrganizationTeamMemberRepository) DeleteByTeamIDAndMemberID(ctx cont
 			}
 		}
 
-		_, err = tx.NewDelete().Model(&types.OrganizationTeamMember{}).Where("team_id = ? AND user_id = ?", teamID, memberID).Exec(ctx)
+		_, err = tx.NewDelete().Model(&types.OrganizationTeamMember{}).Where("team_id = ? AND member_id = ?", teamID, memberID).Exec(ctx)
 		if err != nil {
 			return err
 		}

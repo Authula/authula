@@ -23,7 +23,7 @@ func TestBunOrganizationTeamMemberRepository_Create(t *testing.T) {
 	}{
 		{
 			name:       "team member",
-			teamMember: &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"},
+			teamMember: &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"},
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
 				db := plugintests.SetupRepoDB(t)
@@ -36,7 +36,7 @@ func TestBunOrganizationTeamMemberRepository_Create(t *testing.T) {
 		},
 		{
 			name:       "another team member",
-			teamMember: &types.OrganizationTeamMember{ID: "team-member-2", TeamID: "team-1", UserID: "member-2"},
+			teamMember: &types.OrganizationTeamMember{ID: "team-member-2", TeamID: "team-1", MemberID: "member-2"},
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
 				db := plugintests.SetupRepoDB(t)
@@ -49,7 +49,7 @@ func TestBunOrganizationTeamMemberRepository_Create(t *testing.T) {
 		},
 		{
 			name:       "duplicate id returns error",
-			teamMember: &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"},
+			teamMember: &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"},
 			expectErr:  true,
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
@@ -74,10 +74,10 @@ func TestBunOrganizationTeamMemberRepository_Create(t *testing.T) {
 			require.NotNil(t, created)
 			require.Equal(t, tt.teamMember.ID, created.ID)
 			require.Equal(t, tt.teamMember.TeamID, created.TeamID)
-			require.Equal(t, tt.teamMember.UserID, created.UserID)
+			require.Equal(t, tt.teamMember.MemberID, created.MemberID)
 
 			if tt.expectErr {
-				duplicate := &types.OrganizationTeamMember{ID: tt.teamMember.ID, TeamID: tt.teamMember.TeamID, UserID: tt.teamMember.UserID}
+				duplicate := &types.OrganizationTeamMember{ID: tt.teamMember.ID, TeamID: tt.teamMember.TeamID, MemberID: tt.teamMember.MemberID}
 				duplicateCreated, duplicateErr := repo.Create(ctx, duplicate)
 				require.Error(t, duplicateErr)
 				require.Nil(t, duplicateCreated)
@@ -113,7 +113,7 @@ func TestBunOrganizationTeamMemberRepository_GetByID(t *testing.T) {
 				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
 				require.NoError(t, err)
 				return repo, ctx
 			},
@@ -171,7 +171,7 @@ func TestBunOrganizationTeamMemberRepository_GetByTeamIDAndMemberID(t *testing.T
 				plugintests.SeedOrganizationTeam(t, db, "team-2", "org-1", "Core", "core")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
 				require.NoError(t, err)
 				return repo, ctx
 			},
@@ -190,7 +190,7 @@ func TestBunOrganizationTeamMemberRepository_GetByTeamIDAndMemberID(t *testing.T
 				plugintests.SeedOrganizationTeam(t, db, "team-2", "org-1", "Core", "core")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
 				require.NoError(t, err)
 				return repo, ctx
 			},
@@ -209,7 +209,7 @@ func TestBunOrganizationTeamMemberRepository_GetByTeamIDAndMemberID(t *testing.T
 				plugintests.SeedOrganizationTeam(t, db, "team-2", "org-1", "Core", "core")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
 				require.NoError(t, err)
 				return repo, ctx
 			},
@@ -262,11 +262,11 @@ func TestBunOrganizationTeamMemberRepository_GetAllByTeamID(t *testing.T) {
 				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
 				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-2", TeamID: "team-1", UserID: "member-2"})
+				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-2", TeamID: "team-1", MemberID: "member-2"})
 				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-3", TeamID: "team-1", UserID: "member-3"})
+				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-3", TeamID: "team-1", MemberID: "member-3"})
 				require.NoError(t, err)
 				return repo, ctx
 			},
@@ -288,11 +288,11 @@ func TestBunOrganizationTeamMemberRepository_GetAllByTeamID(t *testing.T) {
 				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
 				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-2", TeamID: "team-1", UserID: "member-2"})
+				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-2", TeamID: "team-1", MemberID: "member-2"})
 				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-3", TeamID: "team-1", UserID: "member-3"})
+				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-3", TeamID: "team-1", MemberID: "member-3"})
 				require.NoError(t, err)
 				return repo, ctx
 			},
@@ -362,7 +362,7 @@ func TestBunOrganizationTeamMemberRepository_DeleteByTeamIDAndMemberID(t *testin
 				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
 				require.NoError(t, err)
 				return repo, ctx
 			},
@@ -452,7 +452,7 @@ func TestBunOrganizationTeamMemberRepository_WithTx(t *testing.T) {
 			t.Parallel()
 
 			repo, ctx, txRepo, tx := tt.setup(t)
-			created, err := txRepo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"})
+			created, err := txRepo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
 			require.NoError(t, err)
 			require.NotNil(t, created)
 			require.Equal(t, "team-member-1", created.ID)
@@ -507,7 +507,7 @@ func TestBunOrganizationTeamMemberRepository_Hooks(t *testing.T) {
 				}
 
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db, hooks)
-				created, err := repo.Create(context.Background(), &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"})
+				created, err := repo.Create(context.Background(), &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
 				require.NoError(t, err)
 				require.NotNil(t, created)
 				require.True(t, beforeCalled)
@@ -525,7 +525,7 @@ func TestBunOrganizationTeamMemberRepository_Hooks(t *testing.T) {
 
 				seedRepo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := seedRepo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", UserID: "member-1"})
+				_, err := seedRepo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
 				require.NoError(t, err)
 
 				beforeCalled := false
