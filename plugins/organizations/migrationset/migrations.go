@@ -28,7 +28,7 @@ func organizationsSQLiteInitial() migrations.Migration {
 				`CREATE TABLE IF NOT EXISTS organizations (
 					id TEXT PRIMARY KEY,
 					owner_id TEXT NOT NULL,
-					name VARCHAR(255) NOT NULL UNIQUE,
+					name VARCHAR(255) NOT NULL,
 					slug VARCHAR(255) NOT NULL UNIQUE,
 					logo TEXT,
 					metadata TEXT,
@@ -39,10 +39,12 @@ func organizationsSQLiteInitial() migrations.Migration {
 				`CREATE INDEX IF NOT EXISTS idx_organizations_owner_id ON organizations(owner_id);`,
 				`DROP TRIGGER IF EXISTS update_organizations_updated_at_trigger;`,
 				`CREATE TRIGGER update_organizations_updated_at_trigger 
-        AFTER UPDATE ON organizations
-        BEGIN
-          UPDATE organizations SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-        END;`,
+				AFTER UPDATE ON organizations
+				FOR EACH ROW
+				WHEN NEW.updated_at <= OLD.updated_at
+				BEGIN
+				  UPDATE organizations SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+				END;`,
 				// -----------------------------------
 				`CREATE TABLE IF NOT EXISTS organization_invitations (
 					id TEXT PRIMARY KEY,
@@ -108,7 +110,7 @@ func organizationsSQLiteInitial() migrations.Migration {
 					user_id TEXT NOT NULL,
 					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 					FOREIGN KEY (team_id) REFERENCES organization_teams(id) ON DELETE CASCADE,
-					FOREIGN KEY (user_id) REFERENCES organization_members(id) ON DELETE CASCADE,
+					FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 					UNIQUE (team_id, user_id)
 				);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_team_members_team_id ON organization_team_members(team_id);`,
@@ -232,7 +234,7 @@ func organizationsPostgresInitial() migrations.Migration {
 					user_id UUID NOT NULL,
 					created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 					CONSTRAINT fk_organization_team_members_team FOREIGN KEY (team_id) REFERENCES organization_teams(id) ON DELETE CASCADE,
-					CONSTRAINT fk_organization_team_members_member FOREIGN KEY (user_id) REFERENCES organization_members(id) ON DELETE CASCADE,
+					CONSTRAINT fk_organization_team_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 					CONSTRAINT uq_organization_team_members_team_member UNIQUE (team_id, user_id)
 				);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_team_members_team_id ON organization_team_members(team_id);`,
@@ -334,7 +336,7 @@ func organizationsMySQLInitial() migrations.Migration {
 					user_id BINARY(16) NOT NULL,
 					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 					CONSTRAINT fk_organization_team_members_team FOREIGN KEY (team_id) REFERENCES organization_teams(id) ON DELETE CASCADE,
-					CONSTRAINT fk_organization_team_members_member FOREIGN KEY (user_id) REFERENCES organization_members(id) ON DELETE CASCADE,
+					CONSTRAINT fk_organization_team_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 					CONSTRAINT uq_organization_team_members_team_member UNIQUE (team_id, user_id),
 					INDEX idx_organization_team_members_team_id (team_id),
 					INDEX idx_organization_team_members_user_id (user_id)

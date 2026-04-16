@@ -40,6 +40,12 @@ func (h *CreateOrganizationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
+		reqCtx.Values[models.ContextAccessControlAssignRole.String()] = &models.AccessControlAssignRoleContext{
+			UserID:         userID,
+			RoleName:       request.Role,
+			AssignerUserID: nil,
+		}
+
 		reqCtx.SetJSONResponse(http.StatusCreated, organization)
 	}
 }

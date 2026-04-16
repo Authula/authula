@@ -153,6 +153,12 @@ func (h *AcceptOrganizationInvitationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
+		reqCtx.Values[models.ContextAccessControlAssignRole.String()] = &models.AccessControlAssignRoleContext{
+			UserID:         userID,
+			RoleName:       invitation.Role,
+			AssignerUserID: &invitation.InviterID,
+		}
+
 		var request types.AcceptOrganizationInvitationRequest
 		request.RedirectURL = r.URL.Query().Get("redirect_url")
 		request.Trim()

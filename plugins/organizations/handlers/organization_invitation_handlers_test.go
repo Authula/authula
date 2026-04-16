@@ -311,6 +311,28 @@ func TestAcceptOrganizationInvitationHandler(t *testing.T) {
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "accept failed",
 		},
+		{
+			name:           "success_with_role_assignment",
+			userID:         new("user-1"),
+			organizationID: "org-1",
+			invitationID:   "inv-1",
+			prepare: func(fixture *organizationInvitationHandlerFixture) {
+				fixture.service.On("AcceptOrganizationInvitation", mock.Anything, "user-1", "org-1", "inv-1").Return(&orgtypes.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: orgtypes.OrganizationInvitationStatusAccepted, InviterID: "user-2"}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
+				invitation := internaltests.DecodeResponseJSON[orgtypes.OrganizationInvitation](t, reqCtx)
+				assert.Equal(t, "inv-1", invitation.ID)
+				assert.Equal(t, orgtypes.OrganizationInvitationStatusAccepted, invitation.Status)
+				assignRoleValue, ok := reqCtx.Values[models.ContextAccessControlAssignRole.String()]
+				require.True(t, ok)
+				assignRoleCtx, ok := assignRoleValue.(*models.AccessControlAssignRoleContext)
+				require.True(t, ok)
+				assert.Equal(t, "user-1", assignRoleCtx.UserID)
+				assert.Equal(t, "member", assignRoleCtx.RoleName)
+				assert.Equal(t, "user-2", *assignRoleCtx.AssignerUserID)
+			},
+		},
 	})
 }
 

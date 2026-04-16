@@ -83,24 +83,22 @@ func (s *organizationTeamService) CreateTeam(ctx context.Context, actorUserID st
 			return err
 		}
 
-		member := actorMember
-		if member == nil {
-			member, err = memberRepo.GetByOrganizationIDAndUserID(ctx, organization.ID, actorUserID)
+		if actorMember == nil {
+			actorMember, err = memberRepo.GetByOrganizationIDAndUserID(ctx, organization.ID, actorUserID)
 			if err != nil {
 				return err
 			}
 		}
-		if member != nil {
-			teamMember := &types.OrganizationTeamMember{
-				ID:     util.GenerateUUID(),
-				TeamID: createdTeam.ID,
-				UserID: member.ID,
-			}
 
-			_, err = teamMemberRepo.Create(ctx, teamMember)
-			if err != nil {
-				return err
-			}
+		teamMember := &types.OrganizationTeamMember{
+			ID:     util.GenerateUUID(),
+			TeamID: createdTeam.ID,
+			UserID: actorUserID,
+		}
+
+		_, err = teamMemberRepo.Create(ctx, teamMember)
+		if err != nil {
+			return err
 		}
 
 		created = createdTeam

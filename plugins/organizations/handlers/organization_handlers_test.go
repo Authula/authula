@@ -138,6 +138,13 @@ func TestCreateOrganizationHandler(t *testing.T) {
 				assert.Equal(t, "user-1", org.OwnerID)
 				assert.Equal(t, "Acme Inc", org.Name)
 				assert.Equal(t, "acme-inc", org.Slug)
+				assignRoleValue, ok := reqCtx.Values[models.ContextAccessControlAssignRole.String()]
+				require.True(t, ok)
+				assignRoleCtx, ok := assignRoleValue.(*models.AccessControlAssignRoleContext)
+				require.True(t, ok)
+				assert.Equal(t, "user-1", assignRoleCtx.UserID)
+				assert.Equal(t, "member", assignRoleCtx.RoleName)
+				assert.Nil(t, assignRoleCtx.AssignerUserID)
 			},
 		},
 	}
