@@ -27,7 +27,7 @@ type organizationInvitationTxRunner interface {
 	RunInTx(ctx context.Context, opts *sql.TxOptions, fn func(context.Context, bun.Tx) error) error
 }
 
-type OrganizationInvitationService struct {
+type organizationInvitationService struct {
 	txRunner             organizationInvitationTxRunner
 	globalConfig         *models.Config
 	pluginConfig         *types.OrganizationsPluginConfig
@@ -55,8 +55,8 @@ func NewOrganizationInvitationService(
 	orgInvitationRepo repositories.OrganizationInvitationRepository,
 	orgMemberRepo repositories.OrganizationMemberRepository,
 	serviceUtils *ServiceUtils,
-) *OrganizationInvitationService {
-	return &OrganizationInvitationService{
+) *organizationInvitationService {
+	return &organizationInvitationService{
 		txRunner:             txRunner,
 		globalConfig:         globalConfig,
 		pluginConfig:         pluginConfig,
@@ -72,7 +72,7 @@ func NewOrganizationInvitationService(
 	}
 }
 
-func (s *OrganizationInvitationService) CreateOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, request types.CreateOrganizationInvitationRequest) (*types.OrganizationInvitation, error) {
+func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, request types.CreateOrganizationInvitationRequest) (*types.OrganizationInvitation, error) {
 	if actorUserID == "" || organizationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
@@ -165,7 +165,7 @@ func (s *OrganizationInvitationService) CreateOrganizationInvitation(ctx context
 	return created, nil
 }
 
-func (s *OrganizationInvitationService) publishOrganizationInvitationCreatedEvent(invitation *types.OrganizationInvitation, organization *types.Organization) {
+func (s *organizationInvitationService) publishOrganizationInvitationCreatedEvent(invitation *types.OrganizationInvitation, organization *types.Organization) {
 	payload, err := json.Marshal(orgevents.OrganizationInvitationCreatedEvent{
 		ID:               util.GenerateUUID(),
 		InvitationID:     invitation.ID,
@@ -189,7 +189,7 @@ func (s *OrganizationInvitationService) publishOrganizationInvitationCreatedEven
 	})
 }
 
-func (s *OrganizationInvitationService) sendOrganizationInvitationEmailAsync(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, redirectURL string) {
+func (s *organizationInvitationService) sendOrganizationInvitationEmailAsync(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, redirectURL string) {
 	if s.mailerService == nil {
 		s.logger.Warn("mailer service not available, skipping organization invitation email")
 		return
@@ -206,7 +206,7 @@ func (s *OrganizationInvitationService) sendOrganizationInvitationEmailAsync(ctx
 	}()
 }
 
-func (s *OrganizationInvitationService) sendOrganizationInvitationEmail(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, redirectURL string) error {
+func (s *organizationInvitationService) sendOrganizationInvitationEmail(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, redirectURL string) error {
 	acceptURL := s.buildOrganizationInvitationAcceptURL(invitation, redirectURL)
 	appName := "Authula"
 	if s.globalConfig.AppName != "" {
@@ -233,7 +233,7 @@ func (s *OrganizationInvitationService) sendOrganizationInvitationEmail(ctx cont
 	return s.mailerService.SendEmail(ctx, invitation.Email, subject, textBody, htmlBody)
 }
 
-func (s *OrganizationInvitationService) buildOrganizationInvitationAcceptURL(invitation *types.OrganizationInvitation, redirectURL string) string {
+func (s *organizationInvitationService) buildOrganizationInvitationAcceptURL(invitation *types.OrganizationInvitation, redirectURL string) string {
 	baseURL := s.globalConfig.BaseURL
 	basePath := s.globalConfig.BasePath
 	acceptPath := fmt.Sprintf("/organizations/%s/invitations/%s/accept", url.PathEscape(invitation.OrganizationID), url.PathEscape(invitation.ID))
@@ -253,7 +253,7 @@ func (s *OrganizationInvitationService) buildOrganizationInvitationAcceptURL(inv
 	return parsedURL.String()
 }
 
-func (s *OrganizationInvitationService) GetAllOrganizationInvitations(ctx context.Context, actorUserID string, organizationID string) ([]types.OrganizationInvitation, error) {
+func (s *organizationInvitationService) GetAllOrganizationInvitations(ctx context.Context, actorUserID string, organizationID string) ([]types.OrganizationInvitation, error) {
 	if actorUserID == "" || organizationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
@@ -271,7 +271,7 @@ func (s *OrganizationInvitationService) GetAllOrganizationInvitations(ctx contex
 	return invitations, nil
 }
 
-func (s *OrganizationInvitationService) GetOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
+func (s *organizationInvitationService) GetOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if actorUserID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
@@ -292,7 +292,7 @@ func (s *OrganizationInvitationService) GetOrganizationInvitation(ctx context.Co
 	return invitation, nil
 }
 
-func (s *OrganizationInvitationService) RevokeOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
+func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if actorUserID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
@@ -325,7 +325,7 @@ func (s *OrganizationInvitationService) RevokeOrganizationInvitation(ctx context
 
 	return updated, nil
 }
-func (s *OrganizationInvitationService) AcceptOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
+func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if actorUserID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
@@ -363,7 +363,7 @@ func (s *OrganizationInvitationService) AcceptOrganizationInvitation(ctx context
 	return &accepted[0], nil
 }
 
-func (s *OrganizationInvitationService) RejectOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
+func (s *organizationInvitationService) RejectOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if actorUserID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
@@ -403,7 +403,7 @@ func (s *OrganizationInvitationService) RejectOrganizationInvitation(ctx context
 	return updated, nil
 }
 
-func (s *OrganizationInvitationService) AcceptPendingOrganizationInvitationsForEmail(ctx context.Context, userID string, email string) ([]types.OrganizationInvitation, error) {
+func (s *organizationInvitationService) AcceptPendingOrganizationInvitationsForEmail(ctx context.Context, userID string, email string) ([]types.OrganizationInvitation, error) {
 	email = strings.ToLower(email)
 	if userID == "" || email == "" {
 		return nil, internalerrors.ErrUnprocessableEntity
@@ -430,7 +430,7 @@ func (s *OrganizationInvitationService) AcceptPendingOrganizationInvitationsForE
 	return s.acceptOrganizationInvitations(ctx, userID, pendingInvitations)
 }
 
-func (s *OrganizationInvitationService) acceptOrganizationInvitations(ctx context.Context, userID string, invitations []types.OrganizationInvitation) ([]types.OrganizationInvitation, error) {
+func (s *organizationInvitationService) acceptOrganizationInvitations(ctx context.Context, userID string, invitations []types.OrganizationInvitation) ([]types.OrganizationInvitation, error) {
 	accepted := make([]types.OrganizationInvitation, 0, len(invitations))
 	err := s.txRunner.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		invitationRepo := s.orgInvitationRepo.WithTx(tx)
@@ -486,7 +486,7 @@ func (s *OrganizationInvitationService) acceptOrganizationInvitations(ctx contex
 	return accepted, nil
 }
 
-func (s *OrganizationInvitationService) expireOrganizationInvitationIfNeeded(ctx context.Context, invitation *types.OrganizationInvitation) error {
+func (s *organizationInvitationService) expireOrganizationInvitationIfNeeded(ctx context.Context, invitation *types.OrganizationInvitation) error {
 	if invitation.Status != types.OrganizationInvitationStatusPending {
 		return nil
 	}

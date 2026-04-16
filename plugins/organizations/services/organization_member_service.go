@@ -17,7 +17,7 @@ type organizationMemberTxRunner interface {
 	RunInTx(ctx context.Context, opts *sql.TxOptions, fn func(context.Context, bun.Tx) error) error
 }
 
-type OrganizationMemberService struct {
+type organizationMemberService struct {
 	userService          rootservices.UserService
 	accessControlService rootservices.AccessControlService
 	orgRepo              repositories.OrganizationRepository
@@ -27,11 +27,11 @@ type OrganizationMemberService struct {
 	txRunner             organizationMemberTxRunner
 }
 
-func NewOrganizationMemberService(userService rootservices.UserService, accessControlService rootservices.AccessControlService, orgRepo repositories.OrganizationRepository, orgMemberRepo repositories.OrganizationMemberRepository, membersLimit *int, txRunner organizationMemberTxRunner, serviceUtils *ServiceUtils) *OrganizationMemberService {
-	return &OrganizationMemberService{userService: userService, accessControlService: accessControlService, orgRepo: orgRepo, orgMemberRepo: orgMemberRepo, serviceUtils: serviceUtils, membersLimit: membersLimit, txRunner: txRunner}
+func NewOrganizationMemberService(userService rootservices.UserService, accessControlService rootservices.AccessControlService, orgRepo repositories.OrganizationRepository, orgMemberRepo repositories.OrganizationMemberRepository, membersLimit *int, txRunner organizationMemberTxRunner, serviceUtils *ServiceUtils) *organizationMemberService {
+	return &organizationMemberService{userService: userService, accessControlService: accessControlService, orgRepo: orgRepo, orgMemberRepo: orgMemberRepo, serviceUtils: serviceUtils, membersLimit: membersLimit, txRunner: txRunner}
 }
 
-func (s *OrganizationMemberService) AddMember(ctx context.Context, actorUserID string, organizationID string, request types.AddOrganizationMemberRequest) (*types.OrganizationMember, error) {
+func (s *organizationMemberService) AddMember(ctx context.Context, actorUserID string, organizationID string, request types.AddOrganizationMemberRequest) (*types.OrganizationMember, error) {
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (s *OrganizationMemberService) AddMember(ctx context.Context, actorUserID s
 	return created, nil
 }
 
-func (s *OrganizationMemberService) GetAllMembers(ctx context.Context, actorUserID string, organizationID string, page int, limit int) ([]types.OrganizationMember, error) {
+func (s *organizationMemberService) GetAllMembers(ctx context.Context, actorUserID string, organizationID string, page int, limit int) ([]types.OrganizationMember, error) {
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (s *OrganizationMemberService) GetAllMembers(ctx context.Context, actorUser
 	return s.orgMemberRepo.GetAllByOrganizationID(ctx, organizationID, page, limit)
 }
 
-func (s *OrganizationMemberService) GetMember(ctx context.Context, actorUserID string, organizationID string, memberID string) (*types.OrganizationMember, error) {
+func (s *organizationMemberService) GetMember(ctx context.Context, actorUserID string, organizationID string, memberID string) (*types.OrganizationMember, error) {
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (s *OrganizationMemberService) GetMember(ctx context.Context, actorUserID s
 	return member, nil
 }
 
-func (s *OrganizationMemberService) UpdateMember(ctx context.Context, actorUserID string, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error) {
+func (s *organizationMemberService) UpdateMember(ctx context.Context, actorUserID string, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error) {
 	_, actorMember, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID)
 	if err != nil {
 		return nil, err
@@ -178,7 +178,7 @@ func (s *OrganizationMemberService) UpdateMember(ctx context.Context, actorUserI
 	return updated, nil
 }
 
-func (s *OrganizationMemberService) RemoveMember(ctx context.Context, actorUserID string, organizationID string, memberID string) error {
+func (s *organizationMemberService) RemoveMember(ctx context.Context, actorUserID string, organizationID string, memberID string) error {
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
 		return err
 	}

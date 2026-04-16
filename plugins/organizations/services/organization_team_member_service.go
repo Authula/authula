@@ -9,7 +9,7 @@ import (
 	"github.com/Authula/authula/plugins/organizations/types"
 )
 
-type OrganizationTeamMemberService struct {
+type organizationTeamMemberService struct {
 	orgRepo           repositories.OrganizationRepository
 	orgMemberRepo     repositories.OrganizationMemberRepository
 	orgTeamRepo       repositories.OrganizationTeamRepository
@@ -23,11 +23,11 @@ func NewOrganizationTeamMemberService(
 	teamRepo repositories.OrganizationTeamRepository,
 	orgTeamMemberRepo repositories.OrganizationTeamMemberRepository,
 	serviceUtils *ServiceUtils,
-) *OrganizationTeamMemberService {
-	return &OrganizationTeamMemberService{orgRepo: orgRepo, orgMemberRepo: orgMemberRepo, orgTeamRepo: teamRepo, orgTeamMemberRepo: orgTeamMemberRepo, serviceUtils: serviceUtils}
+) *organizationTeamMemberService {
+	return &organizationTeamMemberService{orgRepo: orgRepo, orgMemberRepo: orgMemberRepo, orgTeamRepo: teamRepo, orgTeamMemberRepo: orgTeamMemberRepo, serviceUtils: serviceUtils}
 }
 
-func (s *OrganizationTeamMemberService) AddTeamMember(ctx context.Context, actorUserID string, organizationID string, teamID string, request types.AddOrganizationTeamMemberRequest) (*types.OrganizationTeamMember, error) {
+func (s *organizationTeamMemberService) AddTeamMember(ctx context.Context, actorUserID string, organizationID string, teamID string, request types.AddOrganizationTeamMemberRequest) (*types.OrganizationTeamMember, error) {
 	orgMemberID := request.MemberID
 	if orgMemberID == "" {
 		return nil, internalerrors.ErrUnprocessableEntity
@@ -73,7 +73,7 @@ func (s *OrganizationTeamMemberService) AddTeamMember(ctx context.Context, actor
 	return created, nil
 }
 
-func (s *OrganizationTeamMemberService) GetAllTeamMembers(ctx context.Context, actorUserID string, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMember, error) {
+func (s *organizationTeamMemberService) GetAllTeamMembers(ctx context.Context, actorUserID string, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMember, error) {
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (s *OrganizationTeamMemberService) GetAllTeamMembers(ctx context.Context, a
 	return s.orgTeamMemberRepo.GetAllByTeamID(ctx, teamID, page, limit)
 }
 
-func (s *OrganizationTeamMemberService) GetTeamMember(ctx context.Context, actorUserID string, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMember, error) {
+func (s *organizationTeamMemberService) GetTeamMember(ctx context.Context, actorUserID string, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMember, error) {
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (s *OrganizationTeamMemberService) GetTeamMember(ctx context.Context, actor
 	return teamMember, nil
 }
 
-func (s *OrganizationTeamMemberService) RemoveTeamMember(ctx context.Context, actorUserID string, organizationID string, teamID string, memberID string) error {
+func (s *organizationTeamMemberService) RemoveTeamMember(ctx context.Context, actorUserID string, organizationID string, teamID string, memberID string) error {
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
 		return err
 	}

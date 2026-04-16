@@ -8,11 +8,11 @@ import (
 )
 
 type API struct {
-	organizationService services.IOrganizationService
-	invitationService   services.IOrganizationInvitationService
-	memberService       services.IOrganizationMemberService
-	teamService         services.IOrganizationTeamService
-	teamMemberService   services.IOrganizationTeamMemberService
+	organizationService services.OrganizationService
+	invitationService   services.OrganizationInvitationService
+	memberService       services.OrganizationMemberService
+	teamService         services.OrganizationTeamService
+	teamMemberService   services.OrganizationTeamMemberService
 }
 
 func BuildAPI(plugin *OrganizationsPlugin) *API {

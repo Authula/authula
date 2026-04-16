@@ -11,7 +11,7 @@ import (
 )
 
 type CreateOrganizationInvitationHandler struct {
-	OrgInvitationService orgservices.IOrganizationInvitationService
+	OrgInvitationService orgservices.OrganizationInvitationService
 }
 
 func (h *CreateOrganizationInvitationHandler) Handle() http.HandlerFunc {
@@ -47,7 +47,7 @@ func (h *CreateOrganizationInvitationHandler) Handle() http.HandlerFunc {
 }
 
 type GetAllOrganizationInvitationsHandler struct {
-	OrgInvitationService orgservices.IOrganizationInvitationService
+	OrgInvitationService orgservices.OrganizationInvitationService
 }
 
 func (h *GetAllOrganizationInvitationsHandler) Handle() http.HandlerFunc {
@@ -74,7 +74,7 @@ func (h *GetAllOrganizationInvitationsHandler) Handle() http.HandlerFunc {
 }
 
 type GetOrganizationInvitationHandler struct {
-	OrgInvitationService orgservices.IOrganizationInvitationService
+	OrgInvitationService orgservices.OrganizationInvitationService
 }
 
 func (h *GetOrganizationInvitationHandler) Handle() http.HandlerFunc {
@@ -102,7 +102,7 @@ func (h *GetOrganizationInvitationHandler) Handle() http.HandlerFunc {
 }
 
 type RevokeOrganizationInvitationHandler struct {
-	OrgInvitationService orgservices.IOrganizationInvitationService
+	OrgInvitationService orgservices.OrganizationInvitationService
 }
 
 func (h *RevokeOrganizationInvitationHandler) Handle() http.HandlerFunc {
@@ -130,7 +130,7 @@ func (h *RevokeOrganizationInvitationHandler) Handle() http.HandlerFunc {
 }
 
 type AcceptOrganizationInvitationHandler struct {
-	OrgInvitationService orgservices.IOrganizationInvitationService
+	OrgInvitationService orgservices.OrganizationInvitationService
 }
 
 func (h *AcceptOrganizationInvitationHandler) Handle() http.HandlerFunc {
@@ -166,7 +166,7 @@ func (h *AcceptOrganizationInvitationHandler) Handle() http.HandlerFunc {
 }
 
 type RejectOrganizationInvitationHandler struct {
-	OrgInvitationService orgservices.IOrganizationInvitationService
+	OrgInvitationService orgservices.OrganizationInvitationService
 }
 
 func (h *RejectOrganizationInvitationHandler) Handle() http.HandlerFunc {

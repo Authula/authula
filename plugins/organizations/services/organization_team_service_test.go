@@ -13,7 +13,7 @@ import (
 	"github.com/Authula/authula/plugins/organizations/types"
 )
 
-func newTestOrganizationTeamService(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamRepo *orgtests.MockOrganizationTeamRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) *OrganizationTeamService {
+func newTestOrganizationTeamService(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamRepo *orgtests.MockOrganizationTeamRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) *organizationTeamService {
 	serviceUtils := &ServiceUtils{
 		orgRepo:           orgRepo,
 		orgMemberRepo:     memberRepo,

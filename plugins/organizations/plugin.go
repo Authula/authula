@@ -24,11 +24,11 @@ type OrganizationsPlugin struct {
 	teamRepo            repositories.OrganizationTeamRepository
 	teamMemberRepo      repositories.OrganizationTeamMemberRepository
 	serviceUtils        *services.ServiceUtils
-	organizationService *services.OrganizationService
-	invitationService   *services.OrganizationInvitationService
-	memberService       *services.OrganizationMemberService
-	teamService         *services.OrganizationTeamService
-	teamMemberService   *services.OrganizationTeamMemberService
+	organizationService services.OrganizationService
+	invitationService   services.OrganizationInvitationService
+	memberService       services.OrganizationMemberService
+	teamService         services.OrganizationTeamService
+	teamMemberService   services.OrganizationTeamMemberService
 	databaseHooks       *OrganizationsHookExecutor
 }
 

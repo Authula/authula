@@ -122,8 +122,8 @@ func organizationsSQLiteInitial() migrations.Migration {
 				tx,
 				`DROP TABLE IF EXISTS organization_team_members;`,
 				`DROP TABLE IF EXISTS organization_teams;`,
-				`DROP TABLE IF EXISTS organization_invitations;`,
 				`DROP TABLE IF EXISTS organization_members;`,
+				`DROP TABLE IF EXISTS organization_invitations;`,
 				`DROP TABLE IF EXISTS organizations;`,
 			)
 		},

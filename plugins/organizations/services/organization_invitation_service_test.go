@@ -50,7 +50,7 @@ func newTestOrganizationInvitationService(
 	orgRepo repositories.OrganizationRepository,
 	invRepo repositories.OrganizationInvitationRepository,
 	memberRepo repositories.OrganizationMemberRepository,
-) *OrganizationInvitationService {
+) *organizationInvitationService {
 	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}
 	return NewOrganizationInvitationService(
 		txRunner,

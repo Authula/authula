@@ -11,7 +11,7 @@ import (
 )
 
 type AddOrganizationMemberHandler struct {
-	OrgMemberService orgservices.IOrganizationMemberService
+	OrgMemberService orgservices.OrganizationMemberService
 }
 
 func (h *AddOrganizationMemberHandler) Handle() http.HandlerFunc {
@@ -47,7 +47,7 @@ func (h *AddOrganizationMemberHandler) Handle() http.HandlerFunc {
 }
 
 type GetAllOrganizationMembersHandler struct {
-	OrgMemberService orgservices.IOrganizationMemberService
+	OrgMemberService orgservices.OrganizationMemberService
 }
 
 func (h *GetAllOrganizationMembersHandler) Handle() http.HandlerFunc {
@@ -76,7 +76,7 @@ func (h *GetAllOrganizationMembersHandler) Handle() http.HandlerFunc {
 }
 
 type GetOrganizationMemberHandler struct {
-	OrgMemberService orgservices.IOrganizationMemberService
+	OrgMemberService orgservices.OrganizationMemberService
 }
 
 func (h *GetOrganizationMemberHandler) Handle() http.HandlerFunc {
@@ -104,7 +104,7 @@ func (h *GetOrganizationMemberHandler) Handle() http.HandlerFunc {
 }
 
 type UpdateOrganizationMemberHandler struct {
-	OrgMemberService orgservices.IOrganizationMemberService
+	OrgMemberService orgservices.OrganizationMemberService
 }
 
 func (h *UpdateOrganizationMemberHandler) Handle() http.HandlerFunc {
@@ -141,7 +141,7 @@ func (h *UpdateOrganizationMemberHandler) Handle() http.HandlerFunc {
 }
 
 type DeleteOrganizationMemberHandler struct {
-	OrgMemberService orgservices.IOrganizationMemberService
+	OrgMemberService orgservices.OrganizationMemberService
 }
 
 func (h *DeleteOrganizationMemberHandler) Handle() http.HandlerFunc {

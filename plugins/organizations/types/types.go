@@ -1,6 +1,10 @@
 package types
 
-import "time"
+import (
+	"time"
+
+	"github.com/Authula/authula/models"
+)
 
 type OrganizationsPluginConfig struct {
 	Enabled                          bool          `json:"enabled" toml:"enabled"`
@@ -10,7 +14,8 @@ type OrganizationsPluginConfig struct {
 	InvitationExpiresIn              time.Duration `json:"invitation_expires_in" toml:"invitation_expires_in"`
 	RequireEmailVerifiedOnInvitation bool          `json:"require_email_verified_on_invitation" toml:"require_email_verified_on_invitation"`
 
-	DatabaseHooks *OrganizationsDatabaseHooksConfig `json:"-" toml:"-"`
+	SendOrganizationInvitationEmail func(organization *Organization, invitation *OrganizationInvitation, inviter *models.User) error `json:"-" toml:"-"`
+	DatabaseHooks                   *OrganizationsDatabaseHooksConfig                                                                `json:"-" toml:"-"`
 }
 
 func (config *OrganizationsPluginConfig) ApplyDefaults() {

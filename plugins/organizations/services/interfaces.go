@@ -6,7 +6,7 @@ import (
 	"github.com/Authula/authula/plugins/organizations/types"
 )
 
-type IOrganizationService interface {
+type OrganizationService interface {
 	CreateOrganization(ctx context.Context, actorUserID string, request types.CreateOrganizationRequest) (*types.Organization, error)
 	GetAllOrganizations(ctx context.Context, actorUserID string) ([]types.Organization, error)
 	GetOrganizationByID(ctx context.Context, actorUserID string, organizationID string) (*types.Organization, error)
@@ -14,7 +14,7 @@ type IOrganizationService interface {
 	DeleteOrganization(ctx context.Context, actorUserID string, organizationID string) error
 }
 
-type IOrganizationInvitationService interface {
+type OrganizationInvitationService interface {
 	CreateOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, request types.CreateOrganizationInvitationRequest) (*types.OrganizationInvitation, error)
 	GetOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error)
 	GetAllOrganizationInvitations(ctx context.Context, actorUserID string, organizationID string) ([]types.OrganizationInvitation, error)
@@ -23,7 +23,7 @@ type IOrganizationInvitationService interface {
 	RejectOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error)
 }
 
-type IOrganizationMemberService interface {
+type OrganizationMemberService interface {
 	AddMember(ctx context.Context, actorUserID string, organizationID string, request types.AddOrganizationMemberRequest) (*types.OrganizationMember, error)
 	GetAllMembers(ctx context.Context, actorUserID string, organizationID string, page int, limit int) ([]types.OrganizationMember, error)
 	GetMember(ctx context.Context, actorUserID string, organizationID string, memberID string) (*types.OrganizationMember, error)
@@ -31,7 +31,7 @@ type IOrganizationMemberService interface {
 	RemoveMember(ctx context.Context, actorUserID string, organizationID string, memberID string) error
 }
 
-type IOrganizationTeamService interface {
+type OrganizationTeamService interface {
 	CreateTeam(ctx context.Context, actorUserID string, organizationID string, request types.CreateOrganizationTeamRequest) (*types.OrganizationTeam, error)
 	GetAllTeams(ctx context.Context, actorUserID string, organizationID string) ([]types.OrganizationTeam, error)
 	GetTeam(ctx context.Context, actorUserID string, organizationID string, teamID string) (*types.OrganizationTeam, error)
@@ -39,7 +39,7 @@ type IOrganizationTeamService interface {
 	DeleteTeam(ctx context.Context, actorUserID string, organizationID string, teamID string) error
 }
 
-type IOrganizationTeamMemberService interface {
+type OrganizationTeamMemberService interface {
 	AddTeamMember(ctx context.Context, actorUserID string, organizationID string, teamID string, request types.AddOrganizationTeamMemberRequest) (*types.OrganizationTeamMember, error)
 	GetAllTeamMembers(ctx context.Context, actorUserID string, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMember, error)
 	GetTeamMember(ctx context.Context, actorUserID string, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMember, error)
