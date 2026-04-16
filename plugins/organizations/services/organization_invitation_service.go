@@ -160,7 +160,22 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 	}
 
 	s.publishOrganizationInvitationCreatedEvent(created, organization)
-	s.sendOrganizationInvitationEmailAsync(ctx, created, organization, request.RedirectURL)
+
+	if s.pluginConfig != nil && s.pluginConfig.SendOrganizationInvitationEmail != nil {
+		inviter, err := s.userService.GetByID(ctx, created.InviterID)
+		if err != nil {
+			return nil, err
+		}
+		if inviter == nil {
+			return nil, internalerrors.ErrNotFound
+		}
+
+		if err := s.pluginConfig.SendOrganizationInvitationEmail(organization, created, inviter); err != nil {
+			return nil, err
+		}
+	} else {
+		s.sendOrganizationInvitationEmailAsync(ctx, created, organization, request.RedirectURL)
+	}
 
 	return created, nil
 }
