@@ -8,21 +8,24 @@ description: Define and implement services that encapsulate business logic with 
 ## When to use this skill
 
 - Create services that encapsulate business logic
-- Implement business operations that delegate to repositories
+- Implement business operations that delegate to repositories for data access (Database)
 - Add authentication or domain-specific features as services
 
 ## Key principles
 
-1. **Concrete struct design**: Services are concrete structs
+1. **Concrete struct design**: Services are defined as interfaces with the `I` prefix and implemented by concrete structs with the same name without the prefix (e.g., `ITodoService` and `todoService`)
 2. **Constructor-based injection**: Dependencies passed at construction
 3. **Single responsibility**: Each service handles one domain concern
 4. **Repository delegation**: Services delegate all data access to repositories
 5. **Context-aware**: All public methods accept `context.Context`
+6. **Interface return types**: Constructors return interfaces, not concrete types
+7. **Single File Exports**: Each service implementation is in its own file. However, all service interfaces are exported from `interfaces.go` under the `services/` folder.
 
 ## Pattern
 
 Services handle business logic:
-- Define interface (optional but recommended)
+
+- Define interface for service with methods representing business operations
 - Implement as concrete struct with repository dependencies
 - Constructor function injects all dependencies
 - Methods are thin wrappers that validate, transform, and delegate to repositories
@@ -31,7 +34,8 @@ Services handle business logic:
 ## Example
 
 See [examples/todo_service.go](examples/todo_service.go) for:
-- TodoService interface definition
+
+- ITodoService interface definition
 - todoService implementation
 - Validation and repository delegation patterns
 

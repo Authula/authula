@@ -2,22 +2,22 @@ package examples
 
 import "context"
 
-// TodoService interface
-type TodoService interface {
+// Interface
+type ITodoService interface {
 	CreateTodo(ctx context.Context, title string, userID string) (*Todo, error)
 	MarkComplete(ctx context.Context, todoID string) (*Todo, error)
 	DeleteTodo(ctx context.Context, todoID string) error
 	GetTodo(ctx context.Context, todoID string) (*Todo, error)
 }
 
-// todoService implementation
+// Implementation
 type todoService struct {
-	repo TodoRepository
+	todoRepo TodoRepository
 }
 
-func NewTodoService(repo TodoRepository) TodoService {
+func NewTodoService(todoRepo TodoRepository) ITodoService {
 	return &todoService{
-		repo: repo,
+		todoRepo: todoRepo,
 	}
 }
 
@@ -30,11 +30,11 @@ func (s *todoService) CreateTodo(ctx context.Context, title string, userID strin
 		Title:  title,
 		UserID: userID,
 	}
-	return s.repo.Create(ctx, todo)
+	return s.todoRepo.Create(ctx, todo)
 }
 
 func (s *todoService) MarkComplete(ctx context.Context, todoID string) (*Todo, error) {
-	todo, err := s.repo.GetByID(ctx, todoID)
+	todo, err := s.todoRepo.GetByID(ctx, todoID)
 	if err != nil {
 		return nil, err
 	}
@@ -42,15 +42,15 @@ func (s *todoService) MarkComplete(ctx context.Context, todoID string) (*Todo, e
 		return nil, ErrNotFound
 	}
 	todo.Completed = true
-	return s.repo.Update(ctx, todo)
+	return s.todoRepo.Update(ctx, todo)
 }
 
 func (s *todoService) DeleteTodo(ctx context.Context, todoID string) error {
-	return s.repo.Delete(ctx, todoID)
+	return s.todoRepo.Delete(ctx, todoID)
 }
 
 func (s *todoService) GetTodo(ctx context.Context, todoID string) (*Todo, error) {
-	return s.repo.GetByID(ctx, todoID)
+	return s.todoRepo.GetByID(ctx, todoID)
 }
 
 // Utility

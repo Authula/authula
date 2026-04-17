@@ -17,6 +17,22 @@
 - Avoid global variables unless absolutely necessary.
 - Use interfaces to define behavior and promote decoupling. Never code to implementations. When writing services, make sure they implement an interface of a repository e.g. `UserService` imports `UserRepository`. This ensures that the service can be easily tested and swapped out with different implementations if needed.
 - For other services, define interfaces in the `interfaces.go` file within the `services` package and implement them in separate files just like the password service is an interface which has an argon2 implementation. So now it can easily be swapped out for another implementation if needed without changing the rest of the code that depends on it.
+- When you need pointer variables, use the `new` function to create them instead of creating a redudant variable and then assigning the address of it to the next pointer variable.
+
+For example, instead of the following:
+
+```go
+someNum := 100
+config.SomeNum = &someNum
+```
+
+Do this instead:
+
+```go
+config.SomeNum := new(100)
+```
+
+This is now supported in Go 1.26+ which the project is using. This makes the code cleaner and more concise.
 
 ---
 

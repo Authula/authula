@@ -8,26 +8,26 @@ description: Orchestrate services and repositories through use cases to implemen
 ## When to use this skill
 
 - Implement workflows that span multiple services
-- Encapsulate complex authentication or account operations
 - Define reusable operations that handlers invoke
-- Keep handlers thin by moving logic into use cases
+- Keep handlers thin by moving logic into use cases if multiple services are needed/used
+- Encapsulate business logic and orchestration in a single place
+- Coordinate complex operations that require multiple steps and services
 
 ## Key principles
 
 1. **Service orchestration**: Use cases call multiple services
 2. **Business-focused**: Methods represent user actions, not HTTP operations
 3. **Dependency injection**: Services passed at construction
-4. **Pure domain**: No HTTP, no routing, just business logic
-5. **Testable**: Can be tested independently by mocking services
+4. **Pure domain**: No HTTP, no routing, just business logic delegated to services. Usecases simply orchestrate services and handle validation, errors, and return domain models
+5. **Testable**: Can be tested independently by mocking services as services are interfaces
 
 ## Pattern
 
 Use cases orchestrate services:
 
-- Define request/response types
 - Implement as structs with service dependencies
-- Single public Execute or action method
-- Handle validation such as checking request parameters
+- Single public Execute or action method e.g. `RegisterUseCase` with `Execute(ctx context.Context, reqCtx *models.RequestContext) (res *someStructType, error)`. The `res` can be a domain model that returns the data from each service's method output, but should not be an HTTP response. The handler can convert it to an HTTP response if needed.
+- Handle validation such as checking request parameters passed down from the handler.
 - Coordinate multiple services sequentially
 - Handle errors and return domain models
 

@@ -97,7 +97,7 @@ func TestStateService_UpsertUserState(t *testing.T) {
 			if tc.userExists {
 				// always prepare an Upsert expectation when user exists
 				if tc.hasRepoErr {
-					usr.On("Upsert", mock.Anything, mock.Anything).Return(errors.New("boom")).Once()
+					usr.On("Upsert", mock.Anything, mock.Anything).Return(errors.New("some error")).Once()
 				} else if tc.expectCall != nil {
 					usr.On("Upsert", mock.Anything, mock.MatchedBy(tc.expectCall)).Return(nil).Once()
 				} else {
