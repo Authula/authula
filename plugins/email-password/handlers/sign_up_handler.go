@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -12,21 +11,12 @@ import (
 	"github.com/Authula/authula/plugins/email-password/usecases"
 )
 
-type SignUpRequestPayload struct {
-	Name        string          `json:"name"`
-	Email       string          `json:"email"`
-	Password    string          `json:"password"`
-	Image       string          `json:"image,omitempty"`
-	Metadata    json.RawMessage `json:"metadata,omitempty"`
-	CallbackURL string          `json:"callback_url,omitempty"`
-}
-
 type SignUpHandler struct {
 	Logger                       models.Logger
 	Config                       *models.Config
 	PluginConfig                 types.EmailPasswordPluginConfig
-	SignUpUseCase                *usecases.SignUpUseCase
-	SendEmailVerificationUseCase *usecases.SendEmailVerificationUseCase
+	SignUpUseCase                usecases.SignUpUseCase
+	SendEmailVerificationUseCase usecases.SendEmailVerificationUseCase
 }
 
 func (h *SignUpHandler) Handler() http.HandlerFunc {
@@ -34,11 +24,16 @@ func (h *SignUpHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		var payload SignUpRequestPayload
-		if err := util.ParseJSON(r, &payload); err != nil {
+		var request types.SignUpRequest
+		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": "invalid request body",
 			})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -46,12 +41,12 @@ func (h *SignUpHandler) Handler() http.HandlerFunc {
 		userAgent := r.UserAgent()
 		result, err := h.SignUpUseCase.SignUp(
 			ctx,
-			payload.Name,
-			payload.Email,
-			payload.Password,
-			&payload.Image,
-			payload.Metadata,
-			&payload.CallbackURL,
+			request.Name,
+			request.Email,
+			request.Password,
+			request.Image,
+			request.Metadata,
+			request.CallbackURL,
 			&reqCtx.ClientIP,
 			&userAgent,
 		)
@@ -69,7 +64,7 @@ func (h *SignUpHandler) Handler() http.HandlerFunc {
 				taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
 				defer cancel()
 
-				if err := h.SendEmailVerificationUseCase.Send(taskCtx, payload.Email, &payload.CallbackURL); err != nil {
+				if err := h.SendEmailVerificationUseCase.Send(taskCtx, request.Email, request.CallbackURL); err != nil {
 					h.Logger.Error("failed to send email", "err", err)
 				}
 			}()

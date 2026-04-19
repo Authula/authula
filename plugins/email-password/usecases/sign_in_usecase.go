@@ -12,7 +12,7 @@ import (
 	rootservices "github.com/Authula/authula/services"
 )
 
-type SignInUseCase struct {
+type signInUseCase struct {
 	GlobalConfig    *models.Config
 	PluginConfig    types.EmailPasswordPluginConfig
 	Logger          models.Logger
@@ -24,7 +24,21 @@ type SignInUseCase struct {
 	EventBus        models.EventBus
 }
 
-func (uc *SignInUseCase) SignIn(
+func NewSignInUseCase(
+	globalConfig *models.Config,
+	pluginConfig types.EmailPasswordPluginConfig,
+	logger models.Logger,
+	userService rootservices.UserService,
+	accountService rootservices.AccountService,
+	sessionService rootservices.SessionService,
+	tokenService rootservices.TokenService,
+	passwordService rootservices.PasswordService,
+	eventBus models.EventBus,
+) SignInUseCase {
+	return &signInUseCase{GlobalConfig: globalConfig, PluginConfig: pluginConfig, Logger: logger, UserService: userService, AccountService: accountService, SessionService: sessionService, TokenService: tokenService, PasswordService: passwordService, EventBus: eventBus}
+}
+
+func (uc *signInUseCase) SignIn(
 	ctx context.Context,
 	email string,
 	password string,
@@ -78,7 +92,7 @@ func (uc *SignInUseCase) SignIn(
 	}, nil
 }
 
-func (uc *SignInUseCase) publishSignedInEvent(user *models.User) {
+func (uc *signInUseCase) publishSignedInEvent(user *models.User) {
 	userJson, err := json.Marshal(user)
 	if err != nil {
 		uc.Logger.Error(err.Error())
@@ -98,10 +112,10 @@ func (uc *SignInUseCase) publishSignedInEvent(user *models.User) {
 	)
 }
 
-func (uc *SignInUseCase) GetSessionByID(ctx context.Context, sessionID string) (*models.Session, error) {
+func (uc *signInUseCase) GetSessionByID(ctx context.Context, sessionID string) (*models.Session, error) {
 	return uc.SessionService.GetByID(ctx, sessionID)
 }
 
-func (uc *SignInUseCase) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
+func (uc *signInUseCase) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
 	return uc.UserService.GetByID(ctx, userID)
 }

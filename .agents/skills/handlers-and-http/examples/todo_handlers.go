@@ -19,12 +19,13 @@ type CreateTodoRequest struct {
 	SomeOtherField *string `json:"some_other_field,omitempty"`
 }
 
-func (r *CreateTodoRequest) Trim() {
+func (r *CreateTodoRequest) Validate() error {
 	r.Title = strings.TrimSpace(r.Title)
 	r.Description = strings.TrimSpace(r.Description)
 	if r.SomeOtherField != nil {
 		*r.SomeOtherField = strings.TrimSpace(*r.SomeOtherField)
 	}
+	return nil
 }
 
 type CreateTodoResponse struct {
@@ -45,14 +46,19 @@ func (h *CreateTodoHandler) Handle() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		var payload CreateTodoRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
+		var request CreateTodoRequest
+		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
 			reqCtx.Handled = true
 			return
 		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
 
-		todoCreated, err := h.todoService.Create(ctx, &payload)
+		todoCreated, err := h.todoService.Create(ctx, &request)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": "invalid request body"})
 			reqCtx.Handled = true
@@ -71,8 +77,9 @@ type MarkTodoCompleteRequest struct {
 	TodoID string `json:"todo_id"`
 }
 
-func (r *MarkTodoCompleteRequest) Trim() {
+func (r *MarkTodoCompleteRequest) Validate() error {
 	r.TodoID = strings.TrimSpace(r.TodoID)
+	return nil
 }
 
 type MarkTodoCompleteResponse struct {
@@ -92,7 +99,19 @@ func (h *MarkTodoCompleteHandler) Handle() http.HandlerFunc {
 		reqCtx, _ := models.GetRequestContext(ctx)
 		todoID := r.PathValue("id")
 
-		completedTodo, err := h.todoService.MarkAsComplete(ctx, &MarkTodoCompleteRequest{TodoID: todoID})
+		var request MarkTodoCompleteRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+
+		completedTodo, err := h.todoService.MarkAsComplete(ctx, &request)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true

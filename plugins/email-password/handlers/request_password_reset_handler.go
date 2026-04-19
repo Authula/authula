@@ -5,16 +5,12 @@ import (
 
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/email-password/types"
 	"github.com/Authula/authula/plugins/email-password/usecases"
 )
 
-type RequestPasswordResetPayload struct {
-	Email       string `json:"email"`
-	CallbackURL string `json:"callback_url,omitempty"`
-}
-
 type RequestPasswordResetHandler struct {
-	UseCase *usecases.RequestPasswordResetUseCase
+	UseCase usecases.RequestPasswordResetUseCase
 }
 
 func (h *RequestPasswordResetHandler) Handler() http.HandlerFunc {
@@ -22,20 +18,24 @@ func (h *RequestPasswordResetHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		var payload RequestPasswordResetPayload
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
-				"message": err.Error(),
+		var request types.RequestPasswordResetRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
+				"message": "invalid request body",
 			})
 			reqCtx.Handled = true
 			return
 		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
 
-		// Always return 200 to prevent account enumeration
-		_ = h.UseCase.RequestReset(ctx, payload.Email, &payload.CallbackURL)
+		_ = h.UseCase.RequestReset(ctx, request.Email, request.CallbackURL)
 
 		reqCtx.SetJSONResponse(http.StatusOK, map[string]any{
-			"message": "if account exists, password reset link sent to email",
+			"message": "If an account exists, password reset link sent to email",
 		})
 	}
 }

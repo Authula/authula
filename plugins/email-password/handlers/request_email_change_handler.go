@@ -5,16 +5,12 @@ import (
 
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/email-password/types"
 	"github.com/Authula/authula/plugins/email-password/usecases"
 )
 
-type RequestEmailChangePayload struct {
-	NewEmail    string `json:"new_email"`
-	CallbackURL string `json:"callback_url,omitempty"`
-}
-
 type RequestEmailChangeHandler struct {
-	UseCase *usecases.RequestEmailChangeUseCase
+	UseCase usecases.RequestEmailChangeUseCase
 }
 
 func (h *RequestEmailChangeHandler) Handler() http.HandlerFunc {
@@ -28,16 +24,21 @@ func (h *RequestEmailChangeHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		var payload RequestEmailChangePayload
-		if err := util.ParseJSON(r, &payload); err != nil {
+		var request types.RequestEmailChangeRequest
+		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),
 			})
 			reqCtx.Handled = true
 			return
 		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
 
-		err := h.UseCase.RequestChange(ctx, *reqCtx.UserID, payload.NewEmail, &payload.CallbackURL)
+		err := h.UseCase.RequestChange(ctx, *reqCtx.UserID, request.NewEmail, request.CallbackURL)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),

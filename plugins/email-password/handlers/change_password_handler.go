@@ -5,16 +5,12 @@ import (
 
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/email-password/types"
 	"github.com/Authula/authula/plugins/email-password/usecases"
 )
 
-type ChangePasswordPayload struct {
-	Token    string `json:"token"`
-	Password string `json:"password"`
-}
-
 type ChangePasswordHandler struct {
-	UseCase *usecases.ChangePasswordUseCase
+	UseCase usecases.ChangePasswordUseCase
 }
 
 func (h *ChangePasswordHandler) Handler() http.HandlerFunc {
@@ -26,16 +22,21 @@ func (h *ChangePasswordHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		var payload ChangePasswordPayload
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
-				"message": err.Error(),
+		var request types.ChangePasswordRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
+				"message": "invalid request body",
 			})
 			reqCtx.Handled = true
 			return
 		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
 
-		err := h.UseCase.ChangePassword(ctx, payload.Token, payload.Password)
+		err := h.UseCase.ChangePassword(ctx, request.Token, request.Password)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),

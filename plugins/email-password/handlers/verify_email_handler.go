@@ -5,11 +5,12 @@ import (
 	"net/url"
 
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/email-password/types"
 	"github.com/Authula/authula/plugins/email-password/usecases"
 )
 
 type VerifyEmailHandler struct {
-	VerifyEmailUseCase *usecases.VerifyEmailUseCase
+	VerifyEmailUseCase usecases.VerifyEmailUseCase
 }
 
 func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
@@ -17,40 +18,55 @@ func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		tokenStr := r.URL.Query().Get("token")
-		if tokenStr == "" {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
-				"message": "token is required",
-			})
-			reqCtx.Handled = true
-			return
+		token := r.URL.Query().Get("token")
+		var callbackURL string
+		if cb := r.URL.Query().Get("callback_url"); cb != "" {
+			callbackURL = cb
 		}
-
-		verificationType, err := h.VerifyEmailUseCase.VerifyEmail(ctx, tokenStr)
-		if err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
+		request := types.VerifyEmailRequest{
+			Token:       token,
+			CallbackURL: &callbackURL,
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
 				"message": err.Error(),
 			})
 			reqCtx.Handled = true
 			return
 		}
 
-		callbackURL := r.URL.Query().Get("callback_url")
-		if callbackURL != "" {
+		if request.Token == "" {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
+				"message": "token is required",
+			})
+			reqCtx.Handled = true
+			return
+		}
+
+		verificationType, err := h.VerifyEmailUseCase.VerifyEmail(ctx, request.Token)
+		if err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
+				"message": err.Error(),
+			})
+			reqCtx.Handled = true
+			return
+		}
+
+		if request.CallbackURL != nil && *request.CallbackURL != "" {
 			if verificationType == models.TypePasswordResetRequest {
-				u, err := url.Parse(callbackURL)
+				u, err := url.Parse(*request.CallbackURL)
 				if err != nil {
-					reqCtx.RedirectURL = callbackURL + "?token=" + url.QueryEscape(tokenStr)
+					reqCtx.RedirectURL = *request.CallbackURL + "?token=" + url.QueryEscape(request.Token)
 					reqCtx.ResponseStatus = http.StatusFound
 				} else {
 					q := u.Query()
-					q.Set("token", tokenStr)
+					q.Set("token", request.Token)
 					u.RawQuery = q.Encode()
 					reqCtx.RedirectURL = u.String()
 					reqCtx.ResponseStatus = http.StatusFound
 				}
 			} else {
-				reqCtx.RedirectURL = callbackURL
+				reqCtx.RedirectURL = *request.CallbackURL
 				reqCtx.ResponseStatus = http.StatusFound
 			}
 			reqCtx.Handled = true

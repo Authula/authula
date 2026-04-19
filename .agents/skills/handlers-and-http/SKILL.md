@@ -28,7 +28,7 @@ Handlers are the HTTP boundary:
 
 - Define handler struct with service dependency. If a handler needs multiple unrelated services, create a use case struct instead. For example, a `RegisterHandler` needing both `UserService` and `EmailService` should delegate to a `RegisterUseCase` that imports both interfaces, keeping the handler thin and focused on HTTP concerns.
 - Implement `Handle` method with `http.HandlerFunc` type.
-- Parse and validate request. Always include a `Trim()` method on request structs to clean up input but do not trim sensitive fields like passwords, tokens, etc. Before trimming fields on the request struct, check that pointer fields are not nil to avoid dereferencing nil pointers. For example, if you have a request struct with a pointer field like `Email *string`, you should check if `Email` is not nil before calling `strings.TrimSpace()` on it within the `Trim()` method. This ensures that you don't encounter a runtime panic due to dereferencing a nil pointer.
+- Parse and validate request. Always include a `Validate()` method on request structs to clean up input but do not trim sensitive fields like passwords, tokens, etc. Before trimming fields on the request struct, check that pointer fields are not nil to avoid dereferencing nil pointers. For example, if you have a request struct with a pointer field like `Email *string`, you should check if `Email` is not nil before calling `strings.TrimSpace()` on it within the `Validate()` method. This ensures that you don't encounter a runtime panic due to dereferencing a nil pointer.
 - Invoke use case/service
 - Map response to HTTP (status code, headers, JSON) using `reqCtx.SetJSONResponse`.
 - Handle errors consistently
