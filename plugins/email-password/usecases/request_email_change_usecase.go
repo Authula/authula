@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
 	"github.com/Authula/authula/plugins/email-password/types"
+	"github.com/Authula/authula/plugins/email-password/utils"
 	rootservices "github.com/Authula/authula/services"
 )
 
-type RequestEmailChangeUseCase struct {
+type requestEmailChangeUseCase struct {
 	Logger              models.Logger
 	GlobalConfig        *models.Config
 	PluginConfig        types.EmailPasswordPluginConfig
@@ -22,7 +22,19 @@ type RequestEmailChangeUseCase struct {
 	MailerService       rootservices.MailerService
 }
 
-func (uc *RequestEmailChangeUseCase) RequestChange(
+func NewRequestEmailChangeUseCase(
+	logger models.Logger,
+	globalConfig *models.Config,
+	pluginConfig types.EmailPasswordPluginConfig,
+	userService rootservices.UserService,
+	verificationService rootservices.VerificationService,
+	tokenService rootservices.TokenService,
+	mailerService rootservices.MailerService,
+) RequestEmailChangeUseCase {
+	return &requestEmailChangeUseCase{Logger: logger, GlobalConfig: globalConfig, PluginConfig: pluginConfig, UserService: userService, VerificationService: verificationService, TokenService: tokenService, MailerService: mailerService}
+}
+
+func (uc *requestEmailChangeUseCase) RequestChange(
 	ctx context.Context,
 	userID string,
 	newEmail string,
@@ -64,7 +76,7 @@ func (uc *RequestEmailChangeUseCase) RequestChange(
 		return err
 	}
 
-	verificationLink := util.BuildVerificationURL(
+	verificationLink := utils.BuildVerificationURL(
 		uc.GlobalConfig.BaseURL,
 		uc.GlobalConfig.BasePath,
 		token,
@@ -101,7 +113,7 @@ func (uc *RequestEmailChangeUseCase) RequestChange(
 	return nil
 }
 
-func (uc *RequestEmailChangeUseCase) sendRequestEmailChangeEmail(ctx context.Context, user *models.User, newEmail string, verificationLink string) error {
+func (uc *requestEmailChangeUseCase) sendRequestEmailChangeEmail(ctx context.Context, user *models.User, newEmail string, verificationLink string) error {
 	expiryInHours := int(uc.PluginConfig.RequestEmailChangeExpiresIn.Hours())
 	hoursText := "hours"
 	if expiryInHours < 2 {

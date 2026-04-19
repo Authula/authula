@@ -5,16 +5,12 @@ import (
 
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/email-password/types"
 	"github.com/Authula/authula/plugins/email-password/usecases"
 )
 
-type SendEmailVerificationRequestPayload struct {
-	Email       string `json:"email"`
-	CallbackURL string `json:"callback_url,omitempty"`
-}
-
 type SendEmailVerificationHandler struct {
-	UseCase *usecases.SendEmailVerificationUseCase
+	UseCase usecases.SendEmailVerificationUseCase
 }
 
 func (h *SendEmailVerificationHandler) Handler() http.HandlerFunc {
@@ -22,16 +18,23 @@ func (h *SendEmailVerificationHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		var payload SendEmailVerificationRequestPayload
-		if err := util.ParseJSON(r, &payload); err != nil {
+		var request types.SendEmailVerificationRequest
+		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),
 			})
 			reqCtx.Handled = true
 			return
 		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
+				"message": err.Error(),
+			})
+			reqCtx.Handled = true
+			return
+		}
 
-		err := h.UseCase.Send(ctx, payload.Email, &payload.CallbackURL)
+		err := h.UseCase.Send(ctx, request.Email, request.CallbackURL)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
 				"message": err.Error(),

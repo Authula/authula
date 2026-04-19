@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
+	"github.com/Authula/authula/plugins/email-password/utils"
 	rootservices "github.com/Authula/authula/services"
 )
 
-type SendEmailVerificationUseCase struct {
+type sendEmailVerificationUseCase struct {
 	GlobalConfig        *models.Config
 	PluginConfig        types.EmailPasswordPluginConfig
 	Logger              models.Logger
@@ -22,7 +22,19 @@ type SendEmailVerificationUseCase struct {
 	MailerService       rootservices.MailerService
 }
 
-func (uc *SendEmailVerificationUseCase) Send(ctx context.Context, email string, callbackURL *string) error {
+func NewSendEmailVerificationUseCase(
+	globalConfig *models.Config,
+	pluginConfig types.EmailPasswordPluginConfig,
+	logger models.Logger,
+	userService rootservices.UserService,
+	verificationService rootservices.VerificationService,
+	tokenService rootservices.TokenService,
+	mailerService rootservices.MailerService,
+) SendEmailVerificationUseCase {
+	return &sendEmailVerificationUseCase{GlobalConfig: globalConfig, PluginConfig: pluginConfig, Logger: logger, UserService: userService, VerificationService: verificationService, TokenService: tokenService, MailerService: mailerService}
+}
+
+func (uc *sendEmailVerificationUseCase) Send(ctx context.Context, email string, callbackURL *string) error {
 	reqCtx, _ := models.GetRequestContext(ctx)
 
 	if !uc.PluginConfig.RequireEmailVerification {
@@ -73,7 +85,7 @@ func (uc *SendEmailVerificationUseCase) Send(ctx context.Context, email string, 
 		return fmt.Errorf("failed to create verification token: %w", err)
 	}
 
-	verificationLink := util.BuildVerificationURL(
+	verificationLink := utils.BuildVerificationURL(
 		uc.GlobalConfig.BaseURL,
 		uc.GlobalConfig.BasePath,
 		token,
@@ -109,7 +121,7 @@ func (uc *SendEmailVerificationUseCase) Send(ctx context.Context, email string, 
 	return nil
 }
 
-func (uc *SendEmailVerificationUseCase) sendEmailVerification(ctx context.Context, user *models.User, verificationLink string) error {
+func (uc *sendEmailVerificationUseCase) sendEmailVerification(ctx context.Context, user *models.User, verificationLink string) error {
 	expiryInHours := int(uc.PluginConfig.EmailVerificationExpiresIn.Hours())
 	hoursText := "hours"
 	if expiryInHours < 2 {

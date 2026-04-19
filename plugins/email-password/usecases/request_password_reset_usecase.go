@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
+	"github.com/Authula/authula/plugins/email-password/utils"
 	rootservices "github.com/Authula/authula/services"
 )
 
-type RequestPasswordResetUseCase struct {
+type requestPasswordResetUseCase struct {
 	Logger              models.Logger
 	GlobalConfig        *models.Config
 	PluginConfig        types.EmailPasswordPluginConfig
@@ -21,7 +21,19 @@ type RequestPasswordResetUseCase struct {
 	MailerService       rootservices.MailerService
 }
 
-func (uc *RequestPasswordResetUseCase) RequestReset(
+func NewRequestPasswordResetUseCase(
+	logger models.Logger,
+	globalConfig *models.Config,
+	pluginConfig types.EmailPasswordPluginConfig,
+	userService rootservices.UserService,
+	verificationService rootservices.VerificationService,
+	tokenService rootservices.TokenService,
+	mailerService rootservices.MailerService,
+) RequestPasswordResetUseCase {
+	return &requestPasswordResetUseCase{Logger: logger, GlobalConfig: globalConfig, PluginConfig: pluginConfig, UserService: userService, VerificationService: verificationService, TokenService: tokenService, MailerService: mailerService}
+}
+
+func (uc *requestPasswordResetUseCase) RequestReset(
 	ctx context.Context,
 	email string,
 	callbackURL *string,
@@ -52,7 +64,7 @@ func (uc *RequestPasswordResetUseCase) RequestReset(
 		return nil
 	}
 
-	verificationLink := util.BuildVerificationURL(
+	verificationLink := utils.BuildVerificationURL(
 		uc.GlobalConfig.BaseURL,
 		uc.GlobalConfig.BasePath,
 		token,

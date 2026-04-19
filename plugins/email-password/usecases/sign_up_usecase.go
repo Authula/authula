@@ -12,7 +12,7 @@ import (
 	rootservices "github.com/Authula/authula/services"
 )
 
-type SignUpUseCase struct {
+type signUpUseCase struct {
 	GlobalConfig    *models.Config
 	PluginConfig    types.EmailPasswordPluginConfig
 	Logger          models.Logger
@@ -24,7 +24,21 @@ type SignUpUseCase struct {
 	EventBus        models.EventBus
 }
 
-func (uc *SignUpUseCase) SignUp(
+func NewSignUpUseCase(
+	globalConfig *models.Config,
+	pluginConfig types.EmailPasswordPluginConfig,
+	logger models.Logger,
+	userService rootservices.UserService,
+	accountService rootservices.AccountService,
+	sessionService rootservices.SessionService,
+	tokenService rootservices.TokenService,
+	passwordService rootservices.PasswordService,
+	eventBus models.EventBus,
+) SignUpUseCase {
+	return &signUpUseCase{GlobalConfig: globalConfig, PluginConfig: pluginConfig, Logger: logger, UserService: userService, AccountService: accountService, SessionService: sessionService, TokenService: tokenService, PasswordService: passwordService, EventBus: eventBus}
+}
+
+func (uc *signUpUseCase) SignUp(
 	ctx context.Context,
 	name string,
 	email string,
@@ -100,7 +114,7 @@ func (uc *SignUpUseCase) SignUp(
 	}, nil
 }
 
-func (uc *SignUpUseCase) publishSignedUpEvent(user *models.User) {
+func (uc *signUpUseCase) publishSignedUpEvent(user *models.User) {
 	userJson, err := json.Marshal(user)
 	if err != nil {
 		uc.Logger.Error(err.Error())

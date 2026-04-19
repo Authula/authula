@@ -11,18 +11,12 @@ import (
 	"github.com/Authula/authula/plugins/email-password/usecases"
 )
 
-type SignInRequestPayload struct {
-	Email       string `json:"email"`
-	Password    string `json:"password"`
-	CallbackURL string `json:"callback_url,omitempty"`
-}
-
 type SignInHandler struct {
 	Logger                       models.Logger
 	Config                       *models.Config
 	PluginConfig                 types.EmailPasswordPluginConfig
-	SignInUseCase                *usecases.SignInUseCase
-	SendEmailVerificationUseCase *usecases.SendEmailVerificationUseCase
+	SignInUseCase                usecases.SignInUseCase
+	SendEmailVerificationUseCase usecases.SendEmailVerificationUseCase
 }
 
 func (h *SignInHandler) Handler() http.HandlerFunc {
@@ -30,11 +24,16 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		var payload SignInRequestPayload
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
+		var request types.SignInRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
 				"message": "invalid request body",
 			})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -60,9 +59,9 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 		userAgent := r.UserAgent()
 		result, err := h.SignInUseCase.SignIn(
 			ctx,
-			payload.Email,
-			payload.Password,
-			&payload.CallbackURL,
+			request.Email,
+			request.Password,
+			request.CallbackURL,
 			&reqCtx.ClientIP,
 			&userAgent,
 		)
@@ -80,7 +79,7 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 				taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
 				defer cancel()
 
-				if err := h.SendEmailVerificationUseCase.Send(taskCtx, result.User.Email, &payload.CallbackURL); err != nil {
+				if err := h.SendEmailVerificationUseCase.Send(taskCtx, result.User.Email, request.CallbackURL); err != nil {
 					h.Logger.Error("failed to send email", "err", err)
 				}
 			}()

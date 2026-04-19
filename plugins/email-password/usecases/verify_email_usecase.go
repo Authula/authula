@@ -13,7 +13,7 @@ import (
 	rootservices "github.com/Authula/authula/services"
 )
 
-type VerifyEmailUseCase struct {
+type verifyEmailUseCase struct {
 	PluginConfig        types.EmailPasswordPluginConfig
 	Logger              models.Logger
 	UserService         rootservices.UserService
@@ -24,7 +24,20 @@ type VerifyEmailUseCase struct {
 	EventBus            models.EventBus
 }
 
-func (uc *VerifyEmailUseCase) VerifyEmail(ctx context.Context, tokenStr string) (models.VerificationType, error) {
+func NewVerifyEmailUseCase(
+	pluginConfig types.EmailPasswordPluginConfig,
+	logger models.Logger,
+	userService rootservices.UserService,
+	accountService rootservices.AccountService,
+	verificationService rootservices.VerificationService,
+	tokenService rootservices.TokenService,
+	mailerService rootservices.MailerService,
+	eventBus models.EventBus,
+) VerifyEmailUseCase {
+	return &verifyEmailUseCase{PluginConfig: pluginConfig, Logger: logger, UserService: userService, AccountService: accountService, VerificationService: verificationService, TokenService: tokenService, MailerService: mailerService, EventBus: eventBus}
+}
+
+func (uc *verifyEmailUseCase) VerifyEmail(ctx context.Context, tokenStr string) (models.VerificationType, error) {
 	hashedToken := uc.TokenService.Hash(tokenStr)
 
 	verification, err := uc.VerificationService.GetByToken(ctx, hashedToken)
@@ -53,8 +66,7 @@ func (uc *VerifyEmailUseCase) VerifyEmail(ctx context.Context, tokenStr string) 
 		if err := uc.handleEmailVerification(ctx, user, verification.ID); err != nil {
 			return "", err
 		}
-	case models.TypePasswordResetRequest:
-	case models.TypeEmailResetRequest:
+	case models.TypePasswordResetRequest, models.TypeEmailResetRequest:
 		if err := uc.handleEmailChangeVerificationEmail(ctx, *verification.UserID, tokenStr, verification.Identifier); err != nil {
 			return "", err
 		}
@@ -65,7 +77,7 @@ func (uc *VerifyEmailUseCase) VerifyEmail(ctx context.Context, tokenStr string) 
 	return verification.Type, nil
 }
 
-func (uc *VerifyEmailUseCase) handleEmailVerification(ctx context.Context, user *models.User, tokenID string) error {
+func (uc *verifyEmailUseCase) handleEmailVerification(ctx context.Context, user *models.User, tokenID string) error {
 	user.EmailVerified = true
 	if _, err := uc.UserService.Update(ctx, user); err != nil {
 		return err
@@ -95,7 +107,7 @@ func (uc *VerifyEmailUseCase) handleEmailVerification(ctx context.Context, user 
 	return nil
 }
 
-func (uc *VerifyEmailUseCase) handleEmailChangeVerificationEmail(
+func (uc *verifyEmailUseCase) handleEmailChangeVerificationEmail(
 	ctx context.Context,
 	userID string,
 	tokenValue string,
@@ -178,7 +190,7 @@ func (uc *VerifyEmailUseCase) handleEmailChangeVerificationEmail(
 	return nil
 }
 
-func (uc *VerifyEmailUseCase) sendChangedEmailNotifications(ctx context.Context, oldEmail string, newEmail string) error {
+func (uc *verifyEmailUseCase) sendChangedEmailNotifications(ctx context.Context, oldEmail string, newEmail string) error {
 	subject := "Your email has been changed"
 	textBody := fmt.Sprintf("Your account email has been changed from %s to %s. If you did not perform this action, please contact support.", oldEmail, newEmail)
 
@@ -205,7 +217,7 @@ func getHtmlBody(userEmail string, oldEmail string, newEmail string) string {
 	)
 }
 
-func (uc *VerifyEmailUseCase) publishEmailChangedEvent(user *models.User, oldEmail string, newEmail string) {
+func (uc *verifyEmailUseCase) publishEmailChangedEvent(user *models.User, oldEmail string, newEmail string) {
 	userJson, err := json.Marshal(user)
 	if err != nil {
 		uc.Logger.Error(err.Error())

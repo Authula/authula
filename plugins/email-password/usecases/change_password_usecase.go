@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Authula/authula/internal/util"
+	internalutil "github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
 	"github.com/Authula/authula/plugins/email-password/types"
 	rootservices "github.com/Authula/authula/services"
 )
 
-type ChangePasswordUseCase struct {
+type changePasswordUseCase struct {
 	Logger              models.Logger
 	PluginConfig        types.EmailPasswordPluginConfig
 	UserService         rootservices.UserService
@@ -25,7 +25,21 @@ type ChangePasswordUseCase struct {
 	EventBus            models.EventBus
 }
 
-func (uc *ChangePasswordUseCase) ChangePassword(
+func NewChangePasswordUseCase(
+	logger models.Logger,
+	pluginConfig types.EmailPasswordPluginConfig,
+	userService rootservices.UserService,
+	accountService rootservices.AccountService,
+	verificationService rootservices.VerificationService,
+	tokenService rootservices.TokenService,
+	passwordService rootservices.PasswordService,
+	mailerService rootservices.MailerService,
+	eventBus models.EventBus,
+) ChangePasswordUseCase {
+	return &changePasswordUseCase{Logger: logger, PluginConfig: pluginConfig, UserService: userService, AccountService: accountService, VerificationService: verificationService, TokenService: tokenService, PasswordService: passwordService, MailerService: mailerService, EventBus: eventBus}
+}
+
+func (uc *changePasswordUseCase) ChangePassword(
 	ctx context.Context,
 	tokenValue string,
 	newPassword string,
@@ -93,7 +107,7 @@ func (uc *ChangePasswordUseCase) ChangePassword(
 	return nil
 }
 
-func (uc *ChangePasswordUseCase) sendChangedPasswordEmail(ctx context.Context, user *models.User) error {
+func (uc *changePasswordUseCase) sendChangedPasswordEmail(ctx context.Context, user *models.User) error {
 	subject := "Your password has been changed"
 	textBody := "Your password has been successfully changed. If you did not perform this action, please reset your password immediately by requesting a password reset."
 	htmlBody := fmt.Sprintf(
@@ -106,18 +120,18 @@ func (uc *ChangePasswordUseCase) sendChangedPasswordEmail(ctx context.Context, u
 	return uc.MailerService.SendEmail(ctx, user.Email, subject, textBody, htmlBody)
 }
 
-func (uc *ChangePasswordUseCase) publishChangedPasswordEvent(user *models.User) {
+func (uc *changePasswordUseCase) publishChangedPasswordEvent(user *models.User) {
 	userJson, err := json.Marshal(user)
 	if err != nil {
 		uc.Logger.Error(err.Error())
 		return
 	}
 
-	util.PublishEventAsync(
+	internalutil.PublishEventAsync(
 		uc.EventBus,
 		uc.Logger,
 		models.Event{
-			ID:        util.GenerateUUID(),
+			ID:        internalutil.GenerateUUID(),
 			Type:      constants.EventUserChangedPassword,
 			Payload:   userJson,
 			Metadata:  nil,

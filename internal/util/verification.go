@@ -6,11 +6,6 @@ import (
 	"strings"
 )
 
-// BuildVerificationURL constructs the verification endpoint URL with optional callback.
-func BuildVerificationURL(baseURL string, basePath string, token string, callbackURL *string) string {
-	return BuildActionURL(baseURL, basePath, "/verify-email", token, callbackURL)
-}
-
 // BuildActionURL centralizes URL building logic for token-based flows while preserving callback semantics.
 func BuildActionURL(baseURL string, basePath string, actionPath string, token string, callbackURL *string) string {
 	urlToConstruct := buildAbsoluteActionURL(baseURL, basePath, actionPath)

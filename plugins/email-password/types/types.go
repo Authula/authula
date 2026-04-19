@@ -19,6 +19,7 @@ type EmailPasswordPluginConfig struct {
 	EmailVerificationExpiresIn  time.Duration `json:"email_verification_expires_in" toml:"email_verification_expires_in"`
 	PasswordResetExpiresIn      time.Duration `json:"password_reset_expires_in" toml:"password_reset_expires_in"`
 	RequestEmailChangeExpiresIn time.Duration `json:"request_email_change_expires_in" toml:"request_email_change_expires_in"`
+
 	// Function to override sending email verification emails
 	SendEmailVerification func(params SendEmailVerificationParams, reqCtx *models.RequestContext) error `json:"-" toml:"-"`
 	// Function to override sending password reset emails
@@ -69,34 +70,4 @@ type SendRequestEmailChangeEmailParams struct {
 	Token    string
 	NewEmail string
 	OldEmail string
-}
-
-type SignUpResult struct {
-	User         *models.User
-	Session      *models.Session
-	SessionToken string // Empty string if auto sign-in is disabled
-}
-
-type SignUpResponse struct {
-	User    *models.User    `json:"user"`
-	Session *models.Session `json:"session"`
-}
-
-type SignInResult struct {
-	User         *models.User
-	Session      *models.Session
-	SessionToken string
-}
-
-type SignInResponse struct {
-	User    *models.User    `json:"user"`
-	Session *models.Session `json:"session"`
-}
-
-type ChangePasswordResponse struct {
-	Message string `json:"message"`
-}
-
-type ChangeEmailResponse struct {
-	Message string `json:"message"`
 }
