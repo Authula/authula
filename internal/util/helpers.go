@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"net/http"
 	"strings"
 	"time"
 
@@ -165,4 +166,81 @@ func ReadStringSliceMetadata(reqCtx *models.RequestContext, key string) []string
 	}
 
 	return nil
+}
+
+var SupportedRouteMethods = []string{
+	http.MethodGet,
+	http.MethodPost,
+	http.MethodPut,
+	http.MethodPatch,
+	http.MethodDelete,
+}
+
+func ReadStringSliceFromMetadata(metadata map[string]any, key string) []string {
+	if metadata == nil {
+		return nil
+	}
+
+	raw, ok := metadata[key]
+	if !ok || raw == nil {
+		return nil
+	}
+
+	if values, ok := raw.([]string); ok {
+		result := make([]string, 0, len(values))
+		for _, value := range values {
+			trimmed := strings.TrimSpace(value)
+			if trimmed != "" {
+				result = append(result, trimmed)
+			}
+		}
+		return result
+	}
+
+	if valuesAny, ok := raw.([]any); ok {
+		result := make([]string, 0, len(valuesAny))
+		for _, value := range valuesAny {
+			str, ok := value.(string)
+			if !ok {
+				continue
+			}
+
+			trimmed := strings.TrimSpace(str)
+			if trimmed != "" {
+				result = append(result, trimmed)
+			}
+		}
+		return result
+	}
+
+	return nil
+}
+
+func MergeStringSlices(values ...[]string) []string {
+	merged := make([]string, 0)
+	seen := make(map[string]struct{})
+
+	for _, items := range values {
+		for _, value := range items {
+			trimmed := strings.TrimSpace(value)
+			if trimmed == "" {
+				continue
+			}
+			if _, ok := seen[trimmed]; ok {
+				continue
+			}
+			seen[trimmed] = struct{}{}
+			merged = append(merged, trimmed)
+		}
+	}
+
+	return merged
+}
+
+func NormalizeRoutePattern(pattern string) string {
+	trimmed := NormalizePath(pattern)
+	if trimmed == "/" {
+		return trimmed
+	}
+	return strings.ReplaceAll(trimmed, "//", "/")
 }

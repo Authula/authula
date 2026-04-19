@@ -99,9 +99,6 @@ func (p *AdminPlugin) DependsOn() []string {
 }
 
 func (p *AdminPlugin) Routes() []models.Route {
-	if p.Api == nil {
-		return []models.Route{}
-	}
 	return Routes(p.Api)
 }
 

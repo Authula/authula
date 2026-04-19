@@ -123,30 +123,62 @@ func getEnabledFromConfig(config any) (bool, bool) {
 
 // ConvertRouteMetadata converts a list of RouteMapping configs into the internal
 // route metadata map used by the router for plugin routing.
-// Returns a map keyed by "METHOD:path" containing metadata with "plugins" field.
-// Example:
-//
-//	Input: RouteMapping{Path: "/me", Method: "GET", Plugins: ["session.auth"]}
-//	Output: {"GET:/me": {"plugins": ["session.auth"]}}
+// Returns a map keyed by "METHOD:path" containing metadata with "plugins" and "permissions" fields.
+// Route strings can either be METHOD:/path or just /path.
+// Bare paths apply to all supported HTTP methods.
 func ConvertRouteMetadata(routes []models.RouteMapping) (map[string]map[string]any, error) {
 	result := make(map[string]map[string]any)
 
 	for _, route := range routes {
-		if route.Path == "" {
-			return nil, fmt.Errorf("route path cannot be empty")
-		}
-		if route.Method == "" {
-			return nil, fmt.Errorf("route method cannot be empty for path %s", route.Path)
+		if len(route.Paths) == 0 {
+			return nil, fmt.Errorf("route paths cannot be empty")
 		}
 
-		key := route.Method + ":" + route.Path
-		metadata := make(map[string]any)
-		metadata["plugins"] = route.Plugins
-		metadata["permissions"] = route.Permissions
-		result[key] = metadata
+		for _, routePath := range route.Paths {
+			trimmed := strings.TrimSpace(routePath)
+			if trimmed == "" {
+				return nil, fmt.Errorf("route path cannot be empty")
+			}
+
+			methods, pattern, err := parseRouteMappingPath(trimmed)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, method := range methods {
+				key := method + ":" + pattern
+				metadata := result[key]
+				if metadata == nil {
+					metadata = make(map[string]any)
+					result[key] = metadata
+				}
+
+				metadata["plugins"] = MergeStringSlices(ReadStringSliceFromMetadata(metadata, "plugins"), route.Plugins)
+				metadata["permissions"] = MergeStringSlices(ReadStringSliceFromMetadata(metadata, "permissions"), route.Permissions)
+			}
+		}
 	}
 
 	return result, nil
+}
+
+func parseRouteMappingPath(routePath string) ([]string, string, error) {
+	if strings.HasPrefix(routePath, "/") {
+		return SupportedRouteMethods, NormalizeRoutePattern(routePath), nil
+	}
+
+	parts := strings.SplitN(routePath, ":", 2)
+	if len(parts) != 2 {
+		return nil, "", fmt.Errorf("route path must be either METHOD:/path or /path, got %q", routePath)
+	}
+
+	method := strings.ToUpper(strings.TrimSpace(parts[0]))
+	pattern := NormalizeRoutePattern(parts[1])
+	if method == "" {
+		return nil, "", fmt.Errorf("route method cannot be empty for path %q", routePath)
+	}
+
+	return []string{method}, pattern, nil
 }
 
 // ApplyBasePathToMetadataKey applies a basePath prefix to a metadata key (METHOD:path)

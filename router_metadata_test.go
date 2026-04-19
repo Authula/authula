@@ -197,18 +197,15 @@ func TestPluginIDBasedHookExecution(t *testing.T) {
 func TestRouteMetadataConversion(t *testing.T) {
 	routes := []models.RouteMapping{
 		{
-			Path:    "/resource/list",
-			Method:  "GET",
+			Paths:   []string{"GET:/resource/list"},
 			Plugins: []string{"plugin.auth", "plugin.verification"},
 		},
 		{
-			Path:    "/resource/create",
-			Method:  "POST",
+			Paths:   []string{"POST:/resource/create"},
 			Plugins: []string{"plugin.process"},
 		},
 		{
-			Path:    "/resource/update",
-			Method:  "POST",
+			Paths:   []string{"POST:/resource/update"},
 			Plugins: []string{"plugin.auth", "plugin.validation"},
 		},
 	}
@@ -261,6 +258,39 @@ func TestRouteMetadataConversion(t *testing.T) {
 
 	if len(pluginIDs) != 2 || pluginIDs[0] != "plugin.auth" || pluginIDs[1] != "plugin.validation" {
 		t.Errorf("unexpected plugins for %s: %v", key, pluginIDs)
+	}
+}
+
+func TestRouteMetadataConversionSupportsBareWildcardPaths(t *testing.T) {
+	routes := []models.RouteMapping{
+		{
+			Paths:       []string{"/admin/*"},
+			Plugins:     []string{"plugin.admin"},
+			Permissions: []string{"admin.read"},
+		},
+	}
+
+	metadata, err := util.ConvertRouteMetadata(routes)
+	if err != nil {
+		t.Fatalf("ConvertRouteMetadata failed: %v", err)
+	}
+
+	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
+		key := method + ":/admin/*"
+		entry, exists := metadata[key]
+		if !exists {
+			t.Fatalf("expected wildcard key %s in metadata", key)
+		}
+
+		plugins, ok := entry["plugins"].([]string)
+		if !ok || len(plugins) != 1 || plugins[0] != "plugin.admin" {
+			t.Fatalf("unexpected plugins for %s: %v", key, entry["plugins"])
+		}
+
+		permissions, ok := entry["permissions"].([]string)
+		if !ok || len(permissions) != 1 || permissions[0] != "admin.read" {
+			t.Fatalf("unexpected permissions for %s: %v", key, entry["permissions"])
+		}
 	}
 }
 

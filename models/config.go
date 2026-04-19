@@ -21,7 +21,8 @@ type Config struct {
 	EventBus     EventBusConfig     `json:"event_bus" toml:"event_bus"`
 	Plugins      PluginsConfig      `json:"plugins" toml:"plugins"`
 	// RouteMappings defines plugin-to-route mappings.
-	// Each route specifies which plugins should execute hooks for that endpoint.
+	// Each entry can declare multiple routes in Paths using METHOD:/path strings.
+	// A path without a method prefix applies to all HTTP methods.
 	// This enables fully declarative plugin routing in both standalone and library modes.
 	RouteMappings []RouteMapping `json:"route_mappings" toml:"route_mappings"`
 	// PreParsedConfigs stores the original typed plugin config objects.
@@ -132,21 +133,19 @@ type SocialProviderConfig struct {
 // PluginsConfig maps plugin IDs to their configurations
 type PluginsConfig map[string]any
 
-// RouteMapping defines which plugins should execute for a specific route.
-// Used in both standalone and library modes to declaratively map routes to plugins.
+// RouteMapping defines which plugins should execute for one or more routes.
+// Used in both standalone and library modes to declaratively map route patterns to plugins.
 // Standalone: via config.toml [[route_mappings]] table
 // Library: via config.RouteMappings or WithRouteMappings option
+//
 // Example:
 //
 //	[[route_mappings]]
-//	path = "/auth/me"
-//	method = "GET"
+//	paths = ["GET:/auth/me", "/admin/*"]
 //	plugins = ["session.auth", "bearer.auth"]
-//
-// permissions = ["users.read"]
+//	permissions = ["users.read"]
 type RouteMapping struct {
-	Path        string   `json:"path" toml:"path"`
-	Method      string   `json:"method" toml:"method"`
+	Paths       []string `json:"paths" toml:"paths"`
 	Plugins     []string `json:"plugins" toml:"plugins"`
 	Permissions []string `json:"permissions" toml:"permissions"`
 }
