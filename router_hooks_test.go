@@ -696,22 +696,3 @@ func TestRouterRedirectHandledRequest(t *testing.T) {
 		})
 	}
 }
-
-// testHandler is a simple HTTP handler for testing
-type testHandler struct {
-	statusCode int
-	body       string
-	headers    map[string]string
-}
-
-func (h *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if h.headers != nil {
-		for key, val := range h.headers {
-			w.Header().Set(key, val)
-		}
-	}
-	w.WriteHeader(h.statusCode)
-	if _, err := w.Write([]byte(h.body)); err != nil {
-		fmt.Printf("failed to write response body: %v\n", err)
-	}
-}
