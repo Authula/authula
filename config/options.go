@@ -20,10 +20,11 @@ type ConfigOption func(*models.Config)
 func NewConfig(options ...ConfigOption) *models.Config {
 	// Define sensible defaults first
 	config := &models.Config{
-		AppName:  "Authula",
-		BaseURL:  "http://localhost:8080",
-		BasePath: "/auth",
-		Secret:   defaultSecret,
+		AppName:       "Authula",
+		BaseURL:       "http://localhost:8080",
+		BasePath:      "/auth",
+		Secret:        defaultSecret,
+		DisabledPaths: []string{},
 		Session: models.SessionConfig{
 			CookieName:         "authula.session_token",
 			ExpiresIn:          time.Hour * 24 * 7, // 7 days by default
@@ -272,6 +273,12 @@ func WithPlugins(config models.PluginsConfig) ConfigOption {
 func WithRouteMappings(config []models.RouteMapping) ConfigOption {
 	return func(c *models.Config) {
 		c.RouteMappings = config
+	}
+}
+
+func WithDisabledPaths(paths []string) ConfigOption {
+	return func(c *models.Config) {
+		c.DisabledPaths = paths
 	}
 }
 

@@ -186,10 +186,6 @@ func (r *Router) RegisterCustomRoutes(routes []models.Route) {
 }
 
 func (r *Router) shouldSkipRoute(route models.Route, basePath string) bool {
-	if r == nil || r.config == nil {
-		return false
-	}
-
 	path := route.Path
 	if basePath != "" {
 		path = strings.TrimSuffix(basePath, "/") + route.Path
