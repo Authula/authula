@@ -25,6 +25,7 @@ type Config struct {
 	// A path without a method prefix applies to all HTTP methods.
 	// This enables fully declarative plugin routing in both standalone and library modes.
 	RouteMappings []RouteMapping `json:"route_mappings" toml:"route_mappings"`
+	DisabledPaths []string       `json:"disabled_paths" toml:"disabled_paths"`
 	// PreParsedConfigs stores the original typed plugin config objects.
 	// This allows skipping mapstructure unmarshalling and preserving type safety.
 	// Key: plugin ID, Value: typed config struct passed to Auth.New()

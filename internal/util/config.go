@@ -201,3 +201,80 @@ func ApplyBasePathToMetadataKey(key, basePath string) string {
 
 	return method + ":" + fullPath
 }
+
+// IsPathDisabled reports whether a request method/path matches one of the configured disabled paths.
+// Disabled entries support exact METHOD:/path rules and wildcard prefixes such as /organizations/*.
+func IsPathDisabled(method, path string, disabledPaths []string, basePath string) bool {
+	normalizedMethod := strings.ToUpper(strings.TrimSpace(method))
+	normalizedPath := NormalizeRoutePattern(path)
+	normalizedBasePath := NormalizeRoutePattern(basePath)
+
+	for _, disabledPath := range disabledPaths {
+		entry := strings.TrimSpace(disabledPath)
+		if entry == "" {
+			continue
+		}
+
+		entryMethod, entryPattern := parseDisabledPathEntry(entry)
+		if entryPattern == "" {
+			continue
+		}
+
+		if entryMethod != "" && entryMethod != normalizedMethod {
+			continue
+		}
+
+		if disabledPathMatches(normalizedPath, normalizedBasePath, entryPattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func parseDisabledPathEntry(entry string) (string, string) {
+	if strings.Contains(entry, ":") {
+		parts := strings.SplitN(entry, ":", 2)
+		method := strings.ToUpper(strings.TrimSpace(parts[0]))
+		pattern := NormalizeRoutePattern(strings.TrimSpace(parts[1]))
+		return method, pattern
+	}
+
+	return "", NormalizeRoutePattern(entry)
+}
+
+func disabledPathMatches(requestPath, basePath, pattern string) bool {
+	if pattern == "" {
+		return false
+	}
+
+	if prefix, ok := strings.CutSuffix(pattern, "/*"); ok {
+		if prefix == "" {
+			return true
+		}
+
+		if requestPath == prefix || strings.HasPrefix(requestPath, prefix+"/") {
+			return true
+		}
+
+		if basePath != "/" {
+			candidate := NormalizeRoutePattern(strings.TrimPrefix(requestPath, basePath))
+			if candidate == prefix || strings.HasPrefix(candidate, prefix+"/") {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	if requestPath == pattern {
+		return true
+	}
+
+	if basePath != "/" {
+		candidate := NormalizeRoutePattern(strings.TrimPrefix(requestPath, basePath))
+		return candidate == pattern
+	}
+
+	return false
+}
