@@ -127,18 +127,27 @@ func (r *Router) RegisterMiddleware(middleware ...func(http.Handler) http.Handle
 
 // RegisterRoute registers a single route with Chi
 func (r *Router) RegisterRoute(route models.Route) {
+	if r.shouldSkipRoute(route, r.basePath) {
+		return
+	}
 	r.registerRouteWithPrefix(r.basePath, route)
 }
 
 // RegisterCustomRoute registers a custom route without the basePath prefix
 // This is useful for application routes that should not be under the auth basePath
 func (r *Router) RegisterCustomRoute(route models.Route) {
+	if r.shouldSkipRoute(route, "") {
+		return
+	}
 	r.registerRouteWithPrefix("", route)
 }
 
 // RegisterCustomRouteGroup simplifies the management of multiple routes, by allowing to assign a base path and metadata to all child routes.
 func (r *Router) RegisterCustomRouteGroup(group models.RouteGroup) {
 	for _, route := range group.Routes {
+		if r.shouldSkipRoute(route, group.Path) {
+			continue
+		}
 		if route.Metadata != nil {
 			newMetadata := maps.Clone(group.Metadata)
 			maps.Copy(newMetadata, route.Metadata)
@@ -158,6 +167,9 @@ func (r *Router) RegisterCustomRouteGroup(group models.RouteGroup) {
 // RegisterRoutes registers multiple routes with an optional base path
 func (r *Router) RegisterRoutes(routes []models.Route) {
 	for _, route := range routes {
+		if r.shouldSkipRoute(route, r.basePath) {
+			continue
+		}
 		r.registerRouteWithPrefix(r.basePath, route)
 	}
 }
@@ -166,8 +178,24 @@ func (r *Router) RegisterRoutes(routes []models.Route) {
 // This is useful for application routes that should not be under the auth basePath
 func (r *Router) RegisterCustomRoutes(routes []models.Route) {
 	for _, route := range routes {
+		if r.shouldSkipRoute(route, "") {
+			continue
+		}
 		r.registerRouteWithPrefix("", route)
 	}
+}
+
+func (r *Router) shouldSkipRoute(route models.Route, basePath string) bool {
+	if r == nil || r.config == nil {
+		return false
+	}
+
+	path := route.Path
+	if basePath != "" {
+		path = strings.TrimSuffix(basePath, "/") + route.Path
+	}
+
+	return util.IsPathDisabled(route.Method, path, r.config.DisabledPaths, basePath)
 }
 
 // SetRouteMetadataFromConfig sets route metadata mappings from RouteMappings.
@@ -507,6 +535,12 @@ func (r *Router) Handler() http.Handler {
 
 // ServeHTTP implements http.Handler for testing and direct use
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if r.isRequestDisabled(req) {
+		r.applyCORS(req, w)
+		util.JSONResponse(w, http.StatusNotFound, map[string]any{"message": "Not Found"})
+		return
+	}
+
 	// Wrap response writer to defer writes
 	wrappedWriter := &router.DeferredResponseWriter{
 		Wrapped: w,
@@ -539,6 +573,17 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// Associate request context with wrapped writer
 	wrappedWriter.SetRequestContext(reqCtx)
+
+	if util.IsPathDisabled(req.Method, req.URL.Path, r.config.DisabledPaths, r.basePath) {
+		reqCtx.Route = &models.Route{
+			Method:   req.Method,
+			Path:     req.URL.Path,
+			Metadata: make(map[string]any),
+		}
+		reqCtx.SetResponse(http.StatusNotFound, make(http.Header), nil)
+		r.finalizeResponse(reqCtx, wrappedWriter)
+		return
+	}
 
 	// Lookup route metadata
 	metadata, _, exists := r.getRouteMetadata(req.Method, req.URL.Path)
@@ -602,6 +647,18 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// Flush deferred writes or captured response
 	r.finalizeResponse(reqCtx, wrappedWriter)
+}
+
+func (r *Router) isRequestDisabled(req *http.Request) bool {
+	if len(r.config.DisabledPaths) == 0 {
+		return false
+	}
+
+	if util.IsPathDisabled(req.Method, req.URL.Path, r.config.DisabledPaths, r.basePath) {
+		return true
+	}
+
+	return util.IsPathDisabled(req.Method, req.URL.Path, r.config.DisabledPaths, "")
 }
 
 func (r *Router) applyRedirectIfSet(reqCtx *models.RequestContext) {

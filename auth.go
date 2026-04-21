@@ -271,8 +271,6 @@ func (auth *Auth) Handler() http.Handler {
 
 		currentConfig := auth.config
 
-		// Convert route mappings to metadata format for plugin routing
-		// This works identically whether RouteMappings come from config file or library mode
 		if len(currentConfig.RouteMappings) > 0 {
 			routeMetadata, err := util.ConvertRouteMetadata(currentConfig.RouteMappings)
 			if err != nil {
@@ -287,7 +285,6 @@ func (auth *Auth) Handler() http.Handler {
 			}
 		}
 
-		// Register Plugin Routes
 		for _, plugin := range auth.PluginRegistry.Plugins() {
 			if !util.IsPluginEnabled(currentConfig, plugin.Metadata().ID) {
 				continue
@@ -301,7 +298,6 @@ func (auth *Auth) Handler() http.Handler {
 			}
 		}
 
-		// Register Plugin Hooks
 		for _, plugin := range auth.PluginRegistry.Plugins() {
 			if !util.IsPluginEnabled(currentConfig, plugin.Metadata().ID) {
 				continue

@@ -96,18 +96,19 @@ func TestBunRolesRepositoryCreateRole(t *testing.T) {
 			}
 			if stored == nil {
 				t.Fatal("expected stored role, got nil")
-			}
-			if stored.ID != tc.wantID || stored.Name != tc.wantName {
-				t.Fatalf("unexpected stored role: %#v", stored)
-			}
-			if !stringPtrEqual(stored.Description, tc.wantDesc) {
-				t.Fatalf("expected description %#v, got %#v", tc.wantDesc, stored.Description)
-			}
-			if stored.Weight != tc.wantWeight {
-				t.Fatalf("expected weight %d, got %d", tc.wantWeight, stored.Weight)
-			}
-			if stored.CreatedAt.IsZero() || stored.UpdatedAt.IsZero() {
-				t.Fatal("expected timestamps to be populated")
+			} else {
+				if stored.ID != tc.wantID || stored.Name != tc.wantName {
+					t.Fatalf("unexpected stored role: %#v", stored)
+				}
+				if !stringPtrEqual(stored.Description, tc.wantDesc) {
+					t.Fatalf("expected description %#v, got %#v", tc.wantDesc, stored.Description)
+				}
+				if stored.Weight != tc.wantWeight {
+					t.Fatalf("expected weight %d, got %d", tc.wantWeight, stored.Weight)
+				}
+				if stored.CreatedAt.IsZero() || stored.UpdatedAt.IsZero() {
+					t.Fatal("expected timestamps to be populated")
+				}
 			}
 		})
 	}
@@ -288,15 +289,16 @@ func TestBunRolesRepositoryGetRoleByID(t *testing.T) {
 			}
 			if role == nil {
 				t.Fatal("expected role, got nil")
-			}
-			if role.ID != tc.roleID || role.Name != tc.wantName || role.IsSystem != tc.wantSystem {
-				t.Fatalf("unexpected role: %#v", role)
-			}
-			if !stringPtrEqual(role.Description, tc.wantDesc) {
-				t.Fatalf("expected description %#v, got %#v", tc.wantDesc, role.Description)
-			}
-			if role.Weight != tc.wantWeight {
-				t.Fatalf("expected weight %d, got %d", tc.wantWeight, role.Weight)
+			} else {
+				if role.ID != tc.roleID || role.Name != tc.wantName || role.IsSystem != tc.wantSystem {
+					t.Fatalf("unexpected role: %#v", role)
+				}
+				if !stringPtrEqual(role.Description, tc.wantDesc) {
+					t.Fatalf("expected description %#v, got %#v", tc.wantDesc, role.Description)
+				}
+				if role.Weight != tc.wantWeight {
+					t.Fatalf("expected weight %d, got %d", tc.wantWeight, role.Weight)
+				}
 			}
 		})
 	}
@@ -384,15 +386,16 @@ func TestBunRolesRepositoryGetRoleByName(t *testing.T) {
 			}
 			if role == nil {
 				t.Fatal("expected role, got nil")
-			}
-			if role.Name != tc.wantName || role.IsSystem != tc.wantSystem {
-				t.Fatalf("unexpected role: %#v", role)
-			}
-			if !stringPtrEqual(role.Description, tc.wantDesc) {
-				t.Fatalf("expected description %#v, got %#v", tc.wantDesc, role.Description)
-			}
-			if role.Weight != tc.wantWeight {
-				t.Fatalf("expected weight %d, got %d", tc.wantWeight, role.Weight)
+			} else {
+				if role.Name != tc.wantName || role.IsSystem != tc.wantSystem {
+					t.Fatalf("unexpected role: %#v", role)
+				}
+				if !stringPtrEqual(role.Description, tc.wantDesc) {
+					t.Fatalf("expected description %#v, got %#v", tc.wantDesc, role.Description)
+				}
+				if role.Weight != tc.wantWeight {
+					t.Fatalf("expected weight %d, got %d", tc.wantWeight, role.Weight)
+				}
 			}
 		})
 	}
@@ -519,18 +522,19 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 			}
 			if role == nil {
 				t.Fatal("expected updated role, got nil")
-			}
-			if role.Name != derefOrEmpty(tc.wantName) {
-				t.Fatalf("expected name %q, got %q", derefOrEmpty(tc.wantName), role.Name)
-			}
-			if !stringPtrEqual(role.Description, tc.wantDesc) {
-				t.Fatalf("expected description %#v, got %#v", tc.wantDesc, role.Description)
-			}
-			if tc.wantWeight != nil && role.Weight != *tc.wantWeight {
-				t.Fatalf("expected weight %d, got %d", *tc.wantWeight, role.Weight)
-			}
-			if role.UpdatedAt.IsZero() {
-				t.Fatal("expected updated_at to be populated")
+			} else {
+				if role.Name != derefOrEmpty(tc.wantName) {
+					t.Fatalf("expected name %q, got %q", derefOrEmpty(tc.wantName), role.Name)
+				}
+				if !stringPtrEqual(role.Description, tc.wantDesc) {
+					t.Fatalf("expected description %#v, got %#v", tc.wantDesc, role.Description)
+				}
+				if tc.wantWeight != nil && role.Weight != *tc.wantWeight {
+					t.Fatalf("expected weight %d, got %d", *tc.wantWeight, role.Weight)
+				}
+				if role.UpdatedAt.IsZero() {
+					t.Fatal("expected updated_at to be populated")
+				}
 			}
 		})
 	}

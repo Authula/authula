@@ -71,17 +71,18 @@ func TestBunPermissionsRepositoryCreatePermission(t *testing.T) {
 			}
 			if stored == nil {
 				t.Fatal("expected stored permission, got nil")
-			}
-			if stored.ID != tc.wantID || stored.Key != tc.wantKey {
-				t.Fatalf("unexpected stored permission: %#v", stored)
-			}
-			if tc.wantDescription != nil {
-				if stored.Description == nil || *stored.Description != *tc.wantDescription {
-					t.Fatalf("expected description %q, got %#v", *tc.wantDescription, stored.Description)
+			} else {
+				if stored.ID != tc.wantID || stored.Key != tc.wantKey {
+					t.Fatalf("unexpected stored permission: %#v", stored)
 				}
-			}
-			if stored.CreatedAt.IsZero() || stored.UpdatedAt.IsZero() {
-				t.Fatal("expected timestamps to be populated")
+				if tc.wantDescription != nil {
+					if stored.Description == nil || *stored.Description != *tc.wantDescription {
+						t.Fatalf("expected description %q, got %#v", *tc.wantDescription, stored.Description)
+					}
+				}
+				if stored.CreatedAt.IsZero() || stored.UpdatedAt.IsZero() {
+					t.Fatal("expected timestamps to be populated")
+				}
 			}
 		})
 	}

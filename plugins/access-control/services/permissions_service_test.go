@@ -44,18 +44,19 @@ func TestPermissionsServiceCreatePermission(t *testing.T) {
 			assert: func(t *testing.T, permission *types.Permission) {
 				if permission == nil {
 					t.Fatal("expected permission, got nil")
-				}
-				if permission.ID == "" {
-					t.Fatal("expected generated ID")
-				}
-				if permission.Key != "users.read" {
-					t.Fatalf("expected key %q, got %q", "users.read", permission.Key)
-				}
-				if permission.Description == nil || *permission.Description != description {
-					t.Fatalf("expected description %q, got %#v", description, permission.Description)
-				}
-				if !permission.IsSystem {
-					t.Fatal("expected system permission flag to be preserved")
+				} else {
+					if permission.ID == "" {
+						t.Fatal("expected generated ID")
+					}
+					if permission.Key != "users.read" {
+						t.Fatalf("expected key %q, got %q", "users.read", permission.Key)
+					}
+					if permission.Description == nil || *permission.Description != description {
+						t.Fatalf("expected description %q, got %#v", description, permission.Description)
+					}
+					if !permission.IsSystem {
+						t.Fatal("expected system permission flag to be preserved")
+					}
 				}
 			},
 		},
