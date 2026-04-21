@@ -9,23 +9,23 @@ import (
 // Config holds the core configuration for Authula.
 type Config struct {
 	// Core identity
-	AppName      string             `json:"app_name" toml:"app_name"`
-	BaseURL      string             `json:"base_url" toml:"base_url"`
-	BasePath     string             `json:"base_path" toml:"base_path"`
-	Secret       string             `json:"secret" toml:"secret"`
-	Database     DatabaseConfig     `json:"database" toml:"database"`
-	Logger       LoggerConfig       `json:"logger" toml:"logger"`
-	Session      SessionConfig      `json:"session" toml:"session"`
-	Verification VerificationConfig `json:"verification" toml:"verification"`
-	Security     SecurityConfig     `json:"security" toml:"security"`
-	EventBus     EventBusConfig     `json:"event_bus" toml:"event_bus"`
-	Plugins      PluginsConfig      `json:"plugins" toml:"plugins"`
+	AppName       string             `json:"app_name" toml:"app_name"`
+	BaseURL       string             `json:"base_url" toml:"base_url"`
+	BasePath      string             `json:"base_path" toml:"base_path"`
+	Secret        string             `json:"secret" toml:"secret"`
+	DisabledPaths []string           `json:"disabled_paths" toml:"disabled_paths"`
+	Database      DatabaseConfig     `json:"database" toml:"database"`
+	Logger        LoggerConfig       `json:"logger" toml:"logger"`
+	Session       SessionConfig      `json:"session" toml:"session"`
+	Verification  VerificationConfig `json:"verification" toml:"verification"`
+	Security      SecurityConfig     `json:"security" toml:"security"`
+	EventBus      EventBusConfig     `json:"event_bus" toml:"event_bus"`
+	Plugins       PluginsConfig      `json:"plugins" toml:"plugins"`
 	// RouteMappings defines plugin-to-route mappings.
 	// Each entry can declare multiple routes in Paths using METHOD:/path strings.
 	// A path without a method prefix applies to all HTTP methods.
 	// This enables fully declarative plugin routing in both standalone and library modes.
 	RouteMappings []RouteMapping `json:"route_mappings" toml:"route_mappings"`
-	DisabledPaths []string       `json:"disabled_paths" toml:"disabled_paths"`
 	// PreParsedConfigs stores the original typed plugin config objects.
 	// This allows skipping mapstructure unmarshalling and preserving type safety.
 	// Key: plugin ID, Value: typed config struct passed to Auth.New()

@@ -41,5 +41,6 @@ func Load(path string) (*authulamodels.Config, bool, error) {
 		authulaconfig.WithEventBus(loaded.EventBus),
 		authulaconfig.WithPlugins(loaded.Plugins),
 		authulaconfig.WithRouteMappings(loaded.RouteMappings),
+		authulaconfig.WithDisabledPaths(loaded.DisabledPaths),
 	), true, nil
 }
