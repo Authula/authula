@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./project-logo.png" height="100" width="250" alt="Authula Logo"/>
+  <img src="./authula-banner.png" width="800" alt="Authula Logo"/>
 </p>
 
 <div align="center">
@@ -45,7 +45,7 @@ Authula is ideal for:
 
 ---
 
-### 🧩 Plugins & Capabilities
+### Plugins & Capabilities
 
 Authula is architected around a powerful plugin and capability system.
 
@@ -67,16 +67,16 @@ This design empowers you to build secure, maintainable, and highly customizable 
 
 Authula comes with a variety of plugins that provide essential authentication features out of the box:
 
-- 📧 Email & Password: Email-based flows for registration, login, email verification, password reset & email change.
-- 🌐 OAuth providers
-- 🔐 TOTP: Authenticator app support, backup codes, trusted devices for two-factor authentication
-- 💾 Multiple database backends (SQLite, PostgreSQL, MySQL)
-- 🗄️ Secondary storage (In-memory, DB, Redis)
-- ⚡ Rate limiting
-- 🛡️ CSRF protection
-- 🪝 Hooks system
-- 📨 Event bus
-- 🧩 Custom routes and logic
+- Email & Password: Email-based flows for registration, login, email verification, password reset & email change.
+- OAuth providers
+- TOTP: Authenticator app support, backup codes, trusted devices for two-factor authentication
+- Multiple database backends (SQLite, PostgreSQL, MySQL)
+- Secondary storage (In-memory, DB, Redis)
+- Rate limiting
+- CSRF protection
+- Hooks system
+- Event bus
+- Custom routes and logic
 
 ---
 
@@ -109,7 +109,7 @@ Build your own plugins for:
 
 ---
 
-### 🧠 Design Principles
+### Design Principles
 
 - Plugin-first architecture
 - Clean architecture
@@ -150,8 +150,6 @@ Your contributions are welcome! Here's how you can get involved:
 - Set up your development environment by following our [Contribution Guide](./.github/CONTRIBUTING.md).
 - Contribute code by making a [pull request](https://github.com/Authula/authula/) to enhance features, improve user experience, or fix issues.
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Authula/authula&type=date&legend=top-left)](https://www.star-history.com/#Authula/authula&type=date&legend=top-left)
-
 ---
 
 ### Support & Community
@@ -160,17 +158,19 @@ Join our growing community for support, discussions, and updates:
 
 - [Discord Server](https://discord.gg/nThBksdr2Z)
 
----
-
-### 💎 Support Development
-
-If you'd like to support the ongoing development of this project, consider subscribing on Polar, it means a lot to me!
+If you'd like to support the ongoing development of this project, consider subscribing on Polar!
 
 [![Subscribe on Polar](https://img.shields.io/badge/Subscribe-on%20Polar-00d1ff?style=for-the-badge&logo=polar&logoColor=white)](https://buy.polar.sh/polar_cl_Q8rpefucf3fmnRTTeIvPCiE6ZvfMKclwxlyOz283ZC7)
 
 ---
 
-### 💖 Our Sponsors
+### GitHub Stars
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Authula/authula&type=date&legend=top-left)](https://www.star-history.com/#Authula/authula&type=date&legend=top-left)
+
+---
+
+### Our Sponsors
 
 #### 🏢 Corporate Sponsors
 
