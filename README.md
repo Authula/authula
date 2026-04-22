@@ -25,9 +25,7 @@
 
 ---
 
-### Introduction
-
-✨ Overview
+### Overview
 
 **Authula** is an open-source authentication solution that scales with you. Embed it as a library in your Go app, or run it as a standalone auth server with any tech stack. It simplifies adding robust authentication to backend services, empowering developers to build secure applications faster.
 
@@ -35,7 +33,7 @@ All functionality is delivered through a powerful plugin system, allowing you to
 
 ---
 
-### 🎯 Who is it for?
+### Who is it for?
 
 Authula is ideal for:
 
@@ -43,11 +41,11 @@ Authula is ideal for:
 - Teams building microservices or multi-backend systems
 - Companies with self-hosting or compliance requirements
 - Go developers who want first-class embedded auth
-- Anyone who wants modern auth without SaaS lock-in
+- Anyone who wants modern auth without SaaS lock-in and full extensibility
 
 ---
 
-🧩 Plugins & Capabilities
+### 🧩 Plugins & Capabilities
 
 Authula is architected around a powerful plugin and capability system.
 
@@ -69,11 +67,11 @@ This design empowers you to build secure, maintainable, and highly customizable 
 
 Authula comes with a variety of plugins that provide essential authentication features out of the box:
 
-- 📧 Email & Password: Authentication, Email Verification & Password Reset
+- 📧 Email & Password: Email-based flows for registration, login, email verification, password reset & email change.
 - 🌐 OAuth providers
 - 🔐 TOTP: Authenticator app support, backup codes, trusted devices for two-factor authentication
-- 💾 Multiple database backends
-- 🗄️ Secondary storage (Redis, memory, DB)
+- 💾 Multiple database backends (SQLite, PostgreSQL, MySQL)
+- 🗄️ Secondary storage (In-memory, DB, Redis)
 - ⚡ Rate limiting
 - 🛡️ CSRF protection
 - 🪝 Hooks system
@@ -84,7 +82,7 @@ Authula comes with a variety of plugins that provide essential authentication fe
 
 ### Hooks System
 
-Authula includes a powerful, lifecycle-based hooks system that lets you intercept and customize request handling at every stage of the HTTP pipeline.
+Authula includes a powerful, lifecycle-based hooks system that lets you intercept and customize request handling at every stage of the HTTP request/response cycle.
 
 Hooks allow you to implement:
 
@@ -111,119 +109,6 @@ Build your own plugins for:
 
 ---
 
-### Deployment Modes
-
-`Standalone Mode:`
-
-Configure server settings via `config.toml`:
-
-```toml
-app_name = "Authula"
-base_url = "http://localhost:8080"
-base_path = "/api/auth"
-
-[database]
-provider = "postgres"
-# ...
-
-[logger]
-level = "info"
-
-[session]
-cookie_name = "authula.session_token"
-# ...
-
-# and other core settings you can configure...
-
-# finally, configure powerful plugins...
-[plugins]
-
-[plugins.secondary_storage]
-enabled = true
-provider = "redis"
-# ...
-
-[plugins.email]
-enabled = true
-provider = "smtp"
-# ...
-
-[plugins.csrf]
-enabled = true
-# ...
-
-[plugins.email_password]
-enabled = true
-# ...
-
-[plugins.session]
-enabled = true
-# ...
-
-# and much more...
-```
-
-Then run Authula standalone via Docker:
-
-```bash
-docker run -itd -p 8080:8080 \
-  -v $(pwd)/config.toml:/home/appuser/config.toml \
-  -e AUTHULA_BASE_URL=http://localhost:8080 \
-  -e AUTHULA_SECRET=my-app-secret \
-  -e AUTHULA_DATABASE_URL=<your_connection_string> \
-  # other env vars depending on plugins used...
-  ghcr.io/authula/authula:latest
-```
-
-You get:
-
-- Auth microservice
-- Driven by file-based config
-- Deployable using Docker
-- Use it alongside any tech stack over HTTP.
-
-`Embedded Mode (Go Library):`
-
-Embed Authula directly into your Go application:
-
-```go
-import (
-  authula "github.com/Authula/authula"
-  authulaconfig "github.com/Authula/authula/config"
-  authulamodels "github.com/Authula/authula/models"
-  authulaenv "github.com/Authula/authula/env"
-)
-
-config := authulaconfig.NewConfig(
-  authulaconfig.WithAppName("AuthulaPlayground"),
-  authulaconfig.WithBasePath("/api/auth"),
-  authulaconfig.WithDatabase(authulamodels.DatabaseConfig{
-    Provider: "postgres",
-    URL:      os.Getenv(authulaenv.EnvDatabaseURL),
-  }),
-  // other config options...
-)
-
-auth := authula.New(authula.AuthConfig{
-  Config:  config,
-  Plugins: []authulamodels.Plugin{
-    emailpasswordplugin.New(...),
-    // other plugins...
-  },
-})
-
-http.ListenAndServe(":8080", auth.Handler())
-```
-
-You get:
-
-- Zero network overhead
-- Full type safety
-- Native integration
-- Maximum performance
-
----
-
 ### 🧠 Design Principles
 
 - Plugin-first architecture
@@ -234,6 +119,12 @@ You get:
 - Framework agnostic
 - Self-hosted
 - Extensible
+
+---
+
+### Quick Start
+
+[Get Started with Authula](https://authula.vercel.app/docs/get-started/installation)
 
 ---
 
