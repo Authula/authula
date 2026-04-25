@@ -30,8 +30,9 @@ type eventBus struct {
 	pubsub models.PubSub
 	logger watermill.LoggerAdapter
 
-	mu     sync.RWMutex
-	topics map[string]*topicState
+	mu       sync.RWMutex
+	topics   map[string]*topicState
+	wildcard *topicState
 
 	subIDCounter atomic.Uint64
 
@@ -58,6 +59,7 @@ func NewEventBus(config *models.Config, logger watermill.LoggerAdapter, ps model
 		pubsub:     ps,
 		logger:     logger,
 		topics:     make(map[string]*topicState),
+		wildcard:   &topicState{},
 		handlerSem: make(chan struct{}, maxHandlers),
 		rootCtx:    rootCtx,
 		cancel:     cancel,
@@ -102,7 +104,13 @@ func (bus *eventBus) Publish(ctx context.Context, evt models.Event) error {
 		},
 	}
 
-	return bus.pubsub.Publish(ctx, bus.topic(event.Type), msg)
+	if err := bus.pubsub.Publish(ctx, bus.topic(event.Type), msg); err != nil {
+		return err
+	}
+
+	bus.dispatchForWildcard(ctx, event)
+
+	return nil
 }
 
 func (bus *eventBus) Subscribe(
@@ -113,6 +121,20 @@ func (bus *eventBus) Subscribe(
 		return 0, fmt.Errorf("eventbus: handler must not be nil")
 	}
 
+	if eventType == models.EventTypeWildcard {
+		id := models.SubscriptionID(bus.subIDCounter.Add(1))
+
+		bus.mu.Lock()
+		defer bus.mu.Unlock()
+
+		bus.wildcard.handlers = append(bus.wildcard.handlers, handlerEntry{
+			id:      id,
+			handler: handler,
+		})
+
+		return id, nil
+	}
+
 	topic := bus.topic(eventType)
 	id := models.SubscriptionID(bus.subIDCounter.Add(1))
 
@@ -121,7 +143,7 @@ func (bus *eventBus) Subscribe(
 
 	state, exists := bus.topics[topic]
 
-	// First subscriber  start resilient consumer loop that re-subscribes on transport disconnects
+	// First subscriber start resilient consumer loop that re-subscribes on transport disconnects
 	if !exists {
 		ctx, cancel := context.WithCancel(bus.rootCtx)
 
@@ -143,6 +165,21 @@ func (bus *eventBus) Subscribe(
 }
 
 func (bus *eventBus) Unsubscribe(eventType string, id models.SubscriptionID) {
+	if eventType == models.EventTypeWildcard {
+		bus.mu.Lock()
+		defer bus.mu.Unlock()
+
+		handlers := bus.wildcard.handlers
+		for i, entry := range handlers {
+			if entry.id == id {
+				bus.wildcard.handlers = append(handlers[:i], handlers[i+1:]...)
+				break
+			}
+		}
+
+		return
+	}
+
 	topic := bus.topic(eventType)
 
 	bus.mu.Lock()
@@ -165,6 +202,19 @@ func (bus *eventBus) Unsubscribe(eventType string, id models.SubscriptionID) {
 	if len(state.handlers) == 0 {
 		state.cancel()
 		delete(bus.topics, topic)
+	}
+}
+
+func (bus *eventBus) dispatchForWildcard(ctx context.Context, event models.Event) {
+	bus.mu.RLock()
+	handlers := append([]handlerEntry(nil), bus.wildcard.handlers...)
+	bus.mu.RUnlock()
+
+	for _, entry := range handlers {
+		bus.handlerSem <- struct{}{}
+		bus.wg.Add(1)
+
+		go bus.callHandler(ctx, entry.handler, event)
 	}
 }
 

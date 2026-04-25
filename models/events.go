@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// EventTypeWildcard is the reserved internal subscription key for receiving all events.
+const EventTypeWildcard = "*"
+
 // Event represents data to be published or received via the EventBus
 type Event struct {
 	ID        string            `json:"id"`
