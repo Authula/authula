@@ -28,6 +28,10 @@ func BuildAPI(plugin *OrganizationsPlugin) *API {
 
 // Organizations
 
+func (a *API) ExistsByID(ctx context.Context, organizationID string) (bool, error) {
+	return a.organizationService.ExistsByID(ctx, organizationID)
+}
+
 func (a *API) CreateOrganization(ctx context.Context, actor *models.Actor, request types.CreateOrganizationRequest) (*types.Organization, error) {
 	return a.organizationService.CreateOrganization(ctx, actor, request)
 }

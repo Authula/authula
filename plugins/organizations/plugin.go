@@ -90,6 +90,8 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 
 	p.Api = BuildAPI(p)
 
+	ctx.ServiceRegistry.Register(models.ServiceOrganization.String(), OrganizationLookupService(p.Api))
+
 	return nil
 }
 

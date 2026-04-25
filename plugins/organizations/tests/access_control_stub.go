@@ -81,6 +81,16 @@ func (s *AccessControlServiceStub) ValidateRoleAssignment(ctx context.Context, r
 	return true, nil
 }
 
+func (s *AccessControlServiceStub) ValidatePermissionKeys(ctx context.Context, permissionKeys []string) error {
+	_ = ctx
+	_ = permissionKeys
+	if s != nil && s.Err != nil {
+		return s.Err
+	}
+
+	return nil
+}
+
 func (s *AccessControlServiceStub) roleWeight(roleName string) (int, bool) {
 	if s == nil {
 		return 0, false

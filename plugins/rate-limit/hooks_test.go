@@ -200,7 +200,7 @@ func TestRateLimitPluginHandleStoreRateLimitRuleHook(t *testing.T) {
 			contextValue:     models.RateLimitRuleContext{Key: "rule-1", WindowSeconds: 60, MaxRequests: 10},
 			provider:         plugintests.NewFakeRateLimitProvider().WithExistingRule("rule-1", time.Minute, 10),
 			expectedGetCalls: 1,
-			expectedSetCalls: 0,
+			expectedSetCalls: 1,
 		},
 		{
 			name:                 "new rule is stored",

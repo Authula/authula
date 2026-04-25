@@ -5,11 +5,10 @@ import (
 	"time"
 )
 
-// RateLimitEntry tracks requests for a specific key
-type RateLimitEntry struct {
+// RateLimitValue contains the data for a rate limited key
+type RateLimitValue struct {
 	Count     int
-	FirstReq  time.Time
-	LastReset time.Time
+	ExpiresAt time.Time
 }
 
 // RateLimitCheckRequest contains the information needed to check rate limits
@@ -36,6 +35,8 @@ type RateLimitCheckResponse struct {
 type RateLimitProvider interface {
 	// GetName returns the name of the provider
 	GetName() string
+	// GetValue returns a key's value
+	GetValue(ctx context.Context, key string) (any, error)
 	// CheckAndIncrement checks if a request is allowed and increments the counter if so
 	// key is the fully-qualified key (with prefix already included)
 	// window is the time window for expiration

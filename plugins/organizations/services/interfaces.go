@@ -13,6 +13,7 @@ type OrganizationService interface {
 	GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error)
 	UpdateOrganization(ctx context.Context, actor *models.Actor, organizationID string, request types.UpdateOrganizationRequest) (*types.Organization, error)
 	DeleteOrganization(ctx context.Context, actor *models.Actor, organizationID string) error
+	ExistsByID(ctx context.Context, organizationID string) (bool, error)
 }
 
 type OrganizationInvitationService interface {

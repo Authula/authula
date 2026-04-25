@@ -9,6 +9,8 @@ import (
 	accesscontrolplugintypes "github.com/Authula/authula/plugins/access-control/types"
 	adminplugin "github.com/Authula/authula/plugins/admin"
 	adminplugintypes "github.com/Authula/authula/plugins/admin/types"
+	apikeyplugin "github.com/Authula/authula/plugins/api-key"
+	apikeyplugintypes "github.com/Authula/authula/plugins/api-key/types"
 	bearerplugin "github.com/Authula/authula/plugins/bearer"
 	csrfplugin "github.com/Authula/authula/plugins/csrf"
 	emailplugin "github.com/Authula/authula/plugins/email"
@@ -263,6 +265,22 @@ var pluginFactories = []PluginFactory{
 		},
 		Constructor: func(typedConfig any) models.Plugin {
 			return totpplugin.New(typedConfig.(totplugintypes.TOTPPluginConfig))
+		},
+	},
+	{
+		ID:                models.PluginApiKey.String(),
+		RequiredByDefault: false,
+		ConfigParser: func(rawConfig any) (any, error) {
+			config := apikeyplugintypes.ApiKeyPluginConfig{}
+			if rawConfig != nil {
+				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
+					return nil, fmt.Errorf("failed to parse api_key plugin config: %w", err)
+				}
+			}
+			return config, nil
+		},
+		Constructor: func(typedConfig any) models.Plugin {
+			return apikeyplugin.New(typedConfig.(apikeyplugintypes.ApiKeyPluginConfig))
 		},
 	},
 }

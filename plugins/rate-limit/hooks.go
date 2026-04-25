@@ -126,21 +126,16 @@ func (p *RateLimitPlugin) handleStoreRateLimitRuleHook() models.HookHandler {
 			return nil
 		}
 
-		_, _, found, err := p.provider.GetRule(ctx, ruleCtx.Key)
+		_, _, _, err := p.provider.GetRule(ctx, ruleCtx.Key)
 		if err != nil {
 			p.logger.Error("failed to get existing rate limit rule", "key", ruleCtx.Key, "error", err)
 			return nil
 		}
-		if found {
+		window := time.Duration(ruleCtx.WindowSeconds) * time.Second
+		err = p.provider.SetRule(ctx, ruleCtx.Key, window, ruleCtx.MaxRequests)
+		if err != nil {
+			p.logger.Error("failed to store rate limit rule", "key", ruleCtx.Key, "error", err)
 			return nil
-		} else {
-			window := time.Duration(ruleCtx.WindowSeconds) * time.Second
-			err = p.provider.SetRule(ctx, ruleCtx.Key, window, ruleCtx.MaxRequests)
-			if err != nil {
-				p.logger.Error("failed to store rate limit rule", "key", ruleCtx.Key, "error", err)
-				return nil
-			}
-			p.logger.Debug("stored new rate limit rule", "key", ruleCtx.Key, "window_seconds", ruleCtx.WindowSeconds, "max_requests", ruleCtx.MaxRequests)
 		}
 
 		return nil

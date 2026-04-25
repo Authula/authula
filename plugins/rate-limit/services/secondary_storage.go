@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/rate-limit/types"
 )
 
 const ruleKeyPrefix = "rule:"
@@ -29,6 +30,23 @@ func NewSecondaryStorageProvider(name string, storage models.SecondaryStorage) *
 // GetName returns the provider name
 func (p *SecondaryStorageProvider) GetName() string {
 	return p.name
+}
+
+// GetValue returns a key's value
+func (p *SecondaryStorageProvider) GetValue(ctx context.Context, key string) (any, error) {
+	value, err := p.storage.Get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	ruleValue, ok := value.(types.RateLimitValue)
+	if !ok {
+		return nil, fmt.Errorf("unexpected rate limit value type %T", value)
+	}
+
+	return types.RateLimitValue{
+		Count:     ruleValue.Count,
+		ExpiresAt: ruleValue.ExpiresAt,
+	}, nil
 }
 
 // CheckAndIncrement checks if a request is allowed and increments the counter

@@ -16,6 +16,10 @@ func NewRateLimiterService(provider types.RateLimitProvider) rootservices.RateLi
 	return &rateLimiterService{provider: provider}
 }
 
+func (s *rateLimiterService) GetValue(ctx context.Context, key string) (any, error) {
+	return s.provider.GetValue(ctx, key)
+}
+
 func (s *rateLimiterService) CheckAndIncrement(ctx context.Context, key string, window time.Duration, maxRequests int) (bool, int, time.Time, error) {
 	return s.provider.CheckAndIncrement(ctx, key, window, maxRequests)
 }
