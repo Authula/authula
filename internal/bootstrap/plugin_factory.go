@@ -9,6 +9,8 @@ import (
 	accesscontrolplugintypes "github.com/Authula/authula/plugins/access-control/types"
 	adminplugin "github.com/Authula/authula/plugins/admin"
 	adminplugintypes "github.com/Authula/authula/plugins/admin/types"
+	apikeyplugin "github.com/Authula/authula/plugins/api-key"
+	apikeyplugintypes "github.com/Authula/authula/plugins/api-key/types"
 	bearerplugin "github.com/Authula/authula/plugins/bearer"
 	configmanagerplugin "github.com/Authula/authula/plugins/config-manager"
 	configmanagerplugintypes "github.com/Authula/authula/plugins/config-manager/types"
@@ -26,6 +28,7 @@ import (
 	organizationsplugin "github.com/Authula/authula/plugins/organizations"
 	organizationsplugintypes "github.com/Authula/authula/plugins/organizations/types"
 	ratelimitplugin "github.com/Authula/authula/plugins/rate-limit"
+	ratelimitplugintypes "github.com/Authula/authula/plugins/rate-limit/types"
 	secondarystorageplugin "github.com/Authula/authula/plugins/secondary-storage"
 	sessionplugin "github.com/Authula/authula/plugins/session"
 	totpplugin "github.com/Authula/authula/plugins/totp"
@@ -206,7 +209,7 @@ var pluginFactories = []PluginFactory{
 		ID:                models.PluginRateLimit.String(),
 		RequiredByDefault: false,
 		ConfigParser: func(rawConfig any) (any, error) {
-			config := ratelimitplugin.RateLimitPluginConfig{}
+			config := ratelimitplugintypes.RateLimitPluginConfig{}
 			if rawConfig != nil {
 				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
 					return nil, fmt.Errorf("failed to parse ratelimit plugin config: %w", err)
@@ -215,7 +218,7 @@ var pluginFactories = []PluginFactory{
 			return config, nil
 		},
 		Constructor: func(typedConfig any) models.Plugin {
-			return ratelimitplugin.New(typedConfig.(ratelimitplugin.RateLimitPluginConfig))
+			return ratelimitplugin.New(typedConfig.(ratelimitplugintypes.RateLimitPluginConfig))
 		},
 	},
 	{
@@ -280,6 +283,22 @@ var pluginFactories = []PluginFactory{
 		},
 		Constructor: func(typedConfig any) models.Plugin {
 			return totpplugin.New(typedConfig.(totplugintypes.TOTPPluginConfig))
+		},
+	},
+	{
+		ID:                models.PluginApiKey.String(),
+		RequiredByDefault: false,
+		ConfigParser: func(rawConfig any) (any, error) {
+			config := apikeyplugintypes.ApiKeyPluginConfig{}
+			if rawConfig != nil {
+				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
+					return nil, fmt.Errorf("failed to parse api_key plugin config: %w", err)
+				}
+			}
+			return config, nil
+		},
+		Constructor: func(typedConfig any) models.Plugin {
+			return apikeyplugin.New(typedConfig.(apikeyplugintypes.ApiKeyPluginConfig))
 		},
 	},
 }

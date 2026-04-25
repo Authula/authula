@@ -49,6 +49,11 @@ func (m *MockOrganizationService) DeleteOrganization(ctx context.Context, actorU
 	return args.Error(0)
 }
 
+func (m *MockOrganizationService) ExistsByID(ctx context.Context, organizationID string) (bool, error) {
+	args := m.Called(ctx, organizationID)
+	return args.Bool(0), args.Error(1)
+}
+
 type MockOrganizationInvitationService struct {
 	mock.Mock
 }

@@ -1,32 +1,9 @@
-package ratelimit
+package types
 
 import (
 	"context"
 	"time"
-
-	"github.com/uptrace/bun"
 )
-
-type RateLimitProviderType string
-
-const (
-	RateLimitProviderInMemory RateLimitProviderType = "memory"
-	RateLimitProviderRedis    RateLimitProviderType = "redis"
-	RateLimitProviderDatabase RateLimitProviderType = "database"
-)
-
-func (r RateLimitProviderType) String() string {
-	return string(r)
-}
-
-// RateLimit represents a rate limit entry in the database for Bun ORM
-type RateLimit struct {
-	bun.BaseModel `bun:"table:rate_limits"`
-
-	Key       string    `json:"key" bun:"column:key,pk"`
-	Count     int       `json:"count" bun:"column:count"`
-	ExpiresAt time.Time `json:"expires_at" bun:"column:expires_at"`
-}
 
 type RateLimitRule struct {
 	// Disable rate limiting for this endpoint entirely

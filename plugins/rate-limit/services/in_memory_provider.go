@@ -1,10 +1,12 @@
-package ratelimit
+package services
 
 import (
 	"context"
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/Authula/authula/plugins/rate-limit/types"
 )
 
 // InMemoryProvider is a thread-safe in-memory rate limit provider
@@ -21,11 +23,11 @@ type inMemoryEntry struct {
 
 // NewInMemoryProvider creates a new in-memory rate limit provider
 func NewInMemoryProvider() *InMemoryProvider {
-	return NewInMemoryProviderWithConfig(MemoryStorageConfig{})
+	return NewInMemoryProviderWithConfig(types.MemoryStorageConfig{})
 }
 
 // NewInMemoryProviderWithConfig creates a new in-memory rate limit provider with custom config
-func NewInMemoryProviderWithConfig(config MemoryStorageConfig) *InMemoryProvider {
+func NewInMemoryProviderWithConfig(config types.MemoryStorageConfig) *InMemoryProvider {
 	cleanupInterval := config.CleanupInterval
 	if cleanupInterval == 0 {
 		cleanupInterval = 1 * time.Minute
@@ -44,7 +46,7 @@ func NewInMemoryProviderWithConfig(config MemoryStorageConfig) *InMemoryProvider
 
 // GetName returns the provider name
 func (p *InMemoryProvider) GetName() string {
-	return string(RateLimitProviderInMemory)
+	return string(types.RateLimitProviderInMemory)
 }
 
 // CheckAndIncrement checks if a request is allowed and increments the counter

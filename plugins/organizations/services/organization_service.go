@@ -292,3 +292,11 @@ func (s *organizationService) authorizeMember(ctx context.Context, actorUserID s
 
 	return organization, nil
 }
+
+func (s *organizationService) ExistsByID(ctx context.Context, organizationID string) (bool, error) {
+	org, err := s.orgRepo.GetByID(ctx, organizationID)
+	if err != nil {
+		return false, err
+	}
+	return org != nil, nil
+}

@@ -47,6 +47,12 @@ func (a *API) DeleteOrganization(ctx context.Context, actorUserID string, organi
 	return a.organizationService.DeleteOrganization(ctx, actorUserID, organizationID)
 }
 
+// ExistsByID returns true if an organization with the given ID exists.
+// This implements services.OrganizationService for use by other plugins.
+func (a *API) ExistsByID(ctx context.Context, organizationID string) (bool, error) {
+	return a.organizationService.ExistsByID(ctx, organizationID)
+}
+
 // Invitations
 
 func (a *API) CreateInvitation(ctx context.Context, actorUserID string, organizationID string, request types.CreateOrganizationInvitationRequest) (*types.OrganizationInvitation, error) {
