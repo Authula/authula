@@ -13,7 +13,7 @@ description: Define and implement services that encapsulate business logic with 
 
 ## Key principles
 
-1. **Concrete struct design**: Services are defined as interfaces with the `I` prefix and implemented by concrete structs with the same name without the prefix (e.g., `ITodoService` and `todoService`)
+1. **Concrete struct design**: Services are defined as interfaces and implemented by concrete structs with the same name lowercase and with a constructor (e.g., `TodoService` and `todoService` with `NewTodoService` constructor)
 2. **Constructor-based injection**: Dependencies passed at construction
 3. **Single responsibility**: Each service handles one domain concern
 4. **Repository delegation**: Services delegate all data access to repositories
@@ -35,8 +35,8 @@ Services handle business logic:
 
 See [examples/todo_service.go](examples/todo_service.go) for:
 
-- ITodoService interface definition
-- todoService implementation
+- TodoService interface definition
+- todoService implementation with constructor
 - Validation and repository delegation patterns
 
 ## Common mistakes

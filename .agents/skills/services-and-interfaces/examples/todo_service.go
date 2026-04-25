@@ -1,9 +1,12 @@
 package examples
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // Interface
-type ITodoService interface {
+type TodoService interface {
 	CreateTodo(ctx context.Context, title string, userID string) (*Todo, error)
 	MarkComplete(ctx context.Context, todoID string) (*Todo, error)
 	DeleteTodo(ctx context.Context, todoID string) error
@@ -15,7 +18,7 @@ type todoService struct {
 	todoRepo TodoRepository
 }
 
-func NewTodoService(todoRepo TodoRepository) ITodoService {
+func NewTodoService(todoRepo TodoRepository) TodoService {
 	return &todoService{
 		todoRepo: todoRepo,
 	}
@@ -53,10 +56,10 @@ func (s *todoService) GetTodo(ctx context.Context, todoID string) (*Todo, error)
 	return s.todoRepo.GetByID(ctx, todoID)
 }
 
-// Utility
-var (
-	ErrEmptyTitle = nil // In real code, proper error type
-	ErrNotFound   = nil
+// Utilities and types
+const (
+	ErrEmptyTitle = errors.New("title cannot be empty")
+	ErrNotFound   = errors.New("todo not found")
 )
 
 func generateID() string {
