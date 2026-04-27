@@ -83,6 +83,7 @@ type CORSConfig struct {
 type EventBusConfig struct {
 	Prefix                string                  `json:"prefix" toml:"prefix"`
 	MaxConcurrentHandlers int                     `json:"max_concurrent_handlers" toml:"max_concurrent_handlers"`
+	ContextTimeout        time.Duration           `json:"context_timeout" toml:"context_timeout"`
 	Provider              events.EventBusProvider `json:"provider" toml:"provider"`
 	GoChannel             *GoChannelConfig        `json:"go_channel" toml:"go_channel"`
 	SQLite                *SQLiteConfig           `json:"sqlite" toml:"sqlite"`

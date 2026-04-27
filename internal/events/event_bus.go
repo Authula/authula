@@ -40,9 +40,10 @@ type eventBus struct {
 	handlerSem chan struct{}
 
 	// lifecycle
-	rootCtx context.Context
-	cancel  context.CancelFunc
-	wg      sync.WaitGroup
+	rootCtx    context.Context
+	cancel     context.CancelFunc
+	wg         sync.WaitGroup
+	ctxTimeout time.Duration
 }
 
 func NewEventBus(config *models.Config, logger watermill.LoggerAdapter, ps models.PubSub) models.EventBus {
@@ -63,6 +64,7 @@ func NewEventBus(config *models.Config, logger watermill.LoggerAdapter, ps model
 		handlerSem: make(chan struct{}, maxHandlers),
 		rootCtx:    rootCtx,
 		cancel:     cancel,
+		ctxTimeout: config.EventBus.ContextTimeout,
 	}
 }
 
@@ -74,7 +76,7 @@ func (bus *eventBus) topic(eventType string) string {
 	return prefix + "." + eventType
 }
 
-func (bus *eventBus) Publish(ctx context.Context, evt models.Event) error {
+func (bus *eventBus) Publish(evt models.Event) error {
 	event := evt
 
 	if event.Type == "" {
@@ -95,6 +97,9 @@ func (bus *eventBus) Publish(ctx context.Context, evt models.Event) error {
 		return err
 	}
 
+	ctx, cancel := context.WithTimeout(bus.rootCtx, bus.ctxTimeout)
+	defer cancel()
+
 	msg := &models.Message{
 		UUID:    event.ID,
 		Payload: payload,
@@ -103,12 +108,11 @@ func (bus *eventBus) Publish(ctx context.Context, evt models.Event) error {
 			"timestamp":  event.Timestamp.Format(time.RFC3339Nano),
 		},
 	}
-
 	if err := bus.pubsub.Publish(ctx, bus.topic(event.Type), msg); err != nil {
 		return err
 	}
 
-	bus.dispatchForWildcard(ctx, event)
+	bus.dispatchForWildcard(event)
 
 	return nil
 }
@@ -205,7 +209,7 @@ func (bus *eventBus) Unsubscribe(eventType string, id models.SubscriptionID) {
 	}
 }
 
-func (bus *eventBus) dispatchForWildcard(ctx context.Context, event models.Event) {
+func (bus *eventBus) dispatchForWildcard(event models.Event) {
 	bus.mu.RLock()
 	handlers := append([]handlerEntry(nil), bus.wildcard.handlers...)
 	bus.mu.RUnlock()
@@ -214,7 +218,12 @@ func (bus *eventBus) dispatchForWildcard(ctx context.Context, event models.Event
 		bus.handlerSem <- struct{}{}
 		bus.wg.Add(1)
 
-		go bus.callHandler(ctx, entry.handler, event)
+		handlerCtx, cancel := context.WithTimeout(bus.rootCtx, bus.ctxTimeout)
+
+		go func(handler models.EventHandler, ctx context.Context) {
+			defer cancel()
+			bus.callHandler(ctx, handler, event)
+		}(entry.handler, handlerCtx)
 	}
 }
 
@@ -248,6 +257,10 @@ func (bus *eventBus) consumeAndMultiplex(
 
 			bus.mu.RLock()
 			state := bus.topics[topic]
+			if state == nil {
+				bus.mu.RUnlock()
+				continue
+			}
 			handlers := append([]handlerEntry(nil), state.handlers...)
 			bus.mu.RUnlock()
 

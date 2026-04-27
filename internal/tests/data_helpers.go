@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/Authula/authula/models"
 )
@@ -15,8 +14,6 @@ import (
 func PtrString(s string) *string {
 	return &s
 }
-
-func PtrTime(t time.Time) *time.Time { return &t }
 
 func MarshalToJSON(t *testing.T, payload any) []byte {
 	t.Helper()

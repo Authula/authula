@@ -105,7 +105,7 @@ func TestEventBusWildcardSubscription(t *testing.T) {
 					require.NoError(t, err)
 
 					now := time.Now().UTC()
-					err = env.bus.Publish(context.Background(), models.Event{
+					err = env.bus.Publish(models.Event{
 						Type:      "some.event",
 						Timestamp: now,
 						Payload:   payloadBytes,
@@ -142,10 +142,10 @@ func TestEventBusWildcardSubscription(t *testing.T) {
 					})
 					require.NoError(t, err)
 
-					err = env.bus.Publish(context.Background(), models.Event{Type: "organization.created"})
+					err = env.bus.Publish(models.Event{Type: "some.event"})
 					require.NoError(t, err)
 
-					assert.Equal(t, []string{"organization.created"}, env.pubsub.topics)
+					assert.Equal(t, []string{"some.event"}, env.pubsub.topics)
 				})
 			},
 		},

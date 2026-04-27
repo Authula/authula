@@ -92,7 +92,7 @@ type capturingEventBus struct {
 	err    error
 }
 
-func (b *capturingEventBus) Publish(ctx context.Context, event models.Event) error {
+func (b *capturingEventBus) Publish(event models.Event) error {
 	if b.called != nil {
 		b.called <- event
 	}

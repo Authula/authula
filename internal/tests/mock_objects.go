@@ -1,8 +1,6 @@
 package tests
 
 import (
-	"context"
-
 	"github.com/stretchr/testify/mock"
 
 	"github.com/Authula/authula/models"
@@ -14,20 +12,13 @@ func (m *MockLogger) Debug(msg string, args ...any) {}
 func (m *MockLogger) Info(msg string, args ...any)  {}
 func (m *MockLogger) Warn(msg string, args ...any)  {}
 func (m *MockLogger) Error(msg string, args ...any) {}
-func (m *MockLogger) Panic(msg string, args ...any) {}
-func (m *MockLogger) WithField(key string, value any) models.Logger {
-	return m
-}
-func (m *MockLogger) WithFields(fields map[string]any) models.Logger {
-	return m
-}
 
 type MockEventBus struct {
 	mock.Mock
 }
 
-func (m *MockEventBus) Publish(ctx context.Context, event models.Event) error {
-	args := m.Called(ctx, event)
+func (m *MockEventBus) Publish(event models.Event) error {
+	args := m.Called(event)
 	return args.Error(0)
 }
 
