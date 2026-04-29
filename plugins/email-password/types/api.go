@@ -80,12 +80,10 @@ func (p *VerifyEmailRequest) Validate() error {
 }
 
 type SendEmailVerificationRequest struct {
-	Email       string  `json:"email"`
 	CallbackURL *string `json:"callback_url,omitempty"`
 }
 
 func (p *SendEmailVerificationRequest) Validate() error {
-	p.Email = strings.TrimSpace(p.Email)
 	if p.CallbackURL != nil {
 		*p.CallbackURL = strings.TrimSpace(*p.CallbackURL)
 	}

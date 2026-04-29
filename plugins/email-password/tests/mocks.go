@@ -54,8 +54,8 @@ func (m *MockVerifyEmailUseCase) VerifyEmail(ctx context.Context, tokenStr strin
 
 type MockSendEmailVerificationUseCase struct{ mock.Mock }
 
-func (m *MockSendEmailVerificationUseCase) Send(ctx context.Context, email string, callbackURL *string) error {
-	args := m.Called(ctx, email, callbackURL)
+func (m *MockSendEmailVerificationUseCase) Send(ctx context.Context, userID string, callbackURL *string) error {
+	args := m.Called(ctx, userID, callbackURL)
 	return args.Error(0)
 }
 

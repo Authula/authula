@@ -33,7 +33,7 @@ type VerifyEmailUseCase interface {
 }
 
 type SendEmailVerificationUseCase interface {
-	Send(ctx context.Context, email string, callbackURL *string) error
+	Send(ctx context.Context, userID string, callbackURL *string) error
 }
 
 type RequestPasswordResetUseCase interface {

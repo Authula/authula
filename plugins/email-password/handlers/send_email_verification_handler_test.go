@@ -18,16 +18,18 @@ func TestSendEmailVerificationHandler(t *testing.T) {
 
 	tests := []struct {
 		name           string
+		userID         *string
 		body           []byte
 		prepare        func(*plugintests.MockSendEmailVerificationUseCase)
 		expectedStatus int
 	}{
-		{name: "invalid_json", body: []byte("{"), expectedStatus: http.StatusBadRequest},
-		{name: "usecase_error", body: internaltests.MarshalToJSON(t, types.SendEmailVerificationRequest{Email: "user@example.com"}), prepare: func(m *plugintests.MockSendEmailVerificationUseCase) {
-			m.On("Send", mock.Anything, "user@example.com", (*string)(nil)).Return(errors.New("boom")).Once()
+		{name: "unauthorized", body: internaltests.MarshalToJSON(t, types.SendEmailVerificationRequest{}), expectedStatus: http.StatusUnauthorized},
+		{name: "invalid_json", userID: func() *string { v := "user-1"; return &v }(), body: []byte("{"), expectedStatus: http.StatusUnprocessableEntity},
+		{name: "usecase_error", userID: func() *string { v := "user-1"; return &v }(), body: internaltests.MarshalToJSON(t, map[string]any{"email": "attacker@example.com"}), prepare: func(m *plugintests.MockSendEmailVerificationUseCase) {
+			m.On("Send", mock.Anything, "user-1", (*string)(nil)).Return(errors.New("boom")).Once()
 		}, expectedStatus: http.StatusInternalServerError},
-		{name: "success", body: internaltests.MarshalToJSON(t, types.SendEmailVerificationRequest{Email: "user@example.com"}), prepare: func(m *plugintests.MockSendEmailVerificationUseCase) {
-			m.On("Send", mock.Anything, "user@example.com", (*string)(nil)).Return(nil).Once()
+		{name: "success", userID: func() *string { v := "user-1"; return &v }(), body: internaltests.MarshalToJSON(t, map[string]any{"email": "attacker@example.com"}), prepare: func(m *plugintests.MockSendEmailVerificationUseCase) {
+			m.On("Send", mock.Anything, "user-1", (*string)(nil)).Return(nil).Once()
 		}, expectedStatus: http.StatusOK},
 	}
 
@@ -40,7 +42,7 @@ func TestSendEmailVerificationHandler(t *testing.T) {
 				tt.prepare(uc)
 			}
 			handler := &SendEmailVerificationHandler{UseCase: uc}
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/email-password/send-email-verification", tt.body, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/email-password/send-email-verification", tt.body, tt.userID)
 			handler.Handler().ServeHTTP(w, req)
 			require.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			uc.AssertExpectations(t)

@@ -34,20 +34,16 @@ func NewSendEmailVerificationUseCase(
 	return &sendEmailVerificationUseCase{GlobalConfig: globalConfig, PluginConfig: pluginConfig, Logger: logger, UserService: userService, VerificationService: verificationService, TokenService: tokenService, MailerService: mailerService}
 }
 
-func (uc *sendEmailVerificationUseCase) Send(ctx context.Context, email string, callbackURL *string) error {
+func (uc *sendEmailVerificationUseCase) Send(ctx context.Context, userID string, callbackURL *string) error {
 	reqCtx, _ := models.GetRequestContext(ctx)
 
 	if !uc.PluginConfig.RequireEmailVerification {
 		return nil
 	}
 
-	if email == "" {
-		return fmt.Errorf("email cannot be empty")
-	}
-
-	user, err := uc.UserService.GetByEmail(ctx, email)
+	user, err := uc.UserService.GetByID(ctx, userID)
 	if err != nil {
-		uc.Logger.Error("failed to fetch user", map[string]any{"error": err.Error(), "email": email})
+		uc.Logger.Error("failed to fetch user", map[string]any{"error": err.Error(), "user_id": userID})
 		// Don't expose internal errors to prevent enumeration attacks
 		return nil
 	}

@@ -67,8 +67,8 @@ func (a *API) VerifyEmail(ctx context.Context, tokenStr string) (models.Verifica
 	return a.useCases.VerifyEmailUseCase.VerifyEmail(ctx, tokenStr)
 }
 
-func (a *API) SendEmailVerification(ctx context.Context, email string, callbackURL *string) error {
-	return a.useCases.SendEmailVerificationUseCase.Send(ctx, email, callbackURL)
+func (a *API) SendEmailVerification(ctx context.Context, userID string, callbackURL *string) error {
+	return a.useCases.SendEmailVerificationUseCase.Send(ctx, userID, callbackURL)
 }
 
 func (a *API) RequestPasswordReset(ctx context.Context, email string, callbackURL *string) error {
