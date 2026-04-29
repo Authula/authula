@@ -32,7 +32,11 @@ func (h *CreateOrganizationHandler) Handle() http.HandlerFunc {
 			reqCtx.Handled = true
 			return
 		}
-		request.Trim()
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
 
 		organization, err := h.OrgService.CreateOrganization(ctx, userID, request)
 		if err != nil {

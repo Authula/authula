@@ -3,6 +3,8 @@ package types
 import (
 	"encoding/json"
 	"strings"
+
+	internalerrors "github.com/Authula/authula/internal/errors"
 )
 
 type CreateOrganizationRequest struct {
@@ -13,9 +15,13 @@ type CreateOrganizationRequest struct {
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 
-func (r *CreateOrganizationRequest) Trim() {
-	r.Name = strings.TrimSpace(r.Name)
-	r.Role = strings.TrimSpace(r.Role)
+func (r *CreateOrganizationRequest) Validate() error {
+	if strings.TrimSpace(r.Name) == "" {
+		return internalerrors.ErrUnprocessableEntity
+	}
+	if strings.TrimSpace(r.Role) == "" {
+		return internalerrors.ErrUnprocessableEntity
+	}
 	if r.Slug != nil {
 		value := strings.TrimSpace(*r.Slug)
 		r.Slug = &value
@@ -24,6 +30,7 @@ func (r *CreateOrganizationRequest) Trim() {
 		value := strings.TrimSpace(*r.Logo)
 		r.Logo = &value
 	}
+	return nil
 }
 
 type UpdateOrganizationRequest struct {

@@ -90,6 +90,10 @@ func (uc *changePasswordUseCase) ChangePassword(ctx context.Context, tokenValue 
 		return err
 	}
 
+	uc.publishChangedPasswordEvent(user)
+
+	callbackHandled := false
+
 	if uc.PluginConfig.SendChangedPasswordEmail != nil {
 		err := uc.PluginConfig.SendChangedPasswordEmail(types.SendChangedPasswordEmailParams{
 			User: *user,
@@ -97,12 +101,12 @@ func (uc *changePasswordUseCase) ChangePassword(ctx context.Context, tokenValue 
 
 		if err != nil {
 			uc.Logger.Error("failed to send changed password email via plugin callback", "err", err.Error())
+		} else {
+			callbackHandled = true
 		}
-
-		return nil
 	}
 
-	if uc.MailerService != nil {
+	if !callbackHandled && uc.MailerService != nil {
 		go func() {
 			detachedCtx := context.WithoutCancel(ctx)
 			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
@@ -113,8 +117,6 @@ func (uc *changePasswordUseCase) ChangePassword(ctx context.Context, tokenValue 
 			}
 		}()
 	}
-
-	uc.publishChangedPasswordEvent(user)
 
 	return nil
 }

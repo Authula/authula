@@ -86,6 +86,8 @@ func (uc *SignInUseCaseImpl) SignIn(
 		callbackURL,
 	)
 
+	callbackHandled := false
+
 	if uc.PluginConfig.SendMagicLinkVerificationEmail != nil {
 		err := uc.PluginConfig.SendMagicLinkVerificationEmail(types.SendMagicLinkVerificationEmailParams{
 			Email: email,
@@ -95,14 +97,12 @@ func (uc *SignInUseCaseImpl) SignIn(
 
 		if err != nil {
 			uc.Logger.Error("failed to send magic link verification email via plugin callback", "err", err.Error())
+		} else {
+			callbackHandled = true
 		}
-
-		return &types.SignInResult{
-			Token: token,
-		}, nil
 	}
 
-	if uc.MailerService != nil {
+	if !callbackHandled && uc.MailerService != nil {
 		go func() {
 			detachedCtx := context.WithoutCancel(ctx)
 			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)

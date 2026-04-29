@@ -91,6 +91,7 @@ func (uc *sendEmailVerificationUseCase) Send(ctx context.Context, email string, 
 		token,
 		callbackURL,
 	)
+	callbackHandled := false
 
 	if uc.PluginConfig.SendEmailVerification != nil {
 		err := uc.PluginConfig.SendEmailVerification(
@@ -104,12 +105,12 @@ func (uc *sendEmailVerificationUseCase) Send(ctx context.Context, email string, 
 
 		if err != nil {
 			uc.Logger.Error("failed to send email verification via plugin callback", "err", err.Error())
+		} else {
+			callbackHandled = true
 		}
-
-		return nil
 	}
 
-	if uc.MailerService != nil {
+	if !callbackHandled && uc.MailerService != nil {
 		go func() {
 			detachedCtx := context.WithoutCancel(ctx)
 			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)

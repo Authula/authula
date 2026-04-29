@@ -70,6 +70,7 @@ func (uc *requestPasswordResetUseCase) RequestReset(
 		token,
 		callbackURL,
 	)
+	callbackHandled := false
 
 	if uc.PluginConfig.SendPasswordResetEmail != nil {
 		err := uc.PluginConfig.SendPasswordResetEmail(
@@ -83,12 +84,12 @@ func (uc *requestPasswordResetUseCase) RequestReset(
 
 		if err != nil {
 			uc.Logger.Error("failed to send password reset email via plugin callback", "err", err.Error())
+		} else {
+			callbackHandled = true
 		}
-
-		return nil
 	}
 
-	if uc.MailerService != nil {
+	if !callbackHandled && uc.MailerService != nil {
 		go func() {
 			detachedCtx := context.WithoutCancel(ctx)
 			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)

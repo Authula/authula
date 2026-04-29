@@ -176,9 +176,12 @@ func (uc *verifyEmailUseCase) handleEmailChangeVerificationEmail(
 		return err
 	}
 
-	callbackHandled := false
+	uc.publishEmailChangedEvent(user, oldEmail, newEmail)
+
+	sendChangedEmailToOldEmailCallbackHandled := false
+	sendChangedEmailToNewEmailCallbackHandled := false
+
 	if uc.PluginConfig.SendChangedEmailToOldEmail != nil {
-		callbackHandled = true
 		err := uc.PluginConfig.SendChangedEmailToOldEmail(types.SendChangedEmailToOldEmailParams{
 			User:  *user,
 			Email: oldEmail,
@@ -186,11 +189,12 @@ func (uc *verifyEmailUseCase) handleEmailChangeVerificationEmail(
 
 		if err != nil {
 			uc.Logger.Error("failed to send changed email to old email via plugin callback", "err", err.Error())
+		} else {
+			sendChangedEmailToOldEmailCallbackHandled = true
 		}
 	}
 
 	if uc.PluginConfig.SendChangedEmailToNewEmail != nil {
-		callbackHandled = true
 		err := uc.PluginConfig.SendChangedEmailToNewEmail(types.SendChangedEmailToNewEmailParams{
 			User:  *user,
 			Email: newEmail,
@@ -198,15 +202,12 @@ func (uc *verifyEmailUseCase) handleEmailChangeVerificationEmail(
 
 		if err != nil {
 			uc.Logger.Error("failed to send changed email to new email via plugin callback", "err", err.Error())
+		} else {
+			sendChangedEmailToNewEmailCallbackHandled = true
 		}
 	}
 
-	if callbackHandled {
-		uc.publishEmailChangedEvent(user, oldEmail, newEmail)
-		return nil
-	}
-
-	if uc.MailerService != nil {
+	if !sendChangedEmailToOldEmailCallbackHandled && !sendChangedEmailToNewEmailCallbackHandled && uc.MailerService != nil {
 		go func() {
 			detachedCtx := context.WithoutCancel(ctx)
 			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
@@ -217,8 +218,6 @@ func (uc *verifyEmailUseCase) handleEmailChangeVerificationEmail(
 			}
 		}()
 	}
-
-	uc.publishEmailChangedEvent(user, oldEmail, newEmail)
 
 	return nil
 }

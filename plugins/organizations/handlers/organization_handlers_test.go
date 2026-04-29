@@ -57,14 +57,9 @@ func TestCreateOrganizationHandler(t *testing.T) {
 			expectedMessage: "Unauthorized",
 		},
 		{
-			name:   "missing_role",
-			userID: new("user-1"),
-			body:   internaltests.MarshalToJSON(t, orgtypes.CreateOrganizationRequest{Name: "Acme Inc"}),
-			prepare: func(f *organizationHandlerFixture) {
-				f.service.On("CreateOrganization", mock.Anything, "user-1", mock.MatchedBy(func(request orgtypes.CreateOrganizationRequest) bool {
-					return request.Name == "Acme Inc" && request.Role == ""
-				})).Return((*orgtypes.Organization)(nil), internalerrors.ErrUnprocessableEntity).Once()
-			},
+			name:            "missing_role",
+			userID:          new("user-1"),
+			body:            internaltests.MarshalToJSON(t, orgtypes.CreateOrganizationRequest{Name: "Acme Inc"}),
 			expectedStatus:  http.StatusUnprocessableEntity,
 			expectedMessage: "unprocessable entity",
 		},
