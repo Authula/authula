@@ -30,11 +30,15 @@ func (h *CreateOrganizationTeamHandler) Handle() http.HandlerFunc {
 
 		var request types.CreateOrganizationTeamRequest
 		if err := util.ParseJSON(r, &request); err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
 			reqCtx.Handled = true
 			return
 		}
-		request.Trim()
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
 
 		team, err := h.OrgTeamService.CreateTeam(ctx, userID, organizationID, request)
 		if err != nil {
@@ -122,11 +126,15 @@ func (h *UpdateOrganizationTeamHandler) Handle() http.HandlerFunc {
 
 		var request types.UpdateOrganizationTeamRequest
 		if err := util.ParseJSON(r, &request); err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
 			reqCtx.Handled = true
 			return
 		}
-		request.Trim()
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
 
 		team, err := h.OrgTeamService.UpdateTeam(ctx, userID, organizationID, teamID, request)
 		if err != nil {
