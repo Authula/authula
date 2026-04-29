@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
 	"github.com/Authula/authula/plugins/email-password/usecases"
@@ -11,6 +12,7 @@ import (
 
 type VerifyEmailHandler struct {
 	VerifyEmailUseCase usecases.VerifyEmailUseCase
+	TrustedOrigins     []string
 }
 
 func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
@@ -20,8 +22,35 @@ func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
 
 		token := r.URL.Query().Get("token")
 		var callbackURL string
+		var validatedCallbackURL *url.URL
 		if cb := r.URL.Query().Get("callback_url"); cb != "" {
+			parsedCallbackURL, err := util.IsTrustedCallbackURL(cb, h.TrustedOrigins)
+			if err != nil {
+				reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
+					"message": err.Error(),
+				})
+				reqCtx.Handled = true
+				return
+			}
+
+			validatedCallbackURL = parsedCallbackURL
 			callbackURL = cb
+		}
+
+		if token == "" {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
+				"message": "token is required",
+			})
+			reqCtx.Handled = true
+			return
+		}
+
+		if callbackURL != "" && validatedCallbackURL == nil {
+			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
+				"message": "invalid callback_url",
+			})
+			reqCtx.Handled = true
+			return
 		}
 		request := types.VerifyEmailRequest{
 			Token:       token,
@@ -30,14 +59,6 @@ func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
 		if err := request.Validate(); err != nil {
 			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
 				"message": err.Error(),
-			})
-			reqCtx.Handled = true
-			return
-		}
-
-		if request.Token == "" {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
-				"message": "token is required",
 			})
 			reqCtx.Handled = true
 			return
@@ -54,19 +75,13 @@ func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
 
 		if request.CallbackURL != nil && *request.CallbackURL != "" {
 			if verificationType == models.TypePasswordResetRequest {
-				u, err := url.Parse(*request.CallbackURL)
-				if err != nil {
-					reqCtx.RedirectURL = *request.CallbackURL + "?token=" + url.QueryEscape(request.Token)
-					reqCtx.ResponseStatus = http.StatusFound
-				} else {
-					q := u.Query()
-					q.Set("token", request.Token)
-					u.RawQuery = q.Encode()
-					reqCtx.RedirectURL = u.String()
-					reqCtx.ResponseStatus = http.StatusFound
-				}
+				q := validatedCallbackURL.Query()
+				q.Set("token", request.Token)
+				validatedCallbackURL.RawQuery = q.Encode()
+				reqCtx.RedirectURL = validatedCallbackURL.String()
+				reqCtx.ResponseStatus = http.StatusFound
 			} else {
-				reqCtx.RedirectURL = *request.CallbackURL
+				reqCtx.RedirectURL = validatedCallbackURL.String()
 				reqCtx.ResponseStatus = http.StatusFound
 			}
 			reqCtx.Handled = true

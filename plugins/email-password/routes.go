@@ -26,6 +26,7 @@ func Routes(plugin *EmailPasswordPlugin) []models.Route {
 
 	verifyEmailHandler := &handlers.VerifyEmailHandler{
 		VerifyEmailUseCase: useCases.VerifyEmailUseCase,
+		TrustedOrigins:     plugin.globalConfig.Security.TrustedOrigins,
 	}
 
 	sendEmailVerificationHandler := &handlers.SendEmailVerificationHandler{
