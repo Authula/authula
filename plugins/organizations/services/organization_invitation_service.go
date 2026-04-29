@@ -160,24 +160,44 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 	}
 
 	s.publishOrganizationInvitationCreatedEvent(created, organization)
-
-	if s.pluginConfig != nil && s.pluginConfig.SendOrganizationInvitationEmail != nil {
-		inviter, err := s.userService.GetByID(ctx, created.InviterID)
-		if err != nil {
-			return nil, err
-		}
-		if inviter == nil {
-			return nil, internalerrors.ErrNotFound
-		}
-
-		if err := s.pluginConfig.SendOrganizationInvitationEmail(organization, created, inviter); err != nil {
-			return nil, err
-		}
+	acceptURL := s.buildOrganizationInvitationAcceptURL(created, request.RedirectURL)
+	callbackHandled, err := s.sendOrganizationInvitationEmailViaCallback(ctx, created, organization, acceptURL)
+	if err != nil {
+		return nil, err
+	}
+	if callbackHandled {
+		return created, nil
+	}
+	if s.mailerService != nil {
+		s.sendOrganizationInvitationEmailAsync(ctx, created, organization, acceptURL)
 	} else {
-		s.sendOrganizationInvitationEmailAsync(ctx, created, organization, request.RedirectURL)
+		s.logger.Warn("mailer service not available, skipping organization invitation email")
 	}
 
 	return created, nil
+}
+
+func (s *organizationInvitationService) sendOrganizationInvitationEmailViaCallback(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, acceptURL string) (bool, error) {
+	if s.pluginConfig.SendOrganizationInvitationEmail == nil {
+		return false, nil
+	}
+
+	reqCtx, _ := models.GetRequestContext(ctx)
+	inviter, err := s.userService.GetByID(ctx, invitation.InviterID)
+	if err != nil {
+		return true, err
+	}
+	if inviter == nil {
+		return true, internalerrors.ErrNotFound
+	}
+
+	err = s.pluginConfig.SendOrganizationInvitationEmail(types.SendOrganizationInvitationEmailParams{
+		Organization: organization,
+		Invitation:   invitation,
+		Inviter:      inviter,
+		AcceptURL:    acceptURL,
+	}, reqCtx)
+	return true, err
 }
 
 func (s *organizationInvitationService) publishOrganizationInvitationCreatedEvent(invitation *types.OrganizationInvitation, organization *types.Organization) {
@@ -204,7 +224,7 @@ func (s *organizationInvitationService) publishOrganizationInvitationCreatedEven
 	})
 }
 
-func (s *organizationInvitationService) sendOrganizationInvitationEmailAsync(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, redirectURL string) {
+func (s *organizationInvitationService) sendOrganizationInvitationEmailAsync(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, acceptURL string) {
 	if s.mailerService == nil {
 		s.logger.Warn("mailer service not available, skipping organization invitation email")
 		return
@@ -215,14 +235,13 @@ func (s *organizationInvitationService) sendOrganizationInvitationEmailAsync(ctx
 		taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
 		defer cancel()
 
-		if err := s.sendOrganizationInvitationEmail(taskCtx, invitation, organization, redirectURL); err != nil {
+		if err := s.sendOrganizationInvitationEmail(taskCtx, invitation, organization, acceptURL); err != nil {
 			s.logger.Error("failed to send organization invitation email", "invitation_id", invitation.ID, "error", err)
 		}
 	}()
 }
 
-func (s *organizationInvitationService) sendOrganizationInvitationEmail(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, redirectURL string) error {
-	acceptURL := s.buildOrganizationInvitationAcceptURL(invitation, redirectURL)
+func (s *organizationInvitationService) sendOrganizationInvitationEmail(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, acceptURL string) error {
 	appName := "Authula"
 	if s.globalConfig.AppName != "" {
 		appName = s.globalConfig.AppName

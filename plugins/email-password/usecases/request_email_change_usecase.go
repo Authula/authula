@@ -84,7 +84,7 @@ func (uc *requestEmailChangeUseCase) RequestChange(
 	)
 
 	if uc.PluginConfig.SendRequestEmailChangeEmail != nil {
-		if err := uc.PluginConfig.SendRequestEmailChangeEmail(
+		err := uc.PluginConfig.SendRequestEmailChangeEmail(
 			types.SendRequestEmailChangeEmailParams{
 				User:     *user,
 				URL:      verificationLink,
@@ -93,22 +93,26 @@ func (uc *requestEmailChangeUseCase) RequestChange(
 				OldEmail: user.Email,
 			},
 			reqCtx,
-		); err != nil {
-			uc.Logger.Error("failed to send request email change via hook", "err", err)
-			return err
+		)
+
+		if err != nil {
+			uc.Logger.Error("failed to send request email change via plugin callback", "err", err.Error())
 		}
+
 		return nil
 	}
 
-	go func() {
-		detachedCtx := context.WithoutCancel(ctx)
-		taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
-		defer cancel()
+	if uc.MailerService != nil {
+		go func() {
+			detachedCtx := context.WithoutCancel(ctx)
+			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
+			defer cancel()
 
-		if err := uc.sendRequestEmailChangeEmail(taskCtx, user, newEmail, verificationLink); err != nil {
-			uc.Logger.Error(err.Error())
-		}
-	}()
+			if err := uc.sendRequestEmailChangeEmail(taskCtx, user, newEmail, verificationLink); err != nil {
+				uc.Logger.Error("failed to send request email change via built-in email service", "err", err.Error())
+			}
+		}()
+	}
 
 	return nil
 }

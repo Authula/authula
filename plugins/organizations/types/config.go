@@ -14,8 +14,8 @@ type OrganizationsPluginConfig struct {
 	InvitationExpiresIn              time.Duration `json:"invitation_expires_in" toml:"invitation_expires_in"`
 	RequireEmailVerifiedOnInvitation bool          `json:"require_email_verified_on_invitation" toml:"require_email_verified_on_invitation"`
 
-	SendOrganizationInvitationEmail func(organization *Organization, invitation *OrganizationInvitation, inviter *models.User) error `json:"-" toml:"-"`
-	DatabaseHooks                   *OrganizationsDatabaseHooksConfig                                                                `json:"-" toml:"-"`
+	DatabaseHooks                   *OrganizationsDatabaseHooksConfig                                                       `json:"-" toml:"-"`
+	SendOrganizationInvitationEmail func(params SendOrganizationInvitationEmailParams, reqCtx *models.RequestContext) error `json:"-" toml:"-"`
 }
 
 func (config *OrganizationsPluginConfig) ApplyDefaults() {
@@ -79,4 +79,11 @@ type OrganizationTeamMemberDatabaseHooksConfig struct {
 	AfterCreate  func(member OrganizationTeamMember) error
 	BeforeDelete func(member *OrganizationTeamMember) error
 	AfterDelete  func(member OrganizationTeamMember) error
+}
+
+type SendOrganizationInvitationEmailParams struct {
+	Organization *Organization
+	Invitation   *OrganizationInvitation
+	Inviter      *models.User
+	AcceptURL    string
 }

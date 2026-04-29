@@ -8,12 +8,19 @@ import (
 )
 
 var (
+	// HTTP Errors
 	ErrBadRequest          = errors.New("bad request")
 	ErrUnauthorized        = errors.New("unauthorized")
 	ErrForbidden           = errors.New("forbidden")
 	ErrNotFound            = errors.New("not found")
 	ErrConflict            = errors.New("conflict")
 	ErrUnprocessableEntity = errors.New("unprocessable entity")
+
+	// User Errors
+	ErrEmailRequired = errors.New("email is required")
+
+	// Token Errors
+	ErrTokenRequired = errors.New("token is required")
 )
 
 func HandleError(err error, reqCtx *models.RequestContext) {

@@ -84,10 +84,11 @@ func (p *MagicLinkPlugin) Init(ctx *models.PluginContext) error {
 	p.tokenService = tokenService
 
 	mailerService, ok := ctx.ServiceRegistry.Get(models.ServiceMailer.String()).(rootservices.MailerService)
-	if !ok {
-		return fmt.Errorf("mailer service not available in service registry")
+	if ok {
+		p.mailerService = mailerService
+	} else {
+		p.logger.Warn("mailer service not available in service registry: automatic email sending will be disabled for the magic link plugin")
 	}
-	p.mailerService = mailerService
 
 	p.Api = BuildAPI(p)
 

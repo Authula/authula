@@ -89,20 +89,20 @@ func (uc *verifyEmailUseCase) handleEmailVerification(ctx context.Context, user 
 
 	userJson, err := json.Marshal(user)
 	if err != nil {
-		uc.Logger.Error(err.Error())
-	} else {
-		util.PublishEventAsync(
-			uc.EventBus,
-			uc.Logger,
-			models.Event{
-				ID:        util.GenerateUUID(),
-				Type:      constants.EventUserEmailVerified,
-				Payload:   userJson,
-				Metadata:  nil,
-				Timestamp: time.Now().UTC(),
-			},
-		)
+		return err
 	}
+
+	util.PublishEventAsync(
+		uc.EventBus,
+		uc.Logger,
+		models.Event{
+			ID:        util.GenerateUUID(),
+			Type:      constants.EventUserEmailVerified,
+			Payload:   userJson,
+			Metadata:  nil,
+			Timestamp: time.Now().UTC(),
+		},
+	)
 
 	return nil
 }
@@ -113,6 +113,8 @@ func (uc *verifyEmailUseCase) handleEmailChangeVerificationEmail(
 	tokenValue string,
 	newEmail string,
 ) error {
+	reqCtx, _ := models.GetRequestContext(ctx)
+
 	if newEmail == "" {
 		return fmt.Errorf("new email cannot be empty")
 	}
@@ -159,7 +161,6 @@ func (uc *verifyEmailUseCase) handleEmailChangeVerificationEmail(
 	}
 
 	oldEmail := user.Email
-
 	user.Email = newEmail
 	user.EmailVerified = true
 	if _, err := uc.UserService.Update(ctx, user); err != nil {
@@ -175,31 +176,63 @@ func (uc *verifyEmailUseCase) handleEmailChangeVerificationEmail(
 		return err
 	}
 
-	go func() {
-		detachedCtx := context.WithoutCancel(ctx)
-		taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
-		defer cancel()
+	callbackHandled := false
+	if uc.PluginConfig.SendChangedEmailToOldEmail != nil {
+		callbackHandled = true
+		err := uc.PluginConfig.SendChangedEmailToOldEmail(types.SendChangedEmailToOldEmailParams{
+			User:  *user,
+			Email: oldEmail,
+		}, reqCtx)
 
-		if err := uc.sendChangedEmailNotifications(taskCtx, oldEmail, newEmail); err != nil {
-			uc.Logger.Error("failed to send changed email notifications", "err", err)
+		if err != nil {
+			uc.Logger.Error("failed to send changed email to old email via plugin callback", "err", err.Error())
 		}
-	}()
+	}
+
+	if uc.PluginConfig.SendChangedEmailToNewEmail != nil {
+		callbackHandled = true
+		err := uc.PluginConfig.SendChangedEmailToNewEmail(types.SendChangedEmailToNewEmailParams{
+			User:  *user,
+			Email: newEmail,
+		}, reqCtx)
+
+		if err != nil {
+			uc.Logger.Error("failed to send changed email to new email via plugin callback", "err", err.Error())
+		}
+	}
+
+	if callbackHandled {
+		uc.publishEmailChangedEvent(user, oldEmail, newEmail)
+		return nil
+	}
+
+	if uc.MailerService != nil {
+		go func() {
+			detachedCtx := context.WithoutCancel(ctx)
+			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
+			defer cancel()
+
+			if err := uc.sendChangedEmailEmails(taskCtx, oldEmail, newEmail); err != nil {
+				uc.Logger.Error("failed to send changed email emails via built-in email service", "err", err)
+			}
+		}()
+	}
 
 	uc.publishEmailChangedEvent(user, oldEmail, newEmail)
 
 	return nil
 }
 
-func (uc *verifyEmailUseCase) sendChangedEmailNotifications(ctx context.Context, oldEmail string, newEmail string) error {
+func (uc *verifyEmailUseCase) sendChangedEmailEmails(ctx context.Context, oldEmail string, newEmail string) error {
 	subject := "Your email has been changed"
 	textBody := fmt.Sprintf("Your account email has been changed from %s to %s. If you did not perform this action, please contact support.", oldEmail, newEmail)
 
 	if err := uc.MailerService.SendEmail(ctx, oldEmail, subject, textBody, getHtmlBody(oldEmail, oldEmail, newEmail)); err != nil {
-		uc.Logger.Error("failed to send email to old address", "err", err)
+		uc.Logger.Error("failed to send email to old address via built-in email service", "err", err)
 	}
 
 	if err := uc.MailerService.SendEmail(ctx, newEmail, subject, textBody, getHtmlBody(newEmail, oldEmail, newEmail)); err != nil {
-		uc.Logger.Error("failed to send email to new address", "err", err)
+		uc.Logger.Error("failed to send email to new address via built-in email service", "err", err)
 	}
 
 	return nil

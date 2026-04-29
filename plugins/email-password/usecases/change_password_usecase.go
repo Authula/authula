@@ -39,11 +39,9 @@ func NewChangePasswordUseCase(
 	return &changePasswordUseCase{Logger: logger, PluginConfig: pluginConfig, UserService: userService, AccountService: accountService, VerificationService: verificationService, TokenService: tokenService, PasswordService: passwordService, MailerService: mailerService, EventBus: eventBus}
 }
 
-func (uc *changePasswordUseCase) ChangePassword(
-	ctx context.Context,
-	tokenValue string,
-	newPassword string,
-) error {
+func (uc *changePasswordUseCase) ChangePassword(ctx context.Context, tokenValue string, newPassword string) error {
+	reqCtx, _ := models.GetRequestContext(ctx)
+
 	if len(newPassword) < uc.PluginConfig.MinPasswordLength ||
 		len(newPassword) > uc.PluginConfig.MaxPasswordLength {
 		return constants.ErrInvalidPasswordLength
@@ -92,15 +90,29 @@ func (uc *changePasswordUseCase) ChangePassword(
 		return err
 	}
 
-	go func() {
-		detachedCtx := context.WithoutCancel(ctx)
-		taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
-		defer cancel()
+	if uc.PluginConfig.SendChangedPasswordEmail != nil {
+		err := uc.PluginConfig.SendChangedPasswordEmail(types.SendChangedPasswordEmailParams{
+			User: *user,
+		}, reqCtx)
 
-		if err := uc.sendChangedPasswordEmail(taskCtx, user); err != nil {
-			uc.Logger.Error("failed to send changed password email", "err", err)
+		if err != nil {
+			uc.Logger.Error("failed to send changed password email via plugin callback", "err", err.Error())
 		}
-	}()
+
+		return nil
+	}
+
+	if uc.MailerService != nil {
+		go func() {
+			detachedCtx := context.WithoutCancel(ctx)
+			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
+			defer cancel()
+
+			if err := uc.sendChangedPasswordEmail(taskCtx, user); err != nil {
+				uc.Logger.Error("failed to send changed password email via built-in email service", "err", err.Error())
+			}
+		}()
+	}
 
 	uc.publishChangedPasswordEvent(user)
 

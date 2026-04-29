@@ -2,8 +2,6 @@
 
 **Authula** is an open-source authentication solution that scales with you. Embed it as a library in your Go app, or run it as a standalone auth server with any tech stack. It simplifies adding robust authentication to backend services, empowering developers to build secure applications faster.
 
----
-
 ## Code Style Guide
 
 - Always write clean code that is easy to read and maintain.
@@ -34,8 +32,6 @@ config.SomeNum := new(100)
 
 This is now supported in Go 1.26+ which the project is using. This makes the code cleaner and more concise.
 
----
-
 ## Testing Guidelines
 
 - Write unit tests for as many components as possible to ensure reliability such as repositories, services and handlers as well as plugins.
@@ -47,8 +43,6 @@ This is now supported in Go 1.26+ which the project is using. This makes the cod
 - Regularly run tests during development to catch issues early.
 - Run `make build` to ensure the project builds successfully after changes.
 - Then run `make test` to run all tests in the project.
-
----
 
 ## Documentation Guidelines
 
@@ -62,8 +56,6 @@ This is now supported in Go 1.26+ which the project is using. This makes the cod
 - When updating a feature, ensure that any related documentation is also updated to reflect the changes.
 - Create all docs in markdown format and within a top level docs/ directory.
 
----
-
 ## Security Guidelines
 
 - Follow best practices for secure coding to prevent vulnerabilities.
@@ -73,8 +65,6 @@ This is now supported in Go 1.26+ which the project is using. This makes the cod
 - Implement proper authentication and authorization mechanisms to protect sensitive data and resources.
 - Take into account the principle of least privilege when designing access controls.
 - Always take into consideration edge cases and loopholes that could be exploited by attackers and implement safeguards against them.
-
----
 
 ## Agent Skills
 

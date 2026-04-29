@@ -1,167 +1,123 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
+	plugintests "github.com/Authula/authula/plugins/magic-link/tests"
 	"github.com/Authula/authula/plugins/magic-link/types"
 )
 
-type mockVerifyUseCase struct {
-	mock.Mock
-}
+func TestVerifyHandler_Handler(t *testing.T) {
+	testCases := []struct {
+		name         string
+		target       string
+		trustedHosts []string
+		setup        func(t *testing.T, useCase *plugintests.MockVerifyUseCase)
+		assertResult func(t *testing.T, reqCtx *models.RequestContext)
+	}{
+		{
+			name:         "redirects with code",
+			target:       "/magic-link/verify?token=token-123&callback_url=https://app.example.com/welcome",
+			trustedHosts: []string{"https://app.example.com"},
+			setup: func(t *testing.T, useCase *plugintests.MockVerifyUseCase) {
+				useCase.On("Verify", mock.Anything, "token-123", mock.Anything, mock.Anything).Return("token-123", nil).Once()
+			},
+			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
+				if reqCtx.RedirectURL != "https://app.example.com/welcome?token=token-123" {
+					t.Fatalf("expected redirect with token, got %q", reqCtx.RedirectURL)
+				}
+				if reqCtx.ResponseStatus != http.StatusFound {
+					t.Fatalf("expected 302 status, got %d", reqCtx.ResponseStatus)
+				}
+				if !reqCtx.Handled {
+					t.Fatal("expected request to be handled after redirect")
+				}
+			},
+		},
+		{
+			name:   "returns JSON code",
+			target: "/magic-link/verify?token=abc",
+			setup: func(t *testing.T, useCase *plugintests.MockVerifyUseCase) {
+				useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("token-123", nil).Once()
+			},
+			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
+				if reqCtx.ResponseStatus != http.StatusOK {
+					t.Fatalf("expected status OK, got %d", reqCtx.ResponseStatus)
+				}
 
-func (m *mockVerifyUseCase) Verify(ctx context.Context, token string, ipAddress *string, userAgent *string) (string, error) {
-	args := m.Called(ctx, token, ipAddress, userAgent)
-	if args.Get(0) == nil {
-		return "", args.Error(1)
+				var resp types.VerifyResponse
+				if err := json.Unmarshal(reqCtx.ResponseBody, &resp); err != nil {
+					t.Fatalf("expected JSON body, got error: %v", err)
+				}
+				if resp.Token != "token-123" {
+					t.Fatalf("expected token 'token-123', got %q", resp.Token)
+				}
+			},
+		},
+		{
+			name:   "missing token",
+			target: "/magic-link/verify",
+			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
+				internaltests.AssertErrorMessage(t, reqCtx, http.StatusBadRequest, "token is required")
+			},
+		},
+		{
+			name:   "invalid callback url",
+			target: "/magic-link/verify?token=abc&callback_url=ht!tp://bad+url",
+			setup: func(t *testing.T, useCase *plugintests.MockVerifyUseCase) {
+				useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("token-123", nil).Once()
+			},
+			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
+				internaltests.AssertErrorMessage(t, reqCtx, http.StatusBadRequest, "invalid callback_url")
+			},
+		},
+		{
+			name:         "untrusted callback url",
+			target:       "/magic-link/verify?token=abc&callback_url=https://evil.com",
+			trustedHosts: []string{"https://trusted.com"},
+			setup: func(t *testing.T, useCase *plugintests.MockVerifyUseCase) {
+				useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("token-123", nil).Once()
+			},
+			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
+				internaltests.AssertErrorMessage(t, reqCtx, http.StatusBadRequest, "callback_url is not a trusted origin")
+			},
+		},
+		{
+			name:   "use case error",
+			target: "/magic-link/verify?token=abc",
+			setup: func(t *testing.T, useCase *plugintests.MockVerifyUseCase) {
+				useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("", errors.New("some error")).Once()
+			},
+			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
+				internaltests.AssertErrorMessage(t, reqCtx, http.StatusBadRequest, "some error")
+			},
+		},
 	}
-	return args.String(0), args.Error(1)
-}
 
-func TestVerifyHandler_RedirectsWithCode(t *testing.T) {
-	useCase := &mockVerifyUseCase{}
-	useCase.On("Verify", mock.Anything, "token-123", mock.Anything, mock.Anything).Return("token-123", nil).Once()
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			useCase := &plugintests.MockVerifyUseCase{}
+			if tt.setup != nil {
+				tt.setup(t, useCase)
+			}
 
-	handler := &VerifyHandler{
-		UseCase:        useCase,
-		TrustedOrigins: []string{"https://app.example.com"},
-	}
+			handler := &VerifyHandler{
+				UseCase:        useCase,
+				TrustedOrigins: tt.trustedHosts,
+			}
 
-	params := url.Values{}
-	params.Set("token", "token-123")
-	params.Set("callback_url", "https://app.example.com/welcome")
-	req, reqCtx, w := newCallbackRequest(t, "/magic-link/verify?"+params.Encode())
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, tt.target, nil, nil)
+			handler.Handler()(w, req)
 
-	handler.Handler()(w, req)
-
-	if reqCtx.RedirectURL != "https://app.example.com/welcome?token=token-123" {
-		t.Fatalf("expected redirect with token, got %q", reqCtx.RedirectURL)
-	}
-	if reqCtx.ResponseStatus != http.StatusFound {
-		t.Fatalf("expected 302 status, got %d", reqCtx.ResponseStatus)
-	}
-	if !reqCtx.Handled {
-		t.Fatal("expected request to be handled after redirect")
-	}
-	useCase.AssertExpectations(t)
-}
-
-func TestVerifyHandler_ReturnsJSONCode(t *testing.T) {
-	useCase := &mockVerifyUseCase{}
-	useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("token-123", nil).Once()
-
-	handler := &VerifyHandler{UseCase: useCase}
-	req, reqCtx, w := newCallbackRequest(t, "/magic-link/verify?token=abc")
-
-	handler.Handler()(w, req)
-
-	if reqCtx.ResponseStatus != http.StatusOK {
-		t.Fatalf("expected status OK, got %d", reqCtx.ResponseStatus)
-	}
-
-	var resp types.VerifyResponse
-	if err := json.Unmarshal(reqCtx.ResponseBody, &resp); err != nil {
-		t.Fatalf("expected JSON body, got error: %v", err)
-	}
-	if resp.Token != "token-123" {
-		t.Fatalf("expected token 'token-123', got %q", resp.Token)
-	}
-	useCase.AssertExpectations(t)
-}
-
-func TestVerifyHandler_MissingToken(t *testing.T) {
-	handler := &VerifyHandler{UseCase: &mockVerifyUseCase{}}
-	req, reqCtx, w := newCallbackRequest(t, "/magic-link/verify")
-
-	handler.Handler()(w, req)
-
-	assertErrorResponse(t, reqCtx, http.StatusBadRequest, "token is required")
-}
-
-func TestVerifyHandler_InvalidCallbackURL(t *testing.T) {
-	useCase := &mockVerifyUseCase{}
-	useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("token-123", nil).Once()
-	handler := &VerifyHandler{UseCase: useCase}
-	params := url.Values{}
-	params.Set("token", "abc")
-	params.Set("callback_url", "ht!tp://bad url")
-	req, reqCtx, w := newCallbackRequest(t, "/magic-link/verify?"+params.Encode())
-
-	handler.Handler()(w, req)
-
-	assertErrorResponse(t, reqCtx, http.StatusBadRequest, "invalid callback_url")
-	useCase.AssertExpectations(t)
-}
-
-func TestVerifyHandler_UntrustedCallbackURL(t *testing.T) {
-	useCase := &mockVerifyUseCase{}
-	useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("token-123", nil).Once()
-	handler := &VerifyHandler{
-		UseCase:        useCase,
-		TrustedOrigins: []string{"https://trusted.com"},
-	}
-	req, reqCtx, w := newCallbackRequest(t, "/magic-link/verify?token=abc&callback_url=https://evil.com")
-
-	handler.Handler()(w, req)
-
-	assertErrorResponse(t, reqCtx, http.StatusBadRequest, "callback_url is not a trusted origin")
-	useCase.AssertExpectations(t)
-}
-
-func TestVerifyHandler_UseCaseError(t *testing.T) {
-	useCase := &mockVerifyUseCase{}
-	useCase.On("Verify", mock.Anything, "abc", mock.Anything, mock.Anything).Return("", errors.New("some error")).Once()
-
-	handler := &VerifyHandler{UseCase: useCase}
-	req, reqCtx, w := newCallbackRequest(t, "/magic-link/verify?token=abc")
-
-	handler.Handler()(w, req)
-
-	assertErrorResponse(t, reqCtx, http.StatusBadRequest, "some error")
-	useCase.AssertExpectations(t)
-}
-
-func newCallbackRequest(t *testing.T, target string) (*http.Request, *models.RequestContext, *httptest.ResponseRecorder) {
-	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, target, nil)
-	w := httptest.NewRecorder()
-	reqCtx := &models.RequestContext{
-		Request:        req,
-		ResponseWriter: w,
-		Path:           req.URL.Path,
-		Method:         req.Method,
-		Headers:        req.Header,
-		ClientIP:       "127.0.0.1",
-		Values:         make(map[string]any),
-	}
-	ctx := models.SetRequestContext(context.Background(), reqCtx)
-	req = req.WithContext(ctx)
-	reqCtx.Request = req
-	return req, reqCtx, w
-}
-
-func assertErrorResponse(t *testing.T, reqCtx *models.RequestContext, status int, message string) {
-	t.Helper()
-	if !reqCtx.Handled {
-		t.Fatal("expected request to be handled")
-	}
-	if reqCtx.ResponseStatus != status {
-		t.Fatalf("expected status %d, got %d", status, reqCtx.ResponseStatus)
-	}
-	var body map[string]any
-	if err := json.Unmarshal(reqCtx.ResponseBody, &body); err != nil {
-		t.Fatalf("expected JSON body, got error: %v", err)
-	}
-	if body["message"] != message {
-		t.Fatalf("expected message %q, got %v", message, body["message"])
+			tt.assertResult(t, reqCtx)
+			useCase.AssertExpectations(t)
+		})
 	}
 }
