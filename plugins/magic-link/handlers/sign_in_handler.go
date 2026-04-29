@@ -9,12 +9,6 @@ import (
 	"github.com/Authula/authula/plugins/magic-link/usecases"
 )
 
-type SignInPayload struct {
-	Email       string  `json:"email"`
-	Name        *string `json:"name,omitempty"`
-	CallbackURL *string `json:"callback_url,omitempty"`
-}
-
 type SignInHandler struct {
 	UseCase usecases.SignInUseCase
 }
@@ -32,16 +26,23 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		var payload SignInPayload
-		if err := util.ParseJSON(r, &payload); err != nil {
+		var request types.SignInRequest
+		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
 				"message": "invalid request body",
 			})
 			reqCtx.Handled = true
 			return
 		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
+				"message": err.Error(),
+			})
+			reqCtx.Handled = true
+			return
+		}
 
-		_, err := h.UseCase.SignIn(ctx, payload.Name, payload.Email, payload.CallbackURL)
+		_, err := h.UseCase.SignIn(ctx, request.Name, request.Email, request.CallbackURL)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),

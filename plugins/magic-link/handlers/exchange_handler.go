@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
@@ -19,26 +18,24 @@ func (h *ExchangeHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		var payload types.ExchangeRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
+		var request types.ExchangeRequest
+		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
 				"message": "invalid request body",
 			})
 			reqCtx.Handled = true
 			return
 		}
-
-		code := strings.TrimSpace(payload.Token)
-		if code == "" {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
-				"message": "token is required",
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
+				"message": err.Error(),
 			})
 			reqCtx.Handled = true
 			return
 		}
 
 		userAgent := r.UserAgent()
-		result, err := h.UseCase.Exchange(ctx, code, &reqCtx.ClientIP, &userAgent)
+		result, err := h.UseCase.Exchange(ctx, request.Token, &reqCtx.ClientIP, &userAgent)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),

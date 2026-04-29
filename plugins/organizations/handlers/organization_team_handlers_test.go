@@ -95,7 +95,7 @@ func TestCreateOrganizationTeamHandler(t *testing.T) {
 			userID:          new("user-1"),
 			organizationID:  "org-1",
 			body:            []byte("{"),
-			expectedStatus:  http.StatusBadRequest,
+			expectedStatus:  http.StatusUnprocessableEntity,
 			expectedMessage: "invalid request body",
 		},
 		{
@@ -228,7 +228,7 @@ func TestUpdateOrganizationTeamHandler(t *testing.T) {
 			organizationID:  "org-1",
 			teamID:          "team-1",
 			body:            []byte("{"),
-			expectedStatus:  http.StatusBadRequest,
+			expectedStatus:  http.StatusUnprocessableEntity,
 			expectedMessage: "invalid request body",
 		},
 		{

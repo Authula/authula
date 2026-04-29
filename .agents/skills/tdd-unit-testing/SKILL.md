@@ -15,16 +15,16 @@ description: Write unit tests in Go following Red-Green-Refactor TDD principles.
 ## Key principles
 
 1. **Red-Green-Refactor**: Write failing test → implement → refactor
-2. **Mock dependencies**: Use testify/mock to isolate units
-3. **Table-driven tests**: Use `tt` patterns for multiple cases
-4. **One behavior per test**: Keep tests focused and small
-5. **100% coverage target**: Test success and error paths
-6. **Descriptive names**: `TestTodoService_CreateTodo_ReturnsID_OnSuccess`
-7. **Temporary variables**: Utilise the `new()` function in Go 1.26+ to initialise reference type values instead of creating pointer functions that return a reference type. For example, use `new("user-1")` instead of a function such as `ptrString("user-1")` that returns `*string` to create a pointer to a string value. This also includes all other reference types such as `new(10)` for `*int`, `new(true)` for `*bool`, etc.
+2. **Mock dependencies**: Use testify/mock to isolate units and put all mocks in a separate `mocks.go` file under a `tests` folder within the package being tested
+3. **Table-driven tests**: Use `tt` patterns for multiple cases, keep tests focused and small with one behavior per test case and test success and error paths.
+4. **Descriptive names**: `TestTodoService_CreateTodo` and all the scenarios and logic should be tested as individual test cases using the table driven approach
+5. **Temporary variables**: Utilise the `new()` function in Go 1.26+ to initialise reference type values instead of creating pointer functions that return a reference type. For example, use `new("user-1")` instead of a function such as `ptrString("user-1")` that returns `*string` to create a pointer to a string value. This also includes all other reference types such as `new(10)` for `*int`, `new(true)` for `*bool`, etc.
+6. **Assert mock expectations**: Always call `AssertExpectations(t)` at the end of tests that use mocks to ensure all expected calls were made.
+7. **Helpers and test harnesses**: Always utilise any test helpers and utils from the `internals` folder as it contains helpers and utils for tests. If a helper function or util is needed then see whether it is something that is global and can be used across the codebase but if it is specific to a plugin, then keep it local to the plugin by putting the helpers and utils within the plugin's `tests` folder. Never write test code differently in each handler, service, or repository test file. Always follow the same patterns and principles to ensure consistency and maintainability across all tests.
 
 ## Testing strategy
 
-**Handlers**: Create handler struct with UseCase field; return `http.HandlerFunc` from `Handler()` method; test via httptest
+**Handlers**: Create handler struct with UseCase/Service field; return `http.HandlerFunc` from `Handler()` method; test via httptest
 **Services**: Mock repositories; test business logic and error handling
 **Repositories**: Test against real SQLite database (Bun ORM); use test fixtures to set up schema
 **Integration tests**: Use fixtures; test plugin routes end-to-end
@@ -59,8 +59,8 @@ See [examples/](examples/) for Todos testing patterns:
 ## Quick commands
 
 ```bash
-go test ./...              # Run all tests
-go test -cover ./...       # With coverage
+make test                  # Run all tests
+make coverage              # With coverage
 go test -run TestFunc ...  # Specific test
 go test -race ./...        # Detect race conditions
 ```

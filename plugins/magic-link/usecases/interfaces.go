@@ -6,18 +6,6 @@ import (
 	"github.com/Authula/authula/plugins/magic-link/types"
 )
 
-type SignInUseCase interface {
-	SignIn(ctx context.Context, name *string, email string, callbackURL *string) (*types.SignInResult, error)
-}
-
-type VerifyUseCase interface {
-	Verify(ctx context.Context, token string, ipAddress *string, userAgent *string) (string, error)
-}
-
-type ExchangeUseCase interface {
-	Exchange(ctx context.Context, token string, ipAddress *string, userAgent *string) (*types.ExchangeResult, error)
-}
-
 type UseCases struct {
 	SignInUseCase   SignInUseCase
 	VerifyUseCase   VerifyUseCase
@@ -34,4 +22,16 @@ func NewUseCases(
 		VerifyUseCase:   verifyUseCase,
 		ExchangeUseCase: exchangeUseCase,
 	}
+}
+
+type SignInUseCase interface {
+	SignIn(ctx context.Context, name *string, email string, callbackURL *string) (*types.SignInResult, error)
+}
+
+type VerifyUseCase interface {
+	Verify(ctx context.Context, token string, ipAddress *string, userAgent *string) (string, error)
+}
+
+type ExchangeUseCase interface {
+	Exchange(ctx context.Context, token string, ipAddress *string, userAgent *string) (*types.ExchangeResult, error)
 }

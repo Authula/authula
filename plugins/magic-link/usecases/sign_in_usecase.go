@@ -29,6 +29,8 @@ func (uc *SignInUseCaseImpl) SignIn(
 	email string,
 	callbackURL *string,
 ) (*types.SignInResult, error) {
+	reqCtx, _ := models.GetRequestContext(ctx)
+
 	email = strings.ToLower(email)
 
 	existingUser, err := uc.UserService.GetByEmail(ctx, email)
@@ -84,18 +86,30 @@ func (uc *SignInUseCaseImpl) SignIn(
 		callbackURL,
 	)
 
+	callbackHandled := false
+
 	if uc.PluginConfig.SendMagicLinkVerificationEmail != nil {
-		if err := uc.PluginConfig.SendMagicLinkVerificationEmail(email, verificationURL, token); err != nil {
-			return nil, err
+		err := uc.PluginConfig.SendMagicLinkVerificationEmail(types.SendMagicLinkVerificationEmailParams{
+			Email: email,
+			URL:   verificationURL,
+			Token: token,
+		}, reqCtx)
+
+		if err != nil {
+			uc.Logger.Error("failed to send magic link verification email via plugin callback", "err", err.Error())
+		} else {
+			callbackHandled = true
 		}
-	} else {
+	}
+
+	if !callbackHandled && uc.MailerService != nil {
 		go func() {
 			detachedCtx := context.WithoutCancel(ctx)
 			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
 			defer cancel()
 
 			if err := uc.sendMagicLinkVerificationEmail(taskCtx, existingUser, verificationURL); err != nil {
-				uc.Logger.Error("failed to send magic link verification email", "err", err)
+				uc.Logger.Error("failed to send magic link verification email via built-in email service", "err", err.Error())
 			}
 		}()
 	}

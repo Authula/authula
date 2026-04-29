@@ -1,256 +1,140 @@
 package handlers
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
 
-	"github.com/Authula/authula/internal/tests"
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/magic-link/types"
 	"github.com/Authula/authula/plugins/magic-link/usecases"
 )
 
-// Tests
+func TestSignInHandler(t *testing.T) {
+	name := "John Doe"
 
-func TestSignInHandler_ValidRequestWithExistingUser(t *testing.T) {
-	payload := SignInPayload{
-		Email: "test@example.com",
-	}
-	body, _ := json.Marshal(payload)
+	testCases := []struct {
+		name         string
+		requestBody  []byte
+		setup        func(t *testing.T, reqCtx *models.RequestContext, userService *internaltests.MockUserService, accountService *internaltests.MockAccountService, tokenService *internaltests.MockTokenService, verificationService *internaltests.MockVerificationService)
+		assertResult func(t *testing.T, reqCtx *models.RequestContext)
+	}{
+		{
+			name:        "valid request with existing user",
+			requestBody: internaltests.MarshalToJSON(t, types.SignInRequest{Email: "test@example.com"}),
+			setup: func(t *testing.T, reqCtx *models.RequestContext, userService *internaltests.MockUserService, accountService *internaltests.MockAccountService, tokenService *internaltests.MockTokenService, verificationService *internaltests.MockVerificationService) {
+				userService.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{ID: "user-123", Email: "test@example.com"}, nil).Once()
+				tokenService.On("Generate").Return("token-123", nil).Once()
+				tokenService.On("Hash", "token-123").Return("hashed-token-123").Once()
+				verificationService.On("Create", mock.Anything, "user-123", "hashed-token-123", models.TypeMagicLinkSignInRequest, "test@example.com", 15*time.Minute).
+					Return(&models.Verification{ID: "verif-1"}, nil).Once()
 
-	req := httptest.NewRequest("POST", "/magic-link/sign-in", bytes.NewReader(body))
-	w := httptest.NewRecorder()
+				t.Cleanup(func() {
+					userService.AssertExpectations(t)
+					tokenService.AssertExpectations(t)
+					verificationService.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
+				if reqCtx.ResponseStatus != http.StatusOK {
+					t.Fatalf("expected status OK, got %d", reqCtx.ResponseStatus)
+				}
 
-	reqCtx := &models.RequestContext{
-		Request:        req,
-		ResponseWriter: w,
-		Path:           "/magic-link/sign-in",
-		Method:         "POST",
-		Headers:        req.Header,
-		ClientIP:       "127.0.0.1",
-		Values:         make(map[string]any),
-	}
-
-	ctx := models.SetRequestContext(context.Background(), reqCtx)
-	req = req.WithContext(ctx)
-
-	userService := &tests.MockUserService{}
-	userService.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{
-		ID:    "user-123",
-		Email: "test@example.com",
-	}, nil).Once()
-
-	tokenService := &tests.MockTokenService{}
-	tokenService.On("Generate").Return("token-123", nil).Once()
-	tokenService.On("Hash", "token-123").Return("hashed-token-123").Once()
-
-	mailingService := &tests.MockMailerService{}
-	mailingService.On("SendEmail", mock.Anything, "test@example.com", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-
-	verificationService := &tests.MockVerificationService{}
-	verificationService.On("Create", mock.Anything, "user-123", "hashed-token-123", models.TypeMagicLinkSignInRequest, "test@example.com", 15*time.Minute).
-		Return(&models.Verification{ID: "verif-1"}, nil).Once()
-
-	useCase := &usecases.SignInUseCaseImpl{
-		GlobalConfig: &models.Config{
-			BaseURL:  "http://localhost",
-			BasePath: "/auth",
+				var resp types.SignInResponse
+				if err := json.Unmarshal(reqCtx.ResponseBody, &resp); err != nil {
+					t.Fatalf("expected valid JSON response, got error: %v", err)
+				}
+				if resp.Message == "" {
+					t.Fatal("expected message in response")
+				}
+			},
 		},
-		PluginConfig: &types.MagicLinkPluginConfig{
-			ExpiresIn: 15 * time.Minute,
+		{
+			name:        "invalid json",
+			requestBody: []byte("invalid json"),
+			setup: func(t *testing.T, reqCtx *models.RequestContext, userService *internaltests.MockUserService, accountService *internaltests.MockAccountService, tokenService *internaltests.MockTokenService, verificationService *internaltests.MockVerificationService) {
+			},
+			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
+				internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid request body")
+			},
 		},
-		Logger:              &tests.MockLogger{},
-		UserService:         userService,
-		AccountService:      &tests.MockAccountService{},
-		TokenService:        tokenService,
-		VerificationService: verificationService,
-		MailerService:       mailingService,
-	}
+		{
+			name:        "use case error",
+			requestBody: internaltests.MarshalToJSON(t, types.SignInRequest{Email: "test@example.com"}),
+			setup: func(t *testing.T, reqCtx *models.RequestContext, userService *internaltests.MockUserService, accountService *internaltests.MockAccountService, tokenService *internaltests.MockTokenService, verificationService *internaltests.MockVerificationService) {
+				userService.On("GetByEmail", mock.Anything, "test@example.com").Return(nil, errors.New("database error")).Once()
+			},
+			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
+				if !reqCtx.Handled {
+					t.Fatal("expected request to be marked as handled")
+				}
+				if reqCtx.ResponseStatus != http.StatusBadRequest {
+					t.Fatalf("expected status BadRequest, got %d", reqCtx.ResponseStatus)
+				}
 
-	handler := &SignInHandler{UseCase: useCase}
-	handlerFunc := handler.Handler()
-	handlerFunc(w, req)
-
-	if reqCtx.ResponseStatus != http.StatusOK {
-		t.Fatalf("expected status OK, got %d", reqCtx.ResponseStatus)
-	}
-
-	var resp types.SignInResponse
-	_ = json.Unmarshal(reqCtx.ResponseBody, &resp)
-	if resp.Message == "" {
-		t.Fatal("expected message in response")
-	}
-}
-
-func TestSignInHandler_InvalidJSON(t *testing.T) {
-	req := httptest.NewRequest("POST", "/magic-link/sign-in", bytes.NewReader([]byte("invalid json")))
-	w := httptest.NewRecorder()
-
-	reqCtx := &models.RequestContext{
-		Request:        req,
-		ResponseWriter: w,
-		Path:           "/magic-link/sign-in",
-		Method:         "POST",
-		Headers:        req.Header,
-		ClientIP:       "127.0.0.1",
-		Values:         make(map[string]any),
-	}
-
-	ctx := models.SetRequestContext(context.Background(), reqCtx)
-	req = req.WithContext(ctx)
-
-	useCase := &usecases.SignInUseCaseImpl{}
-
-	handler := &SignInHandler{UseCase: useCase}
-	handlerFunc := handler.Handler()
-	handlerFunc(w, req)
-
-	if !reqCtx.Handled {
-		t.Fatal("expected request to be marked as handled")
-	}
-	if reqCtx.ResponseStatus != http.StatusUnprocessableEntity {
-		t.Fatalf("expected status UnprocessableEntity, got %d", reqCtx.ResponseStatus)
-	}
-	var errResp map[string]any
-	if err := json.Unmarshal(reqCtx.ResponseBody, &errResp); err != nil {
-		t.Fatalf("expected JSON error response, got %v", err)
-	}
-	if errResp["message"] != "invalid request body" {
-		t.Fatalf("expected invalid request body message, got %v", errResp["message"])
-	}
-}
-
-func TestSignInHandler_UseCaseError(t *testing.T) {
-	payload := SignInPayload{
-		Email: "test@example.com",
-	}
-
-	body, _ := json.Marshal(payload)
-	req := httptest.NewRequest("POST", "/magic-link/sign-in", bytes.NewReader(body))
-	w := httptest.NewRecorder()
-
-	reqCtx := &models.RequestContext{
-		Request:        req,
-		ResponseWriter: w,
-		Path:           "/magic-link/sign-in",
-		Method:         "POST",
-		Headers:        req.Header,
-		ClientIP:       "127.0.0.1",
-		Values:         make(map[string]any),
-	}
-
-	ctx := models.SetRequestContext(context.Background(), reqCtx)
-	req = req.WithContext(ctx)
-
-	userService := &tests.MockUserService{}
-	userService.On("GetByEmail", mock.Anything, "test@example.com").Return(nil, errors.New("database error")).Once()
-
-	useCase := &usecases.SignInUseCaseImpl{
-		GlobalConfig:        &models.Config{},
-		PluginConfig:        &types.MagicLinkPluginConfig{},
-		Logger:              &tests.MockLogger{},
-		UserService:         userService,
-		AccountService:      &tests.MockAccountService{},
-		TokenService:        &tests.MockTokenService{},
-		VerificationService: &tests.MockVerificationService{},
-		MailerService:       &tests.MockMailerService{},
-	}
-
-	handler := &SignInHandler{UseCase: useCase}
-	handlerFunc := handler.Handler()
-	handlerFunc(w, req)
-
-	if !reqCtx.Handled {
-		t.Fatal("expected request to be marked as handled")
-	}
-	if reqCtx.ResponseStatus != http.StatusBadRequest {
-		t.Fatalf("expected status BadRequest, got %d", reqCtx.ResponseStatus)
-	}
-
-	var errResp map[string]any
-	_ = json.Unmarshal(reqCtx.ResponseBody, &errResp)
-	if errResp["message"] == nil {
-		t.Fatal("expected error message in response")
-	}
-}
-
-func TestSignInHandler_ResponseStructure(t *testing.T) {
-	payload := SignInPayload{
-		Email: "test@example.com",
-	}
-
-	body, _ := json.Marshal(payload)
-	req := httptest.NewRequest("POST", "/magic-link/sign-in", bytes.NewReader(body))
-	w := httptest.NewRecorder()
-
-	reqCtx := &models.RequestContext{
-		Request:        req,
-		ResponseWriter: w,
-		Path:           "/magic-link/sign-in",
-		Method:         "POST",
-		Headers:        req.Header,
-		ClientIP:       "127.0.0.1",
-		Values:         make(map[string]any),
-	}
-
-	ctx := models.SetRequestContext(context.Background(), reqCtx)
-	req = req.WithContext(ctx)
-
-	userService := &tests.MockUserService{}
-	userService.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{
-		ID:    "user-123",
-		Email: "test@example.com",
-	}, nil).Once()
-
-	tokenService := &tests.MockTokenService{}
-	tokenService.On("Generate").Return("token-123", nil).Once()
-	tokenService.On("Hash", "token-123").Return("hashed-token-123").Once()
-
-	mailingService := &tests.MockMailerService{}
-	mailingService.On("SendEmail", mock.Anything, "test@example.com", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-
-	verificationService := &tests.MockVerificationService{}
-	verificationService.On("Create", mock.Anything, "user-123", "hashed-token-123", models.TypeMagicLinkSignInRequest, "test@example.com", 15*time.Minute).
-		Return(&models.Verification{ID: "verif-1"}, nil).Once()
-
-	useCase := &usecases.SignInUseCaseImpl{
-		GlobalConfig: &models.Config{
-			BaseURL:  "http://localhost",
-			BasePath: "/auth",
+				var errResp map[string]any
+				_ = json.Unmarshal(reqCtx.ResponseBody, &errResp)
+				if errResp["message"] == nil {
+					t.Fatal("expected error message in response")
+				}
+			},
 		},
-		PluginConfig: &types.MagicLinkPluginConfig{
-			ExpiresIn: 15 * time.Minute,
+		{
+			name:        "already authenticated returns bad request",
+			requestBody: internaltests.MarshalToJSON(t, types.SignInRequest{Email: "test@example.com"}),
+			setup: func(t *testing.T, reqCtx *models.RequestContext, userService *internaltests.MockUserService, accountService *internaltests.MockAccountService, tokenService *internaltests.MockTokenService, verificationService *internaltests.MockVerificationService) {
+				reqCtx.UserID = &name
+			},
+			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
+				if reqCtx.ResponseStatus != http.StatusBadRequest {
+					t.Fatalf("expected status BadRequest, got %d", reqCtx.ResponseStatus)
+				}
+				var errResp map[string]any
+				_ = json.Unmarshal(reqCtx.ResponseBody, &errResp)
+				if errResp["message"] != "you're already authenticated." {
+					t.Fatalf("expected authenticated message, got %v", errResp["message"])
+				}
+			},
 		},
-		Logger:              &tests.MockLogger{},
-		UserService:         userService,
-		AccountService:      &tests.MockAccountService{},
-		TokenService:        tokenService,
-		VerificationService: verificationService,
-		MailerService:       mailingService,
 	}
 
-	handler := &SignInHandler{UseCase: useCase}
-	handlerFunc := handler.Handler()
-	handlerFunc(w, req)
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			reqBody := tt.requestBody
+			if reqBody == nil {
+				reqBody = []byte(`{}`)
+			}
 
-	if reqCtx.ResponseStatus != http.StatusOK {
-		t.Fatalf("expected status OK, got %d", reqCtx.ResponseStatus)
-	}
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/magic-link/sign-in", reqBody, nil)
 
-	var resp types.SignInResponse
-	err := json.Unmarshal(reqCtx.ResponseBody, &resp)
-	if err != nil {
-		t.Fatalf("expected valid JSON response, got error: %v", err)
-	}
-	if resp.Message == "" {
-		t.Fatal("expected non-empty message in response")
+			userService := &internaltests.MockUserService{}
+			accountService := &internaltests.MockAccountService{}
+			tokenService := &internaltests.MockTokenService{}
+			verificationService := &internaltests.MockVerificationService{}
+
+			pluginConfig := &types.MagicLinkPluginConfig{ExpiresIn: 15 * time.Minute}
+			useCase := &usecases.SignInUseCaseImpl{
+				GlobalConfig:        &models.Config{BaseURL: "http://localhost", BasePath: "/auth"},
+				PluginConfig:        pluginConfig,
+				Logger:              &internaltests.MockLogger{},
+				UserService:         userService,
+				AccountService:      accountService,
+				TokenService:        tokenService,
+				VerificationService: verificationService,
+				MailerService:       nil,
+			}
+
+			tt.setup(t, reqCtx, userService, accountService, tokenService, verificationService)
+
+			handler := &SignInHandler{UseCase: useCase}
+			handler.Handler()(w, req)
+
+			tt.assertResult(t, reqCtx)
+		})
 	}
 }

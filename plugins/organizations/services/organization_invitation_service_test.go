@@ -136,16 +136,6 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			expectErr:      internalerrors.ErrUnauthorized,
 		},
 		{
-			name:           "bad request empty email",
-			actorUserID:    "user-1",
-			organizationID: "org-1",
-			request:        types.CreateOrganizationInvitationRequest{Email: "", Role: "member"},
-			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
-				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-			},
-			expectErr: internalerrors.ErrUnprocessableEntity,
-		},
-		{
 			name:                "invalid role is rejected",
 			actorUserID:         "user-1",
 			organizationID:      "org-1",
@@ -433,7 +423,6 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				require.NotNil(t, invitation)
 				require.False(t, callbackCalled)
 				require.Empty(t, logger.errors)
-				require.Contains(t, logger.warnings, "mailer service not available, skipping organization invitation email")
 			},
 		},
 		{
@@ -453,11 +442,13 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "inviter@example.com"}, nil).Once()
 			},
 			pluginConfig: func(config *types.OrganizationsPluginConfig, callbackCalled *bool) {
-				config.SendOrganizationInvitationEmail = func(organization *types.Organization, invitation *types.OrganizationInvitation, inviter *models.User) error {
+				config.SendOrganizationInvitationEmail = func(params types.SendOrganizationInvitationEmailParams, reqCtx *models.RequestContext) error {
 					*callbackCalled = true
-					require.Equal(t, "org-1", organization.ID)
-					require.Equal(t, "inv-1", invitation.ID)
-					require.Equal(t, "user-1", inviter.ID)
+					require.Equal(t, "org-1", params.Organization.ID)
+					require.Equal(t, "inv-1", params.Invitation.ID)
+					require.Equal(t, "user-1", params.Inviter.ID)
+					require.Contains(t, params.AcceptURL, "/organizations/org-1/invitations/inv-1/accept")
+					require.Nil(t, reqCtx)
 					return nil
 				}
 			},
@@ -473,7 +464,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			},
 		},
 		{
-			name:                "callback error is returned",
+			name:                "callback error falls back to mailer",
 			actorUserID:         "user-1",
 			organizationID:      "org-1",
 			invitationExpiresIn: 36 * time.Hour,
@@ -486,13 +477,61 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			userSetup: func(userSvc *internaltests.MockUserService) {
 				userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "inviter@example.com"}, nil).Once()
 			},
+			mailerFactory: func() (*capturingMailer, chan invitationEmailCall) {
+				mailerCalls := make(chan invitationEmailCall, 1)
+				return &capturingMailer{called: mailerCalls}, mailerCalls
+			},
 			pluginConfig: func(config *types.OrganizationsPluginConfig, callbackCalled *bool) {
-				config.SendOrganizationInvitationEmail = func(organization *types.Organization, invitation *types.OrganizationInvitation, inviter *models.User) error {
+				config.SendOrganizationInvitationEmail = func(params types.SendOrganizationInvitationEmailParams, reqCtx *models.RequestContext) error {
 					*callbackCalled = true
+					require.Equal(t, "user-1", params.Inviter.ID)
+					require.Nil(t, reqCtx)
 					return errors.New("callback error")
 				}
 			},
-			expectErr: errors.New("callback error"),
+			verify: func(t *testing.T, invitation *types.OrganizationInvitation, logger *testInvitationLogger, mailerCalls chan invitationEmailCall, _ chan models.Event, callbackCalled bool) {
+				require.NotNil(t, invitation)
+				require.True(t, callbackCalled)
+				require.Eventually(t, func() bool { return len(mailerCalls) > 0 }, time.Second, 10*time.Millisecond)
+				mailCall := <-mailerCalls
+				require.Equal(t, "user@example.com", mailCall.to)
+				require.NotEmpty(t, logger.errors)
+				require.Contains(t, logger.errors, "failed to send organization invitation email via plugin callback")
+			},
+		},
+		{
+			name:                "callback skips built-in mailer",
+			actorUserID:         "user-1",
+			organizationID:      "org-1",
+			invitationExpiresIn: 36 * time.Hour,
+			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member", RedirectURL: "https://app.example.com/welcome"},
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme"}, nil).Once()
+				invRepo.On("GetByOrganizationIDAndEmail", mock.Anything, "org-1", "user@example.com", types.OrganizationInvitationStatusPending).Return(nil, nil).Once()
+				invRepo.On("Create", mock.Anything, mock.MatchedBy(func(inv *types.OrganizationInvitation) bool {
+					return inv != nil && inv.OrganizationID == "org-1" && inv.InviterID == "user-1" && inv.Email == "user@example.com" && inv.Role == "member"
+				})).Return(&types.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", InviterID: "user-1", Email: "user@example.com", Role: "member", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(36 * time.Hour)}, nil).Once()
+			},
+			userSetup: func(userSvc *internaltests.MockUserService) {
+				userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "inviter@example.com"}, nil).Once()
+			},
+			pluginConfig: func(config *types.OrganizationsPluginConfig, callbackCalled *bool) {
+				config.SendOrganizationInvitationEmail = func(params types.SendOrganizationInvitationEmailParams, reqCtx *models.RequestContext) error {
+					*callbackCalled = true
+					require.Equal(t, "https://example.com/auth/organizations/org-1/invitations/inv-1/accept?redirect_url=https%3A%2F%2Fapp.example.com%2Fwelcome", params.AcceptURL)
+					return nil
+				}
+			},
+			mailerFactory: func() (*capturingMailer, chan invitationEmailCall) {
+				mailerCalls := make(chan invitationEmailCall, 1)
+				return &capturingMailer{called: mailerCalls}, mailerCalls
+			},
+			verify: func(t *testing.T, invitation *types.OrganizationInvitation, logger *testInvitationLogger, mailerCalls chan invitationEmailCall, _ chan models.Event, callbackCalled bool) {
+				require.NotNil(t, invitation)
+				require.True(t, callbackCalled)
+				require.Empty(t, mailerCalls)
+				require.Empty(t, logger.errors)
+			},
 		},
 	}
 

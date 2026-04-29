@@ -65,7 +65,7 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 
 	mailerService, ok := ctx.ServiceRegistry.Get(models.ServiceMailer.String()).(rootservices.MailerService)
 	if !ok {
-		return fmt.Errorf("mailer service not available in service registry")
+		p.logger.Warn("mailer service not available in service registry: automatic email sending will be disabled for the organizations plugin")
 	}
 
 	accessControlService, ok := ctx.ServiceRegistry.Get(models.ServiceAccessControl.String()).(rootservices.AccessControlService)

@@ -61,7 +61,7 @@ func newSignInTestUseCase() (*SignInUseCaseImpl, *mockUserService, *mockAccountS
 		AccountService:      accountSvc,
 		TokenService:        tokenSvc,
 		VerificationService: verificationSvc,
-		MailerService:       mailerSvc,
+		MailerService:       nil,
 	}
 
 	return uc, userSvc, accountSvc, tokenSvc, verificationSvc, mailerSvc

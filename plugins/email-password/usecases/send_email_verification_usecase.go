@@ -91,6 +91,7 @@ func (uc *sendEmailVerificationUseCase) Send(ctx context.Context, email string, 
 		token,
 		callbackURL,
 	)
+	callbackHandled := false
 
 	if uc.PluginConfig.SendEmailVerification != nil {
 		err := uc.PluginConfig.SendEmailVerification(
@@ -101,22 +102,25 @@ func (uc *sendEmailVerificationUseCase) Send(ctx context.Context, email string, 
 			},
 			reqCtx,
 		)
+
 		if err != nil {
-			uc.Logger.Error(err.Error())
-			return err
+			uc.Logger.Error("failed to send email verification via plugin callback", "err", err.Error())
+		} else {
+			callbackHandled = true
 		}
-		return nil
 	}
 
-	go func() {
-		detachedCtx := context.WithoutCancel(ctx)
-		taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
-		defer cancel()
+	if !callbackHandled && uc.MailerService != nil {
+		go func() {
+			detachedCtx := context.WithoutCancel(ctx)
+			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
+			defer cancel()
 
-		if err := uc.sendEmailVerification(taskCtx, user, verificationLink); err != nil {
-			uc.Logger.Error(err.Error())
-		}
-	}()
+			if err := uc.sendEmailVerification(taskCtx, user, verificationLink); err != nil {
+				uc.Logger.Error("failed to send email verification via built-in email service", "err", err.Error())
+			}
+		}()
+	}
 
 	return nil
 }

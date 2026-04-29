@@ -1,23 +1,23 @@
 package types
 
 import (
-	"time"
+	"strings"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/models"
 )
 
-type MagicLinkPluginConfig struct {
-	Enabled       bool          `json:"enabled" toml:"enabled"`
-	ExpiresIn     time.Duration `json:"expires_in" toml:"expires_in"`
-	DisableSignUp bool          `json:"disable_sign_up" toml:"disable_sign_up"`
-	// Custom function to override sending the magic link verification email
-	SendMagicLinkVerificationEmail func(email string, url string, token string) error `json:"-" toml:"-"`
+type SignInRequest struct {
+	Email       string  `json:"email"`
+	Name        *string `json:"name,omitempty"`
+	CallbackURL *string `json:"callback_url,omitempty"`
 }
 
-func (config *MagicLinkPluginConfig) ApplyDefaults() {
-	if config.ExpiresIn == 0 {
-		config.ExpiresIn = 15 * time.Minute
+func (r *SignInRequest) Validate() error {
+	if strings.TrimSpace(r.Email) == "" {
+		return internalerrors.ErrEmailRequired
 	}
+	return nil
 }
 
 type SignInResult struct {
@@ -35,6 +35,13 @@ type VerifyResponse struct {
 
 type ExchangeRequest struct {
 	Token string `json:"token"`
+}
+
+func (r *ExchangeRequest) Validate() error {
+	if strings.TrimSpace(r.Token) == "" {
+		return internalerrors.ErrTokenRequired
+	}
+	return nil
 }
 
 type ExchangeResult struct {

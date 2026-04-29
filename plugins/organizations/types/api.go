@@ -3,6 +3,8 @@ package types
 import (
 	"encoding/json"
 	"strings"
+
+	internalerrors "github.com/Authula/authula/internal/errors"
 )
 
 type CreateOrganizationRequest struct {
@@ -13,9 +15,13 @@ type CreateOrganizationRequest struct {
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 
-func (r *CreateOrganizationRequest) Trim() {
-	r.Name = strings.TrimSpace(r.Name)
-	r.Role = strings.TrimSpace(r.Role)
+func (r *CreateOrganizationRequest) Validate() error {
+	if strings.TrimSpace(r.Name) == "" {
+		return internalerrors.ErrUnprocessableEntity
+	}
+	if strings.TrimSpace(r.Role) == "" {
+		return internalerrors.ErrUnprocessableEntity
+	}
 	if r.Slug != nil {
 		value := strings.TrimSpace(*r.Slug)
 		r.Slug = &value
@@ -24,6 +30,7 @@ func (r *CreateOrganizationRequest) Trim() {
 		value := strings.TrimSpace(*r.Logo)
 		r.Logo = &value
 	}
+	return nil
 }
 
 type UpdateOrganizationRequest struct {
@@ -33,8 +40,10 @@ type UpdateOrganizationRequest struct {
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 
-func (r *UpdateOrganizationRequest) Trim() {
-	r.Name = strings.TrimSpace(r.Name)
+func (r *UpdateOrganizationRequest) Validate() error {
+	if strings.TrimSpace(r.Name) == "" {
+		return internalerrors.ErrUnprocessableEntity
+	}
 	if r.Slug != nil {
 		value := strings.TrimSpace(*r.Slug)
 		r.Slug = &value
@@ -43,6 +52,7 @@ func (r *UpdateOrganizationRequest) Trim() {
 		value := strings.TrimSpace(*r.Logo)
 		r.Logo = &value
 	}
+	return nil
 }
 
 type CreateOrganizationInvitationRequest struct {
@@ -51,10 +61,14 @@ type CreateOrganizationInvitationRequest struct {
 	RedirectURL string `json:"redirect_url,omitempty"`
 }
 
-func (r *CreateOrganizationInvitationRequest) Trim() {
-	r.Email = strings.TrimSpace(r.Email)
-	r.Role = strings.TrimSpace(r.Role)
-	r.RedirectURL = strings.TrimSpace(r.RedirectURL)
+func (r *CreateOrganizationInvitationRequest) Validate() error {
+	if strings.TrimSpace(r.Email) == "" {
+		return internalerrors.ErrUnprocessableEntity
+	}
+	if strings.TrimSpace(r.Role) == "" {
+		return internalerrors.ErrUnprocessableEntity
+	}
+	return nil
 }
 
 type AddOrganizationMemberRequest struct {
@@ -62,17 +76,25 @@ type AddOrganizationMemberRequest struct {
 	Role   string `json:"role"`
 }
 
-func (r *AddOrganizationMemberRequest) Trim() {
-	r.UserID = strings.TrimSpace(r.UserID)
-	r.Role = strings.TrimSpace(r.Role)
+func (r *AddOrganizationMemberRequest) Validate() error {
+	if strings.TrimSpace(r.UserID) == "" {
+		return internalerrors.ErrUnprocessableEntity
+	}
+	if strings.TrimSpace(r.Role) == "" {
+		return internalerrors.ErrUnprocessableEntity
+	}
+	return nil
 }
 
 type UpdateOrganizationMemberRequest struct {
 	Role string `json:"role"`
 }
 
-func (r *UpdateOrganizationMemberRequest) Trim() {
-	r.Role = strings.TrimSpace(r.Role)
+func (r *UpdateOrganizationMemberRequest) Validate() error {
+	if strings.TrimSpace(r.Role) == "" {
+		return internalerrors.ErrUnprocessableEntity
+	}
+	return nil
 }
 
 type CreateOrganizationTeamRequest struct {
@@ -82,8 +104,10 @@ type CreateOrganizationTeamRequest struct {
 	Metadata    json.RawMessage `json:"metadata,omitempty"`
 }
 
-func (r *CreateOrganizationTeamRequest) Trim() {
-	r.Name = strings.TrimSpace(r.Name)
+func (r *CreateOrganizationTeamRequest) Validate() error {
+	if strings.TrimSpace(r.Name) == "" {
+		return internalerrors.ErrUnprocessableEntity
+	}
 	if r.Slug != nil {
 		value := strings.TrimSpace(*r.Slug)
 		r.Slug = &value
@@ -92,6 +116,7 @@ func (r *CreateOrganizationTeamRequest) Trim() {
 		value := strings.TrimSpace(*r.Description)
 		r.Description = &value
 	}
+	return nil
 }
 
 type UpdateOrganizationTeamRequest struct {
@@ -101,8 +126,10 @@ type UpdateOrganizationTeamRequest struct {
 	Metadata    json.RawMessage `json:"metadata,omitempty"`
 }
 
-func (r *UpdateOrganizationTeamRequest) Trim() {
-	r.Name = strings.TrimSpace(r.Name)
+func (r *UpdateOrganizationTeamRequest) Validate() error {
+	if strings.TrimSpace(r.Name) == "" {
+		return internalerrors.ErrUnprocessableEntity
+	}
 	if r.Slug != nil {
 		value := strings.TrimSpace(*r.Slug)
 		r.Slug = &value
@@ -111,22 +138,30 @@ func (r *UpdateOrganizationTeamRequest) Trim() {
 		value := strings.TrimSpace(*r.Description)
 		r.Description = &value
 	}
+	return nil
 }
 
 type AddOrganizationTeamMemberRequest struct {
 	MemberID string `json:"member_id"`
 }
 
-func (r *AddOrganizationTeamMemberRequest) Trim() {
-	r.MemberID = strings.TrimSpace(r.MemberID)
+func (r *AddOrganizationTeamMemberRequest) Validate() error {
+	if strings.TrimSpace(r.MemberID) == "" {
+		return internalerrors.ErrUnprocessableEntity
+	}
+	return nil
 }
 
 type AcceptOrganizationInvitationRequest struct {
-	RedirectURL string `json:"redirect_url,omitempty"`
+	RedirectURL *string `json:"redirect_url,omitempty"`
 }
 
-func (r *AcceptOrganizationInvitationRequest) Trim() {
-	r.RedirectURL = strings.TrimSpace(r.RedirectURL)
+func (r *AcceptOrganizationInvitationRequest) Validate() error {
+	if r.RedirectURL != nil {
+		value := strings.TrimSpace(*r.RedirectURL)
+		r.RedirectURL = &value
+	}
+	return nil
 }
 
 type DeleteOrganizationResponse struct {

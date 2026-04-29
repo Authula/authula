@@ -73,6 +73,8 @@ func NewOrganizationInvitationService(
 }
 
 func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, request types.CreateOrganizationInvitationRequest) (*types.OrganizationInvitation, error) {
+	reqCtx, _ := models.GetRequestContext(ctx)
+
 	if actorUserID == "" || organizationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
@@ -80,14 +82,6 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID)
 	if err != nil {
 		return nil, err
-	}
-
-	email := strings.ToLower(request.Email)
-	if email == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
-	}
-	if _, err := mail.ParseAddress(email); err != nil {
-		return nil, internalerrors.ErrUnprocessableEntity
 	}
 
 	role := request.Role
@@ -118,11 +112,11 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 			return err
 		}
 
-		if err := s.serviceUtils.ensureOrganizationInvitationsLimit(ctx, invitationRepo, organizationID, email, s.pluginConfig.InvitationsLimit); err != nil {
+		if err := s.serviceUtils.ensureOrganizationInvitationsLimit(ctx, invitationRepo, organizationID, request.Email, s.pluginConfig.InvitationsLimit); err != nil {
 			return err
 		}
 
-		if existing, err := invitationRepo.GetByOrganizationIDAndEmail(ctx, organizationID, email, types.OrganizationInvitationStatusPending); err != nil {
+		if existing, err := invitationRepo.GetByOrganizationIDAndEmail(ctx, organizationID, request.Email, types.OrganizationInvitationStatusPending); err != nil {
 			return err
 		} else if existing != nil {
 			if err := s.expireOrganizationInvitationIfNeeded(ctx, existing); err != nil {
@@ -139,7 +133,7 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 		}
 		invitation := &types.OrganizationInvitation{
 			ID:             util.GenerateUUID(),
-			Email:          email,
+			Email:          request.Email,
 			InviterID:      actorUserID,
 			OrganizationID: organizationID,
 			Role:           role,
@@ -161,68 +155,45 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 
 	s.publishOrganizationInvitationCreatedEvent(created, organization)
 
-	if s.pluginConfig != nil && s.pluginConfig.SendOrganizationInvitationEmail != nil {
-		inviter, err := s.userService.GetByID(ctx, created.InviterID)
+	acceptURL := s.buildOrganizationInvitationAcceptURL(created, request.RedirectURL)
+	callbackHandled := false
+
+	if s.pluginConfig.SendOrganizationInvitationEmail != nil {
+		inviter, err := s.userService.GetByID(ctx, actorUserID)
 		if err != nil {
 			return nil, err
 		}
-		if inviter == nil {
-			return nil, internalerrors.ErrNotFound
-		}
 
-		if err := s.pluginConfig.SendOrganizationInvitationEmail(organization, created, inviter); err != nil {
-			return nil, err
+		err = s.pluginConfig.SendOrganizationInvitationEmail(types.SendOrganizationInvitationEmailParams{
+			Organization: organization,
+			Invitation:   created,
+			Inviter:      inviter,
+			AcceptURL:    acceptURL,
+		}, reqCtx)
+
+		if err != nil {
+			s.logger.Error("failed to send organization invitation email via plugin callback", "error", err.Error())
+		} else {
+			callbackHandled = true
 		}
-	} else {
-		s.sendOrganizationInvitationEmailAsync(ctx, created, organization, request.RedirectURL)
+	}
+
+	if !callbackHandled && s.mailerService != nil {
+		go func() {
+			detachedCtx := context.WithoutCancel(ctx)
+			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
+			defer cancel()
+
+			if err := s.sendOrganizationInvitationEmail(taskCtx, created, organization, acceptURL); err != nil {
+				s.logger.Error("failed to send organization invitation email via built-in email service", "invitation_id", created.ID, "error", err)
+			}
+		}()
 	}
 
 	return created, nil
 }
 
-func (s *organizationInvitationService) publishOrganizationInvitationCreatedEvent(invitation *types.OrganizationInvitation, organization *types.Organization) {
-	payload, err := json.Marshal(orgevents.OrganizationInvitationCreatedEvent{
-		ID:               util.GenerateUUID(),
-		InvitationID:     invitation.ID,
-		OrganizationID:   invitation.OrganizationID,
-		OrganizationName: organization.Name,
-		InviteeEmail:     invitation.Email,
-		InviterID:        invitation.InviterID,
-		Role:             invitation.Role,
-		ExpiresAt:        invitation.ExpiresAt,
-	})
-	if err != nil {
-		s.logger.Error("failed to marshal organization invitation created event", "error", err)
-		return
-	}
-
-	util.PublishEventAsync(s.eventBus, s.logger, models.Event{
-		ID:        util.GenerateUUID(),
-		Type:      orgconstants.EventOrganizationsInvitationCreated,
-		Timestamp: time.Now().UTC(),
-		Payload:   payload,
-	})
-}
-
-func (s *organizationInvitationService) sendOrganizationInvitationEmailAsync(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, redirectURL string) {
-	if s.mailerService == nil {
-		s.logger.Warn("mailer service not available, skipping organization invitation email")
-		return
-	}
-
-	go func() {
-		detachedCtx := context.WithoutCancel(ctx)
-		taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
-		defer cancel()
-
-		if err := s.sendOrganizationInvitationEmail(taskCtx, invitation, organization, redirectURL); err != nil {
-			s.logger.Error("failed to send organization invitation email", "invitation_id", invitation.ID, "error", err)
-		}
-	}()
-}
-
-func (s *organizationInvitationService) sendOrganizationInvitationEmail(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, redirectURL string) error {
-	acceptURL := s.buildOrganizationInvitationAcceptURL(invitation, redirectURL)
+func (s *organizationInvitationService) sendOrganizationInvitationEmail(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, acceptURL string) error {
 	appName := "Authula"
 	if s.globalConfig.AppName != "" {
 		appName = s.globalConfig.AppName
@@ -266,6 +237,30 @@ func (s *organizationInvitationService) buildOrganizationInvitationAcceptURL(inv
 	}
 
 	return parsedURL.String()
+}
+
+func (s *organizationInvitationService) publishOrganizationInvitationCreatedEvent(invitation *types.OrganizationInvitation, organization *types.Organization) {
+	payload, err := json.Marshal(orgevents.OrganizationInvitationCreatedEvent{
+		ID:               util.GenerateUUID(),
+		InvitationID:     invitation.ID,
+		OrganizationID:   invitation.OrganizationID,
+		OrganizationName: organization.Name,
+		InviteeEmail:     invitation.Email,
+		InviterID:        invitation.InviterID,
+		Role:             invitation.Role,
+		ExpiresAt:        invitation.ExpiresAt,
+	})
+	if err != nil {
+		s.logger.Error("failed to marshal organization invitation created event", "error", err)
+		return
+	}
+
+	util.PublishEventAsync(s.eventBus, s.logger, models.Event{
+		ID:        util.GenerateUUID(),
+		Type:      orgconstants.EventOrganizationsInvitationCreated,
+		Timestamp: time.Now().UTC(),
+		Payload:   payload,
+	})
 }
 
 func (s *organizationInvitationService) GetAllOrganizationInvitations(ctx context.Context, actorUserID string, organizationID string) ([]types.OrganizationInvitation, error) {

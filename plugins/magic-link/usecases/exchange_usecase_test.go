@@ -54,142 +54,235 @@ func newExchangeUseCaseTestHarness() *exchangeUseCaseTestHarness {
 	return h
 }
 
-func TestExchangeUseCase_Success(t *testing.T) {
-	h := newExchangeUseCaseTestHarness()
+func TestExchangeUseCase(t *testing.T) {
 	ip := "127.0.0.1"
 	ua := "TestAgent/1.0"
 
-	h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
-	h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
-	h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
-	h.userSvc.On("GetByID", mock.Anything, h.user.ID).Return(h.user, nil).Once()
-	h.verificationSvc.On("Delete", mock.Anything, h.verification.ID).Return(nil).Once()
-	h.tokenSvc.On("Generate").Return("generated-session-token", nil).Once()
-	h.tokenSvc.On("Hash", "generated-session-token").Return("hashed-generated-session-token").Once()
-	h.sessionSvc.On("Create", mock.Anything, h.user.ID, "hashed-generated-session-token", &ip, &ua, h.useCase.GlobalConfig.Session.ExpiresIn).
-		Return(&models.Session{ID: "session-123", UserID: h.user.ID}, nil).Once()
+	testCases := []struct {
+		name         string
+		token        string
+		ipAddress    *string
+		userAgent    *string
+		setup        func(t *testing.T, h *exchangeUseCaseTestHarness)
+		assertResult func(t *testing.T, result *types.ExchangeResult, err error)
+	}{
+		{
+			name:      "success returns a session and token",
+			token:     "raw-token",
+			ipAddress: &ip,
+			userAgent: &ua,
+			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
+				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
+				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
+				h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
+				h.userSvc.On("GetByID", mock.Anything, h.user.ID).Return(h.user, nil).Once()
+				h.verificationSvc.On("Delete", mock.Anything, h.verification.ID).Return(nil).Once()
+				h.tokenSvc.On("Generate").Return("generated-session-token", nil).Once()
+				h.tokenSvc.On("Hash", "generated-session-token").Return("hashed-generated-session-token").Once()
+				h.sessionSvc.On("Create", mock.Anything, h.user.ID, "hashed-generated-session-token", &ip, &ua, h.useCase.GlobalConfig.Session.ExpiresIn).
+					Return(&models.Session{ID: "session-123", UserID: h.user.ID}, nil).Once()
 
-	result, err := h.useCase.Exchange(context.Background(), "raw-token", &ip, &ua)
+				t.Cleanup(func() {
+					h.userSvc.AssertExpectations(t)
+					h.verificationSvc.AssertExpectations(t)
+					h.tokenSvc.AssertExpectations(t)
+					h.sessionSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Equal(t, "session-123", result.Session.ID)
+				assert.Equal(t, "user-123", result.User.ID)
+				assert.Equal(t, "generated-session-token", result.SessionToken)
+			},
+		},
+		{
+			name:  "verification lookup error returns the error",
+			token: "raw-token",
+			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
+				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
+				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(nil, errors.New("lookup failed")).Once()
 
-	assert.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.Equal(t, "session-123", result.Session.ID)
-	assert.Equal(t, h.user.ID, result.User.ID)
-	assert.Equal(t, "generated-session-token", result.SessionToken)
-}
+				t.Cleanup(func() {
+					h.verificationSvc.AssertExpectations(t)
+					h.tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+				assert.EqualError(t, err, "lookup failed")
+				assert.Nil(t, result)
+			},
+		},
+		{
+			name:  "missing verification is rejected",
+			token: "raw-token",
+			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
+				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
+				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(nil, nil).Once()
 
-func TestExchangeUseCase_GetByTokenError(t *testing.T) {
-	h := newExchangeUseCaseTestHarness()
+				t.Cleanup(func() {
+					h.verificationSvc.AssertExpectations(t)
+					h.tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+				assert.EqualError(t, err, "invalid or expired token")
+				assert.Nil(t, result)
+			},
+		},
+		{
+			name:  "expired verification is rejected",
+			token: "raw-token",
+			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
+				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
+				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
+				h.verificationSvc.On("IsExpired", h.verification).Return(true).Once()
 
-	h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
-	h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(nil, errors.New("lookup failed")).Once()
+				t.Cleanup(func() {
+					h.verificationSvc.AssertExpectations(t)
+					h.tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+				assert.EqualError(t, err, "invalid or expired token")
+				assert.Nil(t, result)
+			},
+		},
+		{
+			name:  "invalid token type is rejected",
+			token: "raw-token",
+			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
+				h.verification.Type = models.TypeEmailVerification
+				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
+				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
+				h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
 
-	_, err := h.useCase.Exchange(context.Background(), "raw-token", nil, nil)
+				t.Cleanup(func() {
+					h.verificationSvc.AssertExpectations(t)
+					h.tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+				assert.EqualError(t, err, "invalid token type")
+				assert.Nil(t, result)
+			},
+		},
+		{
+			name:  "old sign in tokens are rejected",
+			token: "raw-token",
+			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
+				h.verification.Type = models.TypeMagicLinkSignInRequest
+				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
+				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
+				h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
 
-	assert.EqualError(t, err, "lookup failed")
-}
+				t.Cleanup(func() {
+					h.verificationSvc.AssertExpectations(t)
+					h.tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+				assert.EqualError(t, err, "invalid token type")
+				assert.Nil(t, result)
+			},
+		},
+		{
+			name:  "user lookup error returns the error",
+			token: "raw-token",
+			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
+				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
+				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
+				h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
+				h.userSvc.On("GetByID", mock.Anything, h.user.ID).Return(nil, errors.New("user lookup failed")).Once()
 
-func TestExchangeUseCase_InvalidOrExpiredToken(t *testing.T) {
-	t.Run("not found", func(t *testing.T) {
-		h := newExchangeUseCaseTestHarness()
-		h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
-		h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(nil, nil).Once()
+				t.Cleanup(func() {
+					h.userSvc.AssertExpectations(t)
+					h.verificationSvc.AssertExpectations(t)
+					h.tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+				assert.EqualError(t, err, "user lookup failed")
+				assert.Nil(t, result)
+			},
+		},
+		{
+			name:  "missing user is rejected",
+			token: "raw-token",
+			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
+				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
+				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
+				h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
+				h.userSvc.On("GetByID", mock.Anything, h.user.ID).Return(nil, nil).Once()
 
-		_, err := h.useCase.Exchange(context.Background(), "raw-token", nil, nil)
-		assert.EqualError(t, err, "invalid or expired token")
-	})
+				t.Cleanup(func() {
+					h.userSvc.AssertExpectations(t)
+					h.verificationSvc.AssertExpectations(t)
+					h.tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+				assert.EqualError(t, err, "user not found")
+				assert.Nil(t, result)
+			},
+		},
+		{
+			name:  "verification deletion failure is returned",
+			token: "raw-token",
+			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
+				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
+				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
+				h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
+				h.userSvc.On("GetByID", mock.Anything, h.user.ID).Return(h.user, nil).Once()
+				h.verificationSvc.On("Delete", mock.Anything, h.verification.ID).Return(errors.New("delete failed")).Once()
 
-	t.Run("expired", func(t *testing.T) {
-		h := newExchangeUseCaseTestHarness()
-		h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
-		h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
-		h.verificationSvc.On("IsExpired", h.verification).Return(true).Once()
+				t.Cleanup(func() {
+					h.userSvc.AssertExpectations(t)
+					h.verificationSvc.AssertExpectations(t)
+					h.tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+				assert.EqualError(t, err, "delete failed")
+				assert.Nil(t, result)
+			},
+		},
+		{
+			name:  "session creation failure is returned",
+			token: "raw-token",
+			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
+				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
+				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
+				h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
+				h.userSvc.On("GetByID", mock.Anything, h.user.ID).Return(h.user, nil).Once()
+				h.verificationSvc.On("Delete", mock.Anything, h.verification.ID).Return(nil).Once()
+				h.tokenSvc.On("Generate").Return("generated-session-token", nil).Once()
+				h.tokenSvc.On("Hash", "generated-session-token").Return("hashed-generated-session-token").Once()
+				h.sessionSvc.On("Create", mock.Anything, h.user.ID, "hashed-generated-session-token", (*string)(nil), (*string)(nil), h.useCase.GlobalConfig.Session.ExpiresIn).
+					Return(nil, errors.New("session failed")).Once()
 
-		_, err := h.useCase.Exchange(context.Background(), "raw-token", nil, nil)
-		assert.EqualError(t, err, "invalid or expired token")
-	})
-}
+				t.Cleanup(func() {
+					h.userSvc.AssertExpectations(t)
+					h.verificationSvc.AssertExpectations(t)
+					h.tokenSvc.AssertExpectations(t)
+					h.sessionSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+				assert.EqualError(t, err, "session failed")
+				assert.Nil(t, result)
+			},
+		},
+	}
 
-func TestExchangeUseCase_InvalidTokenType(t *testing.T) {
-	h := newExchangeUseCaseTestHarness()
-	h.verification.Type = models.TypeEmailVerification
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newExchangeUseCaseTestHarness()
+			tt.setup(t, h)
 
-	h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
-	h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
-	h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
-
-	_, err := h.useCase.Exchange(context.Background(), "raw-token", nil, nil)
-
-	assert.EqualError(t, err, "invalid token type")
-}
-
-func TestExchangeUseCase_RejectsOldSignInTokens(t *testing.T) {
-	h := newExchangeUseCaseTestHarness()
-	h.verification.Type = models.TypeMagicLinkSignInRequest
-
-	h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
-	h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
-	h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
-
-	_, err := h.useCase.Exchange(context.Background(), "raw-token", nil, nil)
-
-	assert.EqualError(t, err, "invalid token type")
-}
-
-func TestExchangeUseCase_UserLookupError(t *testing.T) {
-	h := newExchangeUseCaseTestHarness()
-
-	h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
-	h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
-	h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
-	h.userSvc.On("GetByID", mock.Anything, h.user.ID).Return(nil, errors.New("user lookup failed")).Once()
-
-	_, err := h.useCase.Exchange(context.Background(), "raw-token", nil, nil)
-
-	assert.EqualError(t, err, "user lookup failed")
-}
-
-func TestExchangeUseCase_UserNotFound(t *testing.T) {
-	h := newExchangeUseCaseTestHarness()
-
-	h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
-	h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
-	h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
-	h.userSvc.On("GetByID", mock.Anything, h.user.ID).Return(nil, nil).Once()
-
-	_, err := h.useCase.Exchange(context.Background(), "raw-token", nil, nil)
-
-	assert.EqualError(t, err, "user not found")
-}
-
-func TestExchangeUseCase_DeleteVerificationFails(t *testing.T) {
-	h := newExchangeUseCaseTestHarness()
-
-	h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
-	h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
-	h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
-	h.userSvc.On("GetByID", mock.Anything, h.user.ID).Return(h.user, nil).Once()
-	h.verificationSvc.On("Delete", mock.Anything, h.verification.ID).Return(errors.New("delete failed")).Once()
-
-	_, err := h.useCase.Exchange(context.Background(), "raw-token", nil, nil)
-
-	assert.EqualError(t, err, "delete failed")
-}
-
-func TestExchangeUseCase_SessionCreationFails(t *testing.T) {
-	h := newExchangeUseCaseTestHarness()
-
-	h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
-	h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
-	h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
-	h.userSvc.On("GetByID", mock.Anything, h.user.ID).Return(h.user, nil).Once()
-	h.verificationSvc.On("Delete", mock.Anything, h.verification.ID).Return(nil).Once()
-	h.tokenSvc.On("Generate").Return("generated-session-token", nil).Once()
-	h.tokenSvc.On("Hash", "generated-session-token").Return("hashed-generated-session-token").Once()
-	h.sessionSvc.On("Create", mock.Anything, h.user.ID, "hashed-generated-session-token", (*string)(nil), (*string)(nil), h.useCase.GlobalConfig.Session.ExpiresIn).
-		Return(nil, errors.New("session failed")).Once()
-
-	_, err := h.useCase.Exchange(context.Background(), "raw-token", nil, nil)
-
-	assert.EqualError(t, err, "session failed")
+			result, err := h.useCase.Exchange(context.Background(), tt.token, tt.ipAddress, tt.userAgent)
+			tt.assertResult(t, result, err)
+		})
+	}
 }

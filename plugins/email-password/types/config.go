@@ -19,12 +19,12 @@ type EmailPasswordPluginConfig struct {
 	PasswordResetExpiresIn      time.Duration `json:"password_reset_expires_in" toml:"password_reset_expires_in"`
 	RequestEmailChangeExpiresIn time.Duration `json:"request_email_change_expires_in" toml:"request_email_change_expires_in"`
 
-	// Function to override sending email verification emails
-	SendEmailVerification func(params SendEmailVerificationParams, reqCtx *models.RequestContext) error `json:"-" toml:"-"`
-	// Function to override sending password reset emails
-	SendPasswordResetEmail func(params SendPasswordResetEmailParams, reqCtx *models.RequestContext) error `json:"-" toml:"-"`
-	// Function to override sending email change emails
+	SendEmailVerification       func(params SendEmailVerificationParams, reqCtx *models.RequestContext) error       `json:"-" toml:"-"`
+	SendPasswordResetEmail      func(params SendPasswordResetEmailParams, reqCtx *models.RequestContext) error      `json:"-" toml:"-"`
+	SendChangedPasswordEmail    func(params SendChangedPasswordEmailParams, reqCtx *models.RequestContext) error    `json:"-" toml:"-"`
 	SendRequestEmailChangeEmail func(params SendRequestEmailChangeEmailParams, reqCtx *models.RequestContext) error `json:"-" toml:"-"`
+	SendChangedEmailToOldEmail  func(params SendChangedEmailToOldEmailParams, reqCtx *models.RequestContext) error  `json:"-" toml:"-"`
+	SendChangedEmailToNewEmail  func(params SendChangedEmailToNewEmailParams, reqCtx *models.RequestContext) error  `json:"-" toml:"-"`
 }
 
 func (config *EmailPasswordPluginConfig) ApplyDefaults() {
@@ -57,6 +57,10 @@ type SendPasswordResetEmailParams struct {
 	Token string
 }
 
+type SendChangedPasswordEmailParams struct {
+	User models.User
+}
+
 type SendEmailResetEmailParams struct {
 	User  models.User
 	URL   string
@@ -69,4 +73,14 @@ type SendRequestEmailChangeEmailParams struct {
 	Token    string
 	NewEmail string
 	OldEmail string
+}
+
+type SendChangedEmailToOldEmailParams struct {
+	User  models.User
+	Email string
+}
+
+type SendChangedEmailToNewEmailParams struct {
+	User  models.User
+	Email string
 }
