@@ -24,6 +24,33 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
+		if reqCtx.UserID != nil && *reqCtx.UserID != "" {
+			if sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && sessionID != "" {
+				existingSession, err := h.SignInUseCase.GetSessionByID(ctx, sessionID)
+				if err == nil && existingSession != nil && existingSession.ExpiresAt.After(time.Now()) {
+					user, err := h.SignInUseCase.GetUserByID(ctx, existingSession.UserID)
+
+					if err != nil {
+						h.Logger.Error("failed to get user by ID", "err", err.Error())
+						reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
+							"message": "failed to get user for existing session",
+						})
+						reqCtx.Handled = true
+						return
+					}
+
+					if user != nil {
+						reqCtx.Values[models.ContextAuthIdempotentSkipTokensMint.String()] = true
+						reqCtx.SetJSONResponse(http.StatusOK, types.SignInResponse{
+							User:    user,
+							Session: existingSession,
+						})
+						return
+					}
+				}
+			}
+		}
+
 		var request types.SignInRequest
 		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
@@ -36,24 +63,6 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
-		}
-
-		if reqCtx.UserID != nil && *reqCtx.UserID != "" {
-			if sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && sessionID != "" {
-				existingSession, err := h.SignInUseCase.GetSessionByID(ctx, sessionID)
-				if err == nil && existingSession != nil && existingSession.ExpiresAt.After(time.Now()) {
-					user, _ := h.SignInUseCase.GetUserByID(ctx, existingSession.UserID)
-					if user != nil {
-						reqCtx.Values[models.ContextAuthIdempotentSkipTokensMint.String()] = true
-
-						reqCtx.SetJSONResponse(http.StatusOK, types.SignInResponse{
-							User:    user,
-							Session: existingSession,
-						})
-						return
-					}
-				}
-			}
 		}
 
 		userAgent := r.UserAgent()
@@ -73,14 +82,14 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		if h.PluginConfig.RequireEmailVerification && !result.User.EmailVerified && h.PluginConfig.SendEmailOnSignIn {
+		if h.PluginConfig.RequireEmailVerification && h.PluginConfig.SendEmailOnSignIn && !result.User.EmailVerified {
 			go func() {
 				detachedCtx := context.WithoutCancel(ctx)
 				taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
 				defer cancel()
 
 				if err := h.SendEmailVerificationUseCase.Send(taskCtx, result.User.Email, request.CallbackURL); err != nil {
-					h.Logger.Error("failed to send email", "err", err)
+					h.Logger.Error("failed to send email", "err", err.Error())
 				}
 			}()
 		}
