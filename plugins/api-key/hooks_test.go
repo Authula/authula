@@ -29,9 +29,9 @@ func (m *mockRateLimitService) CheckAndIncrement(ctx context.Context, key string
 func TestApiKeyPluginHooks_MatchConfiguredHeaderOnly(t *testing.T) {
 	t.Parallel()
 
-	plugin := &ApiKeyPlugin{config: types.ApiKeyPluginConfig{ApiKeyHeader: "X-Test-API-Key"}}
+	plugin := &ApiKeyPlugin{config: types.ApiKeyPluginConfig{Header: "X-Test-API-Key"}}
 	plugin.config.ApplyDefaults()
-	plugin.ctx = &models.PluginContext{}
+	plugin.pluginCtx = &models.PluginContext{}
 
 	hooks := plugin.buildHooks()
 	require.Len(t, hooks, 1)
@@ -49,13 +49,13 @@ func TestApiKeyPluginHook_InvalidKey_ReturnsUnauthorized(t *testing.T) {
 	service.On("Verify", mock.Anything, types.VerifyApiKeyRequest{Key: "bad-key"}).Return(&types.VerifyApiKeyResult{Valid: false}, nil).Once()
 
 	plugin := &ApiKeyPlugin{
-		config: types.ApiKeyPluginConfig{ApiKeyHeader: "X-Test-API-Key"},
-		ctx:    &models.PluginContext{ServiceRegistry: &internaltests.MockServiceRegistry{}, Logger: &internaltests.MockLogger{}},
-		Api:    NewAPI(service),
+		config:    types.ApiKeyPluginConfig{Header: "X-Test-API-Key"},
+		pluginCtx: &models.PluginContext{ServiceRegistry: &internaltests.MockServiceRegistry{}, Logger: &internaltests.MockLogger{}},
+		Api:       NewAPI(service),
 	}
 
 	reqCtx := newRequestContext(t, http.MethodGet, "/protected", map[string]string{"X-Test-API-Key": "bad-key"})
-	err := plugin.handleApiKeyHook()(reqCtx)
+	err := plugin.validateApiKeyHook()(reqCtx)
 	require.NoError(t, err)
 	assert.True(t, reqCtx.Handled)
 	assert.Equal(t, http.StatusUnauthorized, reqCtx.ResponseStatus)
@@ -70,13 +70,13 @@ func TestApiKeyPluginHook_ValidKeyWithoutRateLimiting_PassesThrough(t *testing.T
 	service.On("Verify", mock.Anything, types.VerifyApiKeyRequest{Key: "good-key"}).Return(&types.VerifyApiKeyResult{Valid: true, ApiKey: apiKey}, nil).Once()
 
 	plugin := &ApiKeyPlugin{
-		config: types.ApiKeyPluginConfig{ApiKeyHeader: "X-Test-API-Key"},
-		ctx:    &models.PluginContext{ServiceRegistry: &internaltests.MockServiceRegistry{}, Logger: &internaltests.MockLogger{}},
-		Api:    NewAPI(service),
+		config:    types.ApiKeyPluginConfig{Header: "X-Test-API-Key"},
+		pluginCtx: &models.PluginContext{ServiceRegistry: &internaltests.MockServiceRegistry{}, Logger: &internaltests.MockLogger{}},
+		Api:       NewAPI(service),
 	}
 
 	reqCtx := newRequestContext(t, http.MethodGet, "/protected", map[string]string{"X-Test-API-Key": "good-key"})
-	err := plugin.handleApiKeyHook()(reqCtx)
+	err := plugin.validateApiKeyHook()(reqCtx)
 	require.NoError(t, err)
 	assert.False(t, reqCtx.Handled)
 	assert.Nil(t, reqCtx.ResponseBody)
@@ -87,7 +87,9 @@ func TestApiKeyPluginHook_ValidKeyWithoutRateLimiting_PassesThrough(t *testing.T
 func TestApiKeyPluginHook_ValidKeyWithRateLimiting_CallsSharedService(t *testing.T) {
 	t.Parallel()
 
-	apiKey := &types.ApiKey{ID: "api-key-1", ReferenceID: "user-1", RateLimitEnabled: true, RateLimitTimeWindow: intPtr(60), RateLimitMaxRequests: intPtr(5)}
+	apiKey := &types.ApiKey{ID: "api-key-1", ReferenceID: "user-1", RateLimitEnabled: true, RateLimitTimeWindow: new(0), RateLimitMaxRequests: new(0)}
+	*apiKey.RateLimitTimeWindow = 60
+	*apiKey.RateLimitMaxRequests = 5
 	service := &apiKeyTests.MockApiKeyService{}
 	service.On("Verify", mock.Anything, types.VerifyApiKeyRequest{Key: "good-key"}).Return(&types.VerifyApiKeyResult{Valid: true, ApiKey: apiKey}, nil).Once()
 
@@ -98,13 +100,13 @@ func TestApiKeyPluginHook_ValidKeyWithRateLimiting_CallsSharedService(t *testing
 	registry.On("Get", models.ServiceRateLimit.String()).Return(any(rateLimitService)).Once()
 
 	plugin := &ApiKeyPlugin{
-		config: types.ApiKeyPluginConfig{ApiKeyHeader: "X-Test-API-Key"},
-		ctx:    &models.PluginContext{ServiceRegistry: registry, Logger: &internaltests.MockLogger{}},
-		Api:    NewAPI(service),
+		config:    types.ApiKeyPluginConfig{Header: "X-Test-API-Key"},
+		pluginCtx: &models.PluginContext{ServiceRegistry: registry, Logger: &internaltests.MockLogger{}},
+		Api:       NewAPI(service),
 	}
 
 	reqCtx := newRequestContext(t, http.MethodGet, "/protected", map[string]string{"X-Test-API-Key": "good-key"})
-	err := plugin.handleApiKeyHook()(reqCtx)
+	err := plugin.validateApiKeyHook()(reqCtx)
 	require.NoError(t, err)
 	assert.False(t, reqCtx.Handled)
 	assert.Equal(t, "4", reqCtx.ResponseWriter.Header().Get("X-RateLimit-Remaining"))
@@ -116,7 +118,9 @@ func TestApiKeyPluginHook_ValidKeyWithRateLimiting_CallsSharedService(t *testing
 func TestApiKeyPluginHook_RateLimitExceeded_ReturnsTooManyRequests(t *testing.T) {
 	t.Parallel()
 
-	apiKey := &types.ApiKey{ID: "api-key-1", ReferenceID: "user-1", RateLimitEnabled: true, RateLimitTimeWindow: intPtr(60), RateLimitMaxRequests: intPtr(5)}
+	apiKey := &types.ApiKey{ID: "api-key-1", ReferenceID: "user-1", RateLimitEnabled: true, RateLimitTimeWindow: new(0), RateLimitMaxRequests: new(0)}
+	*apiKey.RateLimitTimeWindow = 60
+	*apiKey.RateLimitMaxRequests = 5
 	service := &apiKeyTests.MockApiKeyService{}
 	service.On("Verify", mock.Anything, types.VerifyApiKeyRequest{Key: "good-key"}).Return(&types.VerifyApiKeyResult{Valid: true, ApiKey: apiKey}, nil).Once()
 
@@ -127,13 +131,13 @@ func TestApiKeyPluginHook_RateLimitExceeded_ReturnsTooManyRequests(t *testing.T)
 	registry.On("Get", models.ServiceRateLimit.String()).Return(any(rateLimitService)).Once()
 
 	plugin := &ApiKeyPlugin{
-		config: types.ApiKeyPluginConfig{ApiKeyHeader: "X-Test-API-Key"},
-		ctx:    &models.PluginContext{ServiceRegistry: registry, Logger: &internaltests.MockLogger{}},
-		Api:    NewAPI(service),
+		config:    types.ApiKeyPluginConfig{Header: "X-Test-API-Key"},
+		pluginCtx: &models.PluginContext{ServiceRegistry: registry, Logger: &internaltests.MockLogger{}},
+		Api:       NewAPI(service),
 	}
 
 	reqCtx := newRequestContext(t, http.MethodGet, "/protected", map[string]string{"X-Test-API-Key": "good-key"})
-	err := plugin.handleApiKeyHook()(reqCtx)
+	err := plugin.validateApiKeyHook()(reqCtx)
 	require.NoError(t, err)
 	assert.True(t, reqCtx.Handled)
 	assert.Equal(t, http.StatusTooManyRequests, reqCtx.ResponseStatus)
@@ -146,7 +150,9 @@ func TestApiKeyPluginHook_RateLimitExceeded_ReturnsTooManyRequests(t *testing.T)
 func TestApiKeyPluginHook_RateLimitServiceUnavailable_FailsOpen(t *testing.T) {
 	t.Parallel()
 
-	apiKey := &types.ApiKey{ID: "api-key-1", ReferenceID: "user-1", RateLimitEnabled: true, RateLimitTimeWindow: intPtr(60), RateLimitMaxRequests: intPtr(5)}
+	apiKey := &types.ApiKey{ID: "api-key-1", ReferenceID: "user-1", RateLimitEnabled: true, RateLimitTimeWindow: new(0), RateLimitMaxRequests: new(0)}
+	*apiKey.RateLimitTimeWindow = 60
+	*apiKey.RateLimitMaxRequests = 5
 	service := &apiKeyTests.MockApiKeyService{}
 	service.On("Verify", mock.Anything, types.VerifyApiKeyRequest{Key: "good-key"}).Return(&types.VerifyApiKeyResult{Valid: true, ApiKey: apiKey}, nil).Once()
 
@@ -154,13 +160,13 @@ func TestApiKeyPluginHook_RateLimitServiceUnavailable_FailsOpen(t *testing.T) {
 	registry.On("Get", models.ServiceRateLimit.String()).Return(nil).Once()
 
 	plugin := &ApiKeyPlugin{
-		config: types.ApiKeyPluginConfig{ApiKeyHeader: "X-Test-API-Key"},
-		ctx:    &models.PluginContext{ServiceRegistry: registry},
-		Api:    NewAPI(service),
+		config:    types.ApiKeyPluginConfig{Header: "X-Test-API-Key"},
+		pluginCtx: &models.PluginContext{ServiceRegistry: registry},
+		Api:       NewAPI(service),
 	}
 
 	reqCtx := newRequestContext(t, http.MethodGet, "/protected", map[string]string{"X-Test-API-Key": "good-key"})
-	err := plugin.handleApiKeyHook()(reqCtx)
+	err := plugin.validateApiKeyHook()(reqCtx)
 	require.NoError(t, err)
 	assert.False(t, reqCtx.Handled)
 	service.AssertExpectations(t)
@@ -184,5 +190,3 @@ func newRequestContext(t *testing.T, method, path string, headers map[string]str
 		Values:         map[string]any{},
 	}
 }
-
-func intPtr(v int) *int { return &v }

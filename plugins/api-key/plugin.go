@@ -15,11 +15,11 @@ import (
 )
 
 type ApiKeyPlugin struct {
-	config types.ApiKeyPluginConfig
-	logger models.Logger
-	db     bun.IDB
-	ctx    *models.PluginContext
-	Api    *API
+	config    types.ApiKeyPluginConfig
+	logger    models.Logger
+	db        bun.IDB
+	pluginCtx *models.PluginContext
+	Api       *API
 }
 
 func New(config types.ApiKeyPluginConfig) *ApiKeyPlugin {
@@ -40,7 +40,7 @@ func (p *ApiKeyPlugin) Config() any {
 }
 
 func (p *ApiKeyPlugin) Init(ctx *models.PluginContext) error {
-	p.ctx = ctx
+	p.pluginCtx = ctx
 	p.logger = ctx.Logger
 	p.db = ctx.DB
 

@@ -41,7 +41,10 @@ func TestApiKeyServiceCreate(t *testing.T) {
 
 	userID := "user-1"
 	orgID := "org-1"
+	rawApiKey := "a1b2c3d4e5f6g7h8i9j0"
 	prefix := "pref-"
+	start := "a1b2"
+	last := "i9j0"
 	enabled := false
 	rateLimitEnabled := true
 	rateLimitWindow := 60
@@ -64,14 +67,14 @@ func TestApiKeyServiceCreate(t *testing.T) {
 		}, wantErr: internalerrors.ErrNotFound},
 		{name: "user_success", config: types.ApiKeyPluginConfig{DefaultPrefix: "pref-"}, req: types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeUser, ReferenceID: userID, Prefix: &prefix, Enabled: &enabled, RateLimitEnabled: &rateLimitEnabled, RateLimitTimeWindow: &rateLimitWindow, RateLimitMaxRequests: &rateLimitMaxRequests, RequestsRemaining: &requestsRemaining, ExpiresAt: &expiresAt, Metadata: metadata}, setup: func(f *apiKeyServiceFixture) {
 			f.mockUserService.On("GetByID", mock.Anything, userID).Return(&models.User{ID: userID}, nil).Once()
-			f.mockTokenService.On("Generate").Return("raw-key-123456", nil).Once()
-			f.mockTokenService.On("Hash", "raw-key-123456").Return("hashed-key").Once()
+			f.mockTokenService.On("Generate").Return(rawApiKey, nil).Once()
+			f.mockTokenService.On("Hash", rawApiKey).Return("hashed-key").Once()
 			f.mockApiKeyRepo.On("Create", mock.Anything, mock.MatchedBy(func(apiKey *types.ApiKey) bool {
-				return apiKey != nil && apiKey.ID != "" && apiKey.KeyHash == "hashed-key" && apiKey.Name == "Key" && apiKey.OwnerType == types.OwnerTypeUser && apiKey.ReferenceID == userID && apiKey.Start == "pref-raw-key-" && apiKey.Prefix != nil && *apiKey.Prefix == "pref-" && !apiKey.Enabled && apiKey.RateLimitEnabled && apiKey.RateLimitTimeWindow != nil && *apiKey.RateLimitTimeWindow == rateLimitWindow && apiKey.RateLimitMaxRequests != nil && *apiKey.RateLimitMaxRequests == rateLimitMaxRequests && apiKey.RequestsRemaining != nil && *apiKey.RequestsRemaining == requestsRemaining && apiKey.ExpiresAt != nil && apiKey.ExpiresAt.Equal(expiresAt) && string(apiKey.Metadata) == string(metadata)
+				return apiKey != nil && apiKey.ID != "" && apiKey.KeyHash == "hashed-key" && apiKey.Name == "Key" && apiKey.OwnerType == types.OwnerTypeUser && apiKey.ReferenceID == userID && apiKey.Prefix != nil && *apiKey.Prefix == prefix && apiKey.Start == start && apiKey.Last == last && !apiKey.Enabled && apiKey.RateLimitEnabled && apiKey.RateLimitTimeWindow != nil && *apiKey.RateLimitTimeWindow == rateLimitWindow && apiKey.RateLimitMaxRequests != nil && *apiKey.RateLimitMaxRequests == rateLimitMaxRequests && apiKey.RequestsRemaining != nil && *apiKey.RequestsRemaining == requestsRemaining && apiKey.ExpiresAt != nil && apiKey.ExpiresAt.Equal(expiresAt) && string(apiKey.Metadata) == string(metadata)
 			})).Return(&types.ApiKey{ID: "api-key-1"}, nil).Once()
 		}, assertResponse: func(t *testing.T, resp *types.CreateApiKeyResponse) {
 			require.NotNil(t, resp)
-			assert.Equal(t, "raw-key-123456", resp.RawApiKey)
+			assert.Equal(t, rawApiKey, resp.RawApiKey)
 			require.NotNil(t, resp.ApiKey)
 			assert.Equal(t, "api-key-1", resp.ApiKey.ID)
 		}},

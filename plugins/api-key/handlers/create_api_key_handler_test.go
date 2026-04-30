@@ -19,7 +19,7 @@ func TestCreateApiKeyHandler(t *testing.T) {
 	t.Parallel()
 
 	validReq := types.CreateApiKeyRequest{Name: "Key 1", OwnerType: types.OwnerTypeUser, ReferenceID: "user-1"}
-	apiKey := &types.ApiKey{ID: "api-key-1", Name: "Key 1", OwnerType: types.OwnerTypeUser, ReferenceID: "user-1", Enabled: true, Start: "prefix_abcd1234"}
+	apiKey := &types.ApiKey{ID: "api-key-1", Name: "Key 1", OwnerType: types.OwnerTypeUser, ReferenceID: "user-1", Start: "1234", Last: "5678", Enabled: true}
 
 	tests := []struct {
 		name           string

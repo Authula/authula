@@ -15,8 +15,9 @@ type ApiKey struct {
 	Name                 string          `json:"name" bun:"column:name"`
 	OwnerType            string          `json:"owner_type" bun:"column:owner_type"`
 	ReferenceID          string          `json:"reference_id" bun:"column:reference_id"`
-	Start                string          `json:"start" bun:"column:start"`
 	Prefix               *string         `json:"prefix" bun:"column:prefix"`
+	Start                string          `json:"start" bun:"column:start"`
+	Last                 string          `json:"last" bun:"column:last"`
 	Enabled              bool            `json:"enabled" bun:"column:enabled"`
 	RateLimitEnabled     bool            `json:"rate_limit_enabled" bun:"column:rate_limit_enabled"`
 	RateLimitTimeWindow  *int            `json:"rate_limit_time_window" bun:"column:rate_limit_time_window"`

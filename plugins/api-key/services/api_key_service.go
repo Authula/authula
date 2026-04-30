@@ -87,12 +87,14 @@ func (s *apiKeyService) Create(ctx context.Context, req types.CreateApiKeyReques
 		prefix = *req.Prefix
 	}
 
-	start := rawKey
-	if len(start) > 8 {
-		start = start[:8]
+	start := ""
+	if len(rawKey) > 4 {
+		start = rawKey[:4]
 	}
-	if prefix != "" {
-		start = prefix + start
+
+	last := ""
+	if len(rawKey) > 4 {
+		last = rawKey[len(rawKey)-4:]
 	}
 
 	enabled := true
@@ -138,8 +140,9 @@ func (s *apiKeyService) Create(ctx context.Context, req types.CreateApiKeyReques
 		Name:                 req.Name,
 		OwnerType:            req.OwnerType,
 		ReferenceID:          req.ReferenceID,
-		Start:                start,
 		Prefix:               &prefix,
+		Start:                start,
+		Last:                 last,
 		Enabled:              enabled,
 		RateLimitEnabled:     rateLimitEnabled,
 		RateLimitTimeWindow:  &rateLimitTimeWindow,
