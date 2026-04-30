@@ -6,21 +6,23 @@ import (
 	"time"
 
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/rate-limit/types"
+	rootservices "github.com/Authula/authula/services"
 )
 
 type RateLimitHookHandler struct {
 	config       *models.Config
 	logger       models.Logger
-	pluginConfig RateLimitPluginConfig
-	provider     RateLimitProvider
-	customRules  map[string]RateLimitRule
+	pluginConfig types.RateLimitPluginConfig
+	provider     rootservices.RateLimiterService
+	customRules  map[string]types.RateLimitRule
 }
 
 func NewRateLimitHookHandler(
 	config *models.Config,
 	logger models.Logger,
-	pluginConfig RateLimitPluginConfig,
-	provider RateLimitProvider,
+	pluginConfig types.RateLimitPluginConfig,
+	provider rootservices.RateLimiterService,
 ) *RateLimitHookHandler {
 	return &RateLimitHookHandler{
 		config:       config,

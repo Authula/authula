@@ -5,12 +5,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/rate-limit/services"
+	"github.com/Authula/authula/plugins/rate-limit/types"
 )
 
-// TestInMemoryProvider tests the in-memory rate limit provider
 func TestInMemoryProvider(t *testing.T) {
-	provider := NewInMemoryProvider()
+	provider := services.NewInMemoryProvider()
 	defer func() {
 		if err := provider.Close(); err != nil {
 			t.Fatalf("failed to close provider: %v", err)
@@ -62,12 +67,12 @@ func TestInMemoryProvider(t *testing.T) {
 
 // TestRateLimitPluginConfig tests the rate limit plugin config
 func TestRateLimitPluginConfig(t *testing.T) {
-	config := RateLimitPluginConfig{
+	config := types.RateLimitPluginConfig{
 		Enabled:  true,
 		Window:   1 * time.Minute,
 		Max:      100,
 		Prefix:   "ratelimit:",
-		Provider: RateLimitProviderInMemory,
+		Provider: types.RateLimitProviderInMemory,
 	}
 
 	plugin := New(config)
@@ -84,14 +89,44 @@ func TestRateLimitPluginConfig(t *testing.T) {
 
 // TestProviderNames ensures the provider is initialized with correct name
 func TestProviderNames(t *testing.T) {
-	provider := NewInMemoryProvider()
+	provider := services.NewInMemoryProvider()
 	defer func() {
 		if err := provider.Close(); err != nil {
 			t.Fatalf("failed to close provider: %v", err)
 		}
 	}()
 
-	if name := provider.GetName(); name != string(RateLimitProviderInMemory) {
+	if name := provider.GetName(); name != string(types.RateLimitProviderInMemory) {
 		t.Errorf("in-memory provider name should be 'memory', got %s", name)
+	}
+}
+
+func TestRateLimitPlugin_Init_RegistersSharedService(t *testing.T) {
+	t.Parallel()
+
+	plugin := New(types.RateLimitPluginConfig{Provider: types.RateLimitProviderInMemory})
+	registry := &internaltests.MockServiceRegistry{}
+	registry.On("Register", models.ServiceRateLimit.String(), mock.Anything).Once()
+
+	err := plugin.Init(&models.PluginContext{
+		Logger:          &internaltests.MockLogger{},
+		ServiceRegistry: registry,
+		GetConfig: func() *models.Config {
+			return &models.Config{PreParsedConfigs: map[string]any{models.PluginRateLimit.String(): types.RateLimitPluginConfig{Provider: types.RateLimitProviderInMemory}}}
+		},
+	})
+	require.NoError(t, err)
+	registry.AssertExpectations(t)
+}
+
+func TestRateLimiterService_DelegatesToProvider(t *testing.T) {
+	t.Parallel()
+
+	provider := services.NewInMemoryProvider()
+	service := services.NewRateLimiterService(provider)
+	allowed, count, _, err := service.CheckAndIncrement(context.Background(), "test:key", time.Minute, 1)
+	require.NoError(t, err)
+	if !allowed || count != 1 {
+		t.Fatalf("expected allowed first request, got allowed=%v count=%d", allowed, count)
 	}
 }

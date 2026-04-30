@@ -1,29 +1,32 @@
-package ratelimit
+package services
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/Authula/authula/models"
 	"github.com/uptrace/bun"
+
+	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/rate-limit/repositories"
+	"github.com/Authula/authula/plugins/rate-limit/types"
 )
 
 // DatabaseProvider is a database-backed rate limit provider for persistent rate limiting
 type DatabaseProvider struct {
 	logger          models.Logger
 	db              bun.IDB
-	repository      RateLimitRepository
+	repository      repositories.RateLimitRepository
 	cleanupInterval time.Duration
 }
 
 // NewDatabaseProvider creates a new database rate limit provider
 func NewDatabaseProvider(db bun.IDB) (*DatabaseProvider, error) {
-	return NewDatabaseProviderWithConfig(db, DatabaseStorageConfig{})
+	return NewDatabaseProviderWithConfig(db, types.DatabaseStorageConfig{})
 }
 
 // NewDatabaseProviderWithConfig creates a new database rate limit provider with custom config
-func NewDatabaseProviderWithConfig(db bun.IDB, config DatabaseStorageConfig) (*DatabaseProvider, error) {
+func NewDatabaseProviderWithConfig(db bun.IDB, config types.DatabaseStorageConfig) (*DatabaseProvider, error) {
 	if db == nil {
 		return nil, fmt.Errorf("database connection cannot be nil")
 	}
@@ -35,7 +38,7 @@ func NewDatabaseProviderWithConfig(db bun.IDB, config DatabaseStorageConfig) (*D
 
 	provider := &DatabaseProvider{
 		db:              db,
-		repository:      NewRateLimitRepository(db),
+		repository:      repositories.NewRateLimitRepository(db),
 		cleanupInterval: cleanupInterval,
 	}
 

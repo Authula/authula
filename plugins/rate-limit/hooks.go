@@ -7,6 +7,9 @@ import (
 // buildHooks returns the configured hooks for this plugin
 // Rate limiting is applied via HookOnRequest to check early
 func (p *RateLimitPlugin) buildHooks() []models.Hook {
+	if p.handler == nil {
+		return nil
+	}
 	return []models.Hook{
 		// Rate limiting hook: checks rate limits early in request lifecycle
 		// Executes for all requests that have rate limiting enabled via config

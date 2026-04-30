@@ -70,3 +70,11 @@ type CoreServices struct {
 	TokenService        TokenService
 	PasswordService     PasswordService
 }
+
+type RateLimiterService interface {
+	CheckAndIncrement(ctx context.Context, key string, window time.Duration, maxRequests int) (allowed bool, count int, resetAt time.Time, err error)
+}
+
+type OrganizationService interface {
+	ExistsByID(ctx context.Context, organizationID string) (bool, error)
+}

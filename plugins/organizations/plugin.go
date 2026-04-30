@@ -88,6 +88,8 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 	p.teamMemberService = services.NewOrganizationTeamMemberService(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo, p.serviceUtils)
 	p.Api = BuildAPI(p)
 
+	ctx.ServiceRegistry.Register(models.ServiceOrganization.String(), p.Api)
+
 	return nil
 }
 

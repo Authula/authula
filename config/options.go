@@ -61,9 +61,9 @@ func NewConfig(options ...ConfigOption) *models.Config {
 		},
 		Logger: models.LoggerConfig{},
 		EventBus: models.EventBusConfig{
-			Provider:              events.ProviderGoChannel,
 			MaxConcurrentHandlers: 100,
 			ContextTimeout:        5 * time.Second,
+			Provider:              events.ProviderGoChannel,
 			GoChannel:             &models.GoChannelConfig{},
 		},
 		Plugins:           models.PluginsConfig{},
@@ -236,14 +236,14 @@ func WithSecurity(config models.SecurityConfig) ConfigOption {
 
 func WithEventBus(config models.EventBusConfig) ConfigOption {
 	return func(c *models.Config) {
-		if config.Provider != "" {
-			c.EventBus.Provider = config.Provider
-		}
 		if config.MaxConcurrentHandlers > 0 {
 			c.EventBus.MaxConcurrentHandlers = config.MaxConcurrentHandlers
 		}
 		if config.ContextTimeout > 0 {
 			c.EventBus.ContextTimeout = config.ContextTimeout
+		}
+		if config.Provider != "" {
+			c.EventBus.Provider = config.Provider
 		}
 		if config.GoChannel != nil {
 			c.EventBus.GoChannel = config.GoChannel
