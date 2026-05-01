@@ -1,6 +1,8 @@
 package types
 
 import (
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/Authula/authula/models"
@@ -23,7 +25,14 @@ type GetMeResponse struct {
 
 type SignOutRequest struct {
 	SessionID  *string `json:"session_id,omitempty"`
-	SignOutAll bool    `json:"sign_out_all,omitempty"`
+	SignOutAll *bool   `json:"sign_out_all,omitempty"`
+}
+
+func (req *SignOutRequest) Validate() error {
+	if req.SessionID != nil && strings.TrimSpace(*req.SessionID) == "" {
+		return errors.New("session_id cannot be empty if provided")
+	}
+	return nil
 }
 
 type SignOutResponse struct {

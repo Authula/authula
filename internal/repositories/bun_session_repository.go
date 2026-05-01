@@ -38,7 +38,7 @@ func (r *BunSessionRepository) GetByToken(ctx context.Context, token string) (*m
 
 func (r *BunSessionRepository) GetByUserID(ctx context.Context, userID string) (*models.Session, error) {
 	s := new(models.Session)
-	err := r.db.NewSelect().Model(s).Where("user_id = ?", userID).Scan(ctx)
+	err := r.db.NewSelect().Model(s).Where("user_id = ?", userID).Order("created_at DESC").Scan(ctx)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

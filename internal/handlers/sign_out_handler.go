@@ -3,15 +3,11 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/Authula/authula/internal/types"
 	"github.com/Authula/authula/internal/usecases"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 )
-
-type SignOutRequestPayload struct {
-	SessionID  *string `json:"session_id,omitempty"`
-	SignOutAll bool    `json:"sign_out_all,omitempty"`
-}
 
 type SignOutHandler struct {
 	UseCase *usecases.SignOutUseCase
@@ -31,13 +27,18 @@ func (h *SignOutHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		var payload SignOutRequestPayload
-		if err := util.ParseJSON(r, &payload); err != nil {
-			// If no body provided, that's okay - we'll use default behavior
-			payload = SignOutRequestPayload{}
+		var request types.SignOutRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			// If no body is provided, we'll default to using an empty request.
+			request = types.SignOutRequest{}
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
 		}
 
-		result, err := h.UseCase.SignOut(ctx, userID, payload.SessionID, payload.SignOutAll)
+		result, err := h.UseCase.SignOut(ctx, userID, request.SessionID, request.SignOutAll)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
 				"message": "failed to sign out",
