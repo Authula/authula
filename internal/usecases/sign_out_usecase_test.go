@@ -143,9 +143,11 @@ func TestSignOutUseCase(t *testing.T) {
 				}
 				if result == nil {
 					t.Fatal("expected result, got nil")
-				}
-				if result.Message != tt.want.Message {
-					t.Fatalf("expected message %q, got %q", tt.want.Message, result.Message)
+				} else {
+					got := *result
+					if got.Message != tt.want.Message {
+						t.Fatalf("expected message %q, got %q", tt.want.Message, got.Message)
+					}
 				}
 			}
 

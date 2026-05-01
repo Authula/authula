@@ -18,6 +18,7 @@ const (
 	ServiceMailer           ServiceID = "mailer_service"
 	ServiceJWT              ServiceID = "jwt_service"
 	ServiceConfigManager    ServiceID = "config_manager_service"
+	ServiceRateLimit        ServiceID = "rate_limit_service"
 )
 
 func (id ServiceID) String() string {

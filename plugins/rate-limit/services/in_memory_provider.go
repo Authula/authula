@@ -1,16 +1,18 @@
-package ratelimit
+package services
 
 import (
 	"context"
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/Authula/authula/plugins/rate-limit/types"
 )
 
-// InMemoryProvider is a thread-safe in-memory rate limit provider
 type InMemoryProvider struct {
 	mu              sync.RWMutex
 	store           map[string]*inMemoryEntry
+	rules           map[string]*inMemoryRule
 	cleanupInterval time.Duration
 }
 
@@ -19,13 +21,16 @@ type inMemoryEntry struct {
 	expiresAt time.Time
 }
 
-// NewInMemoryProvider creates a new in-memory rate limit provider
-func NewInMemoryProvider() *InMemoryProvider {
-	return NewInMemoryProviderWithConfig(MemoryStorageConfig{})
+type inMemoryRule struct {
+	window      time.Duration
+	maxRequests int
 }
 
-// NewInMemoryProviderWithConfig creates a new in-memory rate limit provider with custom config
-func NewInMemoryProviderWithConfig(config MemoryStorageConfig) *InMemoryProvider {
+func NewInMemoryProvider() *InMemoryProvider {
+	return NewInMemoryProviderWithConfig(types.MemoryStorageConfig{})
+}
+
+func NewInMemoryProviderWithConfig(config types.MemoryStorageConfig) *InMemoryProvider {
 	cleanupInterval := config.CleanupInterval
 	if cleanupInterval == 0 {
 		cleanupInterval = 1 * time.Minute
@@ -33,21 +38,19 @@ func NewInMemoryProviderWithConfig(config MemoryStorageConfig) *InMemoryProvider
 
 	provider := &InMemoryProvider{
 		store:           make(map[string]*inMemoryEntry),
+		rules:           make(map[string]*inMemoryRule),
 		cleanupInterval: cleanupInterval,
 	}
 
-	// Start cleanup goroutine to remove expired entries
 	go provider.cleanupExpired()
 
 	return provider
 }
 
-// GetName returns the provider name
 func (p *InMemoryProvider) GetName() string {
-	return string(RateLimitProviderInMemory)
+	return "memory"
 }
 
-// CheckAndIncrement checks if a request is allowed and increments the counter
 func (p *InMemoryProvider) CheckAndIncrement(ctx context.Context, key string, window time.Duration, maxRequests int) (bool, int, time.Time, error) {
 	select {
 	case <-ctx.Done():
@@ -78,12 +81,34 @@ func (p *InMemoryProvider) CheckAndIncrement(ctx context.Context, key string, wi
 	return allowed, entry.count, entry.expiresAt, nil
 }
 
-// Close closes the provider (no-op for in-memory)
+func (p *InMemoryProvider) SetRule(_ context.Context, key string, window time.Duration, maxRequests int) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.rules[key] = &inMemoryRule{window: window, maxRequests: maxRequests}
+	return nil
+}
+
+func (p *InMemoryProvider) GetRule(_ context.Context, key string) (time.Duration, int, bool, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	rule, ok := p.rules[key]
+	if !ok {
+		return 0, 0, false, nil
+	}
+	return rule.window, rule.maxRequests, true, nil
+}
+
+func (p *InMemoryProvider) DeleteRule(_ context.Context, key string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.rules, key)
+	return nil
+}
+
 func (p *InMemoryProvider) Close() error {
 	return nil
 }
 
-// cleanupExpired periodically removes expired entries
 func (p *InMemoryProvider) cleanupExpired() {
 	ticker := time.NewTicker(p.cleanupInterval)
 	defer ticker.Stop()

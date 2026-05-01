@@ -1,46 +1,9 @@
-package ratelimit
+package types
 
 import (
 	"context"
 	"time"
-
-	"github.com/uptrace/bun"
 )
-
-type RateLimitProviderType string
-
-const (
-	RateLimitProviderInMemory RateLimitProviderType = "memory"
-	RateLimitProviderRedis    RateLimitProviderType = "redis"
-	RateLimitProviderDatabase RateLimitProviderType = "database"
-)
-
-func (r RateLimitProviderType) String() string {
-	return string(r)
-}
-
-// RateLimit represents a rate limit entry in the database for Bun ORM
-type RateLimit struct {
-	bun.BaseModel `bun:"table:rate_limits"`
-
-	Key       string    `json:"key" bun:"column:key,pk"`
-	Count     int       `json:"count" bun:"column:count"`
-	ExpiresAt time.Time `json:"expires_at" bun:"column:expires_at"`
-}
-
-type RateLimitRule struct {
-	// Disable rate limiting for this endpoint entirely
-	Disabled bool `json:"disabled" toml:"disabled"`
-
-	// Time window for the rate limit
-	Window time.Duration `json:"window" toml:"window"`
-
-	// Max number of requests allowed within the window
-	Max int `json:"max" toml:"max"`
-
-	// Optional override for the storage namespace
-	Prefix string `json:"prefix,omitempty" toml:"prefix"`
-}
 
 // RateLimitEntry tracks requests for a specific key
 type RateLimitEntry struct {
@@ -79,6 +42,12 @@ type RateLimitProvider interface {
 	// maxRequests is the maximum number of requests allowed in the window
 	// Returns: (allowed bool, currentCount int, resetTime time.Time, error)
 	CheckAndIncrement(ctx context.Context, key string, window time.Duration, maxRequests int) (bool, int, time.Time, error)
+	// SetRule stores a per-key rate-limit rule without consuming quota.
+	SetRule(ctx context.Context, key string, window time.Duration, maxRequests int) error
+	// GetRule retrieves a stored per-key rule. Returns 0, 0, false, nil when not found.
+	GetRule(ctx context.Context, key string) (window time.Duration, maxRequests int, found bool, err error)
+	// DeleteRule removes the stored rule for a key.
+	DeleteRule(ctx context.Context, key string) error
 	// Close closes any resources held by the provider
 	Close() error
 }

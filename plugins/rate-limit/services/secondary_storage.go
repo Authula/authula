@@ -1,12 +1,15 @@
-package ratelimit
+package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/Authula/authula/models"
 )
+
+const ruleKeyPrefix = "rule:"
 
 // SecondaryStorageProvider wraps a SecondaryStorage backend for rate limiting
 // This allows rate limits to use distributed storage (Redis, database) instead of in-memory
@@ -71,6 +74,57 @@ func (p *SecondaryStorageProvider) CheckAndIncrement(ctx context.Context, key st
 	}
 
 	return count <= maxRequests, count, resetTime, nil
+}
+
+type storedRule struct {
+	WindowSeconds int
+	MaxRequests   int
+}
+
+// SetRule stores a per-key rate-limit rule without consuming quota.
+// The rule is persisted under the key prefix "rule:" with no TTL.
+func (p *SecondaryStorageProvider) SetRule(ctx context.Context, key string, window time.Duration, maxRequests int) error {
+	rule := storedRule{
+		WindowSeconds: int(window.Seconds()),
+		MaxRequests:   maxRequests,
+	}
+	data, err := json.Marshal(rule)
+	if err != nil {
+		return fmt.Errorf("failed to marshal rule: %w", err)
+	}
+	return p.storage.Set(ctx, ruleKeyPrefix+key, data, nil)
+}
+
+// GetRule retrieves a stored per-key rule. Returns 0, 0, false, nil when not found.
+func (p *SecondaryStorageProvider) GetRule(ctx context.Context, key string) (time.Duration, int, bool, error) {
+	raw, err := p.storage.Get(ctx, ruleKeyPrefix+key)
+	if err != nil {
+		return 0, 0, false, fmt.Errorf("failed to get rule: %w", err)
+	}
+	if raw == nil {
+		return 0, 0, false, nil
+	}
+
+	var data []byte
+	switch v := raw.(type) {
+	case []byte:
+		data = v
+	case string:
+		data = []byte(v)
+	default:
+		return 0, 0, false, fmt.Errorf("unexpected rule value type %T", raw)
+	}
+
+	var rule storedRule
+	if err := json.Unmarshal(data, &rule); err != nil {
+		return 0, 0, false, fmt.Errorf("failed to unmarshal rule: %w", err)
+	}
+	return time.Duration(rule.WindowSeconds) * time.Second, rule.MaxRequests, true, nil
+}
+
+// DeleteRule removes the stored rule for a key.
+func (p *SecondaryStorageProvider) DeleteRule(ctx context.Context, key string) error {
+	return p.storage.Delete(ctx, ruleKeyPrefix+key)
 }
 
 // Close closes the provider (no-op since we don't own the storage)

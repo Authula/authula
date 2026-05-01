@@ -19,8 +19,7 @@
         "editor.formatOnSave": true,
         "files.insertFinalNewline": true,
         "editor.defaultFormatter": "golang.go",
-        "javascript.updateImportsOnFileMove.enabled": "always",
-        "typescript.updateImportsOnFileMove.enabled": "always",
+        "js/ts.updateImportsOnFileMove.enabled": "always",
         "telemetry.telemetryLevel": "off",
         "editor.bracketPairColorization.enabled": true,
         "editor.guides.bracketPairs": "active"

@@ -99,12 +99,14 @@ func TestGetMeUseCase(t *testing.T) {
 				}
 				if result == nil {
 					t.Fatal("expected result, got nil")
-				}
-				if result.User != tt.want.User {
-					t.Fatalf("expected user %#v, got %#v", tt.want.User, result.User)
-				}
-				if result.Session != tt.want.Session {
-					t.Fatalf("expected session %#v, got %#v", tt.want.Session, result.Session)
+				} else {
+					got := *result
+					if got.User != tt.want.User {
+						t.Fatalf("expected user %#v, got %#v", tt.want.User, got.User)
+					}
+					if got.Session != tt.want.Session {
+						t.Fatalf("expected session %#v, got %#v", tt.want.Session, got.Session)
+					}
 				}
 			}
 

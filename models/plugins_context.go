@@ -11,3 +11,11 @@ type AccessControlAssignRoleContext struct {
 	RoleName       string
 	AssignerUserID *string
 }
+
+// Rate Limit
+
+type RateLimitRuleContext struct {
+	Key           string
+	WindowSeconds int
+	MaxRequests   int
+}
