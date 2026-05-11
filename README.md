@@ -33,18 +33,6 @@ All functionality is delivered through a powerful plugin system, allowing you to
 
 ---
 
-### Who is it for?
-
-Authula is ideal for:
-
-- Startups that want full control over their authentication stack
-- Teams building microservices or multi-backend systems
-- Companies with self-hosting or compliance requirements
-- Go developers who want first-class embedded auth
-- Anyone who wants modern auth without SaaS lock-in and full extensibility
-
----
-
 ### Plugins & Capabilities
 
 Authula is architected around a powerful plugin and capability system.
