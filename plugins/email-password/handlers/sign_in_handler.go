@@ -88,7 +88,7 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 				taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
 				defer cancel()
 
-				if err := h.SendEmailVerificationUseCase.Send(taskCtx, result.User.Email, request.CallbackURL); err != nil {
+				if err := h.SendEmailVerificationUseCase.Send(taskCtx, result.User.ID, request.CallbackURL); err != nil {
 					h.Logger.Error("failed to send email", "err", err.Error())
 				}
 			}()
