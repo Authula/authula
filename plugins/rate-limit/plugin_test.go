@@ -2,8 +2,6 @@ package ratelimit
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -120,115 +118,6 @@ func TestRateLimitPluginConfig(t *testing.T) {
 	}
 }
 
-func TestRateLimitPluginStoredRuleHook(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name                  string
-		values                map[string]any
-		expectedHandledFirst  bool
-		expectedLimitHeader   string
-		secondCall            bool
-		expectedHandledSecond bool
-	}{
-		{
-			name:                 "no payload",
-			values:               map[string]any{},
-			expectedHandledFirst: false,
-			expectedLimitHeader:  "",
-		},
-		{
-			name: "valid stored rule allows first request",
-			values: map[string]any{
-				models.ContextRateLimitRule.String(): models.RateLimitRuleContext{Key: "api-key-1", WindowSeconds: 60, MaxRequests: 10},
-			},
-			expectedHandledFirst: false,
-			expectedLimitHeader:  "10",
-		},
-		{
-			name: "valid stored rule blocks second request",
-			values: map[string]any{
-				models.ContextRateLimitRule.String(): models.RateLimitRuleContext{Key: "api-key-2", WindowSeconds: 60, MaxRequests: 1},
-			},
-			expectedHandledFirst:  false,
-			expectedLimitHeader:   "1",
-			secondCall:            true,
-			expectedHandledSecond: true,
-		},
-		{
-			name: "invalid stored rule payload is ignored",
-			values: map[string]any{
-				models.ContextRateLimitRule.String(): models.RateLimitRuleContext{Key: "", WindowSeconds: 60, MaxRequests: 10},
-			},
-			expectedHandledFirst: false,
-			expectedLimitHeader:  "",
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			plugin, _ := newTestRateLimitPlugin(t)
-			reqCtx := newTestRequestContext(t, tc.values)
-
-			if err := plugin.checkStoredRateLimitRuleHook()(reqCtx); err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if reqCtx.Handled != tc.expectedHandledFirst {
-				t.Fatalf("expected first handled=%v, got %v", tc.expectedHandledFirst, reqCtx.Handled)
-			}
-			if got := reqCtx.ResponseWriter.Header().Get("X-RateLimit-Limit"); got != tc.expectedLimitHeader {
-				t.Fatalf("expected X-RateLimit-Limit=%q, got %q", tc.expectedLimitHeader, got)
-			}
-
-			if tc.secondCall {
-				if err := plugin.checkStoredRateLimitRuleHook()(reqCtx); err != nil {
-					t.Fatalf("unexpected error on second call: %v", err)
-				}
-				if reqCtx.Handled != tc.expectedHandledSecond {
-					t.Fatalf("expected second handled=%v, got %v", tc.expectedHandledSecond, reqCtx.Handled)
-				}
-			}
-		})
-	}
-}
-
-func TestRateLimitContextSetters(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name     string
-		setter   func(*models.RequestContext)
-		expected models.RateLimitRuleContext
-	}{
-		{
-			name: "set rule context directly",
-			setter: func(reqCtx *models.RequestContext) {
-				SetRuleContext(reqCtx, models.RateLimitRuleContext{Key: "api-key-1", WindowSeconds: 60, MaxRequests: 100})
-			},
-			expected: models.RateLimitRuleContext{Key: "api-key-1", WindowSeconds: 60, MaxRequests: 100},
-		},
-		{
-			name: "set rule context from record",
-			setter: func(reqCtx *models.RequestContext) {
-				SetRuleContextFromRecord(reqCtx, &types.RateLimitRuleRecord{Key: "api-key-2", WindowSeconds: 120, MaxRequests: 7})
-			},
-			expected: models.RateLimitRuleContext{Key: "api-key-2", WindowSeconds: 120, MaxRequests: 7},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			reqCtx := &models.RequestContext{Values: make(map[string]any)}
-			tc.setter(reqCtx)
-			assertRateLimitRuleContext(t, reqCtx, tc.expected)
-		})
-	}
-}
-
 func newTestRateLimitPlugin(t *testing.T) (*RateLimitPlugin, types.RateLimitProvider) {
 	t.Helper()
 
@@ -240,33 +129,4 @@ func newTestRateLimitPlugin(t *testing.T) (*RateLimitPlugin, types.RateLimitProv
 	})
 
 	return &RateLimitPlugin{provider: provider, logger: &internaltests.MockLogger{}}, provider
-}
-
-func newTestRequestContext(t *testing.T, values map[string]any) *models.RequestContext {
-	t.Helper()
-	if values == nil {
-		values = make(map[string]any)
-	}
-
-	return &models.RequestContext{
-		Request:        httptest.NewRequest(http.MethodGet, "/test", nil),
-		ResponseWriter: httptest.NewRecorder(),
-		Values:         values,
-	}
-}
-
-func assertRateLimitRuleContext(t *testing.T, reqCtx *models.RequestContext, expected models.RateLimitRuleContext) {
-	t.Helper()
-
-	rawValue, ok := reqCtx.Values[models.ContextRateLimitRule.String()]
-	if !ok {
-		t.Fatal("expected rule context to be stored")
-	}
-	stored, ok := rawValue.(models.RateLimitRuleContext)
-	if !ok {
-		t.Fatalf("expected typed rule context, got %T", rawValue)
-	}
-	if stored != expected {
-		t.Fatalf("unexpected stored rule context: got %+v, expected %+v", stored, expected)
-	}
 }

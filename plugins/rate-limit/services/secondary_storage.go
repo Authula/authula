@@ -92,7 +92,7 @@ func (p *SecondaryStorageProvider) SetRule(ctx context.Context, key string, wind
 	if err != nil {
 		return fmt.Errorf("failed to marshal rule: %w", err)
 	}
-	return p.storage.Set(ctx, ruleKeyPrefix+key, data, nil)
+	return p.storage.Set(ctx, ruleKeyPrefix+key, string(data), nil)
 }
 
 // GetRule retrieves a stored per-key rule. Returns 0, 0, false, nil when not found.

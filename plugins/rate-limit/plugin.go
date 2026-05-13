@@ -89,15 +89,14 @@ func (p *RateLimitPlugin) Hooks() []models.Hook {
 }
 
 func (p *RateLimitPlugin) initProvider(pluginCtx *models.PluginContext) error {
-	if p.pluginConfig.Provider == types.RateLimitProviderRedis {
+	switch p.pluginConfig.Provider {
+	case types.RateLimitProviderRedis:
 		if provider := p.trySecondaryStorage(); provider != nil {
 			p.provider = provider
 			return nil
 		}
 		p.logger.Warn("Redis provider not available via secondary-storage, falling back to in-memory")
-	}
-
-	if p.pluginConfig.Provider == types.RateLimitProviderDatabase {
+	case types.RateLimitProviderDatabase:
 		if pluginCtx.DB != nil {
 			dbConfig := types.DatabaseStorageConfig{}
 			if p.pluginConfig.Database != nil {

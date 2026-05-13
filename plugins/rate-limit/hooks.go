@@ -13,19 +13,26 @@ func (p *RateLimitPlugin) buildHooks() []models.Hook {
 	return []models.Hook{
 		{
 			Stage:   models.HookOnRequest,
-			Handler: p.checkRateLimitHook(),
-			Order:   0, // Execute early, before all other hooks
+			Handler: p.checkEndpointRateLimitHook(),
+			Order:   0,
 		},
 		{
 			Stage:   models.HookBefore,
-			Handler: p.checkStoredRateLimitRuleHook(),
+			Handler: p.checkRateLimitRuleHook(),
+			Order:   15, // This must run after any plugin that sets the ContextRateLimitRule value, so it should have a higher order than those plugins
+		},
+		{
+			Stage:   models.HookAfter,
+			Handler: p.handleStoreRateLimitRuleHook(),
 			Order:   0,
 		},
 	}
 }
 
-func (p *RateLimitPlugin) checkRateLimitHook() models.HookHandler {
+func (p *RateLimitPlugin) checkEndpointRateLimitHook() models.HookHandler {
 	return func(reqCtx *models.RequestContext) error {
+		ctx := reqCtx.Request.Context()
+
 		validHttpMethods := []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete}
 		if !slices.Contains(validHttpMethods, reqCtx.Request.Method) {
 			return nil
@@ -47,39 +54,18 @@ func (p *RateLimitPlugin) checkRateLimitHook() models.HookHandler {
 			}
 		}
 
-		allowed, count, resetTime, err := p.provider.CheckAndIncrement(reqCtx.Request.Context(), key, window, max)
+		allowed, count, resetTime, err := p.provider.CheckAndIncrement(ctx, key, window, max)
 		if err != nil {
 			p.logger.Error("failed to check rate limit", "error", err, "key", key)
 			// On error, allow the request to proceed (fail-open)
 			return nil
 		}
 
-		reqCtx.ResponseWriter.Header().Set("X-RateLimit-Limit", strconv.Itoa(max))
-		remaining := max - count
-		if remaining < 0 {
-			remaining = 0
-		}
-		reqCtx.ResponseWriter.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
-		reqCtx.ResponseWriter.Header().Set("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
-
-		if !allowed {
-			retryAfter := int(time.Until(resetTime).Seconds())
-			reqCtx.ResponseWriter.Header().Set("X-Retry-After", strconv.Itoa(retryAfter))
-			payload := map[string]any{
-				"message":     "rate limit exceeded",
-				"retry_after": retryAfter,
-				"limit":       max,
-				"remaining":   0,
-			}
-			reqCtx.SetJSONResponse(http.StatusTooManyRequests, payload)
-			reqCtx.Handled = true
-		}
-
-		return nil
+		return p.executeRateLimit(reqCtx, max, count, resetTime, allowed)
 	}
 }
 
-func (p *RateLimitPlugin) checkStoredRateLimitRuleHook() models.HookHandler {
+func (p *RateLimitPlugin) checkRateLimitRuleHook() models.HookHandler {
 	return func(reqCtx *models.RequestContext) error {
 		ctx := reqCtx.Request.Context()
 
@@ -96,26 +82,65 @@ func (p *RateLimitPlugin) checkStoredRateLimitRuleHook() models.HookHandler {
 		window := time.Duration(ruleCtx.WindowSeconds) * time.Second
 		allowed, count, resetTime, err := p.provider.CheckAndIncrement(ctx, ruleCtx.Key, window, ruleCtx.MaxRequests)
 		if err != nil {
-			p.logger.Error("failed to check stored rate limit rule", "error", err, "key", ruleCtx.Key)
+			p.logger.Error("failed to check stored rate limit rule", "key", ruleCtx.Key, "error", err)
 			return nil
 		}
 
-		reqCtx.ResponseWriter.Header().Set("X-RateLimit-Limit", strconv.Itoa(ruleCtx.MaxRequests))
-		remaining := max(ruleCtx.MaxRequests-count, 0)
-		reqCtx.ResponseWriter.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
-		reqCtx.ResponseWriter.Header().Set("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
+		return p.executeRateLimit(reqCtx, ruleCtx.MaxRequests, count, resetTime, allowed)
+	}
+}
 
-		if !allowed {
-			retryAfter := int(time.Until(resetTime).Seconds())
-			reqCtx.ResponseWriter.Header().Set("X-Retry-After", strconv.Itoa(retryAfter))
-			payload := map[string]any{
-				"message":     "rate limit exceeded",
-				"retry_after": retryAfter,
-				"limit":       ruleCtx.MaxRequests,
-				"remaining":   0,
+func (p *RateLimitPlugin) executeRateLimit(reqCtx *models.RequestContext, maxRequests int, count int, resetTime time.Time, allowed bool) error {
+	reqCtx.ResponseWriter.Header().Set("X-RateLimit-Limit", strconv.Itoa(maxRequests))
+	remaining := max(maxRequests-count, 0)
+	reqCtx.ResponseWriter.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
+	reqCtx.ResponseWriter.Header().Set("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
+
+	if !allowed {
+		retryAfter := int(time.Until(resetTime).Seconds())
+		reqCtx.ResponseWriter.Header().Set("X-Retry-After", strconv.Itoa(retryAfter))
+		payload := map[string]any{
+			"message":     "rate limit exceeded",
+			"retry_after": retryAfter,
+			"limit":       maxRequests,
+			"remaining":   0,
+		}
+		reqCtx.SetJSONResponse(http.StatusTooManyRequests, payload)
+		reqCtx.Handled = true
+	}
+
+	return nil
+}
+
+func (p *RateLimitPlugin) handleStoreRateLimitRuleHook() models.HookHandler {
+	return func(reqCtx *models.RequestContext) error {
+		ctx := reqCtx.Request.Context()
+
+		rawValue, ok := reqCtx.Values[models.ContextRateLimitRule.String()]
+		if !ok || rawValue == nil {
+			return nil
+		}
+
+		ruleCtx, ok := getRateLimitRuleContext(rawValue)
+		if !ok || ruleCtx.Key == "" || ruleCtx.WindowSeconds <= 0 || ruleCtx.MaxRequests <= 0 {
+			return nil
+		}
+
+		_, _, found, err := p.provider.GetRule(ctx, ruleCtx.Key)
+		if err != nil {
+			p.logger.Error("failed to get existing rate limit rule", "key", ruleCtx.Key, "error", err)
+			return nil
+		}
+		if found {
+			return nil
+		} else {
+			window := time.Duration(ruleCtx.WindowSeconds) * time.Second
+			err = p.provider.SetRule(ctx, ruleCtx.Key, window, ruleCtx.MaxRequests)
+			if err != nil {
+				p.logger.Error("failed to store rate limit rule", "key", ruleCtx.Key, "error", err)
+				return nil
 			}
-			reqCtx.SetJSONResponse(http.StatusTooManyRequests, payload)
-			reqCtx.Handled = true
+			p.logger.Debug("stored new rate limit rule", "key", ruleCtx.Key, "window_seconds", ruleCtx.WindowSeconds, "max_requests", ruleCtx.MaxRequests)
 		}
 
 		return nil
