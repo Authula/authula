@@ -23,15 +23,16 @@ func sqliteInitial() migrations.Migration {
 			return migrations.ExecStatements(
 				ctx,
 				tx,
-				// -------------------------------
-				`PRAGMA temp_store = MEMORY;`,
-				// -------------------------------
+				// -----------------------------------
+				`PRAGMA foreign_keys = ON;`,
+				// -----------------------------------
 				`CREATE TABLE IF NOT EXISTS rate_limits (
 					key TEXT NOT NULL PRIMARY KEY,
 					count INTEGER NOT NULL,
 					expires_at DATETIME NOT NULL
 				);`,
 				`CREATE INDEX IF NOT EXISTS idx_rate_limits_expires_at ON rate_limits(expires_at);`,
+				// -----------------------------------
 			)
 		},
 		Down: func(ctx context.Context, tx bun.Tx) error {
