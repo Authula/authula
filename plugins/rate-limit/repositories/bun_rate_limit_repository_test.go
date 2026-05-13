@@ -201,8 +201,6 @@ func TestBunRateLimitRepository_SetRule(t *testing.T) {
 		max        int
 		wantWindow int
 		wantMax    int
-		closeDB    bool
-		wantErrMsg string
 	}
 
 	cases := []testCase{
