@@ -5,93 +5,128 @@ import (
 	"testing"
 	"time"
 
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/rate-limit/services"
+	"github.com/Authula/authula/plugins/rate-limit/types"
 )
 
-// TestInMemoryProvider tests the in-memory rate limit provider
 func TestInMemoryProvider(t *testing.T) {
-	provider := NewInMemoryProvider()
-	defer func() {
-		if err := provider.Close(); err != nil {
-			t.Fatalf("failed to close provider: %v", err)
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		key         string
+		window      time.Duration
+		maxRequests int
+		calls       []struct {
+			allowed bool
+			count   int
 		}
-	}()
-
-	ctx := context.Background()
-	window := 1 * time.Minute
-	maxRequests := 5
-
-	// Test initial request is allowed
-	allowed, count, _, err := provider.CheckAndIncrement(ctx, "test:key", window, maxRequests)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !allowed || count != 1 {
-		t.Errorf("first request should be allowed, got allowed=%v count=%d", allowed, count)
-	}
-
-	// Test requests up to limit
-	for i := 2; i <= maxRequests; i++ {
-		allowedN, countN, _, err := provider.CheckAndIncrement(ctx, "test:key", window, maxRequests)
-		if err != nil {
-			t.Fatalf("unexpected error at iteration %d: %v", i, err)
-		}
-		if !allowedN || countN != i {
-			t.Errorf("request %d should be allowed, got allowed=%v count=%d", i, allowedN, countN)
-		}
-	}
-
-	// Test request beyond limit is denied
-	allowedN, countN, _, err := provider.CheckAndIncrement(ctx, "test:key", window, maxRequests)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if allowedN || countN != maxRequests+1 {
-		t.Errorf("request beyond limit should not be allowed, got allowed=%v count=%d", allowedN, countN)
+	}{
+		{
+			name:        "request sequence with overflow",
+			key:         "test:key",
+			window:      1 * time.Minute,
+			maxRequests: 5,
+			calls: []struct {
+				allowed bool
+				count   int
+			}{
+				{allowed: true, count: 1},
+				{allowed: true, count: 2},
+				{allowed: true, count: 3},
+				{allowed: true, count: 4},
+				{allowed: true, count: 5},
+				{allowed: false, count: 6},
+			},
+		},
+		{
+			name:        "different key starts at one",
+			key:         "different:key",
+			window:      1 * time.Minute,
+			maxRequests: 5,
+			calls: []struct {
+				allowed bool
+				count   int
+			}{
+				{allowed: true, count: 1},
+			},
+		},
 	}
 
-	// Test different key is independent
-	allowedD, countD, _, err := provider.CheckAndIncrement(ctx, "different:key", window, maxRequests)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !allowedD || countD != 1 {
-		t.Errorf("different key should start at 1, got allowed=%v count=%d", allowedD, countD)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			provider := services.NewInMemoryProvider()
+			t.Cleanup(func() {
+				if err := provider.Close(); err != nil {
+					t.Fatalf("failed to close provider: %v", err)
+				}
+			})
+
+			ctx := context.Background()
+			for _, call := range tc.calls {
+				allowed, count, _, err := provider.CheckAndIncrement(ctx, tc.key, tc.window, tc.maxRequests)
+				if err != nil {
+					t.Fatalf("unexpected error for key %q: %v", tc.key, err)
+				}
+				if allowed != call.allowed || count != call.count {
+					t.Fatalf("expected allowed=%v count=%d, got allowed=%v count=%d", call.allowed, call.count, allowed, count)
+				}
+			}
+		})
 	}
 }
 
-// TestRateLimitPluginConfig tests the rate limit plugin config
 func TestRateLimitPluginConfig(t *testing.T) {
-	config := RateLimitPluginConfig{
-		Enabled:  true,
-		Window:   1 * time.Minute,
-		Max:      100,
-		Prefix:   "ratelimit:",
-		Provider: RateLimitProviderInMemory,
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		config     types.RateLimitPluginConfig
+		expectedID string
+	}{
+		{
+			name: "default in-memory config",
+			config: types.RateLimitPluginConfig{
+				Enabled:  true,
+				Window:   1 * time.Minute,
+				Max:      100,
+				Prefix:   "ratelimit:",
+				Provider: types.RateLimitProviderInMemory,
+			},
+			expectedID: models.PluginRateLimit.String(),
+		},
 	}
 
-	plugin := New(config)
-	metadata := plugin.Metadata()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	if metadata.ID != models.PluginRateLimit.String() {
-		t.Errorf("plugin ID should be 'ratelimit', got %s", metadata.ID)
-	}
+			plugin := New(tc.config)
+			metadata := plugin.Metadata()
 
-	if plugin.Config() == nil {
-		t.Error("plugin config should not be nil")
+			if metadata.ID != tc.expectedID {
+				t.Fatalf("expected plugin ID %q, got %q", tc.expectedID, metadata.ID)
+			}
+			if plugin.Config() == nil {
+				t.Fatal("plugin config should not be nil")
+			}
+		})
 	}
 }
 
-// TestProviderNames ensures the provider is initialized with correct name
-func TestProviderNames(t *testing.T) {
-	provider := NewInMemoryProvider()
-	defer func() {
+func newTestRateLimitPlugin(t *testing.T) (*RateLimitPlugin, types.RateLimitProvider) {
+	t.Helper()
+
+	provider := services.NewInMemoryProvider()
+	t.Cleanup(func() {
 		if err := provider.Close(); err != nil {
 			t.Fatalf("failed to close provider: %v", err)
 		}
-	}()
+	})
 
-	if name := provider.GetName(); name != string(RateLimitProviderInMemory) {
-		t.Errorf("in-memory provider name should be 'memory', got %s", name)
-	}
+	return &RateLimitPlugin{provider: provider, logger: &internaltests.MockLogger{}}, provider
 }

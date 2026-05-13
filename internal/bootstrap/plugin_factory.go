@@ -26,6 +26,7 @@ import (
 	organizationsplugin "github.com/Authula/authula/plugins/organizations"
 	organizationsplugintypes "github.com/Authula/authula/plugins/organizations/types"
 	ratelimitplugin "github.com/Authula/authula/plugins/rate-limit"
+	ratelimitplugintypes "github.com/Authula/authula/plugins/rate-limit/types"
 	secondarystorageplugin "github.com/Authula/authula/plugins/secondary-storage"
 	sessionplugin "github.com/Authula/authula/plugins/session"
 	totpplugin "github.com/Authula/authula/plugins/totp"
@@ -206,7 +207,7 @@ var pluginFactories = []PluginFactory{
 		ID:                models.PluginRateLimit.String(),
 		RequiredByDefault: false,
 		ConfigParser: func(rawConfig any) (any, error) {
-			config := ratelimitplugin.RateLimitPluginConfig{}
+			config := ratelimitplugintypes.RateLimitPluginConfig{}
 			if rawConfig != nil {
 				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
 					return nil, fmt.Errorf("failed to parse ratelimit plugin config: %w", err)
@@ -215,7 +216,7 @@ var pluginFactories = []PluginFactory{
 			return config, nil
 		},
 		Constructor: func(typedConfig any) models.Plugin {
-			return ratelimitplugin.New(typedConfig.(ratelimitplugin.RateLimitPluginConfig))
+			return ratelimitplugin.New(typedConfig.(ratelimitplugintypes.RateLimitPluginConfig))
 		},
 	},
 	{

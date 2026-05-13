@@ -16,6 +16,7 @@ const (
 	ContextAuthSuccess                  ContextKey = "auth.success"
 	ContextAuthSignOut                  ContextKey = "auth.sign_out"
 	ContextAuthIdempotentSkipTokensMint ContextKey = "auth.idempotent_skip_tokens_mint"
+	ContextRateLimitRule                ContextKey = "rate_limit.rule"
 )
 
 func (k ContextKey) String() string {

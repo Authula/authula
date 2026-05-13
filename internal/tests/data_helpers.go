@@ -17,6 +17,7 @@ func PtrString(s string) *string {
 
 func MarshalToJSON(t *testing.T, payload any) []byte {
 	t.Helper()
+
 	body, err := json.Marshal(payload)
 	if err != nil {
 		t.Fatalf("failed to marshal payload: %v", err)
@@ -47,6 +48,24 @@ func NewHandlerRequest(t *testing.T, method string, path string, body []byte, us
 	reqCtx.Request = req
 
 	return req, w, reqCtx
+}
+
+func NewRequestContext(t *testing.T, method, path string, headers map[string]string) *models.RequestContext {
+	t.Helper()
+
+	req := httptest.NewRequest(method, path, nil)
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+	return &models.RequestContext{
+		Request:        req,
+		ResponseWriter: httptest.NewRecorder(),
+		Path:           path,
+		Method:         method,
+		Headers:        req.Header,
+		ClientIP:       "127.0.0.1",
+		Values:         map[string]any{},
+	}
 }
 
 func AssertErrorMessage(t *testing.T, reqCtx *models.RequestContext, status int, message string) {

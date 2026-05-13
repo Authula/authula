@@ -70,3 +70,28 @@ type CoreServices struct {
 	TokenService        TokenService
 	PasswordService     PasswordService
 }
+
+// RateLimitKeyRule holds the per-key rate-limit configuration seeded at key creation.
+type RateLimitKeyRule struct {
+	Window      time.Duration
+	MaxRequests int
+}
+
+type RateLimiterService interface {
+	// CheckAndIncrement checks the counter for an arbitrary key and increments it.
+	// Used for general IP-based rate limiting.
+	CheckAndIncrement(ctx context.Context, key string, window time.Duration, maxRequests int) (allowed bool, count int, resetAt time.Time, err error)
+	// SetRule stores a per-key rate-limit rule without consuming quota.
+	// Used when an API key with rate limiting is created.
+	SetRule(ctx context.Context, key string, window time.Duration, maxRequests int) error
+	// GetRule retrieves a previously stored per-key rule.
+	// Returns nil, nil when no rule exists for the given key.
+	GetRule(ctx context.Context, key string) (*RateLimitKeyRule, error)
+	// DeleteRule removes the stored rule for a key.
+	// Used when an API key is deleted.
+	DeleteRule(ctx context.Context, key string) error
+}
+
+type OrganizationService interface {
+	ExistsByID(ctx context.Context, organizationID string) (bool, error)
+}
