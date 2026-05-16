@@ -170,16 +170,3 @@ func (p *SecondaryStoragePlugin) Close() error {
 	}
 	return nil
 }
-
-func (p *SecondaryStoragePlugin) OnConfigUpdate(config *models.Config) error {
-	if pluginCfg, ok := config.Plugins[models.PluginSecondaryStorage.String()]; ok {
-		if err := util.ParsePluginConfig(pluginCfg, &p.config); err != nil {
-			p.logger.Error("failed to parse secondary_storage plugin config on update", "error", err)
-			return err
-		}
-	}
-
-	p.config.ApplyDefaults()
-
-	return nil
-}

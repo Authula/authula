@@ -109,13 +109,6 @@ func (p *EmailPasswordPlugin) Routes() []models.Route {
 	return Routes(p)
 }
 
-func (p *EmailPasswordPlugin) OnConfigUpdate(config *models.Config) error {
-	if err := util.LoadPluginConfig(p.ctx.GetConfig(), p.Metadata().ID, &p.pluginConfig); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (p *EmailPasswordPlugin) Close() error {
 	return nil
 }

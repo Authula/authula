@@ -64,17 +64,6 @@ func (p *BearerPlugin) Hooks() []models.Hook {
 	return p.buildHooks()
 }
 
-func (p *BearerPlugin) OnConfigUpdate(config *models.Config) error {
-	if err := util.LoadPluginConfig(config, p.Metadata().ID, &p.config); err != nil {
-		p.logger.Error("failed to parse bearer plugin config on update", "error", err)
-		return err
-	}
-
-	p.config.ApplyDefaults()
-
-	return nil
-}
-
 func (p *BearerPlugin) AuthMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

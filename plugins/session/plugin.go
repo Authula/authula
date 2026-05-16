@@ -79,17 +79,6 @@ func (p *SessionPlugin) Hooks() []models.Hook {
 	return p.buildHooks()
 }
 
-func (p *SessionPlugin) OnConfigUpdate(config *models.Config) error {
-	if err := util.LoadPluginConfig(config, p.Metadata().ID, &p.pluginConfig); err != nil {
-		p.logger.Error("failed to parse session plugin config on update", "error", err)
-		return err
-	}
-
-	p.pluginConfig.ApplyDefaults()
-
-	return nil
-}
-
 // AuthMiddleware validates session cookie and extracts user ID
 func (p *SessionPlugin) AuthMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

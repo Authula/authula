@@ -12,7 +12,6 @@ import (
 type PluginID string
 
 const (
-	PluginConfigManager    PluginID = "config_manager"
 	PluginAccessControl    PluginID = "access_control"
 	PluginAdmin            PluginID = "admin"
 	PluginSecondaryStorage PluginID = "secondary_storage"
@@ -82,15 +81,6 @@ type AuthMethodProvider interface {
 // MiddlewareProvider is an interface for plugins that provide global middleware
 type MiddlewareProvider interface {
 	Middleware() func(http.Handler) http.Handler
-}
-
-// PluginWithConfigWatcher is an optional interface that plugins can implement
-// to receive real-time config updates. When the config is updated in the database,
-// the ConfigManager will call OnConfigUpdate with the new config. Plugins should
-// use this callback to update their own config structs using ParsePluginConfig,
-// which ensures their internal config stays synchronized without changing pointer references.
-type PluginWithConfigWatcher interface {
-	OnConfigUpdate(config *Config) error
 }
 
 // HookStage defines when a hook should be executed in the request lifecycle

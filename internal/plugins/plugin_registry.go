@@ -9,7 +9,6 @@ import (
 	"github.com/Authula/authula/internal/migrationmanager"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/services"
 )
 
 // PluginRegistry manages plugin registration and lifecycle
@@ -98,32 +97,7 @@ func (r *PluginRegistry) InitAll() error {
 		r.logger.Info("plugin initialized", "plugin", pluginID)
 	}
 
-	r.registerConfigWatchers()
 	return nil
-}
-
-// registerConfigWatchers wires config hot-reload
-// Plugins that implement PluginWithConfigWatcher are registered to receive
-// config update notifications from the ConfigManagerService via the service registry.
-func (r *PluginRegistry) registerConfigWatchers() {
-	configManagerService, ok := r.serviceRegistry.Get(models.ServiceConfigManager.String()).(services.ConfigManagerService)
-	if !ok {
-		return
-	}
-
-	for _, plugin := range r.plugins {
-		pluginID := plugin.Metadata().ID
-
-		watcher, ok := plugin.(models.PluginWithConfigWatcher)
-		if !ok {
-			continue
-		}
-
-		if err := configManagerService.RegisterConfigWatcher(pluginID, watcher); err != nil {
-			r.logger.Error("failed to register config watcher", "plugin", pluginID, "error", err)
-			continue
-		}
-	}
 }
 
 func (r *PluginRegistry) RunMigrations(ctx context.Context) error {
