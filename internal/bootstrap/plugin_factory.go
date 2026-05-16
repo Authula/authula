@@ -10,8 +10,6 @@ import (
 	adminplugin "github.com/Authula/authula/plugins/admin"
 	adminplugintypes "github.com/Authula/authula/plugins/admin/types"
 	bearerplugin "github.com/Authula/authula/plugins/bearer"
-	configmanagerplugin "github.com/Authula/authula/plugins/config-manager"
-	configmanagerplugintypes "github.com/Authula/authula/plugins/config-manager/types"
 	csrfplugin "github.com/Authula/authula/plugins/csrf"
 	emailplugin "github.com/Authula/authula/plugins/email"
 	emailpasswordplugin "github.com/Authula/authula/plugins/email-password"
@@ -57,22 +55,6 @@ var pluginFactories = []PluginFactory{
 		},
 		Constructor: func(typedConfig any) models.Plugin {
 			return adminplugin.New(typedConfig.(adminplugintypes.AdminPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginConfigManager.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := configmanagerplugintypes.ConfigManagerPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse config_manager plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return configmanagerplugin.New(typedConfig.(configmanagerplugintypes.ConfigManagerPluginConfig))
 		},
 	},
 	{

@@ -159,43 +159,6 @@ func (p *JWTPlugin) Hooks() []models.Hook {
 	return p.buildHooks()
 }
 
-func (p *JWTPlugin) OnConfigUpdate(config *models.Config) error {
-	if pluginCfg, ok := config.Plugins[models.PluginJWT.String()]; ok {
-		if err := util.ParsePluginConfig(pluginCfg, &p.pluginConfig); err != nil {
-			p.Logger.Error("failed to parse jwt plugin config on update", "error", err)
-			return err
-		}
-	}
-
-	p.pluginConfig.ApplyDefaults()
-	if err := p.pluginConfig.NormalizeAlgorithm(); err != nil {
-		p.Logger.Error("invalid jwt algorithm in plugin config update", "error", err)
-		return err
-	}
-
-	rotated, err := p.keyService.RotateKeysIfNeeded(
-		context.Background(),
-		p.pluginConfig.KeyRotationInterval,
-		p.pluginConfig.KeyRotationGracePeriod,
-		func(ctx context.Context) error {
-			return p.cacheService.InvalidateCache(ctx)
-		},
-	)
-	if err != nil {
-		p.Logger.Warn("failed to rotate keys after config update", "error", err)
-	} else if rotated {
-		p.Logger.Info("key rotation occurred after config update")
-	}
-
-	if p.cacheService != nil {
-		if err := p.cacheService.InvalidateCache(context.Background()); err != nil {
-			p.Logger.Error("failed to invalidate JWKS cache on config update", "error", err)
-		}
-	}
-
-	return nil
-}
-
 func (p *JWTPlugin) Close() error {
 	return nil
 }

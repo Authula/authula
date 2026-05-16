@@ -3,131 +3,113 @@ package bootstrap
 import (
 	"testing"
 
+	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 )
 
 func assertPanic(t *testing.T, f func()) {
+	t.Helper()
+
 	defer func() {
 		if r := recover(); r == nil {
 			t.Errorf("expected panic")
 		}
 	}()
+
 	f()
 }
 
-func TestBuildPluginsFromConfig_ValidPlugins(t *testing.T) {
-	cfg := &models.Config{
-		Plugins: map[string]any{
-			models.PluginCSRF.String(): map[string]any{
-				"enabled": true,
+func pluginIDs(plugins []models.Plugin) []string {
+	ids := make([]string, 0, len(plugins))
+	for _, plugin := range plugins {
+		ids = append(ids, plugin.Metadata().ID)
+	}
+
+	return ids
+}
+
+func TestBuildPluginsFromConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		cfg       *models.Config
+		wantIDs   []string
+		wantPanic bool
+	}{
+		{
+			name: "enabled plugin is included",
+			cfg: &models.Config{
+				Plugins: map[string]any{
+					models.PluginCSRF.String(): map[string]any{
+						"enabled": true,
+					},
+				},
 			},
+			wantIDs: []string{models.PluginCSRF.String()},
+		},
+		{
+			name: "unknown plugin panics",
+			cfg: &models.Config{
+				Plugins: map[string]any{
+					models.PluginCSRF.String(): map[string]any{
+						"enabled": true,
+					},
+					"unknown_plugin": map[string]any{
+						"enabled": true,
+					},
+				},
+			},
+			wantPanic: true,
+		},
+		{
+			name: "disabled plugin is omitted",
+			cfg: &models.Config{
+				Plugins: map[string]any{
+					models.PluginCSRF.String(): map[string]any{
+						"enabled": false,
+					},
+				},
+			},
+			wantIDs: []string{},
+		},
+		{
+			name: "plugin order follows registry order",
+			cfg: &models.Config{
+				Plugins: map[string]any{
+					models.PluginAdmin.String(): map[string]any{
+						"enabled": true,
+					},
+					models.PluginCSRF.String(): map[string]any{
+						"enabled": true,
+					},
+				},
+			},
+			wantIDs: []string{models.PluginAdmin.String(), models.PluginCSRF.String()},
+		},
+		{
+			name: "empty config returns no plugins",
+			cfg: &models.Config{
+				Plugins: map[string]any{},
+			},
+			wantIDs: []string{},
 		},
 	}
 
-	plugins := BuildPluginsFromConfig(cfg)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.wantPanic {
+				assertPanic(t, func() {
+					BuildPluginsFromConfig(tc.cfg)
+				})
 
-	if len(plugins) == 0 {
-		t.Errorf("expected at least 1 plugin, got %d", len(plugins))
-	}
+				return
+			}
 
-	// Verify core plugin is present
-	hasCorePlugin := false
-	for _, p := range plugins {
-		if p.Metadata().ID == models.PluginCSRF.String() {
-			hasCorePlugin = true
-			break
-		}
-	}
-	if !hasCorePlugin {
-		t.Errorf("core plugin not found in plugins list")
-	}
-}
+			plugins := BuildPluginsFromConfig(tc.cfg)
+			gotIDs := pluginIDs(plugins)
 
-func TestBuildPluginsFromConfig_UnknownPlugin(t *testing.T) {
-	cfg := &models.Config{
-		Plugins: map[string]any{
-			models.PluginCSRF.String(): map[string]any{
-				"enabled": true,
-			},
-			"unknown_plugin": map[string]any{
-				"enabled": true,
-			},
-		},
-	}
-
-	assertPanic(t, func() { BuildPluginsFromConfig(cfg) })
-}
-
-func TestBuildPluginsFromConfig_DisabledPlugins(t *testing.T) {
-	cfg := &models.Config{
-		Plugins: map[string]any{
-			models.PluginCSRF.String(): map[string]any{
-				"enabled": true,
-			},
-			models.PluginCSRF.String(): map[string]any{
-				"enabled": false,
-			},
-		},
-	}
-
-	plugins := BuildPluginsFromConfig(cfg)
-
-	for _, p := range plugins {
-		if p.Metadata().ID == models.PluginCSRF.String() {
-			t.Errorf("csrf plugin should not be in plugins list when disabled")
-		}
-	}
-}
-
-func TestBuildPluginsFromConfig_PluginOrder(t *testing.T) {
-	cfg := &models.Config{
-		Plugins: map[string]any{
-			models.PluginConfigManager.String(): map[string]any{
-				"enabled": true,
-			},
-			models.PluginCSRF.String(): map[string]any{
-				"enabled": true,
-			},
-		},
-	}
-
-	plugins := BuildPluginsFromConfig(cfg)
-
-	if len(plugins) == 0 {
-		t.Fatalf("expected plugins to be present, got %d", len(plugins))
-	}
-
-	if plugins[0].Metadata().ID != models.PluginConfigManager.String() {
-		t.Errorf("expected %s to be first, got %s", models.PluginConfigManager.String(), plugins[0].Metadata().ID)
-	}
-}
-
-func TestBuildPluginsFromConfig_CoreDisabled(t *testing.T) {
-	cfg := &models.Config{
-		Plugins: map[string]any{
-			models.PluginCSRF.String(): map[string]any{
-				"enabled": false,
-			},
-		},
-	}
-
-	plugins := BuildPluginsFromConfig(cfg)
-
-	for _, p := range plugins {
-		if p.Metadata().ID == models.PluginCSRF.String() {
-			t.Errorf("csrf plugin should not be in plugins list when disabled")
-		}
-	}
-}
-
-func TestBuildPluginsFromConfig_EmptyConfig(t *testing.T) {
-	cfg := &models.Config{
-		Plugins: map[string]any{},
-	}
-
-	plugins := BuildPluginsFromConfig(cfg)
-
-	if len(plugins) != 0 {
-		t.Errorf("expected 0 plugins for empty config, got %d", len(plugins))
+			if !util.CompareStringArrays(gotIDs, tc.wantIDs) {
+				t.Fatalf("unexpected plugin IDs: got %v, want %v", gotIDs, tc.wantIDs)
+			}
+		})
 	}
 }

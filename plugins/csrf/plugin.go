@@ -72,28 +72,8 @@ func (p *CSRFPlugin) Close() error {
 	return nil
 }
 
-func (p *CSRFPlugin) OnConfigUpdate(config *models.Config) error {
-	if err := util.LoadPluginConfig(config, p.Metadata().ID, &p.pluginConfig); err != nil {
-		p.logger.Error("failed to parse csrf plugin config on update", "error", err)
-		return err
-	}
-
-	p.pluginConfig.ApplyDefaults()
-
-	// Reinitialize header protection if enabled
-	if p.pluginConfig.EnableHeaderProtection {
-		if err := p.initializeHeaderProtection(); err != nil {
-			return err
-		}
-	} else {
-		p.cop = nil
-	}
-
-	return nil
-}
-
 // initializeHeaderProtection initializes the CrossOriginProtection with trusted origins
-// and sets up the custom deny handler. This method is used by both Init and OnConfigUpdate.
+// and sets up the custom deny handler.
 func (p *CSRFPlugin) initializeHeaderProtection() error {
 	if err := util.ValidateTrustedOrigins(p.globalConfig.Security.TrustedOrigins); err != nil {
 		p.logger.Error("invalid trusted origins configuration", "error", err)
