@@ -44,7 +44,7 @@ func TestOrganizationTeamService_CreateTeam(t *testing.T) {
 			name:           "success",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
-			request:        types.CreateOrganizationTeamRequest{Name: "Acme Platform", Metadata: map[string]any{"tier": "core"}},
+			request:        types.CreateOrganizationTeamRequest{Name: "Acme Platform"},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository, hooks *orgtests.MockOrganizationTeamHooks, serviceUtils *ServiceUtils) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 				teamRepo.On("GetByOrganizationIDAndSlug", mock.Anything, "org-1", "acme-platform").Return(nil, nil).Once()

@@ -24,7 +24,7 @@ func ToMap(v any) map[string]any {
 		return nil
 	}
 
-	// Performance optimization: if it's already a map, just use it
+	// If it's already a map, return as is.
 	if m, ok := v.(map[string]any); ok {
 		return m
 	}

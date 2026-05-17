@@ -171,9 +171,9 @@ func TestBunOrganizationRepository_GetAllByOwnerID(t *testing.T) {
 				repo := repositories.NewBunOrganizationRepository(db)
 				ctx := context.Background()
 
-				_, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: map[string]any{"tier": "core"}})
+				_, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc"})
 				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.Organization{ID: "org-2", OwnerID: "user-1", Name: "Platform", Slug: "platform", Metadata: map[string]any{"tier": "platform"}})
+				_, err = repo.Create(ctx, &types.Organization{ID: "org-2", OwnerID: "user-1", Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
 
 				return repo, ctx
@@ -260,7 +260,7 @@ func TestBunOrganizationRepository_Delete(t *testing.T) {
 				repo := repositories.NewBunOrganizationRepository(db)
 				ctx := context.Background()
 
-				_, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: map[string]any{"tier": "core"}})
+				_, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc"})
 				require.NoError(t, err)
 
 				return repo, ctx

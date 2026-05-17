@@ -225,7 +225,7 @@ func TestBunOrganizationTeamRepository_Update(t *testing.T) {
 				repo := repositories.NewBunOrganizationTeamRepository(db)
 				ctx := context.Background()
 
-				created, err := repo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform", Metadata: map[string]any{"tier": "core"}})
+				created, err := repo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
 				return repo, ctx, created
 			},
@@ -267,7 +267,7 @@ func TestBunOrganizationTeamRepository_Delete(t *testing.T) {
 				repo := repositories.NewBunOrganizationTeamRepository(db)
 				ctx := context.Background()
 
-				_, err := repo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform", Metadata: map[string]any{"tier": "core"}})
+				_, err := repo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
 				return repo, ctx
 			},
@@ -334,7 +334,7 @@ func TestBunOrganizationTeamRepository_WithTx(t *testing.T) {
 			require.NotNil(t, txRepo)
 			require.IsType(t, &repositories.BunOrganizationTeamRepository{}, txRepo)
 
-			created, err := txRepo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform", Metadata: map[string]any{"tier": "core"}})
+			created, err := txRepo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
 			require.NoError(t, err)
 			require.NotNil(t, created)
 			require.Equal(t, "team-1", created.ID)
@@ -387,7 +387,7 @@ func TestBunOrganizationTeamRepository_Hooks(t *testing.T) {
 				}
 
 				repo := repositories.NewBunOrganizationTeamRepository(db, hooks)
-				created, err := repo.Create(context.Background(), &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform", Metadata: map[string]any{"tier": "core"}})
+				created, err := repo.Create(context.Background(), &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
 				require.NotNil(t, created)
 				require.True(t, beforeCalled)
@@ -403,7 +403,7 @@ func TestBunOrganizationTeamRepository_Hooks(t *testing.T) {
 
 				seedRepo := repositories.NewBunOrganizationTeamRepository(db)
 				ctx := context.Background()
-				team, err := seedRepo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform", Metadata: map[string]any{"tier": "core"}})
+				team, err := seedRepo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
 
 				beforeCalled := false
@@ -442,7 +442,7 @@ func TestBunOrganizationTeamRepository_Hooks(t *testing.T) {
 
 				seedRepo := repositories.NewBunOrganizationTeamRepository(db)
 				ctx := context.Background()
-				_, err := seedRepo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform", Metadata: map[string]any{"tier": "core"}})
+				_, err := seedRepo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
 
 				beforeCalled := false
