@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -28,7 +27,6 @@ type refreshTokenService struct {
 	refreshExpiresIn time.Duration
 }
 
-// NewRefreshTokenService creates a new refresh token service
 func NewRefreshTokenService(
 	logger models.Logger,
 	eventBus models.EventBus,
@@ -210,11 +208,10 @@ func (s *refreshTokenService) emitTokenReuseRecoveredEvent(sessionID, tokenHash 
 		Timestamp:         time.Now().UTC().Format(time.RFC3339),
 	}
 
-	payload, _ := json.Marshal(event)
 	eventMsg := models.Event{
 		Type:      constants.EventTokenReuseRecovered,
 		Timestamp: time.Now().UTC(),
-		Payload:   payload,
+		Payload:   util.ToMap(event),
 	}
 
 	// Publish event asynchronously - don't block on event bus
@@ -237,11 +234,10 @@ func (s *refreshTokenService) emitTokenReuseThrottledEvent(sessionID, tokenHash 
 		Timestamp:         time.Now().UTC().Format(time.RFC3339),
 	}
 
-	payload, _ := json.Marshal(event)
 	eventMsg := models.Event{
 		Type:      constants.EventTokenReuseThrottled,
 		Timestamp: time.Now().UTC(),
-		Payload:   payload,
+		Payload:   util.ToMap(event),
 	}
 
 	// Publish event asynchronously - don't block on event bus

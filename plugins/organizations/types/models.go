@@ -1,7 +1,6 @@
 package types
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -10,14 +9,14 @@ import (
 type Organization struct {
 	bun.BaseModel `bun:"table:organizations"`
 
-	ID        string          `json:"id" bun:"column:id,pk"`
-	OwnerID   string          `json:"owner_id" bun:"column:owner_id"`
-	Name      string          `json:"name" bun:"column:name"`
-	Slug      string          `json:"slug" bun:"column:slug"`
-	Logo      *string         `json:"logo" bun:"column:logo"`
-	Metadata  json.RawMessage `json:"metadata" bun:"column:metadata"`
-	CreatedAt time.Time       `json:"created_at" bun:"column:created_at,default:current_timestamp"`
-	UpdatedAt time.Time       `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
+	ID        string         `json:"id" bun:"column:id,pk"`
+	OwnerID   string         `json:"owner_id" bun:"column:owner_id"`
+	Name      string         `json:"name" bun:"column:name"`
+	Slug      string         `json:"slug" bun:"column:slug"`
+	Logo      *string        `json:"logo" bun:"column:logo"`
+	Metadata  map[string]any `json:"metadata" bun:"column:metadata"`
+	CreatedAt time.Time      `json:"created_at" bun:"column:created_at,default:current_timestamp"`
+	UpdatedAt time.Time      `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
 }
 
 type OrganizationInvitationStatus string
@@ -57,14 +56,14 @@ type OrganizationMember struct {
 type OrganizationTeam struct {
 	bun.BaseModel `bun:"table:organization_teams"`
 
-	ID             string          `json:"id" bun:"column:id,pk"`
-	OrganizationID string          `json:"organization_id" bun:"column:organization_id"`
-	Name           string          `json:"name" bun:"column:name"`
-	Slug           string          `json:"slug" bun:"column:slug"`
-	Description    *string         `json:"description" bun:"column:description"`
-	Metadata       json.RawMessage `json:"metadata" bun:"column:metadata"`
-	CreatedAt      time.Time       `json:"created_at" bun:"column:created_at,default:current_timestamp"`
-	UpdatedAt      time.Time       `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
+	ID             string         `json:"id" bun:"column:id,pk"`
+	OrganizationID string         `json:"organization_id" bun:"column:organization_id"`
+	Name           string         `json:"name" bun:"column:name"`
+	Slug           string         `json:"slug" bun:"column:slug"`
+	Description    *string        `json:"description" bun:"column:description"`
+	Metadata       map[string]any `json:"metadata" bun:"column:metadata"`
+	CreatedAt      time.Time      `json:"created_at" bun:"column:created_at,default:current_timestamp"`
+	UpdatedAt      time.Time      `json:"updated_at" bun:"column:updated_at,default:current_timestamp"`
 }
 
 type OrganizationTeamMember struct {

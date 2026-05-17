@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"sync"
@@ -16,7 +15,6 @@ import (
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
-	orgevents "github.com/Authula/authula/plugins/organizations/events"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	orgtests "github.com/Authula/authula/plugins/organizations/tests"
 	"github.com/Authula/authula/plugins/organizations/types"
@@ -398,13 +396,10 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 
 				event := <-eventCalls
 				require.Equal(t, orgconstants.EventOrganizationsInvitationCreated, event.Type)
-
-				var payload orgevents.OrganizationInvitationCreatedEvent
-				require.NoError(t, json.Unmarshal(event.Payload, &payload))
-				require.Equal(t, "inv-1", payload.InvitationID)
-				require.Equal(t, "org-1", payload.OrganizationID)
-				require.Equal(t, "Acme", payload.OrganizationName)
-				require.Equal(t, "user@example.com", payload.InviteeEmail)
+				require.Equal(t, "inv-1", event.Payload["invitation_id"])
+				require.Equal(t, "org-1", event.Payload["organization_id"])
+				require.Equal(t, "Acme", event.Payload["organization_name"])
+				require.Equal(t, "user@example.com", event.Payload["invitee_email"])
 				require.Empty(t, logger.warnings)
 			},
 		},

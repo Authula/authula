@@ -2,18 +2,17 @@ package models
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 )
 
 const EventTypeWildcard = "*"
 
 type Event struct {
-	ID        string            `json:"id"`
-	Type      string            `json:"type"`
-	Timestamp time.Time         `json:"timestamp"`
-	Payload   json.RawMessage   `json:"payload"`
-	Metadata  map[string]string `json:"metadata"`
+	ID        string         `json:"id"`
+	Type      string         `json:"type"`
+	Timestamp time.Time      `json:"timestamp"`
+	Payload   map[string]any `json:"payload"`
+	Metadata  map[string]any `json:"metadata"`
 }
 
 type Message struct {

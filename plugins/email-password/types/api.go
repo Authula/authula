@@ -1,19 +1,18 @@
 package types
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/Authula/authula/models"
 )
 
 type SignUpRequest struct {
-	Name        string          `json:"name"`
-	Email       string          `json:"email"`
-	Password    string          `json:"password"`
-	Image       *string         `json:"image,omitempty"`
-	Metadata    json.RawMessage `json:"metadata,omitempty"`
-	CallbackURL *string         `json:"callback_url,omitempty"`
+	Name        string         `json:"name"`
+	Email       string         `json:"email"`
+	Password    string         `json:"password"`
+	Image       *string        `json:"image,omitempty"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
+	CallbackURL *string        `json:"callback_url,omitempty"`
 }
 
 func (p *SignUpRequest) Validate() error {

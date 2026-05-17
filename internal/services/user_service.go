@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 
 	"github.com/Authula/authula/internal/repositories"
@@ -20,7 +19,7 @@ func NewUserService(repo repositories.UserRepository, dbHooks *models.CoreDataba
 	return &userService{repo: repo, dbHooks: dbHooks}
 }
 
-func (s *userService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata json.RawMessage) (*models.User, error) {
+func (s *userService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata map[string]any) (*models.User, error) {
 	existing, _ := s.repo.GetByEmail(ctx, email)
 	if existing != nil {
 		return nil, errors.New("email already in use")

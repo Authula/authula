@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -376,7 +375,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 			body: internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{
 				Name:     "Acme Platform",
 				Logo:     new("http://some/url/logo.svg"),
-				Metadata: json.RawMessage(`{"tier":"pro"}`),
+				Metadata: map[string]any{"tier": "pro"},
 			}),
 			prepare: func(f *organizationHandlerFixture) {
 				f.service.On("UpdateOrganization", mock.Anything, "user-1", "org-1", mock.MatchedBy(func(request orgtypes.UpdateOrganizationRequest) bool {
@@ -387,7 +386,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 					Name:     "Acme Platform",
 					Slug:     "acme-inc",
 					Logo:     new("http://some/url/logo.svg"),
-					Metadata: json.RawMessage(`{"tier":"pro"}`),
+					Metadata: map[string]any{"tier": "pro"},
 				}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
@@ -399,7 +398,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 				assert.Equal(t, "acme-inc", org.Slug)
 				require.NotNil(t, org.Logo)
 				assert.Equal(t, "http://some/url/logo.svg", *org.Logo)
-				assert.NotEmpty(t, string(org.Metadata))
+				assert.JSONEq(t, "{\"tier\":\"pro\"}", string(internaltests.MarshalToJSON(t, org.Metadata)))
 			},
 		},
 		{
@@ -409,7 +408,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 			body: internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{
 				Name:     "Acme Platform",
 				Logo:     new("http://some/url/logo.svg"),
-				Metadata: json.RawMessage(`{"tier":"pro"}`),
+				Metadata: map[string]any{"tier": "pro"},
 			}),
 			prepare: func(f *organizationHandlerFixture) {
 				f.service.On("UpdateOrganization", mock.Anything, "user-1", "org-1", mock.MatchedBy(func(request orgtypes.UpdateOrganizationRequest) bool {
@@ -420,7 +419,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 					Name:     "Acme Platform",
 					Slug:     "acme-inc",
 					Logo:     new("http://some/url/logo.svg"),
-					Metadata: json.RawMessage(`{"tier":"pro"}`),
+					Metadata: map[string]any{"tier": "pro"},
 				}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
@@ -432,7 +431,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 				assert.Equal(t, "acme-inc", org.Slug)
 				require.NotNil(t, org.Logo)
 				assert.Equal(t, "http://some/url/logo.svg", *org.Logo)
-				assert.JSONEq(t, "{\"tier\":\"pro\"}", string(org.Metadata))
+				assert.JSONEq(t, "{\"tier\":\"pro\"}", string(internaltests.MarshalToJSON(t, org.Metadata)))
 			},
 		},
 	}

@@ -1,18 +1,17 @@
 package types
 
 import (
-	"encoding/json"
 	"strings"
 
 	internalerrors "github.com/Authula/authula/internal/errors"
 )
 
 type CreateOrganizationRequest struct {
-	Name     string          `json:"name"`
-	Role     string          `json:"role"`
-	Slug     *string         `json:"slug,omitempty"`
-	Logo     *string         `json:"logo,omitempty"`
-	Metadata json.RawMessage `json:"metadata,omitempty"`
+	Name     string         `json:"name"`
+	Role     string         `json:"role"`
+	Slug     *string        `json:"slug,omitempty"`
+	Logo     *string        `json:"logo,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 func (r *CreateOrganizationRequest) Validate() error {
@@ -34,10 +33,10 @@ func (r *CreateOrganizationRequest) Validate() error {
 }
 
 type UpdateOrganizationRequest struct {
-	Name     string          `json:"name"`
-	Slug     *string         `json:"slug,omitempty"`
-	Logo     *string         `json:"logo,omitempty"`
-	Metadata json.RawMessage `json:"metadata,omitempty"`
+	Name     string         `json:"name"`
+	Slug     *string        `json:"slug,omitempty"`
+	Logo     *string        `json:"logo,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 func (r *UpdateOrganizationRequest) Validate() error {
@@ -98,10 +97,10 @@ func (r *UpdateOrganizationMemberRequest) Validate() error {
 }
 
 type CreateOrganizationTeamRequest struct {
-	Name        string          `json:"name"`
-	Slug        *string         `json:"slug,omitempty"`
-	Description *string         `json:"description,omitempty"`
-	Metadata    json.RawMessage `json:"metadata,omitempty"`
+	Name        string         `json:"name"`
+	Slug        *string        `json:"slug,omitempty"`
+	Description *string        `json:"description,omitempty"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
 }
 
 func (r *CreateOrganizationTeamRequest) Validate() error {
@@ -120,10 +119,10 @@ func (r *CreateOrganizationTeamRequest) Validate() error {
 }
 
 type UpdateOrganizationTeamRequest struct {
-	Name        string          `json:"name"`
-	Slug        *string         `json:"slug,omitempty"`
-	Description *string         `json:"description,omitempty"`
-	Metadata    json.RawMessage `json:"metadata,omitempty"`
+	Name        string         `json:"name"`
+	Slug        *string        `json:"slug,omitempty"`
+	Description *string        `json:"description,omitempty"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
 }
 
 func (r *UpdateOrganizationTeamRequest) Validate() error {

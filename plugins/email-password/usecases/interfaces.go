@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
@@ -19,7 +18,7 @@ type UseCases struct {
 }
 
 type SignUpUseCase interface {
-	SignUp(ctx context.Context, name string, email string, password string, image *string, metadata json.RawMessage, callbackURL *string, ipAddress *string, userAgent *string) (*types.SignUpResult, error)
+	SignUp(ctx context.Context, name string, email string, password string, image *string, metadata map[string]any, callbackURL *string, ipAddress *string, userAgent *string) (*types.SignUpResult, error)
 }
 
 type SignInUseCase interface {

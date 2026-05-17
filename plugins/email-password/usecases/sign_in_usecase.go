@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/Authula/authula/internal/util"
@@ -93,19 +92,13 @@ func (uc *signInUseCase) SignIn(
 }
 
 func (uc *signInUseCase) publishSignedInEvent(user *models.User) {
-	userJson, err := json.Marshal(user)
-	if err != nil {
-		uc.Logger.Error(err.Error())
-		return
-	}
-
 	util.PublishEventAsync(
 		uc.EventBus,
 		uc.Logger,
 		models.Event{
 			ID:        util.GenerateUUID(),
 			Type:      constants.EventUserSignedIn,
-			Payload:   userJson,
+			Payload:   util.ToMap(user),
 			Metadata:  nil,
 			Timestamp: time.Now().UTC(),
 		},

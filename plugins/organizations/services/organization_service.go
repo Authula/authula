@@ -75,7 +75,7 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actorUserI
 		Metadata: request.Metadata,
 	}
 	if len(organization.Metadata) == 0 {
-		organization.Metadata = []byte("{}")
+		organization.Metadata = make(map[string]any)
 	}
 
 	var created *types.Organization
@@ -260,7 +260,7 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, actorUserI
 		organization.Metadata = request.Metadata
 	}
 	if len(organization.Metadata) == 0 {
-		organization.Metadata = []byte("{}")
+		organization.Metadata = make(map[string]any)
 	}
 
 	updated, err := s.orgRepo.Update(ctx, organization)
