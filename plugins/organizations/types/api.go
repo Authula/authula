@@ -33,15 +33,19 @@ func (r *CreateOrganizationRequest) Validate() error {
 }
 
 type UpdateOrganizationRequest struct {
-	Name     string         `json:"name"`
+	Name     *string        `json:"name,omitempty"`
 	Slug     *string        `json:"slug,omitempty"`
 	Logo     *string        `json:"logo,omitempty"`
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 func (r *UpdateOrganizationRequest) Validate() error {
-	if strings.TrimSpace(r.Name) == "" {
-		return internalerrors.ErrUnprocessableEntity
+	if r.Name != nil {
+		value := strings.TrimSpace(*r.Name)
+		if value == "" {
+			return internalerrors.ErrUnprocessableEntity
+		}
+		r.Name = &value
 	}
 	if r.Slug != nil {
 		value := strings.TrimSpace(*r.Slug)

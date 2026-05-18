@@ -236,7 +236,7 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, actorUserI
 	}
 
 	name := request.Name
-	if name == "" {
+	if name != nil && *name == "" {
 		return nil, internalerrors.ErrUnprocessableEntity
 	}
 
@@ -245,13 +245,15 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, actorUserI
 		slug = *request.Slug
 	}
 	if slug == "" {
-		slug = s.serviceUtils.slugify(name)
+		slug = s.serviceUtils.slugify(*name)
 	}
 	if slug == "" {
 		return nil, internalerrors.ErrUnprocessableEntity
 	}
 
-	organization.Name = name
+	if name != nil {
+		organization.Name = *name
+	}
 	organization.Slug = slug
 	if request.Logo != nil {
 		organization.Logo = request.Logo

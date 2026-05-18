@@ -324,7 +324,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 		{
 			name:            "missing_user",
 			organizationID:  "org-1",
-			body:            internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{Name: "Acme Platform"}),
+			body:            internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{Name: new("Acme Platform")}),
 			expectedStatus:  http.StatusUnauthorized,
 			expectedMessage: "Unauthorized",
 		},
@@ -340,7 +340,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 			name:            "unprocessable_entity",
 			userID:          new("user-1"),
 			organizationID:  "org-1",
-			body:            internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{Name: ""}),
+			body:            internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{Name: new("")}),
 			expectedStatus:  http.StatusUnprocessableEntity,
 			expectedMessage: "unprocessable entity",
 		},
@@ -348,10 +348,10 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 			name:           "not_found",
 			userID:         new("user-1"),
 			organizationID: "org-1",
-			body:           internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{Name: "Acme Platform"}),
+			body:           internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{Name: new("Acme Platform")}),
 			prepare: func(f *organizationHandlerFixture) {
 				f.service.On("UpdateOrganization", mock.Anything, "user-1", "org-1", mock.MatchedBy(func(request orgtypes.UpdateOrganizationRequest) bool {
-					return request.Name == "Acme Platform"
+					return request.Name != nil && *request.Name == "Acme Platform"
 				})).Return((*orgtypes.Organization)(nil), internalerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
@@ -361,7 +361,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 			name:           "forbidden",
 			userID:         new("user-1"),
 			organizationID: "org-1",
-			body:           internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{Name: "Acme Platform"}),
+			body:           internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{Name: new("Acme Platform")}),
 			prepare: func(f *organizationHandlerFixture) {
 				f.service.On("UpdateOrganization", mock.Anything, "user-1", "org-1", mock.Anything).Return((*orgtypes.Organization)(nil), internalerrors.ErrForbidden).Once()
 			},
@@ -373,13 +373,13 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			body: internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{
-				Name:     "Acme Platform",
+				Name:     new("Acme Platform"),
 				Logo:     new("http://some/url/logo.svg"),
 				Metadata: map[string]any{"tier": "pro"},
 			}),
 			prepare: func(f *organizationHandlerFixture) {
 				f.service.On("UpdateOrganization", mock.Anything, "user-1", "org-1", mock.MatchedBy(func(request orgtypes.UpdateOrganizationRequest) bool {
-					return request.Name == "Acme Platform"
+					return request.Name != nil && *request.Name == "Acme Platform"
 				})).Return(&orgtypes.Organization{
 					ID:       "org-1",
 					OwnerID:  "owner-2",
@@ -406,13 +406,13 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			body: internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{
-				Name:     "Acme Platform",
+				Name:     new("Acme Platform"),
 				Logo:     new("http://some/url/logo.svg"),
 				Metadata: map[string]any{"tier": "pro"},
 			}),
 			prepare: func(f *organizationHandlerFixture) {
 				f.service.On("UpdateOrganization", mock.Anything, "user-1", "org-1", mock.MatchedBy(func(request orgtypes.UpdateOrganizationRequest) bool {
-					return request.Name == "Acme Platform"
+					return request.Name != nil && *request.Name == "Acme Platform"
 				})).Return(&orgtypes.Organization{
 					ID:       "org-1",
 					OwnerID:  "user-1",

@@ -287,21 +287,21 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 			name:           "unauthorized if not user ID provided",
 			actorUserID:    "",
 			organizationID: "",
-			request:        types.UpdateOrganizationRequest{Name: "Acme Platform"},
+			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
 			expectErr:      internalerrors.ErrUnauthorized,
 		},
 		{
 			name:           "unauthorized if no organization ID provided",
 			actorUserID:    "user-1",
 			organizationID: "",
-			request:        types.UpdateOrganizationRequest{Name: "Acme Platform"},
+			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
 			expectErr:      internalerrors.ErrUnauthorized,
 		},
 		{
 			name:           "forbidden",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
-			request:        types.UpdateOrganizationRequest{Name: "Acme Platform"},
+			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
 			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
 				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(nil, nil).Once()
@@ -312,7 +312,7 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 			name:           "success for member",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
-			request:        types.UpdateOrganizationRequest{Name: "Acme Platform"},
+			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
 			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
 				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1", Name: "Acme", Slug: "acme"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "member"}, nil).Once()
@@ -325,7 +325,7 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 			name:           "success",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
-			request:        types.UpdateOrganizationRequest{Name: "Acme Platform"},
+			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
 			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
 				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme", Slug: "acme"}, nil).Once()
 				repo.On("Update", mock.Anything, mock.MatchedBy(func(org *types.Organization) bool {
