@@ -55,8 +55,8 @@ func TestOrganizationTeamService_CreateTeam(t *testing.T) {
 					require.Equal(t, "org-1", team.OrganizationID)
 					require.Equal(t, "Acme Platform", team.Name)
 					require.Equal(t, "acme-platform", team.Slug)
-					require.Equal(t, map[string]any{"tier": "core"}, team.Metadata)
-				}).Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Acme Platform", Slug: "acme-platform", Metadata: map[string]any{"tier": "core"}}, nil).Once()
+					require.Equal(t, map[string]any{}, team.Metadata)
+				}).Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Acme Platform", Slug: "acme-platform", Metadata: map[string]any{}}, nil).Once()
 				teamMemberRepo.On("Create", mock.Anything, mock.MatchedBy(func(teamMember *types.OrganizationTeamMember) bool {
 					return teamMember != nil && teamMember.TeamID == "team-1" && teamMember.MemberID == "mem-1"
 				})).Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "mem-1"}, nil).Once()
