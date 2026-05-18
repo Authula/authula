@@ -89,7 +89,7 @@ func (bus *eventBus) Publish(evt models.Event) error {
 		event.Timestamp = time.Now().UTC()
 	}
 	if event.Metadata == nil {
-		event.Metadata = make(map[string]string)
+		event.Metadata = make(map[string]any)
 	}
 
 	payload, err := json.Marshal(event)

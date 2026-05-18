@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/Authula/authula/models"
@@ -10,7 +9,7 @@ import (
 
 type UserService interface {
 	GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error)
-	Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata json.RawMessage) (*models.User, error)
+	Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata map[string]any) (*models.User, error)
 	GetByID(ctx context.Context, id string) (*models.User, error)
 	GetByEmail(ctx context.Context, email string) (*models.User, error)
 	Update(ctx context.Context, user *models.User) (*models.User, error)

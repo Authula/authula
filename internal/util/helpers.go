@@ -1,7 +1,6 @@
 package util
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
 	"net/http"
@@ -16,15 +15,6 @@ import (
 // GenerateUUID generates a new UUID string
 func GenerateUUID() string {
 	return uuid.New().String()
-}
-
-// MarshalJSON marshals a value to JSON
-func MarshalJSON(v any) (json.RawMessage, error) {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	return json.RawMessage(data), nil
 }
 
 func CompareStringArrays(arr1 []string, arr2 []string) bool {

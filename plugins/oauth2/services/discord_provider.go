@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/Authula/authula/plugins/oauth2/types"
@@ -46,11 +45,8 @@ func (p *DiscordProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) 
 		Email:             GetStringField(info, "email"),
 		Name:              GetStringField(info, "username"),
 		Picture:           fmt.Sprintf("https://cdn.discordapp.com/avatars/%s/%s.png", GetStringField(info, "id"), GetStringField(info, "avatar")),
+		Raw:               info,
 	}
-
-	// Store raw profile
-	raw, _ := json.Marshal(info)
-	userInfo.Raw = raw
 
 	return userInfo, nil
 }

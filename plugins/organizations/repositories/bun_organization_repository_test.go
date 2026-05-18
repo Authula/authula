@@ -21,11 +21,11 @@ func TestBunOrganizationRepository_Create(t *testing.T) {
 	}{
 		{
 			name:         "keeps provided metadata",
-			organization: &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: []byte(`{"tier":"core"}`)},
+			organization: &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: map[string]any{"tier": "core"}},
 		},
 		{
 			name:         "keeps alternate metadata",
-			organization: &types.Organization{ID: "org-2", OwnerID: "user-1", Name: "Platform", Slug: "platform", Metadata: []byte(`{"tier":"platform"}`)},
+			organization: &types.Organization{ID: "org-2", OwnerID: "user-1", Name: "Platform", Slug: "platform", Metadata: map[string]any{"tier": "platform"}},
 		},
 	}
 
@@ -40,7 +40,7 @@ func TestBunOrganizationRepository_Create(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, created)
 			require.Equal(t, tt.organization.ID, created.ID)
-			require.Equal(t, string(tt.organization.Metadata), string(created.Metadata))
+			require.Equal(t, tt.organization.Metadata, created.Metadata)
 		})
 	}
 }
@@ -64,7 +64,7 @@ func TestBunOrganizationRepository_GetByID(t *testing.T) {
 				repo := repositories.NewBunOrganizationRepository(db)
 				ctx := context.Background()
 
-				_, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: []byte(`{"tier":"core"}`)})
+				_, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: map[string]any{"tier": "core"}})
 				require.NoError(t, err)
 
 				return repo, ctx
@@ -118,7 +118,7 @@ func TestBunOrganizationRepository_GetBySlug(t *testing.T) {
 				repo := repositories.NewBunOrganizationRepository(db)
 				ctx := context.Background()
 
-				_, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: []byte(`{"tier":"core"}`)})
+				_, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: map[string]any{"tier": "core"}})
 				require.NoError(t, err)
 
 				return repo, ctx
@@ -218,7 +218,7 @@ func TestBunOrganizationRepository_Update(t *testing.T) {
 				repo := repositories.NewBunOrganizationRepository(db)
 				ctx := context.Background()
 
-				created, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: []byte(`{"tier":"core"}`)})
+				created, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: map[string]any{"tier": "core"}})
 				require.NoError(t, err)
 				return repo, ctx, created
 			},
@@ -326,7 +326,7 @@ func TestBunOrganizationRepository_WithTx(t *testing.T) {
 			require.NotNil(t, txRepo)
 			require.IsType(t, &repositories.BunOrganizationRepository{}, txRepo)
 
-			created, err := txRepo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: []byte(`{"tier":"core"}`)})
+			created, err := txRepo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: map[string]any{"tier": "core"}})
 			require.NoError(t, err)
 			require.NotNil(t, created)
 			require.Equal(t, "org-1", created.ID)

@@ -2,7 +2,6 @@ package tests
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
@@ -11,7 +10,7 @@ import (
 
 type MockSignUpUseCase struct{ mock.Mock }
 
-func (m *MockSignUpUseCase) SignUp(ctx context.Context, name string, email string, password string, image *string, metadata json.RawMessage, callbackURL *string, ipAddress *string, userAgent *string) (*types.SignUpResult, error) {
+func (m *MockSignUpUseCase) SignUp(ctx context.Context, name string, email string, password string, image *string, metadata map[string]any, callbackURL *string, ipAddress *string, userAgent *string) (*types.SignUpResult, error) {
 	args := m.Called(ctx, name, email, password, image, metadata, callbackURL, ipAddress, userAgent)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

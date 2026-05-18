@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -87,18 +86,13 @@ func (uc *verifyEmailUseCase) handleEmailVerification(ctx context.Context, user 
 		return err
 	}
 
-	userJson, err := json.Marshal(user)
-	if err != nil {
-		return err
-	}
-
 	util.PublishEventAsync(
 		uc.EventBus,
 		uc.Logger,
 		models.Event{
 			ID:        util.GenerateUUID(),
 			Type:      constants.EventUserEmailVerified,
-			Payload:   userJson,
+			Payload:   util.ToMap(user),
 			Metadata:  nil,
 			Timestamp: time.Now().UTC(),
 		},
@@ -250,20 +244,14 @@ func getHtmlBody(userEmail string, oldEmail string, newEmail string) string {
 }
 
 func (uc *verifyEmailUseCase) publishEmailChangedEvent(user *models.User, oldEmail string, newEmail string) {
-	userJson, err := json.Marshal(user)
-	if err != nil {
-		uc.Logger.Error(err.Error())
-		return
-	}
-
 	util.PublishEventAsync(
 		uc.EventBus,
 		uc.Logger,
 		models.Event{
 			ID:        util.GenerateUUID(),
 			Type:      constants.EventUserEmailChanged,
-			Payload:   userJson,
-			Metadata:  map[string]string{"old_email": oldEmail, "new_email": newEmail},
+			Payload:   util.ToMap(user),
+			Metadata:  map[string]any{"old_email": oldEmail, "new_email": newEmail},
 			Timestamp: time.Now().UTC(),
 		},
 	)

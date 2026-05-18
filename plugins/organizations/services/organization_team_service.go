@@ -73,7 +73,7 @@ func (s *organizationTeamService) CreateTeam(ctx context.Context, actorUserID st
 		Metadata:       request.Metadata,
 	}
 	if len(team.Metadata) == 0 {
-		team.Metadata = []byte("{}")
+		team.Metadata = make(map[string]any)
 	}
 
 	var created *types.OrganizationTeam
@@ -186,7 +186,7 @@ func (s *organizationTeamService) UpdateTeam(ctx context.Context, actorUserID st
 	team.Description = request.Description
 	team.Metadata = request.Metadata
 	if len(team.Metadata) == 0 {
-		team.Metadata = []byte("{}")
+		team.Metadata = make(map[string]any)
 	}
 
 	updated, err := s.orgTeamRepo.Update(ctx, team)

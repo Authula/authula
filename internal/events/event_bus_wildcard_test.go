@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -100,16 +99,15 @@ func TestEventBusWildcardSubscription(t *testing.T) {
 					})
 					require.NoError(t, err)
 
-					payload := map[string]string{"source": "test"}
-					payloadBytes, err := json.Marshal(payload)
+					payload := map[string]any{"source": "test"}
 					require.NoError(t, err)
 
 					now := time.Now().UTC()
 					err = env.bus.Publish(models.Event{
 						Type:      "some.event",
 						Timestamp: now,
-						Payload:   payloadBytes,
-						Metadata: map[string]string{
+						Payload:   payload,
+						Metadata: map[string]any{
 							"key": "value",
 						},
 					})
@@ -121,7 +119,7 @@ func TestEventBusWildcardSubscription(t *testing.T) {
 					case event := <-env.received:
 						assert.Equal(t, "some.event", event.Type)
 						assert.Equal(t, now, event.Timestamp)
-						assert.Equal(t, payloadBytes, []byte(event.Payload))
+						assert.Equal(t, payload, event.Payload)
 						assert.Equal(t, "value", event.Metadata["key"])
 					default:
 						t.Fatal("expected wildcard subscriber to receive event")

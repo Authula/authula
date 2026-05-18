@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/Authula/authula/internal/util"
@@ -63,19 +62,14 @@ func resolvePendingToken(
 	return *verification.UserID, verification.ID, nil
 }
 
-func publishEvent(eventBus models.EventBus, logger models.Logger, eventType, userID string) {
-	payload, err := json.Marshal(map[string]string{"userID": userID})
-	if err != nil {
-		logger.Error(err.Error())
-		return
-	}
+func publishEvent(eventBus models.EventBus, logger models.Logger, eventType string, userID string) {
 	util.PublishEventAsync(
 		eventBus,
 		logger,
 		models.Event{
 			ID:        util.GenerateUUID(),
 			Type:      eventType,
-			Payload:   payload,
+			Payload:   map[string]any{"userID": userID},
 			Metadata:  nil,
 			Timestamp: time.Now().UTC(),
 		},

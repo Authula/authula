@@ -55,11 +55,8 @@ func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 		Email:             email,
 		Name:              GetStringField(info, "login"),
 		Picture:           GetStringField(info, "avatar_url"),
+		Raw:               info,
 	}
-
-	// Store raw profile
-	raw, _ := json.Marshal(info)
-	userInfo.Raw = raw
 
 	return userInfo, nil
 }

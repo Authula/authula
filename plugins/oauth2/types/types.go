@@ -2,7 +2,6 @@ package types
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/Authula/authula/models"
@@ -50,11 +49,11 @@ type OAuth2Provider interface {
 
 // UserInfo represents normalized user information from OAuth2 providers
 type UserInfo struct {
-	ProviderAccountID string          `json:"provider_account_id"`
-	Email             string          `json:"email"`
-	Name              string          `json:"name"`
-	Picture           string          `json:"picture"`
-	Raw               json.RawMessage `json:"raw"`
+	ProviderAccountID string         `json:"provider_account_id"`
+	Email             string         `json:"email"`
+	Name              string         `json:"name"`
+	Picture           string         `json:"picture"`
+	Raw               map[string]any `json:"raw"`
 }
 
 // AuthorizeRequest represents an authorization request

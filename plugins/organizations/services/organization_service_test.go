@@ -2,13 +2,13 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	internalerrors "github.com/Authula/authula/internal/errors"
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/plugins/organizations/constants"
 	orgtests "github.com/Authula/authula/plugins/organizations/tests"
 	"github.com/Authula/authula/plugins/organizations/types"
@@ -25,8 +25,8 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 
 	successSetup := func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
 		repo.On("Create", mock.Anything, mock.MatchedBy(func(org *types.Organization) bool {
-			return org != nil && org.OwnerID == "user-1" && org.Name == "Acme Inc" && org.Slug == "acme-inc" && string(org.Metadata) == `{"tier":"pro"}`
-		})).Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: json.RawMessage(`{"tier":"pro"}`)}, nil).Once()
+			return org != nil && org.OwnerID == "user-1" && org.Name == "Acme Inc" && org.Slug == "acme-inc" && string(internaltests.MarshalToJSON(t, org.Metadata)) == `{"tier":"pro"}`
+		})).Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc", Metadata: map[string]any{"tier": "pro"}}, nil).Once()
 		memberRepo.On("Create", mock.Anything, mock.MatchedBy(func(member *types.OrganizationMember) bool {
 			return member != nil && member.OrganizationID == "org-1" && member.UserID == "user-1" && member.Role == "member"
 		})).Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "member"}, nil).Once()
@@ -36,8 +36,8 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 		repo.On("GetAllByOwnerID", mock.Anything, "user-1").Return([]types.Organization{{ID: "org-owned", OwnerID: "user-1", Name: "Owned Org"}}, nil).Once()
 		memberRepo.On("GetAllByUserID", mock.Anything, "user-1").Return([]types.OrganizationMember{{ID: "mem-owned", OrganizationID: "org-owned", UserID: "user-1", Role: "member"}, {ID: "mem-2", OrganizationID: "org-member", UserID: "user-1", Role: "member"}}, nil).Once()
 		repo.On("Create", mock.Anything, mock.MatchedBy(func(org *types.Organization) bool {
-			return org != nil && org.OwnerID == "user-1" && org.Name == "Acme Labs" && org.Slug == "acme-labs" && string(org.Metadata) == "{}"
-		})).Return(&types.Organization{ID: "org-2", OwnerID: "user-1", Name: "Acme Labs", Slug: "acme-labs", Metadata: json.RawMessage(`{}`)}, nil).Once()
+			return org != nil && org.OwnerID == "user-1" && org.Name == "Acme Labs" && org.Slug == "acme-labs" && string(internaltests.MarshalToJSON(t, org.Metadata)) == "{}"
+		})).Return(&types.Organization{ID: "org-2", OwnerID: "user-1", Name: "Acme Labs", Slug: "acme-labs", Metadata: map[string]any{}}, nil).Once()
 		memberRepo.On("Create", mock.Anything, mock.MatchedBy(func(member *types.OrganizationMember) bool {
 			return member != nil && member.OrganizationID == "org-2" && member.UserID == "user-1" && member.Role == "member"
 		})).Return(&types.OrganizationMember{ID: "mem-3", OrganizationID: "org-2", UserID: "user-1", Role: "member"}, nil).Once()
@@ -85,7 +85,7 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 		{
 			name:           "success",
 			actorUserID:    "user-1",
-			request:        types.CreateOrganizationRequest{Name: "Acme Inc", Role: "member", Metadata: json.RawMessage(`{"tier":"pro"}`)},
+			request:        types.CreateOrganizationRequest{Name: "Acme Inc", Role: "member", Metadata: map[string]any{"tier": "pro"}},
 			setup:          successSetup,
 			expectCalled:   true,
 			expectReturned: "org-1",
@@ -94,7 +94,7 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 			name:              "zero limit treated as unlimited",
 			actorUserID:       "user-1",
 			organizationLimit: &zeroLimit,
-			request:           types.CreateOrganizationRequest{Name: "Acme Inc", Role: "member", Metadata: json.RawMessage(`{"tier":"pro"}`)},
+			request:           types.CreateOrganizationRequest{Name: "Acme Inc", Role: "member", Metadata: map[string]any{"tier": "pro"}},
 			setup:             successSetup,
 			expectCalled:      true,
 			expectReturned:    "org-1",

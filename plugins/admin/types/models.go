@@ -1,7 +1,6 @@
 package types
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -59,11 +58,11 @@ type AdminUserSession struct {
 }
 
 type CreateUserRequest struct {
-	Name          string          `json:"name"`
-	Email         string          `json:"email"`
-	EmailVerified *bool           `json:"email_verified,omitempty"`
-	Image         *string         `json:"image,omitempty"`
-	Metadata      json.RawMessage `json:"metadata,omitempty"`
+	Name          string         `json:"name"`
+	Email         string         `json:"email"`
+	EmailVerified *bool          `json:"email_verified,omitempty"`
+	Image         *string        `json:"image,omitempty"`
+	Metadata      map[string]any `json:"metadata,omitempty"`
 }
 
 type CreateUserResponse struct {
@@ -75,11 +74,11 @@ type GetUserByIDResponse struct {
 }
 
 type UpdateUserRequest struct {
-	Name          *string         `json:"name,omitempty"`
-	Email         *string         `json:"email,omitempty"`
-	EmailVerified *bool           `json:"email_verified,omitempty"`
-	Image         *string         `json:"image,omitempty"`
-	Metadata      json.RawMessage `json:"metadata,omitempty"`
+	Name          *string        `json:"name,omitempty"`
+	Email         *string        `json:"email,omitempty"`
+	EmailVerified *bool          `json:"email_verified,omitempty"`
+	Image         *string        `json:"image,omitempty"`
+	Metadata      map[string]any `json:"metadata,omitempty"`
 }
 
 type UpdateUserResponse struct {

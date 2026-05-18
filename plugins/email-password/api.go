@@ -2,7 +2,6 @@ package email_password
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
@@ -44,7 +43,7 @@ func (a *API) SignUp(
 	email string,
 	password string,
 	image *string,
-	metadata json.RawMessage,
+	metadata map[string]any,
 	callbackURL *string,
 	ipAddress *string,
 	userAgent *string,

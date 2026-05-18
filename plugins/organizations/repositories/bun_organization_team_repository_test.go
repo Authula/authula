@@ -21,14 +21,14 @@ func TestBunOrganizationTeamRepository_Create(t *testing.T) {
 	}{
 		{
 			name: "keeps provided metadata",
-			team: &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform", Metadata: []byte(`{"tier":"core"}`)},
+			team: &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform", Metadata: map[string]any{"tier": "core"}},
 		},
 		{
 			name: "keeps metadata and description",
 			team: func() *types.OrganizationTeam {
 				description := new(string)
 				*description = "Core"
-				return &types.OrganizationTeam{ID: "team-2", OrganizationID: "org-1", Name: "Core", Slug: "core", Description: description, Metadata: []byte(`{"tier":"core"}`)}
+				return &types.OrganizationTeam{ID: "team-2", OrganizationID: "org-1", Name: "Core", Slug: "core", Description: description, Metadata: map[string]any{"tier": "core"}}
 			}(),
 		},
 	}
@@ -44,7 +44,7 @@ func TestBunOrganizationTeamRepository_Create(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, created)
 			require.Equal(t, tt.team.ID, created.ID)
-			require.Equal(t, string(tt.team.Metadata), string(created.Metadata))
+			require.Equal(t, tt.team.Metadata, created.Metadata)
 		})
 	}
 }
@@ -334,7 +334,7 @@ func TestBunOrganizationTeamRepository_WithTx(t *testing.T) {
 			require.NotNil(t, txRepo)
 			require.IsType(t, &repositories.BunOrganizationTeamRepository{}, txRepo)
 
-			created, err := txRepo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform", Metadata: []byte(`{"tier":"core"}`)})
+			created, err := txRepo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
 			require.NoError(t, err)
 			require.NotNil(t, created)
 			require.Equal(t, "team-1", created.ID)

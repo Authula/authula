@@ -2,7 +2,6 @@ package tests
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/stretchr/testify/mock"
@@ -14,7 +13,7 @@ type MockUserService struct {
 	mock.Mock
 }
 
-func (m *MockUserService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata json.RawMessage) (*models.User, error) {
+func (m *MockUserService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata map[string]any) (*models.User, error) {
 	args := m.Called(ctx, name, email, emailVerified, image, metadata)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

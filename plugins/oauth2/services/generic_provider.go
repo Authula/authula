@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/Authula/authula/plugins/oauth2/types"
@@ -74,11 +73,8 @@ func (p *GenericProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) 
 		Email:             GetStringField(info, p.emailField),
 		Name:              GetStringField(info, p.nameField),
 		Picture:           GetStringField(info, p.pictureField),
+		Raw:               info,
 	}
-
-	// Store raw profile
-	raw, _ := json.Marshal(info)
-	userInfo.Raw = raw
 
 	return userInfo, nil
 }

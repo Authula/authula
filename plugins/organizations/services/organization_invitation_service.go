@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"html"
 	"net/mail"
@@ -17,7 +16,6 @@ import (
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
-	orgevents "github.com/Authula/authula/plugins/organizations/events"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"
 	rootservices "github.com/Authula/authula/services"
@@ -240,26 +238,19 @@ func (s *organizationInvitationService) buildOrganizationInvitationAcceptURL(inv
 }
 
 func (s *organizationInvitationService) publishOrganizationInvitationCreatedEvent(invitation *types.OrganizationInvitation, organization *types.Organization) {
-	payload, err := json.Marshal(orgevents.OrganizationInvitationCreatedEvent{
-		ID:               util.GenerateUUID(),
-		InvitationID:     invitation.ID,
-		OrganizationID:   invitation.OrganizationID,
-		OrganizationName: organization.Name,
-		InviteeEmail:     invitation.Email,
-		InviterID:        invitation.InviterID,
-		Role:             invitation.Role,
-		ExpiresAt:        invitation.ExpiresAt,
-	})
-	if err != nil {
-		s.logger.Error("failed to marshal organization invitation created event", "error", err)
-		return
-	}
-
 	util.PublishEventAsync(s.eventBus, s.logger, models.Event{
 		ID:        util.GenerateUUID(),
 		Type:      orgconstants.EventOrganizationsInvitationCreated,
 		Timestamp: time.Now().UTC(),
-		Payload:   payload,
+		Payload: map[string]any{
+			"invitation_id":     invitation.ID,
+			"organization_id":   invitation.OrganizationID,
+			"organization_name": organization.Name,
+			"invitee_email":     invitation.Email,
+			"inviter_id":        invitation.InviterID,
+			"role":              invitation.Role,
+			"expires_at":        invitation.ExpiresAt,
+		},
 	})
 }
 

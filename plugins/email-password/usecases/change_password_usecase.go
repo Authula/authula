@@ -2,10 +2,10 @@ package usecases
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/Authula/authula/internal/util"
 	internalutil "github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
@@ -135,19 +135,13 @@ func (uc *changePasswordUseCase) sendChangedPasswordEmail(ctx context.Context, u
 }
 
 func (uc *changePasswordUseCase) publishChangedPasswordEvent(user *models.User) {
-	userJson, err := json.Marshal(user)
-	if err != nil {
-		uc.Logger.Error(err.Error())
-		return
-	}
-
 	internalutil.PublishEventAsync(
 		uc.EventBus,
 		uc.Logger,
 		models.Event{
 			ID:        internalutil.GenerateUUID(),
 			Type:      constants.EventUserChangedPassword,
-			Payload:   userJson,
+			Payload:   util.ToMap(user),
 			Metadata:  nil,
 			Timestamp: time.Now().UTC(),
 		},

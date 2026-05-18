@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -53,7 +52,7 @@ func TestSignUpUseCase(t *testing.T) {
 			setup: func(f *emailPasswordTestFixture) {
 				f.userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(nil, nil).Once()
 				f.passwordSvc.On("Hash", "Password1!").Return("hashed-password", nil).Once()
-				f.userSvc.On("Create", mock.Anything, "Test User", "test@example.com", false, (*string)(nil), json.RawMessage(`{"role":"member"}`)).Return(&models.User{ID: "user-1", Name: "Test User", Email: "test@example.com"}, nil).Once()
+				f.userSvc.On("Create", mock.Anything, "Test User", "test@example.com", false, (*string)(nil), map[string]any{"role": "member"}).Return(&models.User{ID: "user-1", Name: "Test User", Email: "test@example.com"}, nil).Once()
 				f.accountSvc.On("Create", mock.Anything, "user-1", "test@example.com", models.AuthProviderEmail.String(), mock.AnythingOfType("*string")).Return(&models.Account{ID: "account-1", UserID: "user-1"}, nil).Once()
 				f.tokenSvc.On("Generate").Return("session-token", nil).Once()
 				f.tokenSvc.On("Hash", "session-token").Return("hashed-session-token").Once()
@@ -76,7 +75,7 @@ func TestSignUpUseCase(t *testing.T) {
 			if tc.setup != nil {
 				tc.setup(f)
 			}
-			result, err := f.signUpUseCase().SignUp(context.Background(), "Test User", "test@example.com", "Password1!", nil, json.RawMessage(`{"role":"member"}`), nil, nil, nil)
+			result, err := f.signUpUseCase().SignUp(context.Background(), "Test User", "test@example.com", "Password1!", nil, map[string]any{"role": "member"}, nil, nil, nil)
 			tc.assert(t, result, err)
 			f.userSvc.AssertExpectations(t)
 			f.accountSvc.AssertExpectations(t)
