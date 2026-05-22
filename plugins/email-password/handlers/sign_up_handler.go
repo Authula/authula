@@ -70,7 +70,7 @@ func (h *SignUpHandler) Handler() http.HandlerFunc {
 			}()
 		}
 
-		reqCtx.SetUserIDInContext(result.User.ID)
+		reqCtx.SetActorInContext(&models.Actor{ID: result.User.ID, Type: models.ActorUser})
 		if h.PluginConfig.AutoSignIn {
 			reqCtx.Values[models.ContextSessionID.String()] = result.Session.ID
 			reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken

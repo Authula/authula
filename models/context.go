@@ -11,6 +11,7 @@ type ContextKey string
 const (
 	ContextUserID                       ContextKey = "user_id"
 	ContextAuthActor                    ContextKey = "auth.actor"
+	ContextPrincipal                    ContextKey = "auth.principal"
 	ContextSessionID                    ContextKey = "session_id"
 	ContextSessionToken                 ContextKey = "session_token"
 	ContextRequestContext               ContextKey = "request_context"
@@ -122,33 +123,4 @@ func (reqCtx *RequestContext) SetJSONResponse(status int, payload any) {
 	headers := make(http.Header)
 	headers.Set("Content-Type", "application/json")
 	reqCtx.SetResponse(status, headers, data)
-}
-
-func GetUserIDFromContext(ctx context.Context) (string, bool) {
-	// First, check direct Go context (fast path for third-party plugins)
-	value := ctx.Value(ContextUserID)
-	if value != nil {
-		if id, ok := value.(string); ok {
-			return id, true
-		}
-	}
-
-	// Fallback: check RequestContext (for custom runtime)
-	if reqCtx, ok := GetRequestContext(ctx); ok && reqCtx.UserID != nil {
-		return *reqCtx.UserID, true
-	}
-
-	return "", false
-}
-
-// SetUserIDInContext sets the user ID in both the RequestContext and the underlying Go context.
-func (reqCtx *RequestContext) SetUserIDInContext(userID string) {
-	reqCtx.UserID = &userID
-	reqCtx.Request = reqCtx.Request.WithContext(context.WithValue(reqCtx.Request.Context(), ContextUserID, userID))
-}
-
-// GetUserIDFromRequest extracts the user ID from an HTTP request's context.
-// It returns the user ID and a boolean indicating whether it was found.
-func GetUserIDFromRequest(req *http.Request) (string, bool) {
-	return GetUserIDFromContext(req.Context())
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	internalerrors "github.com/Authula/authula/internal/errors"
+	"github.com/Authula/authula/models"
 	orgtests "github.com/Authula/authula/plugins/organizations/tests"
 	"github.com/Authula/authula/plugins/organizations/types"
 )
@@ -31,7 +32,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		actorUserID    string
+		actor            models.Actor
 		organizationID string
 		teamID         string
 		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationTeamRepository, *orgtests.MockOrganizationMemberRepository, *orgtests.MockOrganizationTeamMemberRepository)
@@ -41,7 +42,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 	}{
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
@@ -54,7 +55,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 		},
 		{
 			name:           "org member can list",
-			actorUserID:    "user-2",
+			actor: models.Actor{ID: "user-2", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
@@ -68,14 +69,14 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 		},
 		{
 			name:           "unauthorized",
-			actorUserID:    "",
+			actor: models.Actor{Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			expectErr:      internalerrors.ErrUnauthorized,
 		},
 		{
 			name:           "organization not found",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
@@ -86,7 +87,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 		},
 		{
 			name:           "forbidden",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
@@ -98,7 +99,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 		},
 		{
 			name:           "team lookup error",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
@@ -110,7 +111,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 		},
 		{
 			name:           "team not found",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
@@ -122,7 +123,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 		},
 		{
 			name:           "team from another organization",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
@@ -134,7 +135,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 		},
 		{
 			name:           "repo error",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
@@ -160,7 +161,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 			}
 
 			svc := newTestOrganizationTeamMemberService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-			members, err := svc.GetAllTeamMembers(context.Background(), tt.actorUserID, tt.organizationID, tt.teamID, 1, 10)
+			members, err := svc.GetAllTeamMembers(context.Background(), tt.actor, tt.organizationID, tt.teamID, 1, 10)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -188,7 +189,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		actorUserID    string
+		actor            models.Actor
 		organizationID string
 		teamID         string
 		request        types.AddOrganizationTeamMemberRequest
@@ -198,7 +199,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 	}{
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -215,7 +216,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "org member can add",
-			actorUserID:    "user-2",
+			actor: models.Actor{ID: "user-2", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -233,7 +234,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "unauthorized",
-			actorUserID:    "",
+			actor: models.Actor{Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -241,7 +242,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "organization not found",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -253,7 +254,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "organization lookup error",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -265,7 +266,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "forbidden",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -278,7 +279,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "team lookup error",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -291,7 +292,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "team not found",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -304,7 +305,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "team from another organization",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -317,7 +318,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "member from another organization",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -331,7 +332,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "bad request empty member id",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: ""},
@@ -340,7 +341,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "member lookup error",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -354,7 +355,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "member not found",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -368,7 +369,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "team member conflict",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -383,7 +384,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "team member lookup error",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -398,7 +399,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 		},
 		{
 			name:           "create error",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			request:        types.AddOrganizationTeamMemberRequest{MemberID: "member-1"},
@@ -438,7 +439,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 			}
 
 			svc := NewOrganizationTeamMemberService(orgRepo, memberRepo, teamRepo, teamMemberRepo, serviceUtils)
-			teamMember, err := svc.AddTeamMember(context.Background(), tt.actorUserID, tt.organizationID, tt.teamID, tt.request)
+			teamMember, err := svc.AddTeamMember(context.Background(), tt.actor, tt.organizationID, tt.teamID, tt.request)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -465,7 +466,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		actorUserID    string
+		actor            models.Actor
 		organizationID string
 		teamID         string
 		memberID       string
@@ -476,7 +477,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 	}{
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -491,7 +492,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 		},
 		{
 			name:           "org member can get",
-			actorUserID:    "user-2",
+			actor: models.Actor{ID: "user-2", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -507,7 +508,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 		},
 		{
 			name:           "unauthorized",
-			actorUserID:    "",
+			actor: models.Actor{Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -515,7 +516,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 		},
 		{
 			name:           "organization not found",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -527,7 +528,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 		},
 		{
 			name:           "forbidden",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -540,7 +541,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 		},
 		{
 			name:           "team lookup error",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -553,7 +554,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 		},
 		{
 			name:           "team not found",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -566,7 +567,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 		},
 		{
 			name:           "team from another organization",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -579,7 +580,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 		},
 		{
 			name:           "repo error",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -594,7 +595,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 		},
 		{
 			name:           "not found",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -608,7 +609,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 		},
 		{
 			name:           "whitespace member id",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "",
@@ -636,7 +637,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 			}
 
 			svc := newTestOrganizationTeamMemberService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-			teamMember, err := svc.GetTeamMember(context.Background(), tt.actorUserID, tt.organizationID, tt.teamID, tt.memberID)
+			teamMember, err := svc.GetTeamMember(context.Background(), tt.actor, tt.organizationID, tt.teamID, tt.memberID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -665,7 +666,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		actorUserID    string
+		actor            models.Actor
 		organizationID string
 		teamID         string
 		memberID       string
@@ -675,7 +676,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 	}{
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -690,7 +691,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 		},
 		{
 			name:           "org member can remove",
-			actorUserID:    "user-2",
+			actor: models.Actor{ID: "user-2", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -706,7 +707,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 		},
 		{
 			name:           "unauthorized",
-			actorUserID:    "",
+			actor: models.Actor{Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -714,7 +715,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 		},
 		{
 			name:           "organization not found",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -726,7 +727,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 		},
 		{
 			name:           "forbidden",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -739,7 +740,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 		},
 		{
 			name:           "team lookup error",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -752,7 +753,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 		},
 		{
 			name:           "team not found",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -765,7 +766,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 		},
 		{
 			name:           "team from another organization",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -778,7 +779,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 		},
 		{
 			name:           "team member lookup error",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -793,7 +794,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 		},
 		{
 			name:           "member not found",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -807,7 +808,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 		},
 		{
 			name:           "delete error",
-			actorUserID:    "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			teamID:         "team-1",
 			memberID:       "member-1",
@@ -837,7 +838,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 			}
 
 			svc := newTestOrganizationTeamMemberService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-			err := svc.RemoveTeamMember(context.Background(), tt.actorUserID, tt.organizationID, tt.teamID, tt.memberID)
+			err := svc.RemoveTeamMember(context.Background(), tt.actor, tt.organizationID, tt.teamID, tt.memberID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)

@@ -22,13 +22,13 @@ func (p *AdminPlugin) enforceState(reqCtx *models.RequestContext) error {
 		return nil
 	}
 
-	if reqCtx.UserID == nil || *reqCtx.UserID == "" {
+	if reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
 		return nil
 	}
 
 	ctx := reqCtx.Request.Context()
 
-	state, err := p.Api.GetUserState(ctx, *reqCtx.UserID)
+	state, err := p.Api.GetUserState(ctx, reqCtx.Actor.ID)
 	if err != nil {
 		reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": "failed to evaluate user state"})
 		reqCtx.Handled = true

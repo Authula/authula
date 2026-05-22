@@ -70,14 +70,14 @@ func NewOrganizationInvitationService(
 	}
 }
 
-func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, request types.CreateOrganizationInvitationRequest) (*types.OrganizationInvitation, error) {
+func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context.Context, actor models.Actor, organizationID string, request types.CreateOrganizationInvitationRequest) (*types.OrganizationInvitation, error) {
 	reqCtx, _ := models.GetRequestContext(ctx)
 
-	if actorUserID == "" || organizationID == "" {
+	if actor.ID == "" || organizationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID)
+	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 		return nil, internalerrors.ErrUnprocessableEntity
 	}
 
-	validatedRoleAssignment, err := s.accessControlService.ValidateRoleAssignment(ctx, role, &actorUserID)
+	validatedRoleAssignment, err := s.accessControlService.ValidateRoleAssignment(ctx, role, &actor.ID)
 	if err != nil {
 		if err.Error() == internalerrors.ErrForbidden.Error() {
 			return nil, internalerrors.ErrForbidden
@@ -132,7 +132,7 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 		invitation := &types.OrganizationInvitation{
 			ID:             util.GenerateUUID(),
 			Email:          request.Email,
-			InviterID:      actorUserID,
+			InviterID:      actor.ID,
 			OrganizationID: organizationID,
 			Role:           role,
 			Status:         types.OrganizationInvitationStatusPending,
@@ -157,7 +157,7 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 	callbackHandled := false
 
 	if s.pluginConfig.SendOrganizationInvitationEmail != nil {
-		inviter, err := s.userService.GetByID(ctx, actorUserID)
+		inviter, err := s.userService.GetByID(ctx, actor.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -254,12 +254,12 @@ func (s *organizationInvitationService) publishOrganizationInvitationCreatedEven
 	})
 }
 
-func (s *organizationInvitationService) GetAllOrganizationInvitations(ctx context.Context, actorUserID string, organizationID string) ([]types.OrganizationInvitation, error) {
-	if actorUserID == "" || organizationID == "" {
+func (s *organizationInvitationService) GetAllOrganizationInvitations(ctx context.Context, actor models.Actor, organizationID string) ([]types.OrganizationInvitation, error) {
+	if actor.ID == "" || organizationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	_, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID)
+	_, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -272,12 +272,12 @@ func (s *organizationInvitationService) GetAllOrganizationInvitations(ctx contex
 	return invitations, nil
 }
 
-func (s *organizationInvitationService) GetOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
-	if actorUserID == "" || organizationID == "" || invitationID == "" {
+func (s *organizationInvitationService) GetOrganizationInvitation(ctx context.Context, actor models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
+	if actor.ID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	_, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID)
+	_, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -293,12 +293,12 @@ func (s *organizationInvitationService) GetOrganizationInvitation(ctx context.Co
 	return invitation, nil
 }
 
-func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
-	if actorUserID == "" || organizationID == "" || invitationID == "" {
+func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context.Context, actor models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
+	if actor.ID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	_, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID)
+	_, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -326,12 +326,12 @@ func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context
 
 	return updated, nil
 }
-func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
-	if actorUserID == "" || organizationID == "" || invitationID == "" {
+func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context.Context, actor models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
+	if actor.ID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	user, err := s.serviceUtils.ensureEmailVerifiedForInvitationAcceptance(ctx, s.userService, actorUserID, s.pluginConfig.RequireEmailVerifiedOnInvitation)
+	user, err := s.serviceUtils.ensureEmailVerifiedForInvitationAcceptance(ctx, s.userService, actor.ID, s.pluginConfig.RequireEmailVerifiedOnInvitation)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +353,7 @@ func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context
 		return nil, internalerrors.ErrForbidden
 	}
 
-	accepted, err := s.acceptOrganizationInvitations(ctx, actorUserID, []types.OrganizationInvitation{*invitation})
+	accepted, err := s.acceptOrganizationInvitations(ctx, actor.ID, []types.OrganizationInvitation{*invitation})
 	if err != nil {
 		return nil, err
 	}
@@ -364,12 +364,12 @@ func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context
 	return &accepted[0], nil
 }
 
-func (s *organizationInvitationService) RejectOrganizationInvitation(ctx context.Context, actorUserID string, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
-	if actorUserID == "" || organizationID == "" || invitationID == "" {
+func (s *organizationInvitationService) RejectOrganizationInvitation(ctx context.Context, actor models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
+	if actor.ID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	user, err := s.userService.GetByID(ctx, actorUserID)
+	user, err := s.userService.GetByID(ctx, actor.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -404,9 +404,9 @@ func (s *organizationInvitationService) RejectOrganizationInvitation(ctx context
 	return updated, nil
 }
 
-func (s *organizationInvitationService) AcceptPendingOrganizationInvitationsForEmail(ctx context.Context, userID string, email string) ([]types.OrganizationInvitation, error) {
+func (s *organizationInvitationService) AcceptPendingOrganizationInvitationsForEmail(ctx context.Context, actor models.Actor, email string) ([]types.OrganizationInvitation, error) {
 	email = strings.ToLower(email)
-	if userID == "" || email == "" {
+	if actor.ID == "" || email == "" {
 		return nil, internalerrors.ErrUnprocessableEntity
 	}
 
@@ -415,7 +415,7 @@ func (s *organizationInvitationService) AcceptPendingOrganizationInvitationsForE
 	}
 
 	if s.pluginConfig.RequireEmailVerifiedOnInvitation {
-		if _, err := s.serviceUtils.ensureEmailVerifiedForInvitationAcceptance(ctx, s.userService, userID, true); err != nil {
+		if _, err := s.serviceUtils.ensureEmailVerifiedForInvitationAcceptance(ctx, s.userService, actor.ID, true); err != nil {
 			return nil, err
 		}
 	}
@@ -428,7 +428,7 @@ func (s *organizationInvitationService) AcceptPendingOrganizationInvitationsForE
 		return []types.OrganizationInvitation{}, nil
 	}
 
-	return s.acceptOrganizationInvitations(ctx, userID, pendingInvitations)
+	return s.acceptOrganizationInvitations(ctx, actor.ID, pendingInvitations)
 }
 
 func (s *organizationInvitationService) acceptOrganizationInvitations(ctx context.Context, userID string, invitations []types.OrganizationInvitation) ([]types.OrganizationInvitation, error) {

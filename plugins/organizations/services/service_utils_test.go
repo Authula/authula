@@ -23,7 +23,7 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		actorUserID  string
+		actor            models.Actor
 		organization string
 		setup        func(*orgtests.MockOrganizationRepository)
 		expectErr    error
@@ -31,7 +31,7 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 	}{
 		{
 			name:         "success",
-			actorUserID:  "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -40,13 +40,13 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 		},
 		{
 			name:         "unauthorized when inputs are missing",
-			actorUserID:  "",
+			actor: models.Actor{Type: models.ActorUser},
 			organization: "org-1",
 			expectErr:    internalerrors.ErrUnauthorized,
 		},
 		{
 			name:         "not found when organization is missing",
-			actorUserID:  "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return((*types.Organization)(nil), nil).Once()
@@ -55,7 +55,7 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 		},
 		{
 			name:         "forbidden when actor is not owner",
-			actorUserID:  "user-2",
+			actor: models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -64,7 +64,7 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 		},
 		{
 			name:         "propagates repository error",
-			actorUserID:  "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return((*types.Organization)(nil), repoErr).Once()
@@ -82,7 +82,7 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 				tt.setup(orgRepo)
 			}
 
-			org, err := (&ServiceUtils{orgRepo: orgRepo}).authorizeOwner(context.Background(), tt.actorUserID, tt.organization)
+			org, err := (&ServiceUtils{orgRepo: orgRepo}).authorizeOwner(context.Background(), tt.actor, tt.organization)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				require.Nil(t, org)
@@ -106,7 +106,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		actorUserID  string
+		actor            models.Actor
 		organization string
 		setup        func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository)
 		expectErr    error
@@ -115,7 +115,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 	}{
 		{
 			name:         "owner access",
-			actorUserID:  "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -124,7 +124,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 		},
 		{
 			name:         "member access",
-			actorUserID:  "user-2",
+			actor: models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -134,13 +134,13 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 		},
 		{
 			name:         "unauthorized when inputs are missing",
-			actorUserID:  "",
+			actor: models.Actor{Type: models.ActorUser},
 			organization: "org-1",
 			expectErr:    internalerrors.ErrUnauthorized,
 		},
 		{
 			name:         "not found when organization is missing",
-			actorUserID:  "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return((*types.Organization)(nil), nil).Once()
@@ -149,7 +149,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 		},
 		{
 			name:         "forbidden when member is missing",
-			actorUserID:  "user-2",
+			actor: models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -159,7 +159,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 		},
 		{
 			name:         "propagates organization repository error",
-			actorUserID:  "user-1",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return((*types.Organization)(nil), orgErr).Once()
@@ -168,7 +168,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 		},
 		{
 			name:         "propagates member repository error",
-			actorUserID:  "user-2",
+			actor: models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -188,7 +188,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 				tt.setup(orgRepo, memberRepo)
 			}
 
-			org, member, err := (&ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}).authorizeOrganizationAccess(context.Background(), tt.actorUserID, tt.organization)
+			org, member, err := (&ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}).authorizeOrganizationAccess(context.Background(), tt.actor, tt.organization)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				require.Nil(t, org)

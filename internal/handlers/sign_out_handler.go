@@ -18,8 +18,8 @@ func (h *SignOutHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
+		principal, ok := models.GetActorFromContext(ctx)
+		if !ok || principal == nil || principal.ID == "" {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
 				"message": "unauthorized",
 			})
@@ -38,7 +38,7 @@ func (h *SignOutHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		result, err := h.UseCase.SignOut(ctx, userID, request.SessionID, request.SignOutAll)
+		result, err := h.UseCase.SignOut(ctx, principal.ID, request.SessionID, request.SignOutAll)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
 				"message": "failed to sign out",

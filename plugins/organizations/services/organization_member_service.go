@@ -8,6 +8,7 @@ import (
 
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
+	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"
 	rootservices "github.com/Authula/authula/services"
@@ -31,8 +32,8 @@ func NewOrganizationMemberService(userService rootservices.UserService, accessCo
 	return &organizationMemberService{userService: userService, accessControlService: accessControlService, orgRepo: orgRepo, orgMemberRepo: orgMemberRepo, serviceUtils: serviceUtils, membersLimit: membersLimit, txRunner: txRunner}
 }
 
-func (s *organizationMemberService) AddMember(ctx context.Context, actorUserID string, organizationID string, request types.AddOrganizationMemberRequest) (*types.OrganizationMember, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
+func (s *organizationMemberService) AddMember(ctx context.Context, actor models.Actor, organizationID string, request types.AddOrganizationMemberRequest) (*types.OrganizationMember, error) {
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -60,7 +61,7 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actorUserID s
 		return nil, internalerrors.ErrConflict
 	}
 
-	validatedRoleAssignment, err := s.accessControlService.ValidateRoleAssignment(ctx, role, &actorUserID)
+	validatedRoleAssignment, err := s.accessControlService.ValidateRoleAssignment(ctx, role, &actor.ID)
 	if err != nil {
 		if err.Error() == internalerrors.ErrForbidden.Error() {
 			return nil, internalerrors.ErrForbidden
@@ -103,16 +104,16 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actorUserID s
 	return created, nil
 }
 
-func (s *organizationMemberService) GetAllMembers(ctx context.Context, actorUserID string, organizationID string, page int, limit int) ([]types.OrganizationMember, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
+func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMember, error) {
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
 	return s.orgMemberRepo.GetAllByOrganizationID(ctx, organizationID, page, limit)
 }
 
-func (s *organizationMemberService) GetMember(ctx context.Context, actorUserID string, organizationID string, memberID string) (*types.OrganizationMember, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
+func (s *organizationMemberService) GetMember(ctx context.Context, actor models.Actor, organizationID string, memberID string) (*types.OrganizationMember, error) {
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -131,8 +132,8 @@ func (s *organizationMemberService) GetMember(ctx context.Context, actorUserID s
 	return member, nil
 }
 
-func (s *organizationMemberService) UpdateMember(ctx context.Context, actorUserID string, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error) {
-	_, actorMember, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID)
+func (s *organizationMemberService) UpdateMember(ctx context.Context, actor models.Actor, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error) {
+	_, actorMember, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +151,7 @@ func (s *organizationMemberService) UpdateMember(ctx context.Context, actorUserI
 		return nil, internalerrors.ErrBadRequest
 	}
 
-	validatedRoleAssignment, err := s.accessControlService.ValidateRoleAssignment(ctx, role, &actorUserID)
+	validatedRoleAssignment, err := s.accessControlService.ValidateRoleAssignment(ctx, role, &actor.ID)
 	if err != nil {
 		if err.Error() == internalerrors.ErrForbidden.Error() {
 			return nil, internalerrors.ErrForbidden
@@ -178,8 +179,8 @@ func (s *organizationMemberService) UpdateMember(ctx context.Context, actorUserI
 	return updated, nil
 }
 
-func (s *organizationMemberService) RemoveMember(ctx context.Context, actorUserID string, organizationID string, memberID string) error {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
+func (s *organizationMemberService) RemoveMember(ctx context.Context, actor models.Actor, organizationID string, memberID string) error {
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return err
 	}
 

@@ -79,7 +79,7 @@ func (p *BearerPlugin) AuthMiddleware() func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), models.ContextUserID, userID)
+			ctx := context.WithValue(r.Context(), models.ContextAuthActor, &models.Actor{ID: userID, Type: models.ActorUser, Permissions: []string{}})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -91,7 +91,7 @@ func (p *BearerPlugin) OptionalAuthMiddleware() func(http.Handler) http.Handler 
 			token, err := p.extractToken(r)
 			if err == nil && token != "" {
 				if userID, validateErr := p.jwtService.ValidateToken(token); validateErr == nil {
-					ctx := context.WithValue(r.Context(), models.ContextUserID, userID)
+					ctx := context.WithValue(r.Context(), models.ContextAuthActor, &models.Actor{ID: userID, Type: models.ActorUser, Permissions: []string{}})
 					r = r.WithContext(ctx)
 				}
 			}

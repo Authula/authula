@@ -29,8 +29,8 @@ func NewServiceUtils(orgRepo repositories.OrganizationRepository, orgMemberRepo 
 	}
 }
 
-func (s *ServiceUtils) authorizeOwner(ctx context.Context, actorUserID string, organizationID string) (*types.Organization, error) {
-	if actorUserID == "" || organizationID == "" {
+func (s *ServiceUtils) authorizeOwner(ctx context.Context, actor models.Actor, organizationID string) (*types.Organization, error) {
+	if actor.ID == "" || organizationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
 
@@ -41,15 +41,15 @@ func (s *ServiceUtils) authorizeOwner(ctx context.Context, actorUserID string, o
 	if organization == nil {
 		return nil, internalerrors.ErrNotFound
 	}
-	if organization.OwnerID != actorUserID {
+	if organization.OwnerID != actor.ID {
 		return nil, internalerrors.ErrForbidden
 	}
 
 	return organization, nil
 }
 
-func (s *ServiceUtils) authorizeOrganizationAccess(ctx context.Context, actorUserID string, organizationID string) (*types.Organization, *types.OrganizationMember, error) {
-	if actorUserID == "" || organizationID == "" {
+func (s *ServiceUtils) authorizeOrganizationAccess(ctx context.Context, actor models.Actor, organizationID string) (*types.Organization, *types.OrganizationMember, error) {
+	if actor.ID == "" || organizationID == "" {
 		return nil, nil, internalerrors.ErrUnauthorized
 	}
 
@@ -60,11 +60,11 @@ func (s *ServiceUtils) authorizeOrganizationAccess(ctx context.Context, actorUse
 	if organization == nil {
 		return nil, nil, internalerrors.ErrNotFound
 	}
-	if organization.OwnerID == actorUserID {
+	if organization.OwnerID == actor.ID {
 		return organization, nil, nil
 	}
 
-	member, err := s.orgMemberRepo.GetByOrganizationIDAndUserID(ctx, organizationID, actorUserID)
+	member, err := s.orgMemberRepo.GetByOrganizationIDAndUserID(ctx, organizationID, actor.ID)
 	if err != nil {
 		return nil, nil, err
 	}

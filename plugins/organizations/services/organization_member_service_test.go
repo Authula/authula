@@ -33,7 +33,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 
 	tests := []struct {
 		name                 string
-		actorUserID          string
+		actor                models.Actor
 		organizationID       string
 		request              types.AddOrganizationMemberRequest
 		accessControlService rootservices.AccessControlService
@@ -42,15 +42,16 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		expectErr            error
 	}{
 		{
-			name:           "unauthorized",
-			actorUserID:    "",
+			name:  "unauthorized",
+			actor: models.Actor{Type: models.ActorUser},
+
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"},
 			expectErr:      internalerrors.ErrUnauthorized,
 		},
 		{
 			name:           "organization not found",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, userSvc *internaltests.MockUserService, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -60,7 +61,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "forbidden for non owner",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, userSvc *internaltests.MockUserService, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -71,7 +72,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "bad request empty user id",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "", Role: "member"},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, userSvc *internaltests.MockUserService, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -81,7 +82,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "bad request empty role",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: ""},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, userSvc *internaltests.MockUserService, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -91,7 +92,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "invalid role is rejected",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "ghost"},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, userSvc *internaltests.MockUserService, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -103,7 +104,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "zero limit treated as unlimited",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"},
 			membersLimit:   &zeroLimit,
@@ -118,7 +119,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "success within limit",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"},
 			membersLimit:   &threeLimit,
@@ -134,7 +135,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "quota exceeded",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"},
 			membersLimit:   &twoLimit,
@@ -148,7 +149,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "count lookup error",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"},
 			membersLimit:   &twoLimit,
@@ -162,7 +163,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:                 "higher role is forbidden",
-			actorUserID:          "user-2",
+			actor:                models.Actor{ID: "user-2", Type: models.ActorUser},
 			organizationID:       "org-1",
 			request:              types.AddOrganizationMemberRequest{UserID: "user-3", Role: "manager"},
 			accessControlService: orgtests.NewAccessControlServiceStubWithWeights(nil, map[string]int{"user-2": 10}),
@@ -176,7 +177,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:                 "access control forbidden is normalized",
-			actorUserID:          "user-2",
+			actor:                models.Actor{ID: "user-2", Type: models.ActorUser},
 			organizationID:       "org-1",
 			request:              types.AddOrganizationMemberRequest{UserID: "user-3", Role: "manager"},
 			accessControlService: &orgtests.AccessControlServiceStub{Err: errors.New("forbidden")},
@@ -190,7 +191,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "user lookup error",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, userSvc *internaltests.MockUserService, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -201,7 +202,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "user not found",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, userSvc *internaltests.MockUserService, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -212,7 +213,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "existing member conflict",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, userSvc *internaltests.MockUserService, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -224,7 +225,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "lookup existing member error",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, userSvc *internaltests.MockUserService, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -236,7 +237,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "create error",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, userSvc *internaltests.MockUserService, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -251,7 +252,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 		},
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, userSvc *internaltests.MockUserService, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -283,7 +284,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 			}
 
 			svc := newTestOrganizationMemberService(userSvc, accessControlService, orgRepo, memberRepo, tt.membersLimit)
-			member, err := svc.AddMember(context.Background(), tt.actorUserID, tt.organizationID, tt.request)
+			member, err := svc.AddMember(context.Background(), tt.actor, tt.organizationID, tt.request)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				if strings.Contains(tt.name, "invalid role") {
@@ -316,7 +317,7 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		actorUserID    string
+		actor          models.Actor
 		organizationID string
 		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository)
 		expectErr      error
@@ -324,13 +325,13 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 	}{
 		{
 			name:           "unauthorized",
-			actorUserID:    "",
+			actor:          models.Actor{Type: models.ActorUser},
 			organizationID: "org-1",
 			expectErr:      internalerrors.ErrUnauthorized,
 		},
 		{
 			name:           "organization not found",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(nil, nil).Once()
@@ -339,7 +340,7 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 		},
 		{
 			name:           "forbidden",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
@@ -349,7 +350,7 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 		},
 		{
 			name:           "repository error",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -359,7 +360,7 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 		},
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -381,7 +382,7 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 			}
 
 			svc := newTestOrganizationMemberService(userService, orgtests.NewAccessControlServiceStub(), orgRepo, memberRepo, nil)
-			members, err := svc.GetAllMembers(context.Background(), tt.actorUserID, tt.organizationID, 1, 10)
+			members, err := svc.GetAllMembers(context.Background(), tt.actor, tt.organizationID, 1, 10)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -408,7 +409,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		actorUserID    string
+		actor          models.Actor
 		organizationID string
 		memberID       string
 		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository)
@@ -417,14 +418,14 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 	}{
 		{
 			name:           "unauthorized",
-			actorUserID:    "",
+			actor:          models.Actor{Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			expectErr:      internalerrors.ErrUnauthorized,
 		},
 		{
 			name:           "member id empty",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -434,7 +435,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 		},
 		{
 			name:           "member id whitespace",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "missing",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -445,7 +446,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 		},
 		{
 			name:           "organization not found",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -455,7 +456,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 		},
 		{
 			name:           "forbidden",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -466,7 +467,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 		},
 		{
 			name:           "repository error",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -477,7 +478,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 		},
 		{
 			name:           "not found when member is missing",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -488,7 +489,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 		},
 		{
 			name:           "not found when member belongs to another organization",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -499,7 +500,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 		},
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -522,7 +523,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 			}
 
 			svc := newTestOrganizationMemberService(userService, orgtests.NewAccessControlServiceStub(), orgRepo, memberRepo, nil)
-			member, err := svc.GetMember(context.Background(), tt.actorUserID, tt.organizationID, tt.memberID)
+			member, err := svc.GetMember(context.Background(), tt.actor, tt.organizationID, tt.memberID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -551,7 +552,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 
 	tests := []struct {
 		name                 string
-		actorUserID          string
+		actor                models.Actor
 		organizationID       string
 		memberID             string
 		request              types.UpdateOrganizationMemberRequest
@@ -562,7 +563,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 	}{
 		{
 			name:           "unauthorized",
-			actorUserID:    "",
+			actor:          models.Actor{Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			request:        types.UpdateOrganizationMemberRequest{Role: "admin"},
@@ -570,7 +571,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 		},
 		{
 			name:           "organization not found",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			request:        types.UpdateOrganizationMemberRequest{Role: "admin"},
@@ -581,7 +582,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 		},
 		{
 			name:           "forbidden",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			request:        types.UpdateOrganizationMemberRequest{Role: "admin"},
@@ -593,7 +594,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 		},
 		{
 			name:           "repository error fetching member",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			request:        types.UpdateOrganizationMemberRequest{Role: "admin"},
@@ -605,7 +606,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 		},
 		{
 			name:           "not found when member is missing",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			request:        types.UpdateOrganizationMemberRequest{Role: "admin"},
@@ -617,7 +618,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 		},
 		{
 			name:           "not found when member belongs to another organization",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			request:        types.UpdateOrganizationMemberRequest{Role: "admin"},
@@ -629,7 +630,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 		},
 		{
 			name:           "bad request empty role",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			request:        types.UpdateOrganizationMemberRequest{Role: ""},
@@ -641,7 +642,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 		},
 		{
 			name:           "invalid role is rejected",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			request:        types.UpdateOrganizationMemberRequest{Role: "ghost"},
@@ -653,7 +654,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 		},
 		{
 			name:                 "higher role is forbidden",
-			actorUserID:          "user-2",
+			actor:                models.Actor{ID: "user-2", Type: models.ActorUser},
 			organizationID:       "org-1",
 			memberID:             "mem-1",
 			request:              types.UpdateOrganizationMemberRequest{Role: "manager"},
@@ -667,7 +668,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 		},
 		{
 			name:                 "access control forbidden is normalized",
-			actorUserID:          "user-2",
+			actor:                models.Actor{ID: "user-2", Type: models.ActorUser},
 			organizationID:       "org-1",
 			memberID:             "mem-1",
 			request:              types.UpdateOrganizationMemberRequest{Role: "manager"},
@@ -681,7 +682,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 		},
 		{
 			name:           "update error",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			request:        types.UpdateOrganizationMemberRequest{Role: "admin"},
@@ -696,7 +697,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 		},
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			request:        types.UpdateOrganizationMemberRequest{Role: "admin"},
@@ -729,7 +730,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 			}
 
 			svc := newTestOrganizationMemberService(userService, accessControlService, orgRepo, memberRepo, nil)
-			member, err := svc.UpdateMember(context.Background(), tt.actorUserID, tt.organizationID, tt.memberID, tt.request)
+			member, err := svc.UpdateMember(context.Background(), tt.actor, tt.organizationID, tt.memberID, tt.request)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				if strings.Contains(tt.name, "invalid role") {
@@ -762,7 +763,7 @@ func TestOrganizationMemberService_RemoveMember(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		actorUserID    string
+		actor          models.Actor
 		organizationID string
 		memberID       string
 		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository, *orgtests.MockOrganizationMemberHooks)
@@ -770,14 +771,14 @@ func TestOrganizationMemberService_RemoveMember(t *testing.T) {
 	}{
 		{
 			name:           "unauthorized",
-			actorUserID:    "",
+			actor:          models.Actor{Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			expectErr:      internalerrors.ErrUnauthorized,
 		},
 		{
 			name:           "organization not found",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -787,7 +788,7 @@ func TestOrganizationMemberService_RemoveMember(t *testing.T) {
 		},
 		{
 			name:           "forbidden",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -798,7 +799,7 @@ func TestOrganizationMemberService_RemoveMember(t *testing.T) {
 		},
 		{
 			name:           "repository error fetching member",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -809,7 +810,7 @@ func TestOrganizationMemberService_RemoveMember(t *testing.T) {
 		},
 		{
 			name:           "not found when member is missing",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -820,7 +821,7 @@ func TestOrganizationMemberService_RemoveMember(t *testing.T) {
 		},
 		{
 			name:           "not found when member belongs to another organization",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -831,7 +832,7 @@ func TestOrganizationMemberService_RemoveMember(t *testing.T) {
 		},
 		{
 			name:           "delete error",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -843,7 +844,7 @@ func TestOrganizationMemberService_RemoveMember(t *testing.T) {
 		},
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationMemberHooks) {
@@ -867,7 +868,7 @@ func TestOrganizationMemberService_RemoveMember(t *testing.T) {
 			}
 
 			svc := newTestOrganizationMemberService(userService, orgtests.NewAccessControlServiceStub(), orgRepo, memberRepo, nil)
-			err := svc.RemoveMember(context.Background(), tt.actorUserID, tt.organizationID, tt.memberID)
+			err := svc.RemoveMember(context.Background(), tt.actor, tt.organizationID, tt.memberID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)

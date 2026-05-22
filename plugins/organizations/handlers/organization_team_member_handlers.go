@@ -19,8 +19,8 @@ func (h *AddOrganizationTeamMemberHandler) Handle() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
+		actor, ok := models.GetActorFromContext(ctx)
+		if !ok || actor == nil || actor.ID == "" {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
 			reqCtx.Handled = true
 			return
@@ -41,7 +41,7 @@ func (h *AddOrganizationTeamMemberHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		teamMember, err := h.OrgTeamMemberService.AddTeamMember(ctx, userID, organizationID, teamID, request)
+		teamMember, err := h.OrgTeamMemberService.AddTeamMember(ctx, *actor, organizationID, teamID, request)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -60,8 +60,8 @@ func (h *GetAllOrganizationTeamMembersHandler) Handle() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
+		actor, ok := models.GetActorFromContext(ctx)
+		if !ok || actor == nil || actor.ID == "" {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
 			reqCtx.Handled = true
 			return
@@ -71,7 +71,7 @@ func (h *GetAllOrganizationTeamMembersHandler) Handle() http.HandlerFunc {
 		teamID := r.PathValue("team_id")
 		page := util.GetQueryInt(r, "page", 1)
 		limit := util.GetQueryInt(r, "limit", 10)
-		teamMembers, err := h.OrgTeamMemberService.GetAllTeamMembers(ctx, userID, organizationID, teamID, page, limit)
+		teamMembers, err := h.OrgTeamMemberService.GetAllTeamMembers(ctx, *actor, organizationID, teamID, page, limit)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -90,8 +90,8 @@ func (h *GetOrganizationTeamMemberHandler) Handle() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
+		actor, ok := models.GetActorFromContext(ctx)
+		if !ok || actor == nil || actor.ID == "" {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
 			reqCtx.Handled = true
 			return
@@ -100,7 +100,7 @@ func (h *GetOrganizationTeamMemberHandler) Handle() http.HandlerFunc {
 		organizationID := r.PathValue("organization_id")
 		teamID := r.PathValue("team_id")
 		memberID := r.PathValue("member_id")
-		teamMember, err := h.OrgTeamMemberService.GetTeamMember(ctx, userID, organizationID, teamID, memberID)
+		teamMember, err := h.OrgTeamMemberService.GetTeamMember(ctx, *actor, organizationID, teamID, memberID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -119,8 +119,8 @@ func (h *DeleteOrganizationTeamMemberHandler) Handle() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
+		actor, ok := models.GetActorFromContext(ctx)
+		if !ok || actor == nil || actor.ID == "" {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
 			reqCtx.Handled = true
 			return
@@ -129,7 +129,7 @@ func (h *DeleteOrganizationTeamMemberHandler) Handle() http.HandlerFunc {
 		organizationID := r.PathValue("organization_id")
 		teamID := r.PathValue("team_id")
 		memberID := r.PathValue("member_id")
-		if err := h.OrgTeamMemberService.RemoveTeamMember(ctx, userID, organizationID, teamID, memberID); err != nil {
+		if err := h.OrgTeamMemberService.RemoveTeamMember(ctx, *actor, organizationID, teamID, memberID); err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
 		}

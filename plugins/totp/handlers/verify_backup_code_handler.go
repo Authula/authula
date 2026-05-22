@@ -55,7 +55,7 @@ func (h *VerifyBackupCodeHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetUserIDInContext(result.User.ID)
+		reqCtx.SetActorInContext(&models.Actor{ID: result.User.ID, Type: models.ActorUser})
 		reqCtx.Values[models.ContextSessionID.String()] = result.Session.ID
 		reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken
 		reqCtx.Values[models.ContextAuthSuccess.String()] = true

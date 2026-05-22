@@ -25,7 +25,7 @@ func MarshalToJSON(t *testing.T, payload any) []byte {
 	return body
 }
 
-func NewHandlerRequest(t *testing.T, method string, path string, body []byte, userID *string) (*http.Request, *httptest.ResponseRecorder, *models.RequestContext) {
+func NewHandlerRequest(t *testing.T, method string, path string, body []byte, actor *models.Actor) (*http.Request, *httptest.ResponseRecorder, *models.RequestContext) {
 	t.Helper()
 
 	reader := bytes.NewReader(body)
@@ -40,7 +40,9 @@ func NewHandlerRequest(t *testing.T, method string, path string, body []byte, us
 		Headers:        req.Header,
 		ClientIP:       "127.0.0.1",
 		Values:         make(map[string]any),
-		UserID:         userID,
+	}
+	if actor != nil {
+		reqCtx.SetActorInContext(actor)
 	}
 
 	ctx := models.SetRequestContext(context.Background(), reqCtx)

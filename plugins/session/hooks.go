@@ -58,8 +58,8 @@ func (p *SessionPlugin) signedOutMatcher(reqCtx *models.RequestContext) bool {
 }
 
 func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error {
-	// Cooperative auth: if UserID already set by another auth plugin, skip
-	if reqCtx.UserID != nil {
+	// Cooperative auth: If a Principal is already resolved by a previous plugin, skip execution
+	if reqCtx.Actor != nil {
 		return nil
 	}
 
@@ -71,7 +71,6 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 	}
 
 	sessionToken := cookie.Value
-
 	hashedToken := p.tokenService.Hash(sessionToken)
 	session, err := p.sessionService.GetByToken(reqCtx.Request.Context(), hashedToken)
 	if err != nil || session == nil {
@@ -86,7 +85,10 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 		return nil
 	}
 
-	reqCtx.SetUserIDInContext(session.UserID)
+	reqCtx.SetActorInContext(&models.Actor{
+		ID:   session.UserID,
+		Type: models.ActorUser,
+	})
 	reqCtx.Values[models.ContextSessionID.String()] = session.ID
 
 	// Optionally renew session if it's past 50% of its max age
@@ -98,34 +100,33 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 }
 
 func (p *SessionPlugin) validateSessionHookOptional(reqCtx *models.RequestContext) error {
-	// Cooperative auth: if UserID already set by another auth plugin, skip
-	if reqCtx.UserID != nil {
+	// Cooperative auth: If a Principal is already resolved, skip execution
+	if reqCtx.Actor != nil {
 		return nil
 	}
 
 	cookie, err := reqCtx.Request.Cookie(p.globalConfig.Session.CookieName)
 	if err != nil {
-		// No cookie, skip silently
-		return nil
+		return nil // No cookie, skip silently
 	}
 
 	sessionToken := cookie.Value
 	hashedToken := p.tokenService.Hash(sessionToken)
 	session, err := p.sessionService.GetByToken(reqCtx.Request.Context(), hashedToken)
 	if err != nil || session == nil {
-		// Invalid session, skip silently
-		return nil
+		return nil // Invalid session, skip silently
 	}
 
 	if session.ExpiresAt.Before(time.Now().UTC()) {
-		// Expired session, skip silently
-		return nil
+		return nil // Expired session, skip silently
 	}
 
-	reqCtx.SetUserIDInContext(session.UserID)
+	reqCtx.SetActorInContext(&models.Actor{
+		ID:   session.UserID,
+		Type: models.ActorUser,
+	})
 	reqCtx.Values[models.ContextSessionID.String()] = session.ID
 
-	// Optionally renew session if it's past 50% of its max age
 	if p.shouldRenewSession(session) {
 		p.renewSession(reqCtx.ResponseWriter, reqCtx.Request, session)
 	}
@@ -134,7 +135,8 @@ func (p *SessionPlugin) validateSessionHookOptional(reqCtx *models.RequestContex
 }
 
 func (p *SessionPlugin) issueSessionCookieHook(reqCtx *models.RequestContext) error {
-	if reqCtx.UserID == nil {
+	// Check if a principal exists before trying to execute cookie emission
+	if reqCtx.Actor == nil {
 		return nil
 	}
 

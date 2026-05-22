@@ -440,10 +440,10 @@ func (h *RevokeSessionHandler) Handler() http.HandlerFunc {
 }
 
 func stateActorUserID(reqCtx *models.RequestContext) *string {
-	if reqCtx == nil || reqCtx.UserID == nil || *reqCtx.UserID == "" {
+	if reqCtx == nil || reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
 		return nil
 	}
-	return reqCtx.UserID
+	return &reqCtx.Actor.ID
 }
 
 func respondStateError(reqCtx *models.RequestContext, err error) {

@@ -8,6 +8,7 @@ import (
 
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
+	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"
 )
@@ -36,8 +37,8 @@ func NewOrganizationTeamService(
 	return &organizationTeamService{orgRepo: orgRepo, orgTeamRepo: orgTeamRepo, orgMemberRepo: orgMemberRepo, orgTeamMemberRepo: orgTeamMemberRepo, serviceUtils: serviceUtils, txRunner: txRunner}
 }
 
-func (s *organizationTeamService) CreateTeam(ctx context.Context, actorUserID string, organizationID string, request types.CreateOrganizationTeamRequest) (*types.OrganizationTeam, error) {
-	organization, actorMember, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID)
+func (s *organizationTeamService) CreateTeam(ctx context.Context, actor models.Actor, organizationID string, request types.CreateOrganizationTeamRequest) (*types.OrganizationTeam, error) {
+	organization, actorMember, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +85,7 @@ func (s *organizationTeamService) CreateTeam(ctx context.Context, actorUserID st
 		}
 
 		if actorMember == nil {
-			actorMember, err = memberRepo.GetByOrganizationIDAndUserID(ctx, organization.ID, actorUserID)
+			actorMember, err = memberRepo.GetByOrganizationIDAndUserID(ctx, organization.ID, actor.ID)
 			if err != nil {
 				return err
 			}
@@ -122,16 +123,16 @@ func (s *organizationTeamService) CreateTeam(ctx context.Context, actorUserID st
 	return created, nil
 }
 
-func (s *organizationTeamService) GetAllTeams(ctx context.Context, actorUserID string, organizationID string) ([]types.OrganizationTeam, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
+func (s *organizationTeamService) GetAllTeams(ctx context.Context, actor models.Actor, organizationID string) ([]types.OrganizationTeam, error) {
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
 	return s.orgTeamRepo.GetAllByOrganizationID(ctx, organizationID)
 }
 
-func (s *organizationTeamService) GetTeam(ctx context.Context, actorUserID string, organizationID string, teamID string) (*types.OrganizationTeam, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
+func (s *organizationTeamService) GetTeam(ctx context.Context, actor models.Actor, organizationID string, teamID string) (*types.OrganizationTeam, error) {
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -146,8 +147,8 @@ func (s *organizationTeamService) GetTeam(ctx context.Context, actorUserID strin
 	return team, nil
 }
 
-func (s *organizationTeamService) UpdateTeam(ctx context.Context, actorUserID string, organizationID string, teamID string, request types.UpdateOrganizationTeamRequest) (*types.OrganizationTeam, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
+func (s *organizationTeamService) UpdateTeam(ctx context.Context, actor models.Actor, organizationID string, teamID string, request types.UpdateOrganizationTeamRequest) (*types.OrganizationTeam, error) {
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -197,8 +198,8 @@ func (s *organizationTeamService) UpdateTeam(ctx context.Context, actorUserID st
 	return updated, nil
 }
 
-func (s *organizationTeamService) DeleteTeam(ctx context.Context, actorUserID string, organizationID string, teamID string) error {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID); err != nil {
+func (s *organizationTeamService) DeleteTeam(ctx context.Context, actor models.Actor, organizationID string, teamID string) error {
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return err
 	}
 

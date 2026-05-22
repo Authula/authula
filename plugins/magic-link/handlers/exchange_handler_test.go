@@ -34,8 +34,8 @@ func TestExchangeHandler(t *testing.T) {
 				if reqCtx.ResponseStatus != http.StatusOK {
 					t.Fatalf("expected status OK, got %d", reqCtx.ResponseStatus)
 				}
-				if reqCtx.UserID == nil || *reqCtx.UserID != "user-123" {
-					t.Fatalf("expected user id to be set, got %v", reqCtx.UserID)
+				if reqCtx.Actor == nil || reqCtx.Actor.ID != "user-123" {
+					t.Fatalf("expected user id to be set, got %v", reqCtx.Actor)
 				}
 				if reqCtx.Values[models.ContextSessionID.String()] != "sess-456" {
 					t.Fatalf("expected session id in context, got %v", reqCtx.Values[models.ContextSessionID.String()])

@@ -18,8 +18,8 @@ func (h *GetTOTPURIHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
+		principal, ok := models.GetActorFromContext(ctx)
+		if !ok || principal == nil || principal.ID == "" {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
 				"message": "Unauthorized",
 			})
@@ -27,7 +27,7 @@ func (h *GetTOTPURIHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		totpURI, err := h.UseCase.GetTOTPURI(ctx, userID, h.GlobalConfig.AppName)
+		totpURI, err := h.UseCase.GetTOTPURI(ctx, principal.ID, h.GlobalConfig.AppName)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),

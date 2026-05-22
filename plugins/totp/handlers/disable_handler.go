@@ -16,8 +16,8 @@ func (h *DisableHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
+		principal, ok := models.GetActorFromContext(ctx)
+		if !ok || principal == nil || principal.ID == "" {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
 				"message": "Unauthorized",
 			})
@@ -25,7 +25,7 @@ func (h *DisableHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		if err := h.UseCase.Disable(ctx, userID); err != nil {
+		if err := h.UseCase.Disable(ctx, principal.ID); err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),
 			})

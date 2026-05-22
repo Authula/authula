@@ -96,7 +96,7 @@ func (p *SessionPlugin) AuthMiddleware() func(http.Handler) http.Handler {
 				p.renewSession(w, r, session)
 			}
 
-			ctx := context.WithValue(r.Context(), models.ContextUserID, session.UserID)
+			ctx := context.WithValue(r.Context(), models.ContextAuthActor, &models.Actor{ID: session.UserID, Type: models.ActorUser, Permissions: []string{}})
 			ctx = context.WithValue(ctx, models.ContextSessionID, session.ID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -113,7 +113,7 @@ func (p *SessionPlugin) OptionalAuthMiddleware() func(http.Handler) http.Handler
 					p.renewSession(w, r, session)
 				}
 
-				ctx := context.WithValue(r.Context(), models.ContextUserID, session.UserID)
+				ctx := context.WithValue(r.Context(), models.ContextAuthActor, &models.Actor{ID: session.UserID, Type: models.ActorUser, Permissions: []string{}})
 				ctx = context.WithValue(ctx, models.ContextSessionID, session.ID)
 				r = r.WithContext(ctx)
 			}

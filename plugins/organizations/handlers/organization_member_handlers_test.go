@@ -23,7 +23,7 @@ type organizationMemberHandlerFixture struct {
 
 type organizationMemberHandlerCase struct {
 	name            string
-	userID          *string
+	actor           models.Actor
 	body            []byte
 	organizationID  string
 	memberID        string
@@ -37,10 +37,10 @@ func newOrganizationMemberHandlerFixture() *organizationMemberHandlerFixture {
 	return &organizationMemberHandlerFixture{service: &orgtests.MockOrganizationMemberService{}}
 }
 
-func (f *organizationMemberHandlerFixture) newRequest(t *testing.T, method, path string, body []byte, userID *string, organizationID, memberID string) (*http.Request, *httptest.ResponseRecorder, *models.RequestContext) {
+func (f *organizationMemberHandlerFixture) newRequest(t *testing.T, method, path string, body []byte, actor *models.Actor, organizationID, memberID string) (*http.Request, *httptest.ResponseRecorder, *models.RequestContext) {
 	t.Helper()
 
-	req, w, reqCtx := internaltests.NewHandlerRequest(t, method, path, body, userID)
+	req, w, reqCtx := internaltests.NewHandlerRequest(t, method, path, body, actor)
 	if organizationID != "" {
 		req.SetPathValue("organization_id", organizationID)
 	}
@@ -63,7 +63,7 @@ func runOrganizationMemberHandlerCases(t *testing.T, method, path string, buildH
 			}
 
 			handler := buildHandler(fixture)
-			req, w, reqCtx := fixture.newRequest(t, method, path, tt.body, tt.userID, tt.organizationID, tt.memberID)
+			req, w, reqCtx := fixture.newRequest(t, method, path, tt.body, &tt.actor, tt.organizationID, tt.memberID)
 			handler.ServeHTTP(w, req)
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
@@ -93,7 +93,7 @@ func TestAddOrganizationMemberHandler(t *testing.T) {
 		},
 		{
 			name:            "invalid_json",
-			userID:          new("user-1"),
+			actor:           models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:  "org-1",
 			body:            []byte("{"),
 			expectedStatus:  http.StatusUnprocessableEntity,
@@ -101,7 +101,7 @@ func TestAddOrganizationMemberHandler(t *testing.T) {
 		},
 		{
 			name:           "service_error",
-			userID:         new("user-1"),
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			body:           internaltests.MarshalToJSON(t, orgtypes.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"}),
 			prepare: func(fixture *organizationMemberHandlerFixture) {
@@ -112,7 +112,7 @@ func TestAddOrganizationMemberHandler(t *testing.T) {
 		},
 		{
 			name:           "quota_exceeded",
-			userID:         new("user-1"),
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			body:           internaltests.MarshalToJSON(t, orgtypes.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"}),
 			prepare: func(fixture *organizationMemberHandlerFixture) {
@@ -123,7 +123,7 @@ func TestAddOrganizationMemberHandler(t *testing.T) {
 		},
 		{
 			name:           "success_with_role_assignment",
-			userID:         new("user-1"),
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			body:           internaltests.MarshalToJSON(t, orgtypes.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"}),
 			prepare: func(fixture *organizationMemberHandlerFixture) {
@@ -161,7 +161,7 @@ func TestGetAllOrganizationMembersHandler(t *testing.T) {
 		},
 		{
 			name:           "service_error",
-			userID:         new("user-1"),
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			prepare: func(fixture *organizationMemberHandlerFixture) {
 				fixture.service.On("GetAllMembers", mock.Anything, "user-1", "org-1", 1, 10).Return(([]orgtypes.OrganizationMember)(nil), errors.New("some error")).Once()
@@ -171,7 +171,7 @@ func TestGetAllOrganizationMembersHandler(t *testing.T) {
 		},
 		{
 			name:           "success",
-			userID:         new("user-1"),
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			prepare: func(fixture *organizationMemberHandlerFixture) {
 				fixture.service.On("GetAllMembers", mock.Anything, "user-1", "org-1", 1, 10).Return([]orgtypes.OrganizationMember{{ID: "mem-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}}, nil).Once()
@@ -201,7 +201,7 @@ func TestGetOrganizationMemberHandler(t *testing.T) {
 		},
 		{
 			name:           "not_found",
-			userID:         new("user-1"),
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			prepare: func(fixture *organizationMemberHandlerFixture) {
@@ -212,7 +212,7 @@ func TestGetOrganizationMemberHandler(t *testing.T) {
 		},
 		{
 			name:           "success",
-			userID:         new("user-1"),
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			prepare: func(fixture *organizationMemberHandlerFixture) {
@@ -244,7 +244,7 @@ func TestUpdateOrganizationMemberHandler(t *testing.T) {
 		},
 		{
 			name:            "invalid_json",
-			userID:          new("user-1"),
+			actor:           models.Actor{ID: "user-1"},
 			organizationID:  "org-1",
 			memberID:        "mem-1",
 			body:            []byte("{"),
@@ -253,7 +253,7 @@ func TestUpdateOrganizationMemberHandler(t *testing.T) {
 		},
 		{
 			name:           "forbidden",
-			userID:         new("user-1"),
+			actor:          models.Actor{ID: "user-1"},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			body:           internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationMemberRequest{Role: "admin"}),
@@ -265,7 +265,7 @@ func TestUpdateOrganizationMemberHandler(t *testing.T) {
 		},
 		{
 			name:           "success_with_role_assignment",
-			userID:         new("user-1"),
+			actor:          models.Actor{ID: "user-1"},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			body:           internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationMemberRequest{Role: "admin"}),
@@ -303,7 +303,7 @@ func TestDeleteOrganizationMemberHandler(t *testing.T) {
 		},
 		{
 			name:           "service_error",
-			userID:         new("user-1"),
+			actor:          models.Actor{ID: "user-1"},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			prepare: func(fixture *organizationMemberHandlerFixture) {
@@ -314,7 +314,7 @@ func TestDeleteOrganizationMemberHandler(t *testing.T) {
 		},
 		{
 			name:           "success",
-			userID:         new("user-1"),
+			actor:          models.Actor{ID: "user-1"},
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			prepare: func(fixture *organizationMemberHandlerFixture) {

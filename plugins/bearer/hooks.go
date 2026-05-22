@@ -35,8 +35,8 @@ func (p *BearerPlugin) buildHooks() []models.Hook {
 }
 
 func (p *BearerPlugin) validateBearerToken(reqCtx *models.RequestContext) error {
-	// Cooperative auth: if UserID already set by another auth plugin, skip
-	if reqCtx.UserID != nil {
+	// Cooperative auth: if a Principal is already set by another auth plugin, skip
+	if reqCtx.Actor != nil {
 		return nil
 	}
 
@@ -58,14 +58,14 @@ func (p *BearerPlugin) validateBearerToken(reqCtx *models.RequestContext) error 
 		return nil
 	}
 
-	reqCtx.SetUserIDInContext(userID)
+	reqCtx.SetActorInContext(&models.Actor{ID: userID, Type: models.ActorUser})
 
 	return nil
 }
 
 func (p *BearerPlugin) validateBearerTokenOptional(reqCtx *models.RequestContext) error {
-	// Cooperative auth: if UserID already set by another auth plugin, skip
-	if reqCtx.UserID != nil {
+	// Cooperative auth: if a Principal is already set by another auth plugin, skip
+	if reqCtx.Actor != nil {
 		return nil
 	}
 
@@ -80,7 +80,7 @@ func (p *BearerPlugin) validateBearerTokenOptional(reqCtx *models.RequestContext
 		return nil
 	}
 
-	reqCtx.SetUserIDInContext(userID)
+	reqCtx.SetActorInContext(&models.Actor{ID: userID, Type: models.ActorUser})
 
 	return nil
 }

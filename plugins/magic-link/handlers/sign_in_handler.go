@@ -18,7 +18,7 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		if reqCtx.UserID != nil && *reqCtx.UserID != "" {
+		if reqCtx.Actor != nil && reqCtx.Actor.ID != "" {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": "you're already authenticated.",
 			})

@@ -10,6 +10,7 @@ import (
 
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
+	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/constants"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"
@@ -33,8 +34,8 @@ func NewOrganizationService(orgRepo repositories.OrganizationRepository, orgMemb
 	return &organizationService{orgRepo: orgRepo, orgMemberRepo: orgMemberRepo, serviceUtils: serviceUtils, accessControlService: accessControlService, organizationsLimit: organizationsLimit, txRunner: txRunner}
 }
 
-func (s *organizationService) CreateOrganization(ctx context.Context, actorUserID string, request types.CreateOrganizationRequest) (*types.Organization, error) {
-	if actorUserID == "" {
+func (s *organizationService) CreateOrganization(ctx context.Context, actor models.Actor, request types.CreateOrganizationRequest) (*types.Organization, error) {
+	if actor.ID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
 
@@ -68,7 +69,7 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actorUserI
 
 	organization := &types.Organization{
 		ID:       util.GenerateUUID(),
-		OwnerID:  actorUserID,
+		OwnerID:  actor.ID,
 		Name:     name,
 		Slug:     slug,
 		Logo:     request.Logo,
@@ -80,7 +81,7 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actorUserI
 
 	var created *types.Organization
 	createFn := func(ctx context.Context, orgRepo repositories.OrganizationRepository, memberRepo repositories.OrganizationMemberRepository) error {
-		if err := s.ensureOrganizationLimit(ctx, actorUserID, orgRepo, memberRepo); err != nil {
+		if err := s.ensureOrganizationLimit(ctx, actor, orgRepo, memberRepo); err != nil {
 			return err
 		}
 
@@ -92,7 +93,7 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actorUserI
 		member := &types.OrganizationMember{
 			ID:             util.GenerateUUID(),
 			OrganizationID: createdOrganization.ID,
-			UserID:         actorUserID,
+			UserID:         actor.ID,
 			Role:           role,
 		}
 
@@ -115,7 +116,7 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actorUserI
 	return created, nil
 }
 
-func (s *organizationService) ensureOrganizationLimit(ctx context.Context, actorUserID string, orgRepo repositories.OrganizationRepository, memberRepo repositories.OrganizationMemberRepository) error {
+func (s *organizationService) ensureOrganizationLimit(ctx context.Context, actor models.Actor, orgRepo repositories.OrganizationRepository, memberRepo repositories.OrganizationMemberRepository) error {
 	if s.organizationsLimit == nil || *s.organizationsLimit <= 0 {
 		return nil
 	}
@@ -130,11 +131,11 @@ func (s *organizationService) ensureOrganizationLimit(ctx context.Context, actor
 	wg := sync.WaitGroup{}
 
 	wg.Go(func() {
-		ownedOrganizations, ownedOrganizationsErr = orgRepo.GetAllByOwnerID(ctx, actorUserID)
+		ownedOrganizations, ownedOrganizationsErr = orgRepo.GetAllByOwnerID(ctx, actor.ID)
 	})
 
 	wg.Go(func() {
-		memberRecords, memberRecordsErr = memberRepo.GetAllByUserID(ctx, actorUserID)
+		memberRecords, memberRecordsErr = memberRepo.GetAllByUserID(ctx, actor.ID)
 	})
 
 	wg.Wait()
@@ -167,17 +168,17 @@ func (s *organizationService) ensureOrganizationLimit(ctx context.Context, actor
 	return nil
 }
 
-func (s *organizationService) GetAllOrganizations(ctx context.Context, actorUserID string) ([]types.Organization, error) {
-	if actorUserID == "" {
+func (s *organizationService) GetAllOrganizations(ctx context.Context, actor models.Actor) ([]types.Organization, error) {
+	if actor.ID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	ownedOrganizations, err := s.orgRepo.GetAllByOwnerID(ctx, actorUserID)
+	ownedOrganizations, err := s.orgRepo.GetAllByOwnerID(ctx, actor.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	memberRecords, err := s.orgMemberRepo.GetAllByUserID(ctx, actorUserID)
+	memberRecords, err := s.orgMemberRepo.GetAllByUserID(ctx, actor.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -220,8 +221,8 @@ func (s *organizationService) GetAllOrganizations(ctx context.Context, actorUser
 	return organizations, nil
 }
 
-func (s *organizationService) GetOrganizationByID(ctx context.Context, actorUserID string, organizationID string) (*types.Organization, error) {
-	organization, err := s.authorizeMember(ctx, actorUserID, organizationID)
+func (s *organizationService) GetOrganizationByID(ctx context.Context, actor models.Actor, organizationID string) (*types.Organization, error) {
+	organization, err := s.authorizeMember(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -229,8 +230,8 @@ func (s *organizationService) GetOrganizationByID(ctx context.Context, actorUser
 	return organization, nil
 }
 
-func (s *organizationService) UpdateOrganization(ctx context.Context, actorUserID string, organizationID string, request types.UpdateOrganizationRequest) (*types.Organization, error) {
-	organization, err := s.authorizeMember(ctx, actorUserID, organizationID)
+func (s *organizationService) UpdateOrganization(ctx context.Context, actor models.Actor, organizationID string, request types.UpdateOrganizationRequest) (*types.Organization, error) {
+	organization, err := s.authorizeMember(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -273,8 +274,8 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, actorUserI
 	return updated, nil
 }
 
-func (s *organizationService) DeleteOrganization(ctx context.Context, actorUserID string, organizationID string) error {
-	_, err := s.serviceUtils.authorizeOwner(ctx, actorUserID, organizationID)
+func (s *organizationService) DeleteOrganization(ctx context.Context, actor models.Actor, organizationID string) error {
+	_, err := s.serviceUtils.authorizeOwner(ctx, actor, organizationID)
 	if err != nil {
 		return err
 	}
@@ -286,8 +287,8 @@ func (s *organizationService) DeleteOrganization(ctx context.Context, actorUserI
 	return nil
 }
 
-func (s *organizationService) authorizeMember(ctx context.Context, actorUserID string, organizationID string) (*types.Organization, error) {
-	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actorUserID, organizationID)
+func (s *organizationService) authorizeMember(ctx context.Context, actor models.Actor, organizationID string) (*types.Organization, error) {
+	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}

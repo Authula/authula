@@ -212,7 +212,7 @@ func TestCSRFPlugin_SafeMethodGenerateTokenOnce(t *testing.T) {
 		ResponseWriter: w1,
 		Path:           "/authenticated",
 		Method:         http.MethodGet,
-		UserID:         userID,
+		Actor:          principalPtr(userID),
 	}
 
 	err := beforeHook.Handler(ctx1)
@@ -236,7 +236,7 @@ func TestCSRFPlugin_SafeMethodGenerateTokenOnce(t *testing.T) {
 		ResponseWriter: w2,
 		Path:           "/authenticated",
 		Method:         http.MethodGet,
-		UserID:         userID,
+		Actor:          principalPtr(userID),
 	}
 
 	err = beforeHook.Handler(ctx2)
@@ -341,7 +341,7 @@ func TestCSRFPlugin_UnsafeMethodValidateToken(t *testing.T) {
 				ResponseWriter: w,
 				Path:           "/authenticated",
 				Method:         tt.method,
-				UserID:         userID,
+				Actor:          principalPtr(userID),
 			}
 
 			err := beforeHook.Handler(ctx)
@@ -442,13 +442,18 @@ func TestCSRFPlugin_HookMatcher_SafeMethods(t *testing.T) {
 			var userID *string
 			if tt.userID != "" {
 				userID = &tt.userID
-				req = req.WithContext(context.WithValue(req.Context(), models.ContextUserID, tt.userID))
+				req = req.WithContext(context.WithValue(req.Context(), models.ContextAuthActor, &models.Actor{ID: tt.userID, Type: models.ActorUser, Permissions: []string{}}))
 			}
 			ctx := &models.RequestContext{
 				Request: req,
 				Path:    tt.path,
 				Method:  tt.method,
-				UserID:  userID,
+				Actor: func() *models.Actor {
+					if userID == nil {
+						return nil
+					}
+					return &models.Actor{ID: *userID, Type: models.ActorUser, Permissions: []string{}}
+				}(),
 			}
 
 			result := beforeHook.Matcher(ctx)
@@ -647,7 +652,7 @@ func TestCSRFPlugin_UnsafeMethodWithFormToken(t *testing.T) {
 		ResponseWriter: w,
 		Path:           "/authenticated",
 		Method:         http.MethodPost,
-		UserID:         userID,
+		Actor:          principalPtr(userID),
 	}
 
 	err := beforeHook.Handler(ctx)
@@ -911,7 +916,7 @@ func TestCSRFPlugin_BeforeHookMatcherSkipsUnauthenticatedPaths(t *testing.T) {
 			ctx := &models.RequestContext{
 				Path:   tt.path,
 				Method: tt.method,
-				UserID: userID,
+				Actor:  principalPtr(userID),
 			}
 			result := beforeHook.Matcher(ctx)
 			if result != tt.expected {
@@ -998,7 +1003,7 @@ func TestCSRFPlugin_TokenGenerationRequiresAuthentication(t *testing.T) {
 				ResponseWriter: w,
 				Path:           "/authenticated-endpoint",
 				Method:         tt.method,
-				UserID:         tt.userID,
+				Actor:          principalPtr(tt.userID),
 			}
 
 			// Check if matcher allows this request to run the hook
@@ -1061,7 +1066,7 @@ func TestCSRFPlugin_UnauthenticatedEndpointsSkipValidation(t *testing.T) {
 				Request:        req,
 				ResponseWriter: w,
 				Path:           tt.path,
-				UserID:         nil, // unauthenticated
+				Actor:          nil, // unauthenticated
 			}
 
 			// Matcher should return false (skip hook) for unauthenticated paths
@@ -1152,7 +1157,7 @@ func TestCSRFPlugin_AuthenticatedUnsafeMethodStillValidates(t *testing.T) {
 				ResponseWriter: w,
 				Path:           "/api/protected",
 				Method:         tt.method,
-				UserID:         userID,
+				Actor:          principalPtr(userID),
 			}
 
 			err := beforeHook.Handler(ctx)
@@ -1176,6 +1181,14 @@ func TestCSRFPlugin_AuthenticatedUnsafeMethodStillValidates(t *testing.T) {
 // Helper function to create a string pointer
 func stringPtr(s string) *string {
 	return &s
+}
+
+func principalPtr(userID *string) *models.Actor {
+	if userID == nil {
+		return nil
+	}
+
+	return &models.Actor{ID: *userID, Type: models.ActorUser, Permissions: []string{}}
 }
 
 // TestCSRFPlugin_ScopedTokenValidation tests that CSRF token generation only happens for safe methods with auth.
@@ -1223,7 +1236,7 @@ func TestCSRFPlugin_ScopedTokenValidation(t *testing.T) {
 				Request: req,
 				Path:    tt.path,
 				Method:  tt.method,
-				UserID:  tt.userID,
+				Actor:   principalPtr(tt.userID),
 			}
 
 			result := beforeHook.Matcher(ctx)
@@ -1270,7 +1283,7 @@ func TestCSRFPlugin_MiddlewareTokenGeneration(t *testing.T) {
 		ResponseHeaders: make(http.Header),
 		Handled:         false,
 	}
-	reqCtx.UserID = &userID
+	reqCtx.SetActorInContext(&models.Actor{ID: userID, Type: models.ActorUser})
 
 	// Set the RequestContext in the request context as the router would
 	req = req.WithContext(models.NewContextWithRequestContext(req.Context(), reqCtx))
@@ -1362,7 +1375,7 @@ func TestCSRFPlugin_MiddlewareValidation(t *testing.T) {
 					ResponseHeaders: make(http.Header),
 					Handled:         false,
 				}
-				reqCtx.UserID = &userID
+				reqCtx.SetActorInContext(&models.Actor{ID: userID, Type: models.ActorUser})
 
 				// Set the RequestContext in the request context as the router would
 				req = req.WithContext(models.NewContextWithRequestContext(req.Context(), reqCtx))
@@ -1426,7 +1439,7 @@ func TestCSRFPlugin_MiddlewareSafeMethods(t *testing.T) {
 	for _, method := range safeMethods {
 		t.Run(method, func(t *testing.T) {
 			req := httptest.NewRequest(method, "/api/custom", nil)
-			req = req.WithContext(setContextValue(req.Context(), models.ContextUserID, "user-123"))
+			req = req.WithContext(setContextValue(req.Context(), models.ContextAuthActor, &models.Actor{ID: "user-123", Type: models.ActorUser, Permissions: []string{}}))
 			w := httptest.NewRecorder()
 
 			handlerCalled := false
@@ -1607,7 +1620,7 @@ func TestCSRFPlugin_TokenValidationStillRequiredWithHeaderProtection(t *testing.
 		ResponseWriter: w,
 		Method:         "POST",
 		Path:           "/api/test",
-		UserID:         stringPtr("user123"),
+		Actor:          principalPtr(stringPtr("user123")),
 	}
 
 	// Validate - should fail due to missing token, not missing headers

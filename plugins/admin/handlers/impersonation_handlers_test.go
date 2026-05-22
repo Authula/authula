@@ -117,7 +117,7 @@ func TestStartImpersonationHandler_InvalidJSON(t *testing.T) {
 
 	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", []byte("{invalid"), nil)
 	userID := "actor-1"
-	reqCtx.UserID = &userID
+	reqCtx.SetActorInContext(&models.Actor{ID: userID, Type: models.ActorUser})
 
 	handler.Handler()(w, req)
 
@@ -135,7 +135,7 @@ func TestStartImpersonationHandler_UseCaseError(t *testing.T) {
 
 	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}), nil)
 	userID := "actor-1"
-	reqCtx.UserID = &userID
+	reqCtx.SetActorInContext(&models.Actor{ID: userID, Type: models.ActorUser})
 
 	handler.Handler()(w, req)
 
@@ -172,7 +172,7 @@ func TestStartImpersonationHandler_SuccessSetsContextValues(t *testing.T) {
 	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}), nil)
 	req.Header.Set("User-Agent", userAgent)
 	actorID := "actor-1"
-	reqCtx.UserID = &actorID
+	reqCtx.SetActorInContext(&models.Actor{ID: actorID, Type: models.ActorUser})
 	reqCtx.Values[models.ContextSessionID.String()] = actorSessionID
 
 	handler.Handler()(w, req)
@@ -180,8 +180,8 @@ func TestStartImpersonationHandler_SuccessSetsContextValues(t *testing.T) {
 	if reqCtx.ResponseStatus != http.StatusCreated {
 		t.Fatalf("expected status %d, got %d", http.StatusCreated, reqCtx.ResponseStatus)
 	}
-	if reqCtx.UserID == nil || *reqCtx.UserID != "target-1" {
-		t.Fatalf("expected user id to be target-1, got %v", reqCtx.UserID)
+	if reqCtx.Actor == nil || reqCtx.Actor.ID != "target-1" {
+		t.Fatalf("expected user id to be target-1, got %v", reqCtx.Actor)
 	}
 	if reqCtx.Values[models.ContextSessionID.String()] != sessionID {
 		t.Fatalf("expected session id to be updated, got %v", reqCtx.Values[models.ContextSessionID.String()])
@@ -227,7 +227,7 @@ func TestStopImpersonationHandler(t *testing.T) {
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
 		req.SetPathValue("impersonation_id", "imp-1")
 		actorID := "actor-1"
-		reqCtx.UserID = &actorID
+		reqCtx.SetActorInContext(&models.Actor{ID: actorID, Type: models.ActorUser})
 
 		handler.Handler()(w, req)
 
@@ -245,7 +245,7 @@ func TestStopImpersonationHandler(t *testing.T) {
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
 		req.SetPathValue("impersonation_id", "imp-1")
-		reqCtx.UserID = &actorID
+		reqCtx.SetActorInContext(&models.Actor{ID: actorID, Type: models.ActorUser})
 		reqCtx.Values[models.ContextSessionID.String()] = "session-1"
 
 		handler.Handler()(w, req)
@@ -268,7 +268,7 @@ func TestStopImpersonationHandler(t *testing.T) {
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
 		req.SetPathValue("impersonation_id", "imp-1")
-		reqCtx.UserID = &actorID
+		reqCtx.SetActorInContext(&models.Actor{ID: actorID, Type: models.ActorUser})
 		reqCtx.Values[models.ContextSessionID.String()] = "session-1"
 
 		handler.Handler()(w, req)

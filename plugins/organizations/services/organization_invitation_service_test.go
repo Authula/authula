@@ -113,7 +113,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 
 	tests := []struct {
 		name                 string
-		actorUserID          string
+		actor                models.Actor
 		organizationID       string
 		request              types.CreateOrganizationInvitationRequest
 		invitationExpiresIn  time.Duration
@@ -128,14 +128,14 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 	}{
 		{
 			name:           "unauthorized",
-			actorUserID:    "",
+			actor:          models.Actor{Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
 			expectErr:      internalerrors.ErrUnauthorized,
 		},
 		{
 			name:                "invalid role is rejected",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: 36 * time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "ghost"},
@@ -146,7 +146,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                 "higher role is forbidden",
-			actorUserID:          "user-1",
+			actor:                models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:       "org-1",
 			invitationExpiresIn:  36 * time.Hour,
 			request:              types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "manager"},
@@ -158,7 +158,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                 "access control forbidden is normalized",
-			actorUserID:          "user-1",
+			actor:                models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:       "org-1",
 			invitationExpiresIn:  36 * time.Hour,
 			request:              types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "manager"},
@@ -170,7 +170,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:           "forbidden for non owner",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
@@ -180,7 +180,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "org member can create",
-			actorUserID:         "user-2",
+			actor:               models.Actor{ID: "user-2", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
@@ -195,7 +195,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "success",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: 36 * time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
@@ -218,7 +218,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "members limit zero is treated as unlimited",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
@@ -235,7 +235,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "members limit allows create within quota",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
@@ -253,7 +253,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "members limit blocks when quota exceeded",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
@@ -268,7 +268,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "member quota still blocks before invitations quota",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
@@ -284,7 +284,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "invitations limit zero is treated as unlimited",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
@@ -301,7 +301,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "invitations limit allows create within quota",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
@@ -319,7 +319,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "invitations limit blocks when quota exceeded",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
@@ -334,7 +334,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "pending invitation still conflicts within invitations limit",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
@@ -350,7 +350,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "invitations limit repository count error is returned",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
@@ -365,7 +365,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "sends email and publishes event",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: 36 * time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member", RedirectURL: "https://app.example.com/welcome"},
@@ -405,7 +405,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "skips missing mailer",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: 36 * time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
@@ -422,7 +422,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "uses callback when configured",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: 36 * time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member", RedirectURL: "https://app.example.com/welcome"},
@@ -460,7 +460,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "callback error falls back to mailer",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: 36 * time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
@@ -496,7 +496,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                "callback skips built-in mailer",
-			actorUserID:         "user-1",
+			actor:               models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID:      "org-1",
 			invitationExpiresIn: 36 * time.Hour,
 			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member", RedirectURL: "https://app.example.com/welcome"},
@@ -592,7 +592,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				memberRepo,
 				serviceUtils,
 			)
-			inv, err := svc.CreateOrganizationInvitation(context.Background(), tt.actorUserID, tt.organizationID, tt.request)
+			inv, err := svc.CreateOrganizationInvitation(context.Background(), tt.actor, tt.organizationID, tt.request)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.Nil(t, inv)
@@ -626,7 +626,7 @@ func TestOrganizationInvitationService_GetOrganizationInvitation(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		actorUserID    string
+		actor          models.Actor
 		organizationID string
 		invitationID   string
 		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationInvitationRepository, *orgtests.MockOrganizationMemberRepository)
@@ -636,7 +636,7 @@ func TestOrganizationInvitationService_GetOrganizationInvitation(t *testing.T) {
 	}{
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			invitationID:   "inv-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -648,7 +648,7 @@ func TestOrganizationInvitationService_GetOrganizationInvitation(t *testing.T) {
 		},
 		{
 			name:           "rejected invitation is returned",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			invitationID:   "inv-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -660,7 +660,7 @@ func TestOrganizationInvitationService_GetOrganizationInvitation(t *testing.T) {
 		},
 		{
 			name:           "org member can get",
-			actorUserID:    "user-2",
+			actor:          models.Actor{ID: "user-2", Type: models.ActorUser},
 			organizationID: "org-1",
 			invitationID:   "inv-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -673,7 +673,7 @@ func TestOrganizationInvitationService_GetOrganizationInvitation(t *testing.T) {
 		},
 		{
 			name:           "pending invitation is returned as pending",
-			actorUserID:    "user-2",
+			actor:          models.Actor{ID: "user-2", Type: models.ActorUser},
 			organizationID: "org-1",
 			invitationID:   "inv-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -702,7 +702,7 @@ func TestOrganizationInvitationService_GetOrganizationInvitation(t *testing.T) {
 			}
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
-			invitation, err := svc.GetOrganizationInvitation(context.Background(), tt.actorUserID, tt.organizationID, tt.invitationID)
+			invitation, err := svc.GetOrganizationInvitation(context.Background(), tt.actor, tt.organizationID, tt.invitationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -726,7 +726,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 
 	tests := []struct {
 		name           string
-		actorUserID    string
+		actor          models.Actor
 		organizationID string
 		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationInvitationRepository, *orgtests.MockOrganizationMemberRepository)
 		expectErr      error
@@ -734,7 +734,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 	}{
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -744,7 +744,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 		},
 		{
 			name:           "rejected invitation is returned",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -754,7 +754,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 		},
 		{
 			name:           "org member can list",
-			actorUserID:    "user-2",
+			actor:          models.Actor{ID: "user-2", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
@@ -763,10 +763,10 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 			},
 			expectLen: 1,
 		},
-		{name: "unauthorized", actorUserID: "", organizationID: "org-1", expectErr: internalerrors.ErrUnauthorized},
+		{name: "unauthorized", actor: models.Actor{Type: models.ActorUser}, organizationID: "org-1", expectErr: internalerrors.ErrUnauthorized},
 		{
 			name:           "organization not found",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(nil, nil).Once()
@@ -775,7 +775,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 		},
 		{
 			name:           "organization lookup error",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return((*types.Organization)(nil), repoErr).Once()
@@ -784,7 +784,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 		},
 		{
 			name:           "forbidden",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
@@ -794,7 +794,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 		},
 		{
 			name:           "repo error",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -821,7 +821,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 			}
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
-			invitations, err := svc.GetAllOrganizationInvitations(context.Background(), tt.actorUserID, tt.organizationID)
+			invitations, err := svc.GetAllOrganizationInvitations(context.Background(), tt.actor, tt.organizationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -846,7 +846,7 @@ func TestOrganizationInvitationService_RevokeOrganizationInvitation(t *testing.T
 
 	tests := []struct {
 		name           string
-		actorUserID    string
+		actor          models.Actor
 		organizationID string
 		invitationID   string
 		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationInvitationRepository, *orgtests.MockOrganizationMemberRepository, *orgtests.MockOrganizationInvitationHooks)
@@ -855,7 +855,7 @@ func TestOrganizationInvitationService_RevokeOrganizationInvitation(t *testing.T
 	}{
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			invitationID:   "inv-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
@@ -869,7 +869,7 @@ func TestOrganizationInvitationService_RevokeOrganizationInvitation(t *testing.T
 		},
 		{
 			name:           "org member can revoke",
-			actorUserID:    "user-2",
+			actor:          models.Actor{ID: "user-2", Type: models.ActorUser},
 			organizationID: "org-1",
 			invitationID:   "inv-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
@@ -884,7 +884,7 @@ func TestOrganizationInvitationService_RevokeOrganizationInvitation(t *testing.T
 		},
 		{
 			name:           "expired pending conflict",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			invitationID:   "inv-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
@@ -898,7 +898,7 @@ func TestOrganizationInvitationService_RevokeOrganizationInvitation(t *testing.T
 		},
 		{
 			name:           "update error",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			invitationID:   "inv-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
@@ -929,7 +929,7 @@ func TestOrganizationInvitationService_RevokeOrganizationInvitation(t *testing.T
 			}
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
-			invitation, err := svc.RevokeOrganizationInvitation(context.Background(), tt.actorUserID, tt.organizationID, tt.invitationID)
+			invitation, err := svc.RevokeOrganizationInvitation(context.Background(), tt.actor, tt.organizationID, tt.invitationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -953,7 +953,7 @@ func TestOrganizationInvitationService_AcceptPendingOrganizationInvitationsForEm
 
 	tests := []struct {
 		name                     string
-		userID                   string
+		actor                    models.Actor
 		email                    string
 		requireEmailVerification bool
 		setup                    func(*internaltests.MockUserService, *orgtests.MockOrganizationRepository, *orgtests.MockOrganizationInvitationRepository, *orgtests.MockOrganizationMemberRepository, *orgtests.MockOrganizationInvitationHooks, *orgtests.MockOrganizationMemberHooks)
@@ -962,14 +962,14 @@ func TestOrganizationInvitationService_AcceptPendingOrganizationInvitationsForEm
 	}{
 		{
 			name:      "bad request invalid email",
-			userID:    "user-2",
+			actor:     models.Actor{ID: "user-2", Type: models.ActorUser},
 			email:     "not-an-email",
 			expectErr: internalerrors.ErrBadRequest,
 		},
 		{
-			name:   "success",
-			userID: "user-2",
-			email:  "USER@EXAMPLE.COM",
+			name:  "success",
+			actor: models.Actor{ID: "user-2", Type: models.ActorUser},
+			email: "USER@EXAMPLE.COM",
 			setup: func(userSvc *internaltests.MockUserService, orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
 				invRepo.On("GetAllPendingByEmail", mock.Anything, "user@example.com").Return([]types.OrganizationInvitation{{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)}}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(nil, nil).Once()
@@ -984,7 +984,7 @@ func TestOrganizationInvitationService_AcceptPendingOrganizationInvitationsForEm
 		},
 		{
 			name:                     "forbidden when email verification is required and user is unverified",
-			userID:                   "user-2",
+			actor:                    models.Actor{ID: "user-2", Type: models.ActorUser},
 			email:                    "USER@EXAMPLE.COM",
 			requireEmailVerification: true,
 			setup: func(userSvc *internaltests.MockUserService, orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
@@ -1015,7 +1015,7 @@ func TestOrganizationInvitationService_AcceptPendingOrganizationInvitationsForEm
 
 			txRunner := &orgtests.MockOrganizationInvitationTxRunner{}
 			svc := newTestOrganizationInvitationService(txRunner, pluginConfig, userSvc, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
-			accepted, err := svc.AcceptPendingOrganizationInvitationsForEmail(context.Background(), tt.userID, tt.email)
+			accepted, err := svc.AcceptPendingOrganizationInvitationsForEmail(context.Background(), tt.actor, tt.email)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorContains(t, err, tt.expectErr.Error())
@@ -1035,7 +1035,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 
 	tests := []struct {
 		name                     string
-		actorUserID              string
+		actor                    models.Actor
 		organization             string
 		invitationID             string
 		requireEmailVerification bool
@@ -1046,14 +1046,14 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 	}{
 		{
 			name:         "unauthorized",
-			actorUserID:  "",
+			actor:        models.Actor{Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			expectErr:    internalerrors.ErrUnauthorized,
 		},
 		{
 			name:         "success",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
@@ -1069,7 +1069,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "forbidden when emails differ",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
@@ -1080,7 +1080,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "user lookup error",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
@@ -1090,7 +1090,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "user not found",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
@@ -1100,7 +1100,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "user missing email",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
@@ -1110,7 +1110,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "invitation lookup error",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
@@ -1121,7 +1121,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "invitation not found",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
@@ -1132,7 +1132,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "invitation from other organization",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
@@ -1143,7 +1143,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "expired pending conflict",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
@@ -1157,7 +1157,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "member lookup error",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
@@ -1169,7 +1169,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "member create error",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
@@ -1184,7 +1184,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "update error",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
@@ -1202,7 +1202,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "members quota exceeded",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			membersLimit: &limit,
@@ -1216,7 +1216,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "existing member is still accepted at capacity",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			membersLimit: &limit,
@@ -1232,7 +1232,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 		},
 		{
 			name:                     "forbidden when email verification is required and user is unverified",
-			actorUserID:              "user-2",
+			actor:                    models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization:             "org-1",
 			invitationID:             "inv-1",
 			requireEmailVerification: true,
@@ -1264,7 +1264,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 			}
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, userSvc, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
-			invitation, err := svc.AcceptOrganizationInvitation(context.Background(), tt.actorUserID, tt.organization, tt.invitationID)
+			invitation, err := svc.AcceptOrganizationInvitation(context.Background(), tt.actor, tt.organization, tt.invitationID)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				return
@@ -1283,7 +1283,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 
 	tests := []struct {
 		name         string
-		actorUserID  string
+		actor        models.Actor
 		organization string
 		invitationID string
 		setup        func(*internaltests.MockUserService, *orgtests.MockOrganizationInvitationRepository)
@@ -1292,14 +1292,14 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 	}{
 		{
 			name:         "unauthorized",
-			actorUserID:  "",
+			actor:        models.Actor{Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			expectErr:    internalerrors.ErrUnauthorized,
 		},
 		{
 			name:         "success",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository) {
@@ -1313,7 +1313,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "user lookup error",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository) {
@@ -1323,7 +1323,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "user not found",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository) {
@@ -1333,7 +1333,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "user missing email",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository) {
@@ -1343,7 +1343,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "invitation lookup error",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository) {
@@ -1354,7 +1354,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "invitation not found",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository) {
@@ -1365,7 +1365,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "invitation from other organization",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository) {
@@ -1376,7 +1376,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "expired pending conflict",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository) {
@@ -1390,7 +1390,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "email mismatch forbidden",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository) {
@@ -1401,7 +1401,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 		},
 		{
 			name:         "update error",
-			actorUserID:  "user-2",
+			actor:        models.Actor{ID: "user-2", Type: models.ActorUser},
 			organization: "org-1",
 			invitationID: "inv-1",
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository) {
@@ -1430,7 +1430,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 			}
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, userSvc, orgtests.NewAccessControlServiceStub(), &orgtests.MockOrganizationRepository{}, invRepo, &orgtests.MockOrganizationMemberRepository{})
-			invitation, err := svc.RejectOrganizationInvitation(context.Background(), tt.actorUserID, tt.organization, tt.invitationID)
+			invitation, err := svc.RejectOrganizationInvitation(context.Background(), tt.actor, tt.organization, tt.invitationID)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				return

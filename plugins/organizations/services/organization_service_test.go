@@ -9,6 +9,7 @@ import (
 
 	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
+	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/constants"
 	orgtests "github.com/Authula/authula/plugins/organizations/tests"
 	"github.com/Authula/authula/plugins/organizations/types"
@@ -50,7 +51,7 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 
 	tests := []struct {
 		name              string
-		actorUserID       string
+		actor             models.Actor
 		organizationLimit *int
 		request           types.CreateOrganizationRequest
 		setup             func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository, *orgtests.MockOrganizationHooks, *ServiceUtils)
@@ -59,32 +60,32 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 		expectReturned    string
 	}{
 		{
-			name:        "unauthorized",
-			actorUserID: "",
-			request:     types.CreateOrganizationRequest{Name: "Acme", Role: "member"},
-			expectErr:   internalerrors.ErrUnauthorized,
+			name:      "unauthorized",
+			actor:     models.Actor{Type: models.ActorUser},
+			request:   types.CreateOrganizationRequest{Name: "Acme", Role: "member"},
+			expectErr: internalerrors.ErrUnauthorized,
 		},
 		{
-			name:        "missing role",
-			actorUserID: "user-1",
-			request:     types.CreateOrganizationRequest{Name: "Acme"},
-			expectErr:   internalerrors.ErrUnprocessableEntity,
+			name:      "missing role",
+			actor:     models.Actor{ID: "user-1", Type: models.ActorUser},
+			request:   types.CreateOrganizationRequest{Name: "Acme"},
+			expectErr: internalerrors.ErrUnprocessableEntity,
 		},
 		{
-			name:        "bad request",
-			actorUserID: "user-1",
-			request:     types.CreateOrganizationRequest{Name: "", Role: "member"},
-			expectErr:   internalerrors.ErrUnprocessableEntity,
+			name:      "bad request",
+			actor:     models.Actor{ID: "user-1", Type: models.ActorUser},
+			request:   types.CreateOrganizationRequest{Name: "", Role: "member"},
+			expectErr: internalerrors.ErrUnprocessableEntity,
 		},
 		{
-			name:        "invalid role",
-			actorUserID: "user-1",
-			request:     types.CreateOrganizationRequest{Name: "Acme", Role: "ghost"},
-			expectErr:   internalerrors.ErrUnprocessableEntity,
+			name:      "invalid role",
+			actor:     models.Actor{ID: "user-1", Type: models.ActorUser},
+			request:   types.CreateOrganizationRequest{Name: "Acme", Role: "ghost"},
+			expectErr: internalerrors.ErrUnprocessableEntity,
 		},
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			request:        types.CreateOrganizationRequest{Name: "Acme Inc", Role: "member", Metadata: map[string]any{"tier": "pro"}},
 			setup:          successSetup,
 			expectCalled:   true,
@@ -92,7 +93,7 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 		},
 		{
 			name:              "zero limit treated as unlimited",
-			actorUserID:       "user-1",
+			actor:             models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationLimit: &zeroLimit,
 			request:           types.CreateOrganizationRequest{Name: "Acme Inc", Role: "member", Metadata: map[string]any{"tier": "pro"}},
 			setup:             successSetup,
@@ -101,7 +102,7 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 		},
 		{
 			name:              "success within limit",
-			actorUserID:       "user-1",
+			actor:             models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationLimit: &threeLimit,
 			request:           types.CreateOrganizationRequest{Name: "Acme Labs", Role: "member"},
 			setup:             limitSuccessSetup,
@@ -110,7 +111,7 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 		},
 		{
 			name:              "quota exceeded across owned and member organizations",
-			actorUserID:       "user-1",
+			actor:             models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationLimit: &twoLimit,
 			request:           types.CreateOrganizationRequest{Name: "Acme Platform", Role: "member"},
 			setup:             quotaExceededSetup,
@@ -132,7 +133,7 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 			}
 
 			svc := NewOrganizationService(repo, memberRepo, serviceUtils, accessControlService, tt.organizationLimit, txRunner)
-			org, err := svc.CreateOrganization(context.Background(), tt.actorUserID, tt.request)
+			org, err := svc.CreateOrganization(context.Background(), tt.actor, tt.request)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -160,20 +161,20 @@ func TestOrganizationService_GetAllOrganizations(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		actorUserID string
-		setup       func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository)
-		expectErr   error
-		expectLen   int
+		name      string
+		actor     models.Actor
+		setup     func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository)
+		expectErr error
+		expectLen int
 	}{
 		{
-			name:        "unauthorized",
-			actorUserID: "",
-			expectErr:   internalerrors.ErrUnauthorized,
+			name:      "unauthorized",
+			actor:     models.Actor{Type: models.ActorUser},
+			expectErr: internalerrors.ErrUnauthorized,
 		},
 		{
-			name:        "success",
-			actorUserID: "user-1",
+			name:  "success",
+			actor: models.Actor{ID: "user-1", Type: models.ActorUser},
 			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				repo.On("GetAllByOwnerID", mock.Anything, "user-1").Return([]types.Organization{{ID: "org-1", OwnerID: "user-1", Name: "Acme"}}, nil).Once()
 				memberRepo.On("GetAllByUserID", mock.Anything, "user-1").Return([]types.OrganizationMember{{ID: "mem-1", OrganizationID: "org-2", UserID: "user-1", Role: "member"}}, nil).Once()
@@ -195,7 +196,7 @@ func TestOrganizationService_GetAllOrganizations(t *testing.T) {
 
 			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
 			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, nil, nil)
-			organizations, err := svc.GetAllOrganizations(context.Background(), tt.actorUserID)
+			organizations, err := svc.GetAllOrganizations(context.Background(), tt.actor)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -214,14 +215,14 @@ func TestOrganizationService_GetOrganizationByID(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		actorUserID    string
+		actor          models.Actor
 		organizationID string
 		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository)
 		expectErr      error
 	}{
 		{
 			name:           "forbidden",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
@@ -231,7 +232,7 @@ func TestOrganizationService_GetOrganizationByID(t *testing.T) {
 		},
 		{
 			name:           "success for member",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
@@ -240,7 +241,7 @@ func TestOrganizationService_GetOrganizationByID(t *testing.T) {
 		},
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -260,7 +261,7 @@ func TestOrganizationService_GetOrganizationByID(t *testing.T) {
 
 			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
 			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, nil, nil)
-			org, err := svc.GetOrganizationByID(context.Background(), tt.actorUserID, tt.organizationID)
+			org, err := svc.GetOrganizationByID(context.Background(), tt.actor, tt.organizationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -277,7 +278,7 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		actorUserID    string
+		actor          models.Actor
 		organizationID string
 		request        types.UpdateOrganizationRequest
 		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository, *orgtests.MockOrganizationHooks, *ServiceUtils)
@@ -285,21 +286,21 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 	}{
 		{
 			name:           "unauthorized if not user ID provided",
-			actorUserID:    "",
+			actor:          models.Actor{Type: models.ActorUser},
 			organizationID: "",
 			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
 			expectErr:      internalerrors.ErrUnauthorized,
 		},
 		{
 			name:           "unauthorized if no organization ID provided",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "",
 			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
 			expectErr:      internalerrors.ErrUnauthorized,
 		},
 		{
 			name:           "forbidden",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
 			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
@@ -310,7 +311,7 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 		},
 		{
 			name:           "success for member",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
 			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
@@ -323,7 +324,7 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 		},
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
 			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
@@ -349,7 +350,7 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 			}
 
 			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, nil, nil)
-			org, err := svc.UpdateOrganization(context.Background(), tt.actorUserID, tt.organizationID, tt.request)
+			org, err := svc.UpdateOrganization(context.Background(), tt.actor, tt.organizationID, tt.request)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -366,14 +367,14 @@ func TestOrganizationService_DeleteOrganization(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		actorUserID    string
+		actor          models.Actor
 		organizationID string
 		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationHooks, *ServiceUtils)
 		expectErr      error
 	}{
 		{
 			name:           "success",
-			actorUserID:    "user-1",
+			actor:          models.Actor{ID: "user-1", Type: models.ActorUser},
 			organizationID: "org-1",
 			setup: func(repo *orgtests.MockOrganizationRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
 				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -394,7 +395,7 @@ func TestOrganizationService_DeleteOrganization(t *testing.T) {
 			}
 
 			svc := NewOrganizationService(repo, nil, serviceUtils, nil, nil, nil)
-			err := svc.DeleteOrganization(context.Background(), tt.actorUserID, tt.organizationID)
+			err := svc.DeleteOrganization(context.Background(), tt.actor, tt.organizationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)

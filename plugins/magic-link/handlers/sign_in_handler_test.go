@@ -88,7 +88,7 @@ func TestSignInHandler(t *testing.T) {
 			name:        "already authenticated returns bad request",
 			requestBody: internaltests.MarshalToJSON(t, types.SignInRequest{Email: "test@example.com"}),
 			setup: func(t *testing.T, reqCtx *models.RequestContext, userService *internaltests.MockUserService, accountService *internaltests.MockAccountService, tokenService *internaltests.MockTokenService, verificationService *internaltests.MockVerificationService) {
-				reqCtx.UserID = &name
+				reqCtx.SetActorInContext(&models.Actor{ID: name, Type: models.ActorUser})
 			},
 			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
 				if reqCtx.ResponseStatus != http.StatusBadRequest {

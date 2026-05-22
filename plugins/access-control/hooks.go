@@ -103,7 +103,8 @@ func accessControlAssignRoleContext(value any) (models.AccessControlAssignRoleCo
 func (p *AccessControlPlugin) requireAccessControl(reqCtx *models.RequestContext) error {
 	ctx := reqCtx.Request.Context()
 
-	if reqCtx.UserID == nil || *reqCtx.UserID == "" {
+	principal := reqCtx.Actor
+	if principal == nil || principal.ID == "" {
 		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
 		reqCtx.Handled = true
 		return nil
@@ -115,7 +116,18 @@ func (p *AccessControlPlugin) requireAccessControl(reqCtx *models.RequestContext
 		return nil
 	}
 
-	allowed, err := p.Api.HasPermissions(ctx, *reqCtx.UserID, requiredPermissions)
+	if len(principal.Permissions) > 0 {
+		for _, permission := range requiredPermissions {
+			if !principal.HasPermission(permission) {
+				reqCtx.SetJSONResponse(http.StatusForbidden, map[string]any{"message": "Forbidden"})
+				reqCtx.Handled = true
+				return nil
+			}
+		}
+		return nil
+	}
+
+	allowed, err := p.Api.HasPermissions(ctx, principal.ID, requiredPermissions)
 	if err != nil {
 		reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": err.Error()})
 		reqCtx.Handled = true

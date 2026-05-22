@@ -99,7 +99,7 @@ func TestUpsertUserStateHandler(t *testing.T) {
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/users/user-1", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
-		reqCtx.UserID = &actorID
+		reqCtx.SetActorInContext(&models.Actor{ID: actorID, Type: models.ActorUser})
 		handler.Handler()(w, req)
 
 		internaltests.AssertErrorMessage(t, reqCtx, http.StatusBadRequest, "bad request")
@@ -121,7 +121,7 @@ func TestUpsertUserStateHandler(t *testing.T) {
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/users/user-1", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
 		actorID := "actor-1"
-		reqCtx.UserID = &actorID
+		reqCtx.SetActorInContext(&models.Actor{ID: actorID, Type: models.ActorUser})
 		handler.Handler()(w, req)
 
 		if reqCtx.ResponseStatus != http.StatusOK {
@@ -241,7 +241,7 @@ func TestBanUserHandler(t *testing.T) {
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/ban", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
-		reqCtx.UserID = &actorID
+		reqCtx.SetActorInContext(&models.Actor{ID: actorID, Type: models.ActorUser})
 		handler.Handler()(w, req)
 
 		internaltests.AssertErrorMessage(t, reqCtx, http.StatusBadRequest, "bad request")
@@ -263,7 +263,7 @@ func TestBanUserHandler(t *testing.T) {
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/ban", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
 		actorID := "actor-1"
-		reqCtx.UserID = &actorID
+		reqCtx.SetActorInContext(&models.Actor{ID: actorID, Type: models.ActorUser})
 		handler.Handler()(w, req)
 
 		if reqCtx.ResponseStatus != http.StatusOK {
@@ -311,7 +311,7 @@ func TestUnbanUserHandler(t *testing.T) {
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/unban", nil, nil)
 		req.SetPathValue("user_id", "user-1")
 		actorID := "actor-1"
-		reqCtx.UserID = &actorID
+		reqCtx.SetActorInContext(&models.Actor{ID: actorID, Type: models.ActorUser})
 		handler.Handler()(w, req)
 
 		if reqCtx.ResponseStatus != http.StatusOK {
@@ -409,7 +409,7 @@ func TestUpsertSessionStateHandler(t *testing.T) {
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/sessions/session-1", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("session_id", "session-1")
-		reqCtx.UserID = &actorID
+		reqCtx.SetActorInContext(&models.Actor{ID: actorID, Type: models.ActorUser})
 		handler.Handler()(w, req)
 
 		internaltests.AssertErrorMessage(t, reqCtx, http.StatusBadRequest, "bad request")
@@ -429,7 +429,7 @@ func TestUpsertSessionStateHandler(t *testing.T) {
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/sessions/session-1", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("session_id", "session-1")
 		actorID := "actor-1"
-		reqCtx.UserID = &actorID
+		reqCtx.SetActorInContext(&models.Actor{ID: actorID, Type: models.ActorUser})
 		handler.Handler()(w, req)
 
 		if reqCtx.ResponseStatus != http.StatusOK {
@@ -612,7 +612,7 @@ func TestRevokeSessionHandler(t *testing.T) {
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/sessions/session-1/revoke", internaltests.MarshalToJSON(t, types.RevokeSessionRequest{Reason: &reason}), nil)
 		req.SetPathValue("session_id", "session-1")
 		actorID := "actor-1"
-		reqCtx.UserID = &actorID
+		reqCtx.SetActorInContext(&models.Actor{ID: actorID, Type: models.ActorUser})
 		handler.Handler()(w, req)
 
 		if reqCtx.ResponseStatus != http.StatusOK {

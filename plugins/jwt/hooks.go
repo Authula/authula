@@ -21,7 +21,7 @@ func (id JWTHookID) String() string {
 }
 
 func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
-	if reqCtx.UserID == nil {
+	if reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
 		return nil
 	}
 
@@ -34,15 +34,15 @@ func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
 		return nil
 	}
 
-	tokenPair, err := p.jwtService.GenerateTokens(context.Background(), *reqCtx.UserID, sessionID)
+	tokenPair, err := p.jwtService.GenerateTokens(context.Background(), reqCtx.Actor.ID, sessionID)
 	if err != nil {
-		p.Logger.Error("failed to generate JWT tokens", "user_id", *reqCtx.UserID, "session_id", sessionID, "error", err)
+		p.Logger.Error("failed to generate JWT tokens", "user_id", reqCtx.Actor.ID, "session_id", sessionID, "error", err)
 		return fmt.Errorf("failed to generate authentication tokens: %w", err)
 	}
 
 	expiresAt := time.Now().Add(p.pluginConfig.RefreshExpiresIn)
 	if err := p.refreshService.StoreInitialRefreshToken(reqCtx.Request.Context(), tokenPair.RefreshToken, sessionID, expiresAt); err != nil {
-		p.Logger.Error("failed to store refresh token", "user_id", *reqCtx.UserID, "session_id", sessionID, "error", err)
+		p.Logger.Error("failed to store refresh token", "user_id", reqCtx.Actor.ID, "session_id", sessionID, "error", err)
 		return fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
@@ -53,7 +53,7 @@ func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
 }
 
 func (p *JWTPlugin) respondHook(reqCtx *models.RequestContext) error {
-	if reqCtx.UserID == nil {
+	if reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
 		return nil
 	}
 
