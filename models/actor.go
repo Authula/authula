@@ -1,8 +1,6 @@
 package models
 
 import (
-	"context"
-	"net/http"
 	"slices"
 )
 
@@ -38,36 +36,4 @@ func (actor *Actor) HasPermission(permission string) bool {
 	}
 
 	return slices.Contains(actor.Permissions, permission)
-}
-
-// SetActorInContext updates the actor in both the RequestContext and the underlying Go context stream.
-func (reqCtx *RequestContext) SetActorInContext(actor *Actor) {
-	reqCtx.Actor = actor
-	if reqCtx.Actor.Permissions == nil {
-		reqCtx.Actor.Permissions = make([]string, 0)
-	}
-	if reqCtx.Actor.Metadata == nil {
-		reqCtx.Actor.Metadata = make(map[string]any)
-	}
-	reqCtx.Request = reqCtx.Request.WithContext(context.WithValue(reqCtx.Request.Context(), ContextAuthActor, actor))
-}
-
-// GetActorFromContext extracts the actor from the Go context or RequestContext fallback.
-func GetActorFromContext(ctx context.Context) (*Actor, bool) {
-	if val := ctx.Value(ContextAuthActor); val != nil {
-		if actor, ok := val.(*Actor); ok {
-			return actor, ok
-		}
-	}
-
-	if reqCtx, ok := GetRequestContext(ctx); ok && reqCtx.Actor != nil {
-		return reqCtx.Actor, true
-	}
-
-	return nil, false
-}
-
-// GetActorFromRequest extracts the actor directly from an incoming HTTP request.
-func GetActorFromRequest(req *http.Request) (*Actor, bool) {
-	return GetActorFromContext(req.Context())
 }

@@ -256,14 +256,6 @@ func (auth *Auth) GetActorFromContext(ctx context.Context) (*models.Actor, bool)
 	return models.GetActorFromContext(ctx)
 }
 
-// GetUserIDFromRequest retrieves the user ID from an HTTP request's context.
-// Returns the user ID and a boolean indicating whether it was found.
-// This is a convenience wrapper around models.GetUserIDFromRequest to avoid
-// requiring application code to import the models package.
-func (auth *Auth) GetUserIDFromRequest(req *http.Request) (string, bool) {
-	return models.GetUserIDFromRequest(req)
-}
-
 // GetActorFromRequest retrieves the Actor from an HTTP request's context.
 // Returns the Actor and a boolean indicating whether it was found.
 // This is a convenience wrapper around models.GetActorFromRequest to avoid
