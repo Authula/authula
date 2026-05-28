@@ -58,8 +58,8 @@ func (p *SessionPlugin) signedOutMatcher(reqCtx *models.RequestContext) bool {
 }
 
 func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error {
-	// Cooperative auth: if UserID already set by another auth plugin, skip
-	if reqCtx.UserID != nil {
+	// Cooperative auth: if Actor already set by another auth plugin, skip
+	if reqCtx.Actor != nil && reqCtx.Actor.ID != "" {
 		return nil
 	}
 
@@ -71,7 +71,6 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 	}
 
 	sessionToken := cookie.Value
-
 	hashedToken := p.tokenService.Hash(sessionToken)
 	session, err := p.sessionService.GetByToken(reqCtx.Request.Context(), hashedToken)
 	if err != nil || session == nil {
@@ -86,7 +85,10 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 		return nil
 	}
 
-	reqCtx.SetUserIDInContext(session.UserID)
+	reqCtx.SetActorInContext(&models.Actor{
+		ID:   session.UserID,
+		Type: models.ActorUser,
+	})
 	reqCtx.Values[models.ContextSessionID.String()] = session.ID
 
 	// Optionally renew session if it's past 50% of its max age
@@ -98,8 +100,8 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 }
 
 func (p *SessionPlugin) validateSessionHookOptional(reqCtx *models.RequestContext) error {
-	// Cooperative auth: if UserID already set by another auth plugin, skip
-	if reqCtx.UserID != nil {
+	// Cooperative auth: if Actor already set by another auth plugin, skip
+	if reqCtx.Actor != nil && reqCtx.Actor.ID != "" {
 		return nil
 	}
 
@@ -122,7 +124,10 @@ func (p *SessionPlugin) validateSessionHookOptional(reqCtx *models.RequestContex
 		return nil
 	}
 
-	reqCtx.SetUserIDInContext(session.UserID)
+	reqCtx.SetActorInContext(&models.Actor{
+		ID:   session.UserID,
+		Type: models.ActorUser,
+	})
 	reqCtx.Values[models.ContextSessionID.String()] = session.ID
 
 	// Optionally renew session if it's past 50% of its max age
@@ -134,7 +139,7 @@ func (p *SessionPlugin) validateSessionHookOptional(reqCtx *models.RequestContex
 }
 
 func (p *SessionPlugin) issueSessionCookieHook(reqCtx *models.RequestContext) error {
-	if reqCtx.UserID == nil {
+	if reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
 		return nil
 	}
 

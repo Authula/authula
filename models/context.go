@@ -83,14 +83,6 @@ func GetRequestContext(ctx context.Context) (*RequestContext, bool) {
 	return rc, ok
 }
 
-// GetOrganizationIDFromContext extracts the active tenant ID from the context if it exists.
-func GetOrganizationIDFromContext(ctx context.Context) (string, bool) {
-	if actor, ok := GetActorFromContext(ctx); ok && actor.OrganizationID != nil {
-		return *actor.OrganizationID, true
-	}
-	return "", false
-}
-
 // SetResponse sets the captured response fields that will be written once
 // the request lifecycle (including hooks) completes.
 func (reqCtx *RequestContext) SetResponse(status int, headers http.Header, body []byte) {
@@ -147,8 +139,41 @@ func (reqCtx *RequestContext) SetUserIDInContext(userID string) {
 	reqCtx.Request = reqCtx.Request.WithContext(context.WithValue(reqCtx.Request.Context(), ContextUserID, userID))
 }
 
-// GetUserIDFromRequest extracts the user ID from an HTTP request's context.
-// It returns the user ID and a boolean indicating whether it was found.
-func GetUserIDFromRequest(req *http.Request) (string, bool) {
-	return GetUserIDFromContext(req.Context())
+// SetActorInContext updates the actor in both the RequestContext and the underlying Go context stream.
+func (reqCtx *RequestContext) SetActorInContext(actor *Actor) {
+	reqCtx.Actor = actor
+	if reqCtx.Actor == nil {
+		return
+	}
+	if reqCtx.Actor.Permissions == nil {
+		reqCtx.Actor.Permissions = make([]string, 0)
+	}
+	if reqCtx.Actor.Metadata == nil {
+		reqCtx.Actor.Metadata = make(map[string]any)
+	}
+	reqCtx.Request = reqCtx.Request.WithContext(context.WithValue(reqCtx.Request.Context(), ContextAuthActor, actor))
+	if reqCtx.Actor.ID != "" {
+		reqCtx.UserID = &reqCtx.Actor.ID
+		reqCtx.Request = reqCtx.Request.WithContext(context.WithValue(reqCtx.Request.Context(), ContextUserID, reqCtx.Actor.ID))
+	}
+}
+
+// GetActorFromContext extracts the actor from the Go context or RequestContext fallback.
+func GetActorFromContext(ctx context.Context) (*Actor, bool) {
+	if val := ctx.Value(ContextAuthActor); val != nil {
+		if actor, ok := val.(*Actor); ok {
+			return actor, ok
+		}
+	}
+
+	if reqCtx, ok := GetRequestContext(ctx); ok && reqCtx.Actor != nil {
+		return reqCtx.Actor, true
+	}
+
+	return nil, false
+}
+
+// GetActorFromRequest extracts the actor directly from an incoming HTTP request.
+func GetActorFromRequest(req *http.Request) (*Actor, bool) {
+	return GetActorFromContext(req.Context())
 }
