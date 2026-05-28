@@ -10,6 +10,7 @@ type ContextKey string
 
 const (
 	ContextUserID                       ContextKey = "user_id"
+	ContextAuthActor                    ContextKey = "auth.actor"
 	ContextSessionID                    ContextKey = "session_id"
 	ContextSessionToken                 ContextKey = "session_token"
 	ContextRequestContext               ContextKey = "request_context"
@@ -37,7 +38,9 @@ type RequestContext struct {
 	Headers http.Header
 
 	// User information (may be nil if not authenticated)
-	UserID   *string
+	UserID *string
+	// Actor identity resolved by authentication, may be nil if unauthenticated
+	Actor    *Actor
 	ClientIP string
 
 	// Generic key-value storage for hooks to share data
@@ -78,6 +81,14 @@ func SetRequestContext(ctx context.Context, rc *RequestContext) context.Context 
 func GetRequestContext(ctx context.Context) (*RequestContext, bool) {
 	rc, ok := ctx.Value(ContextRequestContext).(*RequestContext)
 	return rc, ok
+}
+
+// GetOrganizationIDFromContext extracts the active tenant ID from the context if it exists.
+func GetOrganizationIDFromContext(ctx context.Context) (string, bool) {
+	if actor, ok := GetActorFromContext(ctx); ok && actor.OrganizationID != nil {
+		return *actor.OrganizationID, true
+	}
+	return "", false
 }
 
 // SetResponse sets the captured response fields that will be written once
