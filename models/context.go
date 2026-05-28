@@ -11,7 +11,6 @@ type ContextKey string
 const (
 	ContextUserID                       ContextKey = "user_id"
 	ContextAuthActor                    ContextKey = "auth.actor"
-	ContextPrincipal                    ContextKey = "auth.principal"
 	ContextSessionID                    ContextKey = "session_id"
 	ContextSessionToken                 ContextKey = "session_token"
 	ContextRequestContext               ContextKey = "request_context"

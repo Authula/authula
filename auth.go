@@ -240,28 +240,12 @@ func (auth *Auth) RegisterHooks(hooks []models.Hook) {
 	auth.router.RegisterHooks(hooks)
 }
 
-// GetPrincipalFromContext retrieves the principal from a context.
-// Returns the principal and a boolean indicating whether it was found.
-// This is a convenience wrapper around models.GetPrincipalFromContext to avoid
-// requiring application code to import the models package.
-func (auth *Auth) GetPrincipalFromContext(ctx context.Context) (*models.Actor, bool) {
-	return models.GetActorFromContext(ctx)
-}
-
 // GetActorFromContext retrieves the Actor from a context.
 // Returns the Actor and a boolean indicating whether it was found.
 // This is a convenience wrapper around models.GetActorFromContext to avoid
 // requiring application code to import the models package.
 func (auth *Auth) GetActorFromContext(ctx context.Context) (*models.Actor, bool) {
 	return models.GetActorFromContext(ctx)
-}
-
-// GetUserIDFromRequest retrieves the user ID from an HTTP request's context.
-// Returns the user ID and a boolean indicating whether it was found.
-// This is a convenience wrapper around models.GetUserIDFromRequest to avoid
-// requiring application code to import the models package.
-func (auth *Auth) GetPrincipalFromRequest(req *http.Request) (*models.Actor, bool) {
-	return models.GetActorFromRequest(req)
 }
 
 // GetActorFromRequest retrieves the Actor from an HTTP request's context.
