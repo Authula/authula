@@ -18,7 +18,7 @@ func (h *SendEmailVerificationHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		if reqCtx.UserID == nil || *reqCtx.UserID == "" {
+		if reqCtx.Actor == nil || reqCtx.Actor.Type != models.ActorUser {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "unauthorized"})
 			reqCtx.Handled = true
 			return
@@ -36,7 +36,7 @@ func (h *SendEmailVerificationHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		err := h.UseCase.Send(ctx, *reqCtx.UserID, request.CallbackURL)
+		err := h.UseCase.Send(ctx, reqCtx.Actor.ID, request.CallbackURL)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true

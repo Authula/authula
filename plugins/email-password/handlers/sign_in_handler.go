@@ -24,7 +24,7 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		if reqCtx.UserID != nil && *reqCtx.UserID != "" {
+		if reqCtx.Actor != nil && reqCtx.Actor.Type == models.ActorUser {
 			if sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && sessionID != "" {
 				existingSession, err := h.SignInUseCase.GetSessionByID(ctx, sessionID)
 				if err == nil && existingSession != nil && existingSession.ExpiresAt.After(time.Now()) {
@@ -94,7 +94,10 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 			}()
 		}
 
-		reqCtx.SetUserIDInContext(result.User.ID)
+		reqCtx.SetActorInContext(&models.Actor{
+			ID:   result.User.ID,
+			Type: models.ActorUser,
+		})
 		reqCtx.Values[models.ContextSessionID.String()] = result.Session.ID
 		reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken
 		reqCtx.Values[models.ContextAuthSuccess.String()] = true

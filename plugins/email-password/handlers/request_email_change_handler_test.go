@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	internaltests "github.com/Authula/authula/internal/tests"
+	"github.com/Authula/authula/models"
 	plugintests "github.com/Authula/authula/plugins/email-password/tests"
 	"github.com/Authula/authula/plugins/email-password/types"
 )
@@ -16,20 +17,19 @@ import (
 func TestRequestEmailChangeHandler(t *testing.T) {
 	t.Parallel()
 
-	userID := "user-1"
 	tests := []struct {
 		name           string
-		userID         *string
+		actor          *models.Actor
 		body           []byte
 		prepare        func(*plugintests.MockRequestEmailChangeUseCase)
 		expectedStatus int
 	}{
-		{name: "unauthorized", body: internaltests.MarshalToJSON(t, types.RequestEmailChangeRequest{NewEmail: "new@example.com"}), expectedStatus: http.StatusUnauthorized},
-		{name: "invalid_json", userID: &userID, body: []byte("{"), expectedStatus: http.StatusBadRequest},
-		{name: "usecase_error", userID: &userID, body: internaltests.MarshalToJSON(t, types.RequestEmailChangeRequest{NewEmail: "new@example.com"}), prepare: func(m *plugintests.MockRequestEmailChangeUseCase) {
+		{name: "unauthorized", actor: nil, body: internaltests.MarshalToJSON(t, types.RequestEmailChangeRequest{NewEmail: "new@example.com"}), expectedStatus: http.StatusUnauthorized},
+		{name: "invalid_json", actor: &models.Actor{ID: "user-1", Type: models.ActorUser}, body: []byte("{"), expectedStatus: http.StatusBadRequest},
+		{name: "usecase_error", actor: &models.Actor{ID: "user-1", Type: models.ActorUser}, body: internaltests.MarshalToJSON(t, types.RequestEmailChangeRequest{NewEmail: "new@example.com"}), prepare: func(m *plugintests.MockRequestEmailChangeUseCase) {
 			m.On("RequestChange", mock.Anything, "user-1", "new@example.com", (*string)(nil)).Return(errors.New("boom")).Once()
 		}, expectedStatus: http.StatusBadRequest},
-		{name: "success", userID: &userID, body: internaltests.MarshalToJSON(t, types.RequestEmailChangeRequest{NewEmail: "new@example.com"}), prepare: func(m *plugintests.MockRequestEmailChangeUseCase) {
+		{name: "success", actor: &models.Actor{ID: "user-1", Type: models.ActorUser}, body: internaltests.MarshalToJSON(t, types.RequestEmailChangeRequest{NewEmail: "new@example.com"}), prepare: func(m *plugintests.MockRequestEmailChangeUseCase) {
 			m.On("RequestChange", mock.Anything, "user-1", "new@example.com", (*string)(nil)).Return(nil).Once()
 		}, expectedStatus: http.StatusOK},
 	}
@@ -43,7 +43,7 @@ func TestRequestEmailChangeHandler(t *testing.T) {
 				tt.prepare(uc)
 			}
 			handler := &RequestEmailChangeHandler{UseCase: uc}
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/email-password/request-email-change", tt.body, tt.userID)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodPost, "/email-password/request-email-change", tt.body, tt.actor)
 			handler.Handler().ServeHTTP(w, req)
 			require.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			uc.AssertExpectations(t)

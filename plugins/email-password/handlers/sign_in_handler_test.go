@@ -21,18 +21,18 @@ func TestSignInHandler(t *testing.T) {
 
 	user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: false}
 	session := &models.Session{ID: "session-1", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}
-	userID := "user-1"
+	actor := &models.Actor{ID: "user-1", Type: models.ActorUser}
 	tests := []struct {
 		name           string
 		body           []byte
-		userID         *string
+		actor          *models.Actor
 		values         map[string]any
 		pluginConfig   types.EmailPasswordPluginConfig
 		prepare        func(*plugintests.MockSignInUseCase, *plugintests.MockSendEmailVerificationUseCase)
 		expectedStatus int
 	}{
 		{name: "invalid_json", body: []byte("{"), expectedStatus: http.StatusUnprocessableEntity},
-		{name: "existing_session_reuse", body: internaltests.MarshalToJSON(t, types.SignInRequest{Email: "user@example.com", Password: "password123"}), userID: &userID, values: map[string]any{models.ContextSessionID.String(): "session-1"}, prepare: func(m *plugintests.MockSignInUseCase, _ *plugintests.MockSendEmailVerificationUseCase) {
+		{name: "existing_session_reuse", body: internaltests.MarshalToJSON(t, types.SignInRequest{Email: "user@example.com", Password: "password123"}), actor: actor, values: map[string]any{models.ContextSessionID.String(): "session-1"}, prepare: func(m *plugintests.MockSignInUseCase, _ *plugintests.MockSendEmailVerificationUseCase) {
 			m.On("GetSessionByID", mock.Anything, "session-1").Return(session, nil).Once()
 			m.On("GetUserByID", mock.Anything, "user-1").Return(user, nil).Once()
 		}, expectedStatus: http.StatusOK},
@@ -48,20 +48,20 @@ func TestSignInHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			si := &plugintests.MockSignInUseCase{}
-			send := &plugintests.MockSendEmailVerificationUseCase{}
+			mockSignInUseCase := &plugintests.MockSignInUseCase{}
+			mockSendEmailVerificationUseCase := &plugintests.MockSendEmailVerificationUseCase{}
 			if tt.prepare != nil {
-				tt.prepare(si, send)
+				tt.prepare(mockSignInUseCase, mockSendEmailVerificationUseCase)
 			}
-			handler := &SignInHandler{Logger: &internaltests.MockLogger{}, Config: &models.Config{Session: models.SessionConfig{ExpiresIn: time.Hour}}, PluginConfig: tt.pluginConfig, SignInUseCase: si, SendEmailVerificationUseCase: send}
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/email-password/sign-in", tt.body, tt.userID)
+			handler := &SignInHandler{Logger: &internaltests.MockLogger{}, Config: &models.Config{Session: models.SessionConfig{ExpiresIn: time.Hour}}, PluginConfig: tt.pluginConfig, SignInUseCase: mockSignInUseCase, SendEmailVerificationUseCase: mockSendEmailVerificationUseCase}
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodPost, "/email-password/sign-in", tt.body, tt.actor)
 			if tt.values != nil {
 				maps.Copy(reqCtx.Values, tt.values)
 			}
 			handler.Handler().ServeHTTP(w, req)
 			require.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
-			si.AssertExpectations(t)
-			send.AssertExpectations(t)
+			mockSignInUseCase.AssertExpectations(t)
+			mockSendEmailVerificationUseCase.AssertExpectations(t)
 		})
 	}
 }
