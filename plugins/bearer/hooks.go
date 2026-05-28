@@ -36,7 +36,7 @@ func (p *BearerPlugin) buildHooks() []models.Hook {
 
 func (p *BearerPlugin) validateBearerToken(reqCtx *models.RequestContext) error {
 	// Cooperative auth: if Actor already set by another auth plugin, skip
-	if reqCtx.Actor != nil && reqCtx.Actor.ID != "" {
+	if reqCtx.Actor != nil {
 		return nil
 	}
 
@@ -68,7 +68,7 @@ func (p *BearerPlugin) validateBearerToken(reqCtx *models.RequestContext) error 
 
 func (p *BearerPlugin) validateBearerTokenOptional(reqCtx *models.RequestContext) error {
 	// Cooperative auth: if Actor already set by another auth plugin, skip
-	if reqCtx.Actor != nil && reqCtx.Actor.ID != "" {
+	if reqCtx.Actor != nil {
 		return nil
 	}
 

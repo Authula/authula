@@ -59,7 +59,7 @@ func (p *SessionPlugin) signedOutMatcher(reqCtx *models.RequestContext) bool {
 
 func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error {
 	// Cooperative auth: if Actor already set by another auth plugin, skip
-	if reqCtx.Actor != nil && reqCtx.Actor.ID != "" {
+	if reqCtx.Actor != nil {
 		return nil
 	}
 
@@ -101,7 +101,7 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 
 func (p *SessionPlugin) validateSessionHookOptional(reqCtx *models.RequestContext) error {
 	// Cooperative auth: if Actor already set by another auth plugin, skip
-	if reqCtx.Actor != nil && reqCtx.Actor.ID != "" {
+	if reqCtx.Actor != nil {
 		return nil
 	}
 
@@ -139,7 +139,7 @@ func (p *SessionPlugin) validateSessionHookOptional(reqCtx *models.RequestContex
 }
 
 func (p *SessionPlugin) issueSessionCookieHook(reqCtx *models.RequestContext) error {
-	if reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
+	if reqCtx.Actor == nil || reqCtx.Actor.Type != models.ActorUser {
 		return nil
 	}
 
