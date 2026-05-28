@@ -1,4 +1,4 @@
-FROM golang:1.26
+FROM golang:1.26.2
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -7,7 +7,7 @@ WORKDIR /root
 
 RUN apt update && apt install -y \
   apt-transport-https ca-certificates gnupg lsb-release iputils-ping net-tools \
-  curl wget git zip unzip less zsh jq lsof
+  curl wget git zip unzip less zsh jq lsof ripgrep
 
 ENV HOME="/root"
 # Required for some cgo operations such as using certain database drivers like SQLite
