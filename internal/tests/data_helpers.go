@@ -41,6 +41,8 @@ func NewHandlerRequest(t *testing.T, method string, path string, body []byte, us
 		ClientIP:       "127.0.0.1",
 		Values:         make(map[string]any),
 		UserID:         userID,
+		// Set to nil for now until handlers are refactored to use Actor instead of UserID
+		Actor: nil,
 	}
 
 	ctx := models.SetRequestContext(context.Background(), reqCtx)

@@ -48,6 +48,7 @@ func CloneRequestContext(ctx *models.RequestContext) *models.RequestContext {
 		Headers: ctx.Headers,
 		Route:   ctx.Route,
 		UserID:  ctx.UserID,
+		Actor:   ctx.Actor,
 		Handled: ctx.Handled,
 	}
 
