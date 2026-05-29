@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/admin/constants"
 	adminhandlers "github.com/Authula/authula/plugins/admin/handlers"
 	admintests "github.com/Authula/authula/plugins/admin/tests"
 	"github.com/Authula/authula/plugins/admin/types"
@@ -23,7 +23,7 @@ func TestGetUserStateHandler(t *testing.T) {
 		t.Parallel()
 
 		useCase, userStateRepo, _, _ := admintests.NewStateUseCaseFixture()
-		userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return((*types.AdminUserState)(nil), constants.ErrBadRequest).Once()
+		userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return((*types.AdminUserState)(nil), internalerrors.ErrBadRequest).Once()
 		handler := adminhandlers.NewGetUserStateHandler(useCase)
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/user-1", nil, nil)
@@ -94,7 +94,7 @@ func TestUpsertUserStateHandler(t *testing.T) {
 		request := types.UpsertUserStateRequest{Banned: true}
 		actorID := "actor-1"
 		impRepo.On("UserExists", mock.Anything, "user-1").Return(true, nil).Once()
-		userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(constants.ErrBadRequest).Once()
+		userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(internalerrors.ErrBadRequest).Once()
 		handler := adminhandlers.NewUpsertUserStateHandler(useCase)
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/users/user-1", internaltests.MarshalToJSON(t, request), nil)
@@ -142,7 +142,7 @@ func TestDeleteUserStateHandler(t *testing.T) {
 		t.Parallel()
 
 		useCase, userStateRepo, _, _ := admintests.NewStateUseCaseFixture()
-		userStateRepo.On("Delete", mock.Anything, "user-1").Return(constants.ErrNotFound).Once()
+		userStateRepo.On("Delete", mock.Anything, "user-1").Return(internalerrors.ErrNotFound).Once()
 		handler := adminhandlers.NewDeleteUserStateHandler(useCase)
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/states/users/user-1", nil, nil)
@@ -236,7 +236,7 @@ func TestBanUserHandler(t *testing.T) {
 		request := types.BanUserRequest{}
 		actorID := "actor-1"
 		impRepo.On("UserExists", mock.Anything, "user-1").Return(true, nil).Once()
-		userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(constants.ErrBadRequest).Once()
+		userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(internalerrors.ErrBadRequest).Once()
 		handler := adminhandlers.NewBanUserHandler(useCase)
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/ban", internaltests.MarshalToJSON(t, request), nil)
@@ -286,7 +286,7 @@ func TestUnbanUserHandler(t *testing.T) {
 
 		useCase, userStateRepo, _, impRepo := admintests.NewStateUseCaseFixture()
 		impRepo.On("UserExists", mock.Anything, "user-1").Return(true, nil).Once()
-		userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(constants.ErrNotFound).Once()
+		userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(internalerrors.ErrNotFound).Once()
 		handler := adminhandlers.NewUnbanUserHandler(useCase)
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/users/user-1/unban", nil, nil)
@@ -333,7 +333,7 @@ func TestGetSessionStateHandler(t *testing.T) {
 		t.Parallel()
 
 		useCase, _, sessionStateRepo, _ := admintests.NewStateUseCaseFixture()
-		sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return((*types.AdminSessionState)(nil), constants.ErrForbidden).Once()
+		sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return((*types.AdminSessionState)(nil), internalerrors.ErrForbidden).Once()
 		handler := adminhandlers.NewGetSessionStateHandler(useCase)
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/sessions/session-1", nil, nil)
@@ -404,7 +404,7 @@ func TestUpsertSessionStateHandler(t *testing.T) {
 		request := types.UpsertSessionStateRequest{Revoke: true}
 		actorID := "actor-1"
 		sessionStateRepo.On("SessionExists", mock.Anything, "session-1").Return(true, nil).Once()
-		sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(constants.ErrBadRequest).Once()
+		sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(internalerrors.ErrBadRequest).Once()
 		handler := adminhandlers.NewUpsertSessionStateHandler(useCase)
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/admin/states/sessions/session-1", internaltests.MarshalToJSON(t, request), nil)
@@ -450,7 +450,7 @@ func TestDeleteSessionStateHandler(t *testing.T) {
 		t.Parallel()
 
 		useCase, _, sessionStateRepo, _ := admintests.NewStateUseCaseFixture()
-		sessionStateRepo.On("Delete", mock.Anything, "session-1").Return(constants.ErrNotFound).Once()
+		sessionStateRepo.On("Delete", mock.Anything, "session-1").Return(internalerrors.ErrNotFound).Once()
 		handler := adminhandlers.NewDeleteSessionStateHandler(useCase)
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/states/sessions/session-1", nil, nil)
@@ -529,7 +529,7 @@ func TestGetUserAdminSessionsHandler(t *testing.T) {
 
 		useCase, _, sessionStateRepo, impRepo := admintests.NewStateUseCaseFixture()
 		impRepo.On("UserExists", mock.Anything, "user-1").Return(true, nil).Once()
-		sessionStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(([]types.AdminUserSession)(nil), constants.ErrNotFound).Once()
+		sessionStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(([]types.AdminUserSession)(nil), internalerrors.ErrNotFound).Once()
 		handler := adminhandlers.NewGetUserAdminSessionsHandler(useCase)
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/states/users/user-1/sessions", nil, nil)
@@ -588,7 +588,7 @@ func TestRevokeSessionHandler(t *testing.T) {
 		useCase, _, sessionStateRepo, _ := admintests.NewStateUseCaseFixture()
 		reason := "security"
 		sessionStateRepo.On("SessionExists", mock.Anything, "session-1").Return(true, nil).Once()
-		sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(constants.ErrForbidden).Once()
+		sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(internalerrors.ErrForbidden).Once()
 		handler := adminhandlers.NewRevokeSessionHandler(useCase)
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/states/sessions/session-1/revoke", internaltests.MarshalToJSON(t, types.RevokeSessionRequest{Reason: &reason}), nil)

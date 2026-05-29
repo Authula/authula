@@ -3,11 +3,10 @@ package constants
 import "errors"
 
 var (
-	ErrBadRequest   = errors.New("bad request")
-	ErrUnauthorized = errors.New("unauthorized")
-	ErrForbidden    = errors.New("forbidden")
-	ErrNotFound     = errors.New("not found")
-	ErrConflict     = errors.New("conflict")
-
-	ErrUserIDRequired = errors.New("user ID is required")
+	ErrUserIDRequired                 = errors.New("user ID is required")
+	ErrProviderIDRequired             = errors.New("provider ID is required")
+	ErrAccountIDRequired              = errors.New("account ID is required")
+	ErrAccessTokenExpiresAtBeforeNow  = errors.New("access token expiration time must be in the future")
+	ErrRefreshTokenExpiresAtBeforeNow = errors.New("refresh token expiration time must be in the future")
+	ErrNoPropertiesProvided           = errors.New("at least one property must be provided for update")
 )

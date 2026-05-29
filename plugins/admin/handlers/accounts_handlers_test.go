@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/admin/constants"
 	adminhandlers "github.com/Authula/authula/plugins/admin/handlers"
 	admintests "github.com/Authula/authula/plugins/admin/tests"
 	"github.com/Authula/authula/plugins/admin/types"
@@ -17,80 +17,131 @@ import (
 func TestCreateAccountHandler(t *testing.T) {
 	t.Parallel()
 
-	t.Run("invalid body", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name            string
+		body            []byte
+		setup           func(*testing.T, *internaltests.MockAccountRepository, *internaltests.MockUserRepository, *admintests.MockPasswordService)
+		expectedStatus  int
+		expectedMessage string
+		expectAccount   bool
+	}{
+		{
+			name:            "invalid body",
+			body:            []byte("{invalid"),
+			expectedStatus:  http.StatusUnprocessableEntity,
+			expectedMessage: "invalid character 'i' looking for beginning of object key string",
+		},
+		{
+			name: "success",
+			setup: func(t *testing.T, accountRepo *internaltests.MockAccountRepository, userRepo *internaltests.MockUserRepository, passwordSvc *admintests.MockPasswordService) {
+				t.Helper()
+				userRepo.On("GetByID", mock.Anything, "u1").Return(&models.User{ID: "u1"}, nil).Once()
+				accountRepo.On("GetByProviderAndAccountID", mock.Anything, "email", "acct-1").Return((*models.Account)(nil), nil).Once()
+				passwordSvc.On("Hash", "plain").Return("hashed", nil).Once()
+				accountRepo.On("Create", mock.Anything, mock.AnythingOfType("*models.Account")).Return(&models.Account{ID: "acc-1", UserID: "u1"}, nil).Once()
+			},
+			expectedStatus: http.StatusCreated,
+			expectAccount:  true,
+		},
+	}
 
-		useCase, _, _, _, _ := admintests.NewAccountsUseCaseFixture()
-		handler := adminhandlers.NewCreateAccountHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users/u1/accounts", []byte("{invalid"), nil)
-		req.SetPathValue("user_id", "u1")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		handler.Handler()(w, req)
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid request body")
-	})
+			useCase, _, accountRepo, userRepo, passwordSvc := admintests.NewAccountsUseCaseFixture()
+			handler := adminhandlers.NewCreateAccountHandler(useCase)
+			request := types.CreateAccountRequest{ProviderID: "email", AccountID: "acct-1", Password: admintests.PtrString(t, "plain")}
+			body := tc.body
+			if body == nil {
+				body = internaltests.MarshalToJSON(t, request)
+			}
+			if tc.setup != nil {
+				tc.setup(t, accountRepo, userRepo, passwordSvc)
+			}
 
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users/u1/accounts", body, nil)
+			req.SetPathValue("user_id", "u1")
+			handler.Handler()(w, req)
 
-		useCase, _, accountRepo, userRepo, passwordSvc := admintests.NewAccountsUseCaseFixture()
-		handler := adminhandlers.NewCreateAccountHandler(useCase)
-		request := types.CreateAccountRequest{ProviderID: "email", AccountID: "acct-1", Password: admintests.PtrString(t, "plain")}
+			if reqCtx.ResponseStatus != tc.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tc.expectedStatus, reqCtx.ResponseStatus)
+			}
+			if tc.expectedMessage != "" {
+				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedMessage)
+			}
+			if tc.expectAccount {
+				payload := internaltests.DecodeResponseJSON[types.CreateAccountResponse](t, reqCtx)
+				if payload.Account == nil {
+					t.Fatalf("expected account in payload")
+				}
+			}
 
-		userRepo.On("GetByID", mock.Anything, "u1").Return(&models.User{ID: "u1"}, nil).Once()
-		accountRepo.On("GetByProviderAndAccountID", mock.Anything, "email", "acct-1").Return((*models.Account)(nil), nil).Once()
-		passwordSvc.On("Hash", "plain").Return("hashed", nil).Once()
-		accountRepo.On("Create", mock.Anything, mock.AnythingOfType("*models.Account")).Return(&models.Account{ID: "acc-1", UserID: "u1"}, nil).Once()
-
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users/u1/accounts", internaltests.MarshalToJSON(t, request), nil)
-		req.SetPathValue("user_id", "u1")
-		handler.Handler()(w, req)
-
-		if reqCtx.ResponseStatus != http.StatusCreated {
-			t.Fatalf("expected status %d, got %d", http.StatusCreated, reqCtx.ResponseStatus)
-		}
-		payload := internaltests.DecodeResponseJSON[types.CreateAccountResponse](t, reqCtx)
-		if payload.Account == nil {
-			t.Fatalf("expected account in payload")
-		}
-	})
+			accountRepo.AssertExpectations(t)
+			userRepo.AssertExpectations(t)
+			passwordSvc.AssertExpectations(t)
+		})
+	}
 }
 
 func TestGetAccountByIDHandler(t *testing.T) {
 	t.Parallel()
 
-	t.Run("not found", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name            string
+		setup           func(*internaltests.MockAccountRepository)
+		expectedStatus  int
+		expectedMessage string
+		expectAccount   bool
+	}{
+		{
+			name: "not found",
+			setup: func(accountRepo *internaltests.MockAccountRepository) {
+				accountRepo.On("GetByID", mock.Anything, "acc-1").Return((*models.Account)(nil), nil).Once()
+			},
+			expectedStatus:  http.StatusNotFound,
+			expectedMessage: "account not found",
+		},
+		{
+			name: "success",
+			setup: func(accountRepo *internaltests.MockAccountRepository) {
+				accountRepo.On("GetByID", mock.Anything, "acc-1").Return(&models.Account{ID: "acc-1"}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			expectAccount:  true,
+		},
+	}
 
-		useCase, _, accountRepo, _, _ := admintests.NewAccountsUseCaseFixture()
-		handler := adminhandlers.NewGetAccountByIDHandler(useCase)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		accountRepo.On("GetByID", mock.Anything, "acc-1").Return((*models.Account)(nil), nil).Once()
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/accounts/acc-1", nil, nil)
-		req.SetPathValue("id", "acc-1")
-		handler.Handler()(w, req)
+			useCase, _, accountRepo, _, _ := admintests.NewAccountsUseCaseFixture()
+			handler := adminhandlers.NewGetAccountByIDHandler(useCase)
+			if tc.setup != nil {
+				tc.setup(accountRepo)
+			}
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusNotFound, "account not found")
-	})
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/accounts/acc-1", nil, nil)
+			req.SetPathValue("id", "acc-1")
+			handler.Handler()(w, req)
 
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
+			if reqCtx.ResponseStatus != tc.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tc.expectedStatus, reqCtx.ResponseStatus)
+			}
+			if tc.expectedMessage != "" {
+				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedMessage)
+			}
+			if tc.expectAccount {
+				payload := internaltests.DecodeResponseJSON[types.GetAccountByIDResponse](t, reqCtx)
+				if payload.Account == nil {
+					t.Fatalf("expected account in payload")
+				}
+			}
 
-		useCase, _, accountRepo, _, _ := admintests.NewAccountsUseCaseFixture()
-		handler := adminhandlers.NewGetAccountByIDHandler(useCase)
-
-		accountRepo.On("GetByID", mock.Anything, "acc-1").Return(&models.Account{ID: "acc-1"}, nil).Once()
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/accounts/acc-1", nil, nil)
-		req.SetPathValue("id", "acc-1")
-		handler.Handler()(w, req)
-
-		if reqCtx.ResponseStatus != http.StatusOK {
-			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
-		}
-		payload := internaltests.DecodeResponseJSON[types.GetAccountByIDResponse](t, reqCtx)
-		if payload.Account == nil {
-			t.Fatalf("expected account in payload")
-		}
-	})
+			accountRepo.AssertExpectations(t)
+		})
+	}
 }
 
 func TestGetUserAccountsHandler(t *testing.T) {
@@ -118,69 +169,117 @@ func TestGetUserAccountsHandler(t *testing.T) {
 func TestUpdateAccountHandler(t *testing.T) {
 	t.Parallel()
 
-	t.Run("invalid body", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name            string
+		body            []byte
+		setup           func(*internaltests.MockAccountRepository)
+		expectedStatus  int
+		expectedMessage string
+	}{
+		{
+			name:            "invalid body",
+			body:            []byte("{invalid"),
+			expectedStatus:  http.StatusUnprocessableEntity,
+			expectedMessage: "invalid character 'i' looking for beginning of object key string",
+		},
+		{
+			name: "not found",
+			body: func() []byte {
+				scope := "openid"
+				return internaltests.MarshalToJSON(t, types.UpdateAccountRequest{Scope: &scope})
+			}(),
+			setup: func(accountRepo *internaltests.MockAccountRepository) {
+				accountRepo.On("GetByID", mock.Anything, "acc-1").Return((*models.Account)(nil), nil).Once()
+			},
+			expectedStatus:  http.StatusNotFound,
+			expectedMessage: "not found",
+		},
+	}
 
-		useCase, _, _, _, _ := admintests.NewAccountsUseCaseFixture()
-		handler := adminhandlers.NewUpdateAccountHandler(useCase)
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/accounts/acc-1", []byte("{invalid"), nil)
-		req.SetPathValue("id", "acc-1")
-		handler.Handler()(w, req)
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid request body")
-	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("error", func(t *testing.T) {
-		t.Parallel()
+			useCase, _, accountRepo, _, _ := admintests.NewAccountsUseCaseFixture()
+			handler := adminhandlers.NewUpdateAccountHandler(useCase)
+			if tc.setup != nil {
+				tc.setup(accountRepo)
+			}
 
-		useCase, _, accountRepo, _, _ := admintests.NewAccountsUseCaseFixture()
-		handler := adminhandlers.NewUpdateAccountHandler(useCase)
-		scope := "openid"
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/accounts/acc-1", tc.body, nil)
+			req.SetPathValue("id", "acc-1")
+			handler.Handler()(w, req)
 
-		accountRepo.On("GetByID", mock.Anything, "acc-1").Return((*models.Account)(nil), nil).Once()
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/accounts/acc-1", internaltests.MarshalToJSON(t, types.UpdateAccountRequest{Scope: &scope}), nil)
-		req.SetPathValue("id", "acc-1")
-		handler.Handler()(w, req)
+			if reqCtx.ResponseStatus != tc.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tc.expectedStatus, reqCtx.ResponseStatus)
+			}
+			if tc.expectedMessage != "" {
+				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedMessage)
+			}
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusNotFound, "not found")
-	})
+			accountRepo.AssertExpectations(t)
+		})
+	}
 }
 
 func TestDeleteAccountHandler(t *testing.T) {
 	t.Parallel()
 
-	t.Run("error", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name            string
+		setup           func(*internaltests.MockAccountRepository)
+		expectedStatus  int
+		expectedMessage string
+		expectedBody    string
+	}{
+		{
+			name: "error",
+			setup: func(accountRepo *internaltests.MockAccountRepository) {
+				accountRepo.On("GetByID", mock.Anything, "acc-1").Return(&models.Account{ID: "acc-1"}, nil).Once()
+				accountRepo.On("Delete", mock.Anything, "acc-1").Return(internalerrors.ErrBadRequest).Once()
+			},
+			expectedStatus:  http.StatusBadRequest,
+			expectedMessage: "bad request",
+		},
+		{
+			name: "success",
+			setup: func(accountRepo *internaltests.MockAccountRepository) {
+				accountRepo.On("GetByID", mock.Anything, "acc-1").Return(&models.Account{ID: "acc-1"}, nil).Once()
+				accountRepo.On("Delete", mock.Anything, "acc-1").Return(nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody:   "account deleted",
+		},
+	}
 
-		useCase, _, accountRepo, _, _ := admintests.NewAccountsUseCaseFixture()
-		handler := adminhandlers.NewDeleteAccountHandler(useCase)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		accountRepo.On("GetByID", mock.Anything, "acc-1").Return(&models.Account{ID: "acc-1"}, nil).Once()
-		accountRepo.On("Delete", mock.Anything, "acc-1").Return(constants.ErrBadRequest).Once()
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/accounts/acc-1", nil, nil)
-		req.SetPathValue("id", "acc-1")
-		handler.Handler()(w, req)
+			useCase, _, accountRepo, _, _ := admintests.NewAccountsUseCaseFixture()
+			handler := adminhandlers.NewDeleteAccountHandler(useCase)
+			if tc.setup != nil {
+				tc.setup(accountRepo)
+			}
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusBadRequest, "bad request")
-	})
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/accounts/acc-1", nil, nil)
+			req.SetPathValue("id", "acc-1")
+			handler.Handler()(w, req)
 
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
+			if reqCtx.ResponseStatus != tc.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tc.expectedStatus, reqCtx.ResponseStatus)
+			}
+			if tc.expectedMessage != "" {
+				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedMessage)
+			}
+			if tc.expectedBody != "" {
+				payload := internaltests.DecodeResponseJSON[types.DeleteAccountResponse](t, reqCtx)
+				if payload.Message != tc.expectedBody {
+					t.Fatalf("expected %s, got %s", tc.expectedBody, payload.Message)
+				}
+			}
 
-		useCase, _, accountRepo, _, _ := admintests.NewAccountsUseCaseFixture()
-		handler := adminhandlers.NewDeleteAccountHandler(useCase)
-
-		accountRepo.On("GetByID", mock.Anything, "acc-1").Return(&models.Account{ID: "acc-1"}, nil).Once()
-		accountRepo.On("Delete", mock.Anything, "acc-1").Return(nil).Once()
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/accounts/acc-1", nil, nil)
-		req.SetPathValue("id", "acc-1")
-		handler.Handler()(w, req)
-
-		if reqCtx.ResponseStatus != http.StatusOK {
-			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
-		}
-		payload := internaltests.DecodeResponseJSON[types.DeleteAccountResponse](t, reqCtx)
-		if payload.Message != "account deleted" {
-			t.Fatalf("expected account deleted, got %s", payload.Message)
-		}
-	})
+			accountRepo.AssertExpectations(t)
+		})
+	}
 }

@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
-	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	adminservices "github.com/Authula/authula/plugins/admin/services"
 	admintypes "github.com/Authula/authula/plugins/admin/types"
 )
@@ -38,7 +38,7 @@ func TestUsersService_Create(t *testing.T) {
 			name:     "email conflict",
 			existing: &models.User{Email: "a@b"},
 			request:  admintypes.CreateUserRequest{Email: "a@b"},
-			wantErr:  adminconstants.ErrConflict,
+			wantErr:  internalerrors.ErrConflict,
 		},
 		{
 			name:    "repo get error",
@@ -146,7 +146,7 @@ func TestUsersService_Update_notFound(t *testing.T) {
 	repo.On("GetByID", mock.Anything, "u1").Return(nil, nil).Once()
 
 	_, err := svc.Update(ctx, "u1", admintypes.UpdateUserRequest{})
-	assert.ErrorIs(t, err, adminconstants.ErrNotFound)
+	assert.ErrorIs(t, err, internalerrors.ErrNotFound)
 	repo.AssertExpectations(t)
 }
 
@@ -168,6 +168,6 @@ func TestUsersService_Delete_notFound(t *testing.T) {
 	svc, repo := newUsersServiceFixture()
 	ctx := context.Background()
 	repo.On("GetByID", mock.Anything, "u1").Return(nil, nil).Once()
-	assert.ErrorIs(t, svc.Delete(ctx, "u1"), adminconstants.ErrNotFound)
+	assert.ErrorIs(t, svc.Delete(ctx, "u1"), internalerrors.ErrNotFound)
 	repo.AssertExpectations(t)
 }

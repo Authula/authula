@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/Authula/authula/plugins/admin/constants"
+	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/plugins/admin/services"
 	"github.com/Authula/authula/plugins/admin/types"
 )
@@ -20,7 +20,7 @@ func NewStateUseCase(service *services.StateService) StateUseCase {
 func (u StateUseCase) GetUserState(ctx context.Context, userID string) (*types.AdminUserState, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	return u.service.GetUserState(ctx, userID)
@@ -29,7 +29,7 @@ func (u StateUseCase) GetUserState(ctx context.Context, userID string) (*types.A
 func (u StateUseCase) UpsertUserState(ctx context.Context, userID string, request types.UpsertUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	return u.service.UpsertUserState(ctx, userID, request, actorUserID)
@@ -38,7 +38,7 @@ func (u StateUseCase) UpsertUserState(ctx context.Context, userID string, reques
 func (u StateUseCase) CreateUserState(ctx context.Context, userID string, request types.CreateUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	return u.service.CreateUserState(ctx, userID, request, actorUserID)
@@ -47,7 +47,7 @@ func (u StateUseCase) CreateUserState(ctx context.Context, userID string, reques
 func (u StateUseCase) UpdateUserState(ctx context.Context, userID string, request types.UpsertUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	return u.service.UpdateUserState(ctx, userID, request, actorUserID)
@@ -56,7 +56,7 @@ func (u StateUseCase) UpdateUserState(ctx context.Context, userID string, reques
 func (u StateUseCase) DeleteUserState(ctx context.Context, userID string) error {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return constants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 
 	return u.service.DeleteUserState(ctx, userID)
@@ -69,7 +69,7 @@ func (u StateUseCase) GetBannedUserStates(ctx context.Context) ([]types.AdminUse
 func (u StateUseCase) GetSessionState(ctx context.Context, sessionID string) (*types.AdminSessionState, error) {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	return u.service.GetSessionState(ctx, sessionID)
@@ -78,7 +78,7 @@ func (u StateUseCase) GetSessionState(ctx context.Context, sessionID string) (*t
 func (u StateUseCase) UpsertSessionState(ctx context.Context, sessionID string, request types.UpsertSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	return u.service.UpsertSessionState(ctx, sessionID, request, actorUserID)
@@ -87,7 +87,7 @@ func (u StateUseCase) UpsertSessionState(ctx context.Context, sessionID string, 
 func (u StateUseCase) CreateSessionState(ctx context.Context, sessionID string, request types.CreateSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	return u.service.CreateSessionState(ctx, sessionID, request, actorUserID)
@@ -96,7 +96,7 @@ func (u StateUseCase) CreateSessionState(ctx context.Context, sessionID string, 
 func (u StateUseCase) UpdateSessionState(ctx context.Context, sessionID string, request types.UpsertSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	return u.service.UpdateSessionState(ctx, sessionID, request, actorUserID)
@@ -105,7 +105,7 @@ func (u StateUseCase) UpdateSessionState(ctx context.Context, sessionID string, 
 func (u StateUseCase) DeleteSessionState(ctx context.Context, sessionID string) error {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return constants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 
 	return u.service.DeleteSessionState(ctx, sessionID)
@@ -114,7 +114,7 @@ func (u StateUseCase) DeleteSessionState(ctx context.Context, sessionID string) 
 func (u StateUseCase) GetUserAdminSessions(ctx context.Context, userID string) ([]types.AdminUserSession, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	return u.service.GetUserAdminSessions(ctx, userID)

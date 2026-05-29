@@ -3,7 +3,7 @@ package usecases
 import (
 	"context"
 
-	"github.com/Authula/authula/plugins/admin/constants"
+	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/plugins/admin/services"
 	"github.com/Authula/authula/plugins/admin/types"
 )
@@ -42,12 +42,12 @@ func (u ImpersonationUseCase) StopImpersonation(ctx context.Context, impersonate
 	}
 
 	if sessionState == nil || sessionState.ImpersonatorUserID == nil {
-		return constants.ErrUnauthorized
+		return internalerrors.ErrUnauthorized
 	}
 
 	actorUserID := *sessionState.ImpersonatorUserID
 	if actorUserID == "" {
-		return constants.ErrUnauthorized
+		return internalerrors.ErrUnauthorized
 	}
 
 	return u.impersonationService.StopImpersonation(ctx, actorUserID, request)

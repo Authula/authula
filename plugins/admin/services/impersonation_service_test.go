@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
-	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	adminservices "github.com/Authula/authula/plugins/admin/services"
 	admintests "github.com/Authula/authula/plugins/admin/tests"
 	admintypes "github.com/Authula/authula/plugins/admin/types"
@@ -33,25 +33,25 @@ func TestImpersonationService_StartImpersonation_validation(t *testing.T) {
 		setup func(impRepo *admintests.MockImpersonationRepository)
 		want  error
 	}{
-		{name: "empty actor", actor: "", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r"}, want: adminconstants.ErrBadRequest},
-		{name: "empty target", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "  ", Reason: "r"}, want: adminconstants.ErrBadRequest},
-		{name: "same user", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "a1", Reason: "r"}, want: adminconstants.ErrBadRequest},
-		{name: "empty reason", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "   "}, want: adminconstants.ErrBadRequest},
+		{name: "empty actor", actor: "", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r"}, want: internalerrors.ErrBadRequest},
+		{name: "empty target", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "  ", Reason: "r"}, want: internalerrors.ErrBadRequest},
+		{name: "same user", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "a1", Reason: "r"}, want: internalerrors.ErrBadRequest},
+		{name: "empty reason", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "   "}, want: internalerrors.ErrBadRequest},
 		{name: "actor not exists", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r"}, setup: func(impRepo *admintests.MockImpersonationRepository) {
 			impRepo.On("UserExists", mock.Anything, "a1").Return(false, nil).Once()
-		}, want: adminconstants.ErrNotFound},
+		}, want: internalerrors.ErrNotFound},
 		{name: "target not exists", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r"}, setup: func(impRepo *admintests.MockImpersonationRepository) {
 			impRepo.On("UserExists", mock.Anything, "a1").Return(true, nil).Once()
 			impRepo.On("UserExists", mock.Anything, "u2").Return(false, nil).Once()
-		}, want: adminconstants.ErrNotFound},
+		}, want: internalerrors.ErrNotFound},
 		{name: "expires invalid zero", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r", ExpiresInSeconds: func(i int) *int { return &i }(0)}, setup: func(impRepo *admintests.MockImpersonationRepository) {
 			impRepo.On("UserExists", mock.Anything, "a1").Return(true, nil).Once()
 			impRepo.On("UserExists", mock.Anything, "u2").Return(true, nil).Once()
-		}, want: adminconstants.ErrBadRequest},
+		}, want: internalerrors.ErrBadRequest},
 		{name: "expires invalid large", actor: "a1", req: admintypes.StartImpersonationRequest{TargetUserID: "u2", Reason: "r", ExpiresInSeconds: func(i int) *int { return &i }(999999)}, setup: func(impRepo *admintests.MockImpersonationRepository) {
 			impRepo.On("UserExists", mock.Anything, "a1").Return(true, nil).Once()
 			impRepo.On("UserExists", mock.Anything, "u2").Return(true, nil).Once()
-		}, want: adminconstants.ErrBadRequest},
+		}, want: internalerrors.ErrBadRequest},
 	}
 
 	for _, tc := range tests {
@@ -149,19 +149,19 @@ func TestImpersonationService_StopImpersonation(t *testing.T) {
 
 	// case: empty actor
 	err := svc.StopImpersonation(ctx, "", admintypes.StopImpersonationRequest{})
-	require.ErrorIs(t, err, adminconstants.ErrBadRequest)
+	require.ErrorIs(t, err, internalerrors.ErrBadRequest)
 
 	// case: id not found
 	impRepo.On("GetActiveImpersonationByID", mock.Anything, "imp1").Return(nil, nil).Once()
 	err = svc.StopImpersonation(ctx, "actor", admintypes.StopImpersonationRequest{ImpersonationID: admintests.PtrString(t, "imp1")})
-	require.ErrorIs(t, err, adminconstants.ErrNotFound)
+	require.ErrorIs(t, err, internalerrors.ErrNotFound)
 	impRepo.AssertExpectations(t)
 
 	// case: found but wrong actor
 	impRepo.ExpectedCalls = nil
 	impRepo.On("GetActiveImpersonationByID", mock.Anything, "imp1").Return(imp, nil).Once()
 	err = svc.StopImpersonation(ctx, "other", admintypes.StopImpersonationRequest{ImpersonationID: admintests.PtrString(t, "imp1")})
-	require.ErrorIs(t, err, adminconstants.ErrForbidden)
+	require.ErrorIs(t, err, internalerrors.ErrForbidden)
 	impRepo.AssertExpectations(t)
 
 	// case: success with session cleanup
@@ -202,11 +202,11 @@ func TestImpersonationService_GetImpersonationByID(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := svc.GetImpersonationByID(ctx, "   ")
-	require.ErrorIs(t, err, adminconstants.ErrBadRequest)
+	require.ErrorIs(t, err, internalerrors.ErrBadRequest)
 
 	impRepo.On("GetImpersonationByID", mock.Anything, "i1").Return(nil, nil).Once()
 	_, err = svc.GetImpersonationByID(ctx, "i1")
-	require.ErrorIs(t, err, adminconstants.ErrNotFound)
+	require.ErrorIs(t, err, internalerrors.ErrNotFound)
 
 	impObj := &admintypes.Impersonation{ID: "i1"}
 	impRepo.ExpectedCalls = nil

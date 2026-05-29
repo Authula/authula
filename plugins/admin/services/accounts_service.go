@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	corerepositories "github.com/Authula/authula/internal/repositories"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
-	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/types"
 	rootservices "github.com/Authula/authula/services"
 )
@@ -36,7 +36,7 @@ func (s *AccountsService) GetByUserID(ctx context.Context, userID string) ([]mod
 		return nil, err
 	}
 	if user == nil {
-		return nil, adminconstants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	return s.accountRepo.GetAllByUserID(ctx, userID)
@@ -48,7 +48,7 @@ func (s *AccountsService) Create(ctx context.Context, userID string, request typ
 		return nil, err
 	}
 	if user == nil {
-		return nil, adminconstants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	existing, err := s.accountRepo.GetByProviderAndAccountID(ctx, request.ProviderID, request.AccountID)
@@ -56,7 +56,7 @@ func (s *AccountsService) Create(ctx context.Context, userID string, request typ
 		return nil, err
 	}
 	if existing != nil {
-		return nil, adminconstants.ErrConflict
+		return nil, internalerrors.ErrConflict
 	}
 
 	password := request.Password
@@ -94,7 +94,7 @@ func (s *AccountsService) Update(ctx context.Context, accountID string, request 
 		return nil, err
 	}
 	if account == nil {
-		return nil, adminconstants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	if request.ProviderID != nil {
@@ -141,7 +141,7 @@ func (s *AccountsService) Delete(ctx context.Context, accountID string) error {
 		return err
 	}
 	if account == nil {
-		return adminconstants.ErrNotFound
+		return internalerrors.ErrNotFound
 	}
 
 	return s.accountRepo.Delete(ctx, accountID)

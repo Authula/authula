@@ -19,17 +19,25 @@ func NewCreateAccountHandler(useCase usecases.AccountsUseCase) *CreateAccountHan
 
 func (h *CreateAccountHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		reqCtx, _ := models.GetRequestContext(r.Context())
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
 		userID := r.PathValue("user_id")
 
-		var payload types.CreateAccountRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+		var request types.CreateAccountRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
+				"message": err.Error(),
+			})
 			reqCtx.Handled = true
 			return
 		}
 
-		account, err := h.useCase.Create(r.Context(), userID, payload)
+		account, err := h.useCase.Create(ctx, userID, request)
 		if err != nil {
 			respondAccountsError(reqCtx, err)
 			return
@@ -49,10 +57,11 @@ func NewGetUserAccountsHandler(useCase usecases.AccountsUseCase) *GetUserAccount
 
 func (h *GetUserAccountsHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		reqCtx, _ := models.GetRequestContext(r.Context())
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
 		userID := r.PathValue("user_id")
 
-		accounts, err := h.useCase.GetByUserID(r.Context(), userID)
+		accounts, err := h.useCase.GetByUserID(ctx, userID)
 		if err != nil {
 			respondAccountsError(reqCtx, err)
 			return
@@ -72,10 +81,11 @@ func NewGetAccountByIDHandler(useCase usecases.AccountsUseCase) *GetAccountByIDH
 
 func (h *GetAccountByIDHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		reqCtx, _ := models.GetRequestContext(r.Context())
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
 		accountID := r.PathValue("id")
 
-		account, err := h.useCase.GetByID(r.Context(), accountID)
+		account, err := h.useCase.GetByID(ctx, accountID)
 		if err != nil {
 			respondAccountsError(reqCtx, err)
 			return
@@ -100,17 +110,25 @@ func NewUpdateAccountHandler(useCase usecases.AccountsUseCase) *UpdateAccountHan
 
 func (h *UpdateAccountHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		reqCtx, _ := models.GetRequestContext(r.Context())
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
 		accountID := r.PathValue("id")
 
-		var payload types.UpdateAccountRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+		var request types.UpdateAccountRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
+				"message": err.Error(),
+			})
 			reqCtx.Handled = true
 			return
 		}
 
-		account, err := h.useCase.Update(r.Context(), accountID, payload)
+		account, err := h.useCase.Update(ctx, accountID, request)
 		if err != nil {
 			respondAccountsError(reqCtx, err)
 			return
@@ -130,10 +148,11 @@ func NewDeleteAccountHandler(useCase usecases.AccountsUseCase) *DeleteAccountHan
 
 func (h *DeleteAccountHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		reqCtx, _ := models.GetRequestContext(r.Context())
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
 		accountID := r.PathValue("id")
 
-		if err := h.useCase.Delete(r.Context(), accountID); err != nil {
+		if err := h.useCase.Delete(ctx, accountID); err != nil {
 			respondAccountsError(reqCtx, err)
 			return
 		}

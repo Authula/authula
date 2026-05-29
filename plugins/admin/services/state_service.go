@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Authula/authula/plugins/admin/constants"
+	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/plugins/admin/repositories"
 	"github.com/Authula/authula/plugins/admin/types"
 )
@@ -29,7 +29,7 @@ func (s *StateService) CreateUserState(ctx context.Context, userID string, reque
 		return nil, err
 	}
 	if !exists {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	current, err := s.userStateRepo.GetByUserID(ctx, userID)
@@ -37,7 +37,7 @@ func (s *StateService) CreateUserState(ctx context.Context, userID string, reque
 		return nil, err
 	}
 	if current != nil {
-		return nil, constants.ErrConflict
+		return nil, internalerrors.ErrConflict
 	}
 
 	state := buildUserStateFromCreate(userID, request, actorUserID)
@@ -54,7 +54,7 @@ func (s *StateService) UpdateUserState(ctx context.Context, userID string, reque
 		return nil, err
 	}
 	if !exists {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	current, err := s.userStateRepo.GetByUserID(ctx, userID)
@@ -62,7 +62,7 @@ func (s *StateService) UpdateUserState(ctx context.Context, userID string, reque
 		return nil, err
 	}
 	if current == nil {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	state := buildUserState(userID, request, actorUserID)
@@ -79,7 +79,7 @@ func (s *StateService) UpsertUserState(ctx context.Context, userID string, reque
 		return nil, err
 	}
 	if !exists {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	state := buildUserState(userID, request, actorUserID)
@@ -109,7 +109,7 @@ func (s *StateService) CreateSessionState(ctx context.Context, sessionID string,
 		return nil, err
 	}
 	if !exists {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	current, err := s.sessionStateRepo.GetBySessionID(ctx, sessionID)
@@ -117,7 +117,7 @@ func (s *StateService) CreateSessionState(ctx context.Context, sessionID string,
 		return nil, err
 	}
 	if current != nil {
-		return nil, constants.ErrConflict
+		return nil, internalerrors.ErrConflict
 	}
 
 	state := buildSessionStateFromCreate(sessionID, request, actorUserID)
@@ -134,7 +134,7 @@ func (s *StateService) UpdateSessionState(ctx context.Context, sessionID string,
 		return nil, err
 	}
 	if !exists {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	current, err := s.sessionStateRepo.GetBySessionID(ctx, sessionID)
@@ -142,7 +142,7 @@ func (s *StateService) UpdateSessionState(ctx context.Context, sessionID string,
 		return nil, err
 	}
 	if current == nil {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	state := buildSessionState(sessionID, request, actorUserID)
@@ -159,7 +159,7 @@ func (s *StateService) UpsertSessionState(ctx context.Context, sessionID string,
 		return nil, err
 	}
 	if !exists {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	state := buildSessionState(sessionID, request, actorUserID)
@@ -181,7 +181,7 @@ func (s *StateService) GetUserAdminSessions(ctx context.Context, userID string) 
 		return nil, err
 	}
 	if !exists {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	return s.sessionStateRepo.GetByUserID(ctx, userID)

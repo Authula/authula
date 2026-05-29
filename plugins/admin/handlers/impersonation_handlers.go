@@ -94,7 +94,10 @@ func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetUserIDInContext(result.Impersonation.TargetUserID)
+		reqCtx.SetActorInContext(&models.Actor{
+			ID:   result.Impersonation.TargetUserID,
+			Type: models.ActorUser,
+		})
 		if result.SessionID != nil && *result.SessionID != "" {
 			reqCtx.Values[models.ContextSessionID.String()] = *result.SessionID
 		}

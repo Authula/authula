@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/services"
@@ -23,10 +24,10 @@ func (u UsersUseCase) Create(ctx context.Context, request types.CreateUserReques
 	email := strings.TrimSpace(strings.ToLower(request.Email))
 
 	if name == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 	if email == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	request.Name = name
@@ -69,7 +70,7 @@ func (u UsersUseCase) Update(ctx context.Context, userID string, request types.U
 		return nil, constants.ErrUserIDRequired
 	}
 	if request.Name == nil && request.Email == nil && request.EmailVerified == nil && request.Image == nil && len(request.Metadata) == 0 {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	return u.service.Update(ctx, userID, request)
@@ -78,7 +79,7 @@ func (u UsersUseCase) Update(ctx context.Context, userID string, request types.U
 func (u UsersUseCase) Delete(ctx context.Context, userID string) error {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return constants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 
 	return u.service.Delete(ctx, userID)

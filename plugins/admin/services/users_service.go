@@ -3,10 +3,10 @@ package services
 import (
 	"context"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	repositories "github.com/Authula/authula/internal/repositories"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
-	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/types"
 )
 
@@ -24,7 +24,7 @@ func (s *UsersService) Create(ctx context.Context, request types.CreateUserReque
 		return nil, err
 	}
 	if existing != nil {
-		return nil, adminconstants.ErrConflict
+		return nil, internalerrors.ErrConflict
 	}
 
 	userToCreate := &models.User{
@@ -62,7 +62,7 @@ func (s *UsersService) Update(ctx context.Context, userID string, request types.
 		return nil, err
 	}
 	if user == nil {
-		return nil, adminconstants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	if request.Name != nil {
@@ -95,7 +95,7 @@ func (s *UsersService) Delete(ctx context.Context, userID string) error {
 		return err
 	}
 	if existing == nil {
-		return adminconstants.ErrNotFound
+		return internalerrors.ErrNotFound
 	}
 
 	err = s.userRepo.Delete(ctx, userID)

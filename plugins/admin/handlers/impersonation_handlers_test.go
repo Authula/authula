@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
-	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	adminhandlers "github.com/Authula/authula/plugins/admin/handlers"
 	admintests "github.com/Authula/authula/plugins/admin/tests"
 	"github.com/Authula/authula/plugins/admin/types"
@@ -62,7 +62,7 @@ func TestGetImpersonationByIDHandler(t *testing.T) {
 		t.Parallel()
 
 		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		impRepo.On("GetImpersonationByID", mock.Anything, "imp-1").Return((*types.Impersonation)(nil), adminconstants.ErrNotFound).Once()
+		impRepo.On("GetImpersonationByID", mock.Anything, "imp-1").Return((*types.Impersonation)(nil), internalerrors.ErrNotFound).Once()
 		handler := adminhandlers.NewGetImpersonationByIDHandler(useCase)
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations/imp-1", nil, nil)
@@ -130,7 +130,7 @@ func TestStartImpersonationHandler_UseCaseError(t *testing.T) {
 	useCase, impRepo, _, _, tokenSvc := admintests.NewImpersonationUseCaseFixture(t)
 	impRepo.On("UserExists", mock.Anything, "actor-1").Return(true, nil).Once()
 	impRepo.On("UserExists", mock.Anything, "target-1").Return(true, nil).Once()
-	tokenSvc.On("Generate").Return("", adminconstants.ErrForbidden).Once()
+	tokenSvc.On("Generate").Return("", internalerrors.ErrForbidden).Once()
 	handler := adminhandlers.NewStartImpersonationHandler(useCase)
 
 	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}), nil)

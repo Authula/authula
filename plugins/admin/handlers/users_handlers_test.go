@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/admin/constants"
 	adminhandlers "github.com/Authula/authula/plugins/admin/handlers"
 	admintests "github.com/Authula/authula/plugins/admin/tests"
 	"github.com/Authula/authula/plugins/admin/types"
@@ -90,7 +90,7 @@ func TestGetAllUsersHandler(t *testing.T) {
 		t.Parallel()
 
 		useCase, repo := admintests.NewUsersUseCaseFixture()
-		repo.On("GetAll", mock.Anything, (*string)(nil), 10).Return(([]models.User)(nil), (*string)(nil), constants.ErrForbidden).Once()
+		repo.On("GetAll", mock.Anything, (*string)(nil), 10).Return(([]models.User)(nil), (*string)(nil), internalerrors.ErrForbidden).Once()
 		handler := adminhandlers.NewGetAllUsersHandler(useCase)
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users", nil, nil)
 
@@ -136,7 +136,7 @@ func TestGetUserByIDHandler(t *testing.T) {
 		t.Parallel()
 
 		useCase, repo := admintests.NewUsersUseCaseFixture()
-		repo.On("GetByID", mock.Anything, "user-1").Return((*models.User)(nil), constants.ErrUnauthorized).Once()
+		repo.On("GetByID", mock.Anything, "user-1").Return((*models.User)(nil), internalerrors.ErrUnauthorized).Once()
 		handler := adminhandlers.NewGetUserByIDHandler(useCase)
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/users/user-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")
@@ -206,7 +206,7 @@ func TestUpdateUserHandler(t *testing.T) {
 		useCase, repo := admintests.NewUsersUseCaseFixture()
 		name := "Updated"
 		request := types.UpdateUserRequest{Name: &name}
-		repo.On("GetByID", mock.Anything, "user-1").Return((*models.User)(nil), constants.ErrBadRequest).Once()
+		repo.On("GetByID", mock.Anything, "user-1").Return((*models.User)(nil), internalerrors.ErrBadRequest).Once()
 		handler := adminhandlers.NewUpdateUserHandler(useCase)
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/users/user-1", internaltests.MarshalToJSON(t, request), nil)
 		req.SetPathValue("user_id", "user-1")
@@ -250,7 +250,7 @@ func TestDeleteUserHandler(t *testing.T) {
 
 		useCase, repo := admintests.NewUsersUseCaseFixture()
 		repo.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1"}, nil).Once()
-		repo.On("Delete", mock.Anything, "user-1").Return(constants.ErrBadRequest).Once()
+		repo.On("Delete", mock.Anything, "user-1").Return(internalerrors.ErrBadRequest).Once()
 		handler := adminhandlers.NewDeleteUserHandler(useCase)
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/admin/users/user-1", nil, nil)
 		req.SetPathValue("user_id", "user-1")

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Authula/authula/plugins/admin/constants"
+	internalerrors "github.com/Authula/authula/internal/errors"
 )
 
 func mapAdminHttpErrorStatus(err error) int {
@@ -13,15 +13,15 @@ func mapAdminHttpErrorStatus(err error) int {
 	}
 
 	switch {
-	case errors.Is(err, constants.ErrBadRequest):
+	case errors.Is(err, internalerrors.ErrBadRequest):
 		return http.StatusBadRequest
-	case errors.Is(err, constants.ErrUnauthorized):
+	case errors.Is(err, internalerrors.ErrUnauthorized):
 		return http.StatusUnauthorized
-	case errors.Is(err, constants.ErrForbidden):
+	case errors.Is(err, internalerrors.ErrForbidden):
 		return http.StatusForbidden
-	case errors.Is(err, constants.ErrNotFound):
+	case errors.Is(err, internalerrors.ErrNotFound):
 		return http.StatusNotFound
-	case errors.Is(err, constants.ErrConflict):
+	case errors.Is(err, internalerrors.ErrConflict):
 		return http.StatusConflict
 	default:
 		return http.StatusInternalServerError
@@ -34,15 +34,15 @@ func mapAdminHttpErrorMessage(err error) string {
 	}
 
 	switch {
-	case errors.Is(err, constants.ErrBadRequest):
+	case errors.Is(err, internalerrors.ErrBadRequest):
 		return "bad request"
-	case errors.Is(err, constants.ErrUnauthorized):
+	case errors.Is(err, internalerrors.ErrUnauthorized):
 		return "unauthorized"
-	case errors.Is(err, constants.ErrForbidden):
+	case errors.Is(err, internalerrors.ErrForbidden):
 		return "forbidden"
-	case errors.Is(err, constants.ErrNotFound):
+	case errors.Is(err, internalerrors.ErrNotFound):
 		return "not found"
-	case errors.Is(err, constants.ErrConflict):
+	case errors.Is(err, internalerrors.ErrConflict):
 		return "conflict"
 	default:
 		return err.Error()

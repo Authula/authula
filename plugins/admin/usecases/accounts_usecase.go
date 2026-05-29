@@ -4,8 +4,9 @@ import (
 	"context"
 	"strings"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/admin/constants"
+	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/services"
 	"github.com/Authula/authula/plugins/admin/types"
 )
@@ -21,7 +22,7 @@ func NewAccountsUseCase(service *services.AccountsService) AccountsUseCase {
 func (u AccountsUseCase) GetByID(ctx context.Context, accountID string) (*models.Account, error) {
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 	return u.service.GetByID(ctx, accountID)
 }
@@ -29,7 +30,7 @@ func (u AccountsUseCase) GetByID(ctx context.Context, accountID string) (*models
 func (u AccountsUseCase) GetByUserID(ctx context.Context, userID string) ([]models.Account, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return nil, constants.ErrUserIDRequired
+		return nil, adminconstants.ErrUserIDRequired
 	}
 	return u.service.GetByUserID(ctx, userID)
 }
@@ -44,10 +45,10 @@ func (u AccountsUseCase) Create(ctx context.Context, userID string, request type
 	}
 
 	if userID == "" {
-		return nil, constants.ErrUserIDRequired
+		return nil, adminconstants.ErrUserIDRequired
 	}
 	if request.ProviderID == "" || request.AccountID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	return u.service.Create(ctx, userID, request)
@@ -56,7 +57,7 @@ func (u AccountsUseCase) Create(ctx context.Context, userID string, request type
 func (u AccountsUseCase) Update(ctx context.Context, accountID string, request types.UpdateAccountRequest) (*models.Account, error) {
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	if request.ProviderID == nil &&
@@ -68,7 +69,7 @@ func (u AccountsUseCase) Update(ctx context.Context, accountID string, request t
 		request.RefreshTokenExpiresAt == nil &&
 		request.Scope == nil &&
 		request.Password == nil {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	if request.ProviderID != nil {
@@ -90,7 +91,7 @@ func (u AccountsUseCase) Update(ctx context.Context, accountID string, request t
 func (u AccountsUseCase) Delete(ctx context.Context, accountID string) error {
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
-		return constants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 	return u.service.Delete(ctx, accountID)
 }

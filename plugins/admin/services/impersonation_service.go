@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
-	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/repositories"
 	"github.com/Authula/authula/plugins/admin/types"
 	rootservices "github.com/Authula/authula/services"
@@ -53,7 +53,7 @@ func (s *ImpersonationService) GetAllImpersonations(ctx context.Context) ([]type
 func (s *ImpersonationService) GetImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error) {
 	impersonationID = strings.TrimSpace(impersonationID)
 	if impersonationID == "" {
-		return nil, adminconstants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	row, err := s.impersonationRepo.GetImpersonationByID(ctx, impersonationID)
@@ -61,7 +61,7 @@ func (s *ImpersonationService) GetImpersonationByID(ctx context.Context, imperso
 		return nil, err
 	}
 	if row == nil {
-		return nil, adminconstants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	return row, nil
@@ -80,16 +80,16 @@ func (s *ImpersonationService) StartImpersonation(
 	reason := strings.TrimSpace(req.Reason)
 
 	if actorUserID == "" {
-		return nil, adminconstants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 	if targetUserID == "" {
-		return nil, adminconstants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 	if actorUserID == targetUserID {
-		return nil, adminconstants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 	if reason == "" {
-		return nil, adminconstants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	actorExists, err := s.impersonationRepo.UserExists(ctx, actorUserID)
@@ -97,7 +97,7 @@ func (s *ImpersonationService) StartImpersonation(
 		return nil, err
 	}
 	if !actorExists {
-		return nil, adminconstants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	targetExists, err := s.impersonationRepo.UserExists(ctx, targetUserID)
@@ -105,7 +105,7 @@ func (s *ImpersonationService) StartImpersonation(
 		return nil, err
 	}
 	if !targetExists {
-		return nil, adminconstants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	now := time.Now().UTC()
@@ -113,11 +113,11 @@ func (s *ImpersonationService) StartImpersonation(
 	maxDuration := s.maxExpiresIn
 	if req.ExpiresInSeconds != nil {
 		if *req.ExpiresInSeconds <= 0 {
-			return nil, adminconstants.ErrBadRequest
+			return nil, internalerrors.ErrBadRequest
 		}
 		requestedDuration := time.Duration(*req.ExpiresInSeconds) * time.Second
 		if requestedDuration > s.maxExpiresIn {
-			return nil, adminconstants.ErrBadRequest
+			return nil, internalerrors.ErrBadRequest
 		}
 		maxDuration = requestedDuration
 		expiresAt = now.Add(requestedDuration)
@@ -186,7 +186,7 @@ func (s *ImpersonationService) StartImpersonation(
 func (s *ImpersonationService) StopImpersonation(ctx context.Context, actorUserID string, request types.StopImpersonationRequest) error {
 	actorUserID = strings.TrimSpace(actorUserID)
 	if actorUserID == "" {
-		return adminconstants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 
 	var target *types.Impersonation
@@ -197,7 +197,7 @@ func (s *ImpersonationService) StopImpersonation(ctx context.Context, actorUserI
 			return err
 		}
 		if target == nil {
-			return adminconstants.ErrNotFound
+			return internalerrors.ErrNotFound
 		}
 	} else {
 		target, err = s.impersonationRepo.GetLatestActiveImpersonationByActor(ctx, actorUserID)
@@ -205,12 +205,12 @@ func (s *ImpersonationService) StopImpersonation(ctx context.Context, actorUserI
 			return err
 		}
 		if target == nil {
-			return adminconstants.ErrNotFound
+			return internalerrors.ErrNotFound
 		}
 	}
 
 	if target.ActorUserID != actorUserID {
-		return adminconstants.ErrForbidden
+		return internalerrors.ErrForbidden
 	}
 
 	if target.ImpersonationSessionID != nil && s.sessionStateRepo != nil {

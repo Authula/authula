@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/Authula/authula/plugins/admin/constants"
+	internalerrors "github.com/Authula/authula/internal/errors"
 	adminservices "github.com/Authula/authula/plugins/admin/services"
 	admintests "github.com/Authula/authula/plugins/admin/tests"
 	admintypes "github.com/Authula/authula/plugins/admin/types"
@@ -48,7 +48,7 @@ func TestStateService_UpsertUserState(t *testing.T) {
 		{
 			name:       "user not found",
 			userExists: false,
-			wantErr:    constants.ErrNotFound,
+			wantErr:    internalerrors.ErrNotFound,
 		},
 		{
 			name:       "ban with details",
@@ -175,7 +175,7 @@ func TestStateService_UpsertSessionState(t *testing.T) {
 		{
 			name:    "session not found",
 			exists:  false,
-			wantErr: constants.ErrNotFound,
+			wantErr: internalerrors.ErrNotFound,
 		},
 		{
 			name:    "revoke",
