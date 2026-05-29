@@ -24,7 +24,7 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		if reqCtx.Actor != nil && reqCtx.Actor.Type == models.ActorUser {
+		if reqCtx.Actor != nil {
 			if sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && sessionID != "" {
 				existingSession, err := h.SignInUseCase.GetSessionByID(ctx, sessionID)
 				if err == nil && existingSession != nil && existingSession.ExpiresAt.After(time.Now()) {

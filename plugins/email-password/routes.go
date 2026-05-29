@@ -3,6 +3,7 @@ package email_password
 import (
 	"net/http"
 
+	"github.com/Authula/authula/middleware"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/handlers"
 )
@@ -47,38 +48,59 @@ func Routes(plugin *EmailPasswordPlugin) []models.Route {
 
 	return []models.Route{
 		{
-			Method:  http.MethodPost,
-			Path:    "/email-password/sign-up",
+			Method: http.MethodPost,
+			Path:   "/email-password/sign-up",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequirePublicOrUserActor(),
+			},
 			Handler: signUpHandler.Handler(),
 		},
 		{
-			Method:  http.MethodPost,
-			Path:    "/email-password/sign-in",
+			Method: http.MethodPost,
+			Path:   "/email-password/sign-in",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequirePublicOrUserActor(),
+			},
 			Handler: signInHandler.Handler(),
 		},
 		{
-			Method:  http.MethodGet,
-			Path:    "/email-password/verify-email",
+			Method: http.MethodGet,
+			Path:   "/email-password/verify-email",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequirePublicOrUserActor(),
+			},
 			Handler: verifyEmailHandler.Handler(),
 		},
 		{
-			Method:  http.MethodPost,
-			Path:    "/email-password/send-email-verification",
+			Method: http.MethodPost,
+			Path:   "/email-password/send-email-verification",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequireActor(models.ActorUser),
+			},
 			Handler: sendEmailVerificationHandler.Handler(),
 		},
 		{
-			Method:  http.MethodPost,
-			Path:    "/email-password/request-password-reset",
+			Method: http.MethodPost,
+			Path:   "/email-password/request-password-reset",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequirePublicOrUserActor(),
+			},
 			Handler: requestPasswordResetHandler.Handler(),
 		},
 		{
-			Method:  http.MethodPost,
-			Path:    "/email-password/change-password",
+			Method: http.MethodPost,
+			Path:   "/email-password/change-password",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequirePublicOrUserActor(),
+			},
 			Handler: changePasswordHandler.Handler(),
 		},
 		{
-			Method:  http.MethodPost,
-			Path:    "/email-password/request-email-change",
+			Method: http.MethodPost,
+			Path:   "/email-password/request-email-change",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequireActor(models.ActorUser),
+			},
 			Handler: requestEmailChangeHandler.Handler(),
 		},
 	}

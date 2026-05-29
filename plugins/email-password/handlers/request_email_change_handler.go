@@ -18,12 +18,6 @@ func (h *RequestEmailChangeHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		if reqCtx.Actor == nil || reqCtx.Actor.Type != models.ActorUser {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
-
 		var request types.RequestEmailChangeRequest
 		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
