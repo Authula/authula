@@ -18,15 +18,6 @@ func (h *SignOutHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
-				"message": "unauthorized",
-			})
-			reqCtx.Handled = true
-			return
-		}
-
 		var request types.SignOutRequest
 		if err := util.ParseJSON(r, &request); err != nil {
 			// If no body is provided, we'll default to using an empty request.
@@ -38,7 +29,7 @@ func (h *SignOutHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		result, err := h.UseCase.SignOut(ctx, userID, request.SessionID, request.SignOutAll)
+		result, err := h.UseCase.SignOut(ctx, reqCtx.Actor.ID, request.SessionID, request.SignOutAll)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
 				"message": "failed to sign out",

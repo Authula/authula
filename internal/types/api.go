@@ -3,15 +3,9 @@ package types
 import (
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/Authula/authula/models"
 )
-
-type HealthCheckResult struct {
-	Status    string    `json:"status"`
-	Timestamp time.Time `json:"timestamp"`
-}
 
 type GetMeResult struct {
 	User    *models.User

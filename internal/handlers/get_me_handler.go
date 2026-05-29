@@ -17,16 +17,7 @@ func (h *GetMeHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
-				"message": "unauthorized",
-			})
-			reqCtx.Handled = true
-			return
-		}
-
-		result, err := h.UseCase.GetMe(ctx, userID)
+		result, err := h.UseCase.GetMe(ctx, reqCtx.Actor.ID)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
 				"message": err.Error(),

@@ -1,7 +1,10 @@
 package internal
 
 import (
+	"net/http"
+
 	"github.com/Authula/authula/internal/handlers"
+	"github.com/Authula/authula/middleware"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/services"
 )
@@ -19,13 +22,19 @@ func CoreRoutes(logger models.Logger, userService services.UserService, sessionS
 
 	return []models.Route{
 		{
-			Method:  "GET",
-			Path:    "/me",
+			Method: "GET",
+			Path:   "/me",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequireActor(models.ActorUser),
+			},
 			Handler: getMeHandler.Handler(),
 		},
 		{
-			Method:  "POST",
-			Path:    "/sign-out",
+			Method: "POST",
+			Path:   "/sign-out",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequireActor(models.ActorUser),
+			},
 			Handler: signOutHandler.Handler(),
 		},
 	}
