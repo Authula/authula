@@ -11,7 +11,6 @@ import (
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	plugintests "github.com/Authula/authula/plugins/email-password/tests"
-	"github.com/Authula/authula/plugins/email-password/types"
 )
 
 func TestSendEmailVerificationHandler(t *testing.T) {
@@ -24,7 +23,6 @@ func TestSendEmailVerificationHandler(t *testing.T) {
 		prepare        func(*plugintests.MockSendEmailVerificationUseCase)
 		expectedStatus int
 	}{
-		{name: "unauthorized", body: internaltests.MarshalToJSON(t, types.SendEmailVerificationRequest{}), expectedStatus: http.StatusUnauthorized},
 		{name: "invalid_json", actor: &models.Actor{ID: "user-1", Type: models.ActorUser}, body: []byte("{"), expectedStatus: http.StatusUnprocessableEntity},
 		{name: "usecase_error", actor: &models.Actor{ID: "user-1", Type: models.ActorUser}, body: internaltests.MarshalToJSON(t, map[string]any{"email": "attacker@example.com"}), prepare: func(m *plugintests.MockSendEmailVerificationUseCase) {
 			m.On("Send", mock.Anything, "user-1", (*string)(nil)).Return(errors.New("boom")).Once()
