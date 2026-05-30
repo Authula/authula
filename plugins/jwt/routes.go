@@ -3,6 +3,7 @@ package jwt
 import (
 	"net/http"
 
+	"github.com/Authula/authula/middleware"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/handlers"
 	"github.com/Authula/authula/plugins/jwt/usecases"
@@ -31,14 +32,17 @@ func Routes(plugin *JWTPlugin) []models.Route {
 
 	return []models.Route{
 		{
-			Path:    "/token/refresh",
-			Method:  http.MethodPost,
-			Handler: refreshHandler.Handler(),
+			Path:   "/token/refresh",
+			Method: http.MethodPost,
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequirePublicOrUserActor(),
+			},
+			Handler: refreshHandler.Handle(),
 		},
 		{
 			Path:    "/.well-known/jwks.json",
 			Method:  http.MethodGet,
-			Handler: jwksHandler.Handler(),
+			Handler: jwksHandler.Handle(),
 		},
 	}
 }

@@ -5,38 +5,33 @@ import (
 
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/jwt/types"
 	"github.com/Authula/authula/plugins/jwt/usecases"
 )
-
-type refreshTokenRequest struct {
-	RefreshToken string `json:"refresh_token" validate:"required"`
-}
-
-type refreshTokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-}
 
 type RefreshTokenHandler struct {
 	Logger              models.Logger
 	RefreshTokenUseCase usecases.RefreshTokenUseCase
 }
 
-func (h *RefreshTokenHandler) Handler() http.HandlerFunc {
+func (h *RefreshTokenHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		var req refreshTokenRequest
-		if err := util.ParseJSON(r, &req); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
-				"message": "invalid request body",
-			})
+		var request types.RefreshTokenRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
 
-		if req.RefreshToken == "" {
+		if request.RefreshToken == "" {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": "refresh_token is required",
 			})
@@ -44,17 +39,16 @@ func (h *RefreshTokenHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		result, err := h.RefreshTokenUseCase.RefreshTokens(ctx, req.RefreshToken)
+		result, err := h.RefreshTokenUseCase.RefreshTokens(ctx, request.RefreshToken)
 		if err != nil {
-			h.Logger.Error(err.Error())
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
-				"message": "invalid or expired refresh token",
+				"message": err.Error(),
 			})
 			reqCtx.Handled = true
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, refreshTokenResponse{
+		reqCtx.SetJSONResponse(http.StatusOK, types.RefreshTokenResponse{
 			AccessToken:  result.AccessToken,
 			RefreshToken: result.RefreshToken,
 		})
