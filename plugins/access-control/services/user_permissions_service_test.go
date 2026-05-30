@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
+	internalerrors "github.com/Authula/authula/internal/errors"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -24,7 +24,7 @@ func TestUserPermissionsServiceGetUserPermissions(t *testing.T) {
 		{
 			name:        "blank user id",
 			userID:      "",
-			expectedErr: accesscontrolconstants.ErrUnprocessableEntity,
+			expectedErr: internalerrors.ErrUnprocessableEntity,
 		},
 		{
 			name:   "success",
@@ -38,9 +38,9 @@ func TestUserPermissionsServiceGetUserPermissions(t *testing.T) {
 			name:   "repo error",
 			userID: "u1",
 			setupMock: func(m *accesscontroltests.MockUserPermissionsRepository) {
-				m.On("GetUserPermissions", mock.Anything, "u1").Return(([]types.UserPermissionInfo)(nil), accesscontrolconstants.ErrNotFound).Once()
+				m.On("GetUserPermissions", mock.Anything, "u1").Return(([]types.UserPermissionInfo)(nil), internalerrors.ErrNotFound).Once()
 			},
-			expectedErr: accesscontrolconstants.ErrNotFound,
+			expectedErr: internalerrors.ErrNotFound,
 		},
 	}
 
@@ -87,7 +87,7 @@ func TestUserPermissionsServiceHasPermissions(t *testing.T) {
 		{
 			name:        "blank user id",
 			userID:      "",
-			expectedErr: accesscontrolconstants.ErrUnprocessableEntity,
+			expectedErr: internalerrors.ErrUnprocessableEntity,
 		},
 		{
 			name:           "success",
@@ -103,9 +103,9 @@ func TestUserPermissionsServiceHasPermissions(t *testing.T) {
 			userID:         "u1",
 			permissionKeys: []string{"users.read"},
 			setupMock: func(m *accesscontroltests.MockUserPermissionsRepository) {
-				m.On("HasPermissions", mock.Anything, "u1", []string{"users.read"}).Return(false, accesscontrolconstants.ErrForbidden).Once()
+				m.On("HasPermissions", mock.Anything, "u1", []string{"users.read"}).Return(false, internalerrors.ErrForbidden).Once()
 			},
-			expectedErr: accesscontrolconstants.ErrForbidden,
+			expectedErr: internalerrors.ErrForbidden,
 		},
 	}
 

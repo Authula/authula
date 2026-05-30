@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 
-	"github.com/Authula/authula/plugins/access-control/constants"
+	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -20,7 +20,7 @@ func NewRolePermissionsService(rolesRepo repositories.RolesRepository, permissio
 
 func (s *RolePermissionsService) GetRolePermissions(ctx context.Context, roleID string) ([]types.UserPermissionInfo, error) {
 	if roleID == "" {
-		return nil, constants.ErrUnprocessableEntity
+		return nil, internalerrors.ErrUnprocessableEntity
 	}
 
 	role, err := s.rolesRepo.GetRoleByID(ctx, roleID)
@@ -28,7 +28,7 @@ func (s *RolePermissionsService) GetRolePermissions(ctx context.Context, roleID 
 		return nil, err
 	}
 	if role == nil {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	return s.rolePermissionsRepo.GetRolePermissions(ctx, roleID)
@@ -36,10 +36,10 @@ func (s *RolePermissionsService) GetRolePermissions(ctx context.Context, roleID 
 
 func (s *RolePermissionsService) AddPermissionToRole(ctx context.Context, roleID string, permissionID string, grantedByUserID *string) error {
 	if roleID == "" {
-		return constants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 	if permissionID == "" {
-		return constants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 
 	role, err := s.rolesRepo.GetRoleByID(ctx, roleID)
@@ -47,10 +47,10 @@ func (s *RolePermissionsService) AddPermissionToRole(ctx context.Context, roleID
 		return err
 	}
 	if role == nil {
-		return constants.ErrNotFound
+		return internalerrors.ErrNotFound
 	}
 	if role.IsSystem {
-		return constants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 
 	permission, err := s.permissionsRepo.GetPermissionByID(ctx, permissionID)
@@ -58,10 +58,10 @@ func (s *RolePermissionsService) AddPermissionToRole(ctx context.Context, roleID
 		return err
 	}
 	if permission == nil {
-		return constants.ErrNotFound
+		return internalerrors.ErrNotFound
 	}
 	if permission.IsSystem {
-		return constants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 
 	return s.rolePermissionsRepo.AddRolePermission(ctx, roleID, permissionID, grantedByUserID)
@@ -69,10 +69,10 @@ func (s *RolePermissionsService) AddPermissionToRole(ctx context.Context, roleID
 
 func (s *RolePermissionsService) RemovePermissionFromRole(ctx context.Context, roleID string, permissionID string) error {
 	if roleID == "" {
-		return constants.ErrUnprocessableEntity
+		return internalerrors.ErrUnprocessableEntity
 	}
 	if permissionID == "" {
-		return constants.ErrUnprocessableEntity
+		return internalerrors.ErrUnprocessableEntity
 	}
 
 	role, err := s.rolesRepo.GetRoleByID(ctx, roleID)
@@ -80,10 +80,10 @@ func (s *RolePermissionsService) RemovePermissionFromRole(ctx context.Context, r
 		return err
 	}
 	if role == nil {
-		return constants.ErrNotFound
+		return internalerrors.ErrNotFound
 	}
 	if role.IsSystem {
-		return constants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 
 	permission, err := s.permissionsRepo.GetPermissionByID(ctx, permissionID)
@@ -91,10 +91,10 @@ func (s *RolePermissionsService) RemovePermissionFromRole(ctx context.Context, r
 		return err
 	}
 	if permission == nil {
-		return constants.ErrNotFound
+		return internalerrors.ErrNotFound
 	}
 	if permission.IsSystem {
-		return constants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 
 	return s.rolePermissionsRepo.RemoveRolePermission(ctx, roleID, permissionID)
@@ -102,7 +102,7 @@ func (s *RolePermissionsService) RemovePermissionFromRole(ctx context.Context, r
 
 func (s *RolePermissionsService) ReplaceRolePermissions(ctx context.Context, roleID string, permissionIDs []string, grantedByUserID *string) error {
 	if roleID == "" {
-		return constants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 
 	role, err := s.rolesRepo.GetRoleByID(ctx, roleID)
@@ -110,10 +110,10 @@ func (s *RolePermissionsService) ReplaceRolePermissions(ctx context.Context, rol
 		return err
 	}
 	if role == nil {
-		return constants.ErrNotFound
+		return internalerrors.ErrNotFound
 	}
 	if role.IsSystem {
-		return constants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 
 	normalized := make([]string, 0, len(permissionIDs))
@@ -132,10 +132,10 @@ func (s *RolePermissionsService) ReplaceRolePermissions(ctx context.Context, rol
 			return err
 		}
 		if permission == nil {
-			return constants.ErrNotFound
+			return internalerrors.ErrNotFound
 		}
 		if permission.IsSystem {
-			return constants.ErrBadRequest
+			return internalerrors.ErrBadRequest
 		}
 
 		normalized = append(normalized, permissionID)

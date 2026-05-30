@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
+	internalerrors "github.com/Authula/authula/internal/errors"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -28,7 +28,7 @@ func TestAccessControlServiceRoleExists(t *testing.T) {
 			setup: func(rolesRepo *accesscontroltests.MockRolesRepository) {
 				rolesRepo.On("GetRoleByName", mock.Anything, "missing").Return((*types.Role)(nil), nil).Once()
 			},
-			wantErr: accesscontrolconstants.ErrNotFound,
+			wantErr: internalerrors.ErrNotFound,
 			wantOK:  false,
 		},
 		{
@@ -43,9 +43,9 @@ func TestAccessControlServiceRoleExists(t *testing.T) {
 			name:     "repository error",
 			roleName: "editor",
 			setup: func(rolesRepo *accesscontroltests.MockRolesRepository) {
-				rolesRepo.On("GetRoleByName", mock.Anything, "editor").Return((*types.Role)(nil), accesscontrolconstants.ErrForbidden).Once()
+				rolesRepo.On("GetRoleByName", mock.Anything, "editor").Return((*types.Role)(nil), internalerrors.ErrForbidden).Once()
 			},
-			wantErr: accesscontrolconstants.ErrForbidden,
+			wantErr: internalerrors.ErrForbidden,
 		},
 	}
 
@@ -95,7 +95,7 @@ func TestAccessControlServiceValidateRoleAssignment(t *testing.T) {
 			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
 				rolesRepo.On("GetRoleByName", mock.Anything, "missing").Return((*types.Role)(nil), nil).Once()
 			},
-			wantErr: accesscontrolconstants.ErrNotFound,
+			wantErr: internalerrors.ErrNotFound,
 		},
 		{
 			name:     "nil assigner is not allowed",
@@ -114,7 +114,7 @@ func TestAccessControlServiceValidateRoleAssignment(t *testing.T) {
 				rolesRepo.On("GetRoleByName", mock.Anything, "editor").Return(&types.Role{ID: "role-1", Name: "editor", Weight: 10}, nil).Once()
 				userRolesRepo.On("GetUserRoles", mock.Anything, "assigner-user-1").Return([]types.UserRoleInfo{{RoleID: "role-old", RoleName: "old", RoleWeight: 100, ExpiresAt: func() *time.Time { value := time.Now().UTC().Add(-time.Hour); return &value }()}}, nil).Once()
 			},
-			wantErr: accesscontrolconstants.ErrForbidden,
+			wantErr: internalerrors.ErrForbidden,
 		},
 		{
 			name:     "expired roles are ignored",
@@ -137,7 +137,7 @@ func TestAccessControlServiceValidateRoleAssignment(t *testing.T) {
 				rolesRepo.On("GetRoleByName", mock.Anything, "admin").Return(&types.Role{ID: "role-2", Name: "admin", Weight: 80}, nil).Once()
 				userRolesRepo.On("GetUserRoles", mock.Anything, "assigner-user-1").Return([]types.UserRoleInfo{{RoleID: "role-member", RoleName: "member", RoleWeight: 10}}, nil).Once()
 			},
-			wantErr: accesscontrolconstants.ErrForbidden,
+			wantErr: internalerrors.ErrForbidden,
 		},
 	}
 

@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
-	"github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/services"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
@@ -41,7 +41,7 @@ func TestGetRolePermissionsHandler(t *testing.T) {
 			name:   "use case error",
 			roleID: "role-404",
 			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, _ *accesscontroltests.MockRolePermissionsRepository) {
-				rolesRepo.On("GetRoleByID", mock.Anything, "role-404").Return((*types.Role)(nil), constants.ErrNotFound).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-404").Return((*types.Role)(nil), internalerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedBody:   map[string]string{"message": "not found"},
@@ -130,7 +130,7 @@ func TestAddRolePermissionHandler(t *testing.T) {
 			roleID:         "role-1",
 			body:           []byte("{invalid json"),
 			expectedStatus: http.StatusUnprocessableEntity,
-			expectedBody:   map[string]string{"message": "invalid request body"},
+			expectedBody:   map[string]string{"message": "invalid character 'i' looking for beginning of object key string"},
 		},
 		{
 			name:   "use case error",
@@ -139,7 +139,7 @@ func TestAddRolePermissionHandler(t *testing.T) {
 			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Administrator"}, nil).Once()
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
-				rolePermissionsRepo.On("AddRolePermission", mock.Anything, "role-1", "perm-1", (*string)(nil)).Return(constants.ErrUnauthorized).Once()
+				rolePermissionsRepo.On("AddRolePermission", mock.Anything, "role-1", "perm-1", (*string)(nil)).Return(internalerrors.ErrUnauthorized).Once()
 			},
 			expectedStatus: http.StatusUnauthorized,
 			expectedBody:   map[string]string{"message": "unauthorized"},
@@ -231,7 +231,7 @@ func TestReplaceRolePermissionsHandler(t *testing.T) {
 			roleID:         "role-1",
 			body:           []byte("{invalid json"),
 			expectedStatus: http.StatusUnprocessableEntity,
-			expectedBody:   map[string]string{"message": "invalid request body"},
+			expectedBody:   map[string]string{"message": "invalid character 'i' looking for beginning of object key string"},
 		},
 		{
 			name:   "use case error",
@@ -241,7 +241,7 @@ func TestReplaceRolePermissionsHandler(t *testing.T) {
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Administrator"}, nil).Once()
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-2").Return(&types.Permission{ID: "perm-2", Key: "users.write"}, nil).Once()
-				rolePermissionsRepo.On("ReplaceRolePermissions", mock.Anything, "role-1", []string{"perm-1", "perm-2"}, (*string)(nil)).Return(constants.ErrConflict).Once()
+				rolePermissionsRepo.On("ReplaceRolePermissions", mock.Anything, "role-1", []string{"perm-1", "perm-2"}, (*string)(nil)).Return(internalerrors.ErrConflict).Once()
 			},
 			expectedStatus: http.StatusConflict,
 			expectedBody:   map[string]string{"message": "conflict"},
@@ -333,7 +333,7 @@ func TestRemoveRolePermissionHandler(t *testing.T) {
 			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Administrator"}, nil).Once()
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
-				rolePermissionsRepo.On("RemoveRolePermission", mock.Anything, "role-1", "perm-1").Return(constants.ErrNotFound).Once()
+				rolePermissionsRepo.On("RemoveRolePermission", mock.Anything, "role-1", "perm-1").Return(internalerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedBody:   map[string]string{"message": "not found"},

@@ -22,14 +22,19 @@ func (h *CreateRoleHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		var payload types.CreateRoleRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+		var request types.CreateRoleRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
 
-		role, err := h.useCase.CreateRole(r.Context(), payload)
+		role, err := h.useCase.CreateRole(ctx, request)
 		if err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
@@ -54,7 +59,7 @@ func (h *GetAllRolesHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		roles, err := h.useCase.GetAllRoles(r.Context())
+		roles, err := h.useCase.GetAllRoles(ctx)
 		if err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
@@ -78,7 +83,7 @@ func (h *GetRoleByNameHandler) Handler() http.HandlerFunc {
 		reqCtx, _ := models.GetRequestContext(ctx)
 		roleName := r.PathValue("role_name")
 
-		role, err := h.useCase.GetRoleByName(r.Context(), roleName)
+		role, err := h.useCase.GetRoleByName(ctx, roleName)
 		if err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
@@ -102,7 +107,7 @@ func (h *GetRoleByIDHandler) Handler() http.HandlerFunc {
 		reqCtx, _ := models.GetRequestContext(ctx)
 		roleID := r.PathValue("role_id")
 
-		roleDetails, err := h.useCase.GetRoleByID(r.Context(), roleID)
+		roleDetails, err := h.useCase.GetRoleByID(ctx, roleID)
 		if err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
@@ -126,14 +131,19 @@ func (h *UpdateRoleHandler) Handler() http.HandlerFunc {
 		reqCtx, _ := models.GetRequestContext(ctx)
 		roleID := r.PathValue("role_id")
 
-		var payload types.UpdateRoleRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+		var request types.UpdateRoleRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
 
-		role, err := h.useCase.UpdateRole(r.Context(), roleID, payload)
+		role, err := h.useCase.UpdateRole(ctx, roleID, request)
 		if err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
@@ -159,7 +169,7 @@ func (h *DeleteRoleHandler) Handler() http.HandlerFunc {
 		reqCtx, _ := models.GetRequestContext(ctx)
 		roleID := r.PathValue("role_id")
 
-		if err := h.useCase.DeleteRole(r.Context(), roleID); err != nil {
+		if err := h.useCase.DeleteRole(ctx, roleID); err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
 		}

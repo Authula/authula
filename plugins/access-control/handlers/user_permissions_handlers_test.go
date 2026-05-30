@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
-	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/services"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
@@ -43,7 +43,7 @@ func TestGetUserPermissionsHandler(t *testing.T) {
 			name:   "repo error",
 			userID: "u1",
 			setupMock: func(m *accesscontroltests.MockUserPermissionsRepository) {
-				m.On("GetUserPermissions", mock.Anything, "u1").Return(([]types.UserPermissionInfo)(nil), accesscontrolconstants.ErrNotFound).Once()
+				m.On("GetUserPermissions", mock.Anything, "u1").Return(([]types.UserPermissionInfo)(nil), internalerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedBody:   map[string]string{"message": "not found"},
@@ -98,7 +98,7 @@ func TestCheckUserPermissionsHandler(t *testing.T) {
 			userID:         "u1",
 			body:           []byte("{invalid json"),
 			expectedStatus: http.StatusUnprocessableEntity,
-			expectedBody:   map[string]string{"message": "invalid request body"},
+			expectedBody:   map[string]string{"message": "invalid character 'i' looking for beginning of object key string"},
 		},
 		{
 			name:   "success",
@@ -115,7 +115,7 @@ func TestCheckUserPermissionsHandler(t *testing.T) {
 			userID: "u1",
 			body:   internaltests.MarshalToJSON(t, types.CheckUserPermissionsRequest{PermissionKeys: []string{"users.read"}}),
 			setupMock: func(m *accesscontroltests.MockUserPermissionsRepository) {
-				m.On("HasPermissions", mock.Anything, "u1", []string{"users.read"}).Return(false, accesscontrolconstants.ErrForbidden).Once()
+				m.On("HasPermissions", mock.Anything, "u1", []string{"users.read"}).Return(false, internalerrors.ErrForbidden).Once()
 			},
 			expectedStatus: http.StatusForbidden,
 			expectedBody:   map[string]string{"message": "forbidden"},

@@ -47,14 +47,19 @@ func (h *AddRolePermissionHandler) Handler() http.HandlerFunc {
 		reqCtx, _ := models.GetRequestContext(ctx)
 		roleID := r.PathValue("role_id")
 
-		var payload types.AddRolePermissionRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+		var request types.AddRolePermissionRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
 
-		if err := h.useCase.AddPermissionToRole(r.Context(), roleID, payload.PermissionID, rolePermissionActorUserID(reqCtx)); err != nil {
+		if err := h.useCase.AddPermissionToRole(ctx, roleID, request.PermissionID, rolePermissionActorUserID(reqCtx)); err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
 		}
@@ -79,14 +84,19 @@ func (h *ReplaceRolePermissionsHandler) Handler() http.HandlerFunc {
 		reqCtx, _ := models.GetRequestContext(ctx)
 		roleID := r.PathValue("role_id")
 
-		var payload types.ReplaceRolePermissionsRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+		var request types.ReplaceRolePermissionsRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
 
-		if err := h.useCase.ReplaceRolePermissions(r.Context(), roleID, payload.PermissionIDs, rolePermissionActorUserID(reqCtx)); err != nil {
+		if err := h.useCase.ReplaceRolePermissions(ctx, roleID, request.PermissionIDs, rolePermissionActorUserID(reqCtx)); err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
 		}
@@ -112,7 +122,7 @@ func (h *RemoveRolePermissionHandler) Handler() http.HandlerFunc {
 		roleID := r.PathValue("role_id")
 		permissionID := r.PathValue("permission_id")
 
-		if err := h.useCase.RemovePermissionFromRole(r.Context(), roleID, permissionID); err != nil {
+		if err := h.useCase.RemovePermissionFromRole(ctx, roleID, permissionID); err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
 		}

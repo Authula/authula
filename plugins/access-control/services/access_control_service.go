@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Authula/authula/plugins/access-control/constants"
+	internalerrors "github.com/Authula/authula/internal/errors"
 )
 
 type AccessControlService struct {
@@ -31,7 +31,7 @@ func (s *AccessControlService) ValidateRoleAssignment(ctx context.Context, roleN
 		return false, err
 	}
 	if role == nil || role.ID == "" {
-		return false, constants.ErrNotFound
+		return false, internalerrors.ErrNotFound
 	}
 
 	if assignerUserID == nil || *assignerUserID == "" {
@@ -45,11 +45,11 @@ func (s *AccessControlService) ValidateRoleAssignment(ctx context.Context, roleN
 
 	highestWeight, activeCount := determineHighestActiveRoleWeight(assignerRoles, time.Now().UTC())
 	if activeCount == 0 {
-		return false, constants.ErrForbidden
+		return false, internalerrors.ErrForbidden
 	}
 
 	if role.Weight > highestWeight {
-		return false, constants.ErrForbidden
+		return false, internalerrors.ErrForbidden
 	}
 
 	return true, nil

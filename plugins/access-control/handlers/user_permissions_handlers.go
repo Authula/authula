@@ -23,7 +23,7 @@ func (h *GetUserPermissionsHandler) Handler() http.HandlerFunc {
 		reqCtx, _ := models.GetRequestContext(ctx)
 		userID := r.PathValue("user_id")
 
-		permissions, err := h.useCase.GetUserPermissions(r.Context(), userID)
+		permissions, err := h.useCase.GetUserPermissions(ctx, userID)
 		if err != nil {
 			respondUserHandlerError(reqCtx, err)
 			return
@@ -47,14 +47,19 @@ func (h *CheckUserPermissionsHandler) Handler() http.HandlerFunc {
 		reqCtx, _ := models.GetRequestContext(ctx)
 		userID := r.PathValue("user_id")
 
-		var payload types.CheckUserPermissionsRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+		var request types.CheckUserPermissionsRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
 
-		allowed, err := h.useCase.HasPermissions(r.Context(), userID, payload.PermissionKeys)
+		allowed, err := h.useCase.HasPermissions(ctx, userID, request.PermissionKeys)
 		if err != nil {
 			respondUserHandlerError(reqCtx, err)
 			return

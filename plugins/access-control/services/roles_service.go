@@ -3,8 +3,9 @@ package services
 import (
 	"context"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
-	"github.com/Authula/authula/plugins/access-control/constants"
+	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -21,7 +22,7 @@ func NewRolesService(rolesRepo repositories.RolesRepository, rolePermissionsRepo
 
 func (s *RolesService) CreateRole(ctx context.Context, req types.CreateRoleRequest) (*types.Role, error) {
 	if req.Name == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	var description *string
@@ -54,7 +55,7 @@ func (s *RolesService) GetAllRoles(ctx context.Context) ([]types.Role, error) {
 
 func (s *RolesService) GetRoleByName(ctx context.Context, roleName string) (*types.Role, error) {
 	if roleName == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	role, err := s.rolesRepo.GetRoleByName(ctx, roleName)
@@ -62,7 +63,7 @@ func (s *RolesService) GetRoleByName(ctx context.Context, roleName string) (*typ
 		return nil, err
 	}
 	if role == nil {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	return role, nil
@@ -70,7 +71,7 @@ func (s *RolesService) GetRoleByName(ctx context.Context, roleName string) (*typ
 
 func (s *RolesService) GetRoleByID(ctx context.Context, roleID string) (*types.RoleDetails, error) {
 	if roleID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	role, err := s.rolesRepo.GetRoleByID(ctx, roleID)
@@ -78,7 +79,7 @@ func (s *RolesService) GetRoleByID(ctx context.Context, roleID string) (*types.R
 		return nil, err
 	}
 	if role == nil {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	permissions, err := s.rolePermissionsRepo.GetRolePermissions(ctx, roleID)
@@ -91,11 +92,11 @@ func (s *RolesService) GetRoleByID(ctx context.Context, roleID string) (*types.R
 
 func (s *RolesService) UpdateRole(ctx context.Context, roleID string, req types.UpdateRoleRequest) (*types.Role, error) {
 	if roleID == "" {
-		return nil, constants.ErrBadRequest
+		return nil, internalerrors.ErrBadRequest
 	}
 
 	if req.Name == nil && req.Description == nil && req.Weight == nil {
-		return nil, constants.ErrUnprocessableEntity
+		return nil, internalerrors.ErrUnprocessableEntity
 	}
 
 	role, err := s.rolesRepo.GetRoleByID(ctx, roleID)
@@ -103,16 +104,16 @@ func (s *RolesService) UpdateRole(ctx context.Context, roleID string, req types.
 		return nil, err
 	}
 	if role == nil {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 	if role.IsSystem {
-		return nil, constants.ErrCannotUpdateSystemRole
+		return nil, accesscontrolconstants.ErrCannotUpdateSystemRole
 	}
 
 	var name *string
 	if req.Name != nil {
 		if *req.Name == "" {
-			return nil, constants.ErrBadRequest
+			return nil, internalerrors.ErrBadRequest
 		}
 		name = req.Name
 	}
@@ -132,7 +133,7 @@ func (s *RolesService) UpdateRole(ctx context.Context, roleID string, req types.
 		return nil, err
 	}
 	if !updated {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	role, err = s.rolesRepo.GetRoleByID(ctx, roleID)
@@ -140,7 +141,7 @@ func (s *RolesService) UpdateRole(ctx context.Context, roleID string, req types.
 		return nil, err
 	}
 	if role == nil {
-		return nil, constants.ErrNotFound
+		return nil, internalerrors.ErrNotFound
 	}
 
 	return role, nil
@@ -148,7 +149,7 @@ func (s *RolesService) UpdateRole(ctx context.Context, roleID string, req types.
 
 func (s *RolesService) DeleteRole(ctx context.Context, roleID string) error {
 	if roleID == "" {
-		return constants.ErrBadRequest
+		return internalerrors.ErrBadRequest
 	}
 
 	role, err := s.rolesRepo.GetRoleByID(ctx, roleID)
@@ -156,10 +157,10 @@ func (s *RolesService) DeleteRole(ctx context.Context, roleID string) error {
 		return err
 	}
 	if role == nil {
-		return constants.ErrNotFound
+		return internalerrors.ErrNotFound
 	}
 	if role.IsSystem {
-		return constants.ErrCannotUpdateSystemRole
+		return accesscontrolconstants.ErrCannotUpdateSystemRole
 	}
 
 	totalUsersByRole, err := s.userRolesRepo.CountUsersByRole(ctx, roleID)
@@ -167,7 +168,7 @@ func (s *RolesService) DeleteRole(ctx context.Context, roleID string) error {
 		return err
 	}
 	if totalUsersByRole > 0 {
-		return constants.ErrConflict
+		return internalerrors.ErrConflict
 	}
 
 	deleted, err := s.rolesRepo.DeleteRole(ctx, roleID)
@@ -175,7 +176,7 @@ func (s *RolesService) DeleteRole(ctx context.Context, roleID string) error {
 		return err
 	}
 	if !deleted {
-		return constants.ErrNotFound
+		return internalerrors.ErrNotFound
 	}
 
 	return nil

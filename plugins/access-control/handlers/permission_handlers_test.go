@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
-	"github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/services"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
@@ -32,7 +32,7 @@ func TestGetAllPermissionsHandler(t *testing.T) {
 		{
 			name: "service error",
 			setupMock: func(m *accesscontroltests.MockPermissionsRepository) {
-				m.On("GetAllPermissions", mock.Anything).Return(([]types.Permission)(nil), constants.ErrForbidden).Once()
+				m.On("GetAllPermissions", mock.Anything).Return(([]types.Permission)(nil), internalerrors.ErrForbidden).Once()
 			},
 			expectedStatus: http.StatusForbidden,
 			expectedBody:   map[string]string{"message": "forbidden"},
@@ -133,7 +133,7 @@ func TestCreatePermissionHandler(t *testing.T) {
 			name:           "invalid request body",
 			body:           []byte("{invalid json"),
 			expectedStatus: http.StatusUnprocessableEntity,
-			expectedBody:   map[string]string{"message": "invalid request body"},
+			expectedBody:   map[string]string{"message": "invalid character 'i' looking for beginning of object key string"},
 		},
 		{
 			name: "service error",
@@ -145,7 +145,7 @@ func TestCreatePermissionHandler(t *testing.T) {
 			setupMock: func(m *accesscontroltests.MockPermissionsRepository) {
 				m.On("CreatePermission", mock.Anything, mock.MatchedBy(func(permission *types.Permission) bool {
 					return permission != nil && permission.Key == "users.create" && permission.Description != nil && *permission.Description == *description && !permission.IsSystem && permission.ID != ""
-				})).Return(constants.ErrBadRequest).Once()
+				})).Return(internalerrors.ErrBadRequest).Once()
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   map[string]string{"message": "bad request"},
@@ -233,7 +233,7 @@ func TestGetPermissionByIDHandler(t *testing.T) {
 			name:         "service error",
 			permissionID: "perm-404",
 			setupMock: func(m *accesscontroltests.MockPermissionsRepository) {
-				m.On("GetPermissionByID", mock.Anything, "perm-404").Return((*types.Permission)(nil), constants.ErrNotFound).Once()
+				m.On("GetPermissionByID", mock.Anything, "perm-404").Return((*types.Permission)(nil), internalerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedBody:   map[string]string{"message": "not found"},
@@ -320,7 +320,7 @@ func TestUpdatePermissionHandler(t *testing.T) {
 			permissionID:   "perm-1",
 			body:           []byte("{invalid json"),
 			expectedStatus: http.StatusUnprocessableEntity,
-			expectedBody:   map[string]string{"message": "invalid request body"},
+			expectedBody:   map[string]string{"message": "invalid character 'i' looking for beginning of object key string"},
 		},
 		{
 			name:         "service error",
@@ -330,7 +330,7 @@ func TestUpdatePermissionHandler(t *testing.T) {
 				m.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read", Description: existingDescription, IsSystem: false}, nil).Once()
 				m.On("UpdatePermission", mock.Anything, "perm-1", mock.MatchedBy(func(description *string) bool {
 					return description != nil && *description == *updatedDescriptionPtr
-				})).Return(false, constants.ErrBadRequest).Once()
+				})).Return(false, internalerrors.ErrBadRequest).Once()
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   map[string]string{"message": "bad request"},

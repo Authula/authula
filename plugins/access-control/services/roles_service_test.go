@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
+	internalerrors "github.com/Authula/authula/internal/errors"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -48,7 +48,7 @@ func TestRolesServiceGetRoleByName(t *testing.T) {
 		{
 			name:     "bad request",
 			roleName: "",
-			wantErr:  accesscontrolconstants.ErrBadRequest,
+			wantErr:  internalerrors.ErrBadRequest,
 		},
 		{
 			name:     "not found",
@@ -56,7 +56,7 @@ func TestRolesServiceGetRoleByName(t *testing.T) {
 			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
 				rolesRepo.On("GetRoleByName", mock.Anything, "missing").Return((*types.Role)(nil), nil).Once()
 			},
-			wantErr: accesscontrolconstants.ErrNotFound,
+			wantErr: internalerrors.ErrNotFound,
 		},
 		{
 			name:     "success",
@@ -191,7 +191,7 @@ func TestRolesServiceDeleteRole(t *testing.T) {
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "admin"}, nil).Once()
 				userRolesRepo.On("CountUsersByRole", mock.Anything, "role-1").Return(1, nil).Once()
 			},
-			wantErr: accesscontrolconstants.ErrConflict,
+			wantErr: internalerrors.ErrConflict,
 		},
 		{
 			name: "success",

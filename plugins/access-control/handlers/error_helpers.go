@@ -4,7 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Authula/authula/plugins/access-control/constants"
+	internalerrors "github.com/Authula/authula/internal/errors"
+	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
 )
 
 func mapHttpErrorStatus(err error) int {
@@ -13,17 +14,17 @@ func mapHttpErrorStatus(err error) int {
 	}
 
 	switch {
-	case errors.Is(err, constants.ErrUnauthorized):
+	case errors.Is(err, internalerrors.ErrUnauthorized):
 		return http.StatusUnauthorized
-	case errors.Is(err, constants.ErrForbidden), errors.Is(err, constants.ErrCannotUpdateSystemRole):
+	case errors.Is(err, internalerrors.ErrForbidden), errors.Is(err, accesscontrolconstants.ErrCannotUpdateSystemRole):
 		return http.StatusForbidden
-	case errors.Is(err, constants.ErrNotFound):
+	case errors.Is(err, internalerrors.ErrNotFound):
 		return http.StatusNotFound
-	case errors.Is(err, constants.ErrConflict):
+	case errors.Is(err, internalerrors.ErrConflict):
 		return http.StatusConflict
-	case errors.Is(err, constants.ErrBadRequest):
+	case errors.Is(err, internalerrors.ErrBadRequest):
 		return http.StatusBadRequest
-	case errors.Is(err, constants.ErrUnprocessableEntity):
+	case errors.Is(err, internalerrors.ErrUnprocessableEntity):
 		return http.StatusUnprocessableEntity
 	default:
 		return http.StatusInternalServerError
@@ -36,19 +37,19 @@ func mapHttpErrorMessage(err error) string {
 	}
 
 	switch {
-	case errors.Is(err, constants.ErrUnauthorized):
+	case errors.Is(err, internalerrors.ErrUnauthorized):
 		return "unauthorized"
-	case errors.Is(err, constants.ErrForbidden):
+	case errors.Is(err, internalerrors.ErrForbidden):
 		return "forbidden"
-	case errors.Is(err, constants.ErrNotFound):
+	case errors.Is(err, internalerrors.ErrNotFound):
 		return "not found"
-	case errors.Is(err, constants.ErrConflict):
+	case errors.Is(err, internalerrors.ErrConflict):
 		return "conflict"
-	case errors.Is(err, constants.ErrBadRequest):
+	case errors.Is(err, internalerrors.ErrBadRequest):
 		return "bad request"
-	case errors.Is(err, constants.ErrUnprocessableEntity):
+	case errors.Is(err, internalerrors.ErrUnprocessableEntity):
 		return "unprocessable entity"
-	case errors.Is(err, constants.ErrCannotUpdateSystemRole):
+	case errors.Is(err, accesscontrolconstants.ErrCannotUpdateSystemRole):
 		return "cannot update system role"
 	default:
 		return err.Error()

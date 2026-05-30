@@ -51,14 +51,19 @@ func (h *ReplaceUserRolesHandler) Handler() http.HandlerFunc {
 		reqCtx, _ := models.GetRequestContext(ctx)
 		userID := r.PathValue("user_id")
 
-		var payload types.ReplaceUserRolesRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+		var request types.ReplaceUserRolesRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
 
-		if err := h.useCase.ReplaceUserRoles(r.Context(), userID, payload.RoleIDs, userActorUserID(reqCtx)); err != nil {
+		if err := h.useCase.ReplaceUserRoles(ctx, userID, request.RoleIDs, userActorUserID(reqCtx)); err != nil {
 			respondUserHandlerError(reqCtx, err)
 			return
 		}
@@ -81,14 +86,19 @@ func (h *AssignUserRoleHandler) Handler() http.HandlerFunc {
 		reqCtx, _ := models.GetRequestContext(ctx)
 		userID := r.PathValue("user_id")
 
-		var payload types.AssignUserRoleRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+		var request types.AssignUserRoleRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
 
-		if err := h.useCase.AssignRoleToUser(r.Context(), userID, payload, userActorUserID(reqCtx)); err != nil {
+		if err := h.useCase.AssignRoleToUser(ctx, userID, request, userActorUserID(reqCtx)); err != nil {
 			respondUserHandlerError(reqCtx, err)
 			return
 		}
@@ -112,7 +122,7 @@ func (h *RemoveUserRoleHandler) Handler() http.HandlerFunc {
 		userID := r.PathValue("user_id")
 		roleID := r.PathValue("role_id")
 
-		if err := h.useCase.RemoveRoleFromUser(r.Context(), userID, roleID); err != nil {
+		if err := h.useCase.RemoveRoleFromUser(ctx, userID, roleID); err != nil {
 			respondUserHandlerError(reqCtx, err)
 			return
 		}
