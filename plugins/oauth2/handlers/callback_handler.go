@@ -21,7 +21,7 @@ func NewCallbackHandler(useCase *usecases.CallbackUseCase, hmacKey []byte) *Call
 	return &CallbackHandler{UseCase: useCase, HMACKey: hmacKey}
 }
 
-func (h *CallbackHandler) Handler() http.HandlerFunc {
+func (h *CallbackHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
@@ -68,7 +68,7 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		if reqCtx.UserID != nil && *reqCtx.UserID != "" {
+		if reqCtx.Actor != nil {
 			if sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && sessionID != "" {
 				existingSession, err := h.UseCase.GetSessionByID(ctx, sessionID)
 				if err == nil && existingSession != nil && existingSession.ExpiresAt.After(time.Now()) {
@@ -125,7 +125,10 @@ func (h *CallbackHandler) Handler() http.HandlerFunc {
 			MaxAge:   -1,
 		})
 
-		reqCtx.SetUserIDInContext(result.User.ID)
+		reqCtx.SetActorInContext(&models.Actor{
+			ID:   result.User.ID,
+			Type: models.ActorUser,
+		})
 		reqCtx.Values[models.ContextSessionID.String()] = result.Session.ID
 		reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken
 		reqCtx.Values[models.ContextAuthSuccess.String()] = true

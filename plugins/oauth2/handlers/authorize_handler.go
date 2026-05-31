@@ -19,7 +19,7 @@ func NewAuthorizeHandler(useCase *usecases.AuthorizeUseCase) *AuthorizeHandler {
 	return &AuthorizeHandler{UseCase: useCase}
 }
 
-func (h *AuthorizeHandler) Handler() http.HandlerFunc {
+func (h *AuthorizeHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
