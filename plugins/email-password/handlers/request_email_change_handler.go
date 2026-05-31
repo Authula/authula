@@ -20,7 +20,7 @@ func (h *RequestEmailChangeHandler) Handler() http.HandlerFunc {
 
 		var request types.RequestEmailChangeRequest
 		if err := util.ParseJSON(r, &request); err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
 				"message": err.Error(),
 			})
 			reqCtx.Handled = true
