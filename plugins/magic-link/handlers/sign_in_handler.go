@@ -18,7 +18,7 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		if reqCtx.UserID != nil && *reqCtx.UserID != "" {
+		if reqCtx.Actor != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": "you're already authenticated.",
 			})
@@ -28,25 +28,19 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 
 		var request types.SignInRequest
 		if err := util.ParseJSON(r, &request); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
-				"message": "invalid request body",
-			})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
 		if err := request.Validate(); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
-				"message": err.Error(),
-			})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
 
 		_, err := h.UseCase.SignIn(ctx, request.Name, request.Email, request.CallbackURL)
 		if err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
-				"message": err.Error(),
-			})
+			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}

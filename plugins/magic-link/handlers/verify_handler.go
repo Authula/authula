@@ -33,9 +33,7 @@ func (h *VerifyHandler) Handler() http.HandlerFunc {
 		userAgent := r.UserAgent()
 		tokenForExchange, err := h.UseCase.Verify(ctx, token, &reqCtx.ClientIP, &userAgent)
 		if err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
-				"message": err.Error(),
-			})
+			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}

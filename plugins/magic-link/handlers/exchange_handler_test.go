@@ -15,9 +15,11 @@ import (
 )
 
 func TestExchangeHandler(t *testing.T) {
+	actor := &models.Actor{ID: "user-123", Type: models.ActorUser}
 	testCases := []struct {
 		name         string
 		body         []byte
+		actor        *models.Actor
 		setup        func(t *testing.T, useCase *plugintests.MockExchangeUseCase)
 		assertResult func(t *testing.T, reqCtx *models.RequestContext)
 	}{
@@ -70,7 +72,7 @@ func TestExchangeHandler(t *testing.T) {
 			name: "invalid json",
 			body: []byte("{invalid"),
 			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
-				internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid request body")
+				internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid character 'i' looking for beginning of object key string")
 			},
 		},
 		{
@@ -109,6 +111,13 @@ func TestExchangeHandler(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:  "already authenticated returns bad request",
+			actor: actor,
+			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
+				internaltests.AssertErrorMessage(t, reqCtx, http.StatusBadRequest, "you're already authenticated.")
+			},
+		},
 	}
 
 	for _, tt := range testCases {
@@ -119,7 +128,7 @@ func TestExchangeHandler(t *testing.T) {
 			}
 
 			handler := &ExchangeHandler{UseCase: useCase}
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/magic-link/exchange", tt.body, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodPost, "/magic-link/exchange", tt.body, tt.actor)
 
 			if tt.name == "passes request metadata to use case" {
 				req.Header.Set("User-Agent", "TestAgent/1.0")

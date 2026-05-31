@@ -16,8 +16,6 @@ import (
 )
 
 func TestSignInHandler(t *testing.T) {
-	name := "John Doe"
-
 	testCases := []struct {
 		name         string
 		requestBody  []byte
@@ -56,11 +54,11 @@ func TestSignInHandler(t *testing.T) {
 		},
 		{
 			name:        "invalid json",
-			requestBody: []byte("invalid json"),
+			requestBody: []byte("{invalid"),
 			setup: func(t *testing.T, reqCtx *models.RequestContext, userService *internaltests.MockUserService, accountService *internaltests.MockAccountService, tokenService *internaltests.MockTokenService, verificationService *internaltests.MockVerificationService) {
 			},
 			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
-				internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid request body")
+				internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid character 'i' looking for beginning of object key string")
 			},
 		},
 		{
@@ -88,7 +86,7 @@ func TestSignInHandler(t *testing.T) {
 			name:        "already authenticated returns bad request",
 			requestBody: internaltests.MarshalToJSON(t, types.SignInRequest{Email: "test@example.com"}),
 			setup: func(t *testing.T, reqCtx *models.RequestContext, userService *internaltests.MockUserService, accountService *internaltests.MockAccountService, tokenService *internaltests.MockTokenService, verificationService *internaltests.MockVerificationService) {
-				reqCtx.UserID = &name
+				reqCtx.Actor = &models.Actor{ID: "user-123", Type: models.ActorUser}
 			},
 			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
 				if reqCtx.ResponseStatus != http.StatusBadRequest {
@@ -110,7 +108,7 @@ func TestSignInHandler(t *testing.T) {
 				reqBody = []byte(`{}`)
 			}
 
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/magic-link/sign-in", reqBody, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodPost, "/magic-link/sign-in", reqBody, nil)
 
 			userService := &internaltests.MockUserService{}
 			accountService := &internaltests.MockAccountService{}

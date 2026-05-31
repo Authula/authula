@@ -113,7 +113,7 @@ func TestVerifyHandler_Handler(t *testing.T) {
 				TrustedOrigins: tt.trustedHosts,
 			}
 
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, tt.target, nil, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodGet, tt.target, nil, nil)
 			handler.Handler()(w, req)
 
 			tt.assertResult(t, reqCtx)
