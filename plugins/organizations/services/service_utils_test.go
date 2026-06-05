@@ -83,12 +83,12 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		if tt.setup != nil {
-			tt.setup(orgRepo)
-		}
+			orgRepo := &orgtests.MockOrganizationRepository{}
+			if tt.setup != nil {
+				tt.setup(orgRepo)
+			}
 
-		org, err := (&ServiceUtils{orgRepo: orgRepo, authorizer: &noopAuthorizer{}}).authorizeOwner(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization)
+			org, err := (&ServiceUtils{orgRepo: orgRepo, authorizer: &noopAuthorizer{}}).authorizeOwner(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				require.Nil(t, org)

@@ -38,7 +38,9 @@ func newOrganizationHandlerFixture() *organizationHandlerFixture {
 }
 
 func (f *organizationHandlerFixture) newRequest(t *testing.T, method, path string, body []byte, userID *string, organizationID string) (*http.Request, *httptest.ResponseRecorder, *models.RequestContext) {
-	req, w, reqCtx := internaltests.NewHandlerRequest(t, method, path, body, userID)
+	var req *http.Request
+	var w *httptest.ResponseRecorder
+	var reqCtx *models.RequestContext
 	if userID != nil {
 		req, w, reqCtx = internaltests.NewHandlerRequestWithActor(t, method, path, body, orgtests.Actor(*userID))
 	} else {

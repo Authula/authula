@@ -294,11 +294,11 @@ func TestCSRFPlugin_CSRFValidation(t *testing.T) {
 			headerValue: "token123",
 		},
 		{
-			name:       "POST missing cookie",
-			method:     http.MethodPost,
-			hasHeader:  true,
+			name:        "POST missing cookie",
+			method:      http.MethodPost,
+			hasHeader:   true,
 			headerValue: "token",
-			wantReject: true,
+			wantReject:  true,
 		},
 		{
 			name:        "POST mismatched tokens",
@@ -599,7 +599,7 @@ func TestCSRFPlugin_Middleware(t *testing.T) {
 					w.WriteHeader(reqCtx.ResponseStatus)
 				}
 				if len(reqCtx.ResponseBody) > 0 {
-					w.Write(reqCtx.ResponseBody)
+					_, _ = w.Write(reqCtx.ResponseBody)
 				}
 			}
 
