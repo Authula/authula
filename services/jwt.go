@@ -1,5 +1,11 @@
 package services
 
+import (
+	"context"
+
+	"github.com/Authula/authula/models"
+)
+
 type JWTService interface {
-	ValidateToken(token string) (userID string, err error)
+	ValidateToken(ctx context.Context, token string) (*models.Actor, error)
 }

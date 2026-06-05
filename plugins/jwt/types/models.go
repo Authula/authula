@@ -6,7 +6,6 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// JWKS represents a cryptographic key pair for signing and verification
 type JWKS struct {
 	bun.BaseModel `bun:"table:jwks"`
 
@@ -17,7 +16,6 @@ type JWKS struct {
 	CreatedAt  time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp"`
 }
 
-// RefreshToken represents a stored refresh token in the database
 type RefreshToken struct {
 	bun.BaseModel `bun:"table:refresh_tokens"`
 

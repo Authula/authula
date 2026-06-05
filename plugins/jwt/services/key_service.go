@@ -2,11 +2,8 @@ package services
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"crypto/ed25519"
-	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -25,17 +22,14 @@ type keyService struct {
 	repo         repositories.JWKSRepository
 	logger       models.Logger
 	secret       string
-	algorithm    types.JWTAlgorithm
 	tokenService coreservices.TokenService
 }
 
-// NewKeyService creates a new key service
-func NewKeyService(repo repositories.JWKSRepository, logger models.Logger, tokenService coreservices.TokenService, secret string, algorithm types.JWTAlgorithm) KeyService {
+func NewKeyService(repo repositories.JWKSRepository, logger models.Logger, tokenService coreservices.TokenService, secret string) KeyService {
 	return &keyService{
 		repo:         repo,
 		logger:       logger,
 		secret:       secret,
-		algorithm:    algorithm,
 		tokenService: tokenService,
 	}
 }
@@ -121,59 +115,19 @@ func (s *keyService) RotateKeysIfNeeded(ctx context.Context, rotationInterval ti
 	return true, nil
 }
 
-// generateKey returns a newly generated private/public key pair for the given algorithm
-func generateKey(alg types.JWTAlgorithm) (priv any, pub any, err error) {
-	switch alg {
-	case types.JWTAlgRS256, types.JWTAlgPS256:
-		priv, err = rsa.GenerateKey(rand.Reader, 2048)
-		if err != nil {
-			return nil, nil, err
-		}
-		pub = &priv.(*rsa.PrivateKey).PublicKey
-		return
-
-	case types.JWTAlgES256:
-		priv, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		if err != nil {
-			return nil, nil, err
-		}
-		pub = &priv.(*ecdsa.PrivateKey).PublicKey
-		return
-
-	case types.JWTAlgES512:
-		priv, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
-		if err != nil {
-			return nil, nil, err
-		}
-		pub = &priv.(*ecdsa.PrivateKey).PublicKey
-		return
-
-	case types.JWTAlgEdDSA:
-		var seed [32]byte
-		if _, err := rand.Read(seed[:]); err != nil {
-			return nil, nil, fmt.Errorf("failed to read random seed: %w", err)
-		}
-		priv = ed25519.NewKeyFromSeed(seed[:])
-		pub = priv.(ed25519.PrivateKey).Public()
-		return
-
-	case types.JWTAlgECDHES:
-		// ECDH-ES uses EC P-256 keys for key agreement (future JWE)
-		priv, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		if err != nil {
-			return nil, nil, err
-		}
-		pub = &priv.(*ecdsa.PrivateKey).PublicKey
-		return
-
-	default:
-		return nil, nil, fmt.Errorf("unsupported algorithm: %s", alg)
+func generateKey() (priv any, pub any, err error) {
+	var seed [32]byte
+	if _, err := rand.Read(seed[:]); err != nil {
+		return nil, nil, fmt.Errorf("failed to read random seed: %w", err)
 	}
+	priv = ed25519.NewKeyFromSeed(seed[:])
+	pub = priv.(ed25519.PrivateKey).Public()
+	return
 }
 
 // generateAndStoreKey generates a key pair and stores it in the database
 func (s *keyService) generateAndStoreKey(ctx context.Context) error {
-	privKey, pubKey, err := generateKey(s.algorithm)
+	privKey, pubKey, err := generateKey()
 	if err != nil {
 		return fmt.Errorf("failed to generate key pair: %w", err)
 	}
@@ -205,7 +159,7 @@ func (s *keyService) generateAndStoreKey(ctx context.Context) error {
 		return fmt.Errorf("failed to store key: %w", err)
 	}
 
-	s.logger.Info("generated and stored key", "id", jwksKey.ID, "algorithm", s.algorithm.String())
+	s.logger.Info("generated and stored key", "id", jwksKey.ID, "algorithm", "EdDSA")
 	return nil
 }
 
@@ -215,12 +169,6 @@ func privateKeyToPEM(privKey any) ([]byte, error) {
 	var keyType string
 
 	switch pk := privKey.(type) {
-	case *rsa.PrivateKey:
-		keyBytes, _ = x509.MarshalPKCS8PrivateKey(pk)
-		keyType = "PRIVATE KEY"
-	case *ecdsa.PrivateKey:
-		keyBytes, _ = x509.MarshalPKCS8PrivateKey(pk)
-		keyType = "PRIVATE KEY"
 	case ed25519.PrivateKey:
 		keyBytes, _ = x509.MarshalPKCS8PrivateKey(pk)
 		keyType = "PRIVATE KEY"
@@ -242,12 +190,6 @@ func publicKeyToPEM(pubKey any) ([]byte, error) {
 	var keyType string
 
 	switch pk := pubKey.(type) {
-	case *rsa.PublicKey:
-		keyBytes, _ = x509.MarshalPKIXPublicKey(pk)
-		keyType = "PUBLIC KEY"
-	case *ecdsa.PublicKey:
-		keyBytes, _ = x509.MarshalPKIXPublicKey(pk)
-		keyType = "PUBLIC KEY"
 	case ed25519.PublicKey:
 		keyBytes, _ = x509.MarshalPKIXPublicKey(pk)
 		keyType = "PUBLIC KEY"

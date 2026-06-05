@@ -73,13 +73,16 @@ func (p *BearerPlugin) AuthMiddleware() func(http.Handler) http.Handler {
 				return
 			}
 
-			userID, err := p.jwtService.ValidateToken(token)
+			actor, err := p.jwtService.ValidateToken(r.Context(), token)
 			if err != nil {
 				p.writeUnauthorized(w, err)
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), models.ContextUserID, userID)
+			ctx := context.WithValue(r.Context(), models.ContextAuthActor, actor)
+			if actor.ID != "" {
+				ctx = context.WithValue(ctx, models.ContextUserID, actor.ID)
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -90,8 +93,11 @@ func (p *BearerPlugin) OptionalAuthMiddleware() func(http.Handler) http.Handler 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token, err := p.extractToken(r)
 			if err == nil && token != "" {
-				if userID, validateErr := p.jwtService.ValidateToken(token); validateErr == nil {
-					ctx := context.WithValue(r.Context(), models.ContextUserID, userID)
+				if actor, validateErr := p.jwtService.ValidateToken(r.Context(), token); validateErr == nil {
+					ctx := context.WithValue(r.Context(), models.ContextAuthActor, actor)
+					if actor.ID != "" {
+						ctx = context.WithValue(ctx, models.ContextUserID, actor.ID)
+					}
 					r = r.WithContext(ctx)
 				}
 			}

@@ -1,12 +1,12 @@
 package jwt
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/Authula/authula/models"
+	jwtservices "github.com/Authula/authula/plugins/jwt/services"
 	"github.com/Authula/authula/plugins/jwt/types"
 )
 
@@ -43,7 +43,7 @@ func (p *JWTPlugin) issueTokensHookMatcher(reqCtx *models.RequestContext) bool {
 }
 
 func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
-	if reqCtx.Actor == nil || reqCtx.Actor.Type != models.ActorUser {
+	if reqCtx.Actor == nil {
 		return nil
 	}
 
@@ -51,45 +51,71 @@ func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
 		return nil
 	}
 
-	sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string)
-	if !ok || sessionID == "" {
-		return nil
-	}
+	ctx := reqCtx.Request.Context()
 
-	tokenPair, err := p.jwtService.GenerateTokens(context.Background(), reqCtx.Actor.ID, sessionID)
-	if err != nil {
-		p.Logger.Error("failed to generate JWT tokens", "user_id", reqCtx.Actor.ID, "session_id", sessionID, "error", err)
-		return fmt.Errorf("failed to generate authentication tokens: %w", err)
-	}
+	switch reqCtx.Actor.Type {
+	case models.ActorMachine:
+		{
+			orgID := ""
+			if reqCtx.Actor.OrganizationID != nil {
+				orgID = *reqCtx.Actor.OrganizationID
+			}
+			tokenPair, err := p.jwtService.(jwtservices.TokenService).GenerateMachineToken(
+				ctx, reqCtx.Actor.ID, orgID, reqCtx.Actor.Scopes,
+			)
+			if err != nil {
+				p.Logger.Error("failed to generate machine JWT token", "client_id", reqCtx.Actor.ID, "error", err)
+				return fmt.Errorf("failed to generate machine authentication tokens: %w", err)
+			}
+			reqCtx.Values[types.JWTTokenTypeAccess.String()] = tokenPair.AccessToken
+		}
+	case models.ActorUser:
+		{
+			sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string)
+			if !ok || sessionID == "" {
+				return nil
+			}
 
-	expiresAt := time.Now().Add(p.pluginConfig.RefreshExpiresIn)
-	if err := p.refreshService.StoreInitialRefreshToken(reqCtx.Request.Context(), tokenPair.RefreshToken, sessionID, expiresAt); err != nil {
-		p.Logger.Error("failed to store refresh token", "user_id", reqCtx.Actor.ID, "session_id", sessionID, "error", err)
-		return fmt.Errorf("failed to store refresh token: %w", err)
-	}
+			tokenPair, err := p.jwtService.(jwtservices.TokenService).GenerateUserToken(ctx, reqCtx.Actor.ID, sessionID)
+			if err != nil {
+				p.Logger.Error("failed to generate user JWT tokens", "user_id", reqCtx.Actor.ID, "session_id", sessionID, "error", err)
+				return fmt.Errorf("failed to generate authentication tokens: %w", err)
+			}
 
-	reqCtx.Values[types.JWTTokenTypeAccess.String()] = tokenPair.AccessToken
-	reqCtx.Values[types.JWTTokenTypeRefresh.String()] = tokenPair.RefreshToken
+			expiresAt := time.Now().Add(p.pluginConfig.RefreshExpiresIn)
+			if err := p.refreshService.StoreInitialRefreshToken(ctx, tokenPair.RefreshToken, sessionID, expiresAt); err != nil {
+				p.Logger.Error("failed to store refresh token", "user_id", reqCtx.Actor.ID, "session_id", sessionID, "error", err)
+				return fmt.Errorf("failed to store refresh token: %w", err)
+			}
+
+			reqCtx.Values[types.JWTTokenTypeAccess.String()] = tokenPair.AccessToken
+			reqCtx.Values[types.JWTTokenTypeRefresh.String()] = tokenPair.RefreshToken
+		}
+	}
 
 	return nil
 }
 
 func (p *JWTPlugin) respondHook(reqCtx *models.RequestContext) error {
-	if reqCtx.Actor == nil || reqCtx.Actor.Type != models.ActorUser {
+	if reqCtx.Actor == nil {
 		return nil
 	}
 
-	access, ok1 := reqCtx.Values[types.JWTTokenTypeAccess.String()].(string)
-	refresh, ok2 := reqCtx.Values[types.JWTTokenTypeRefresh.String()].(string)
-	if !ok1 || !ok2 {
+	access, ok := reqCtx.Values[types.JWTTokenTypeAccess.String()].(string)
+	if !ok || access == "" {
 		return nil
 	}
 
-	reqCtx.SetJSONResponse(http.StatusOK, map[string]any{
-		"access_token":  access,
-		"refresh_token": refresh,
-	})
+	payload := map[string]any{
+		"access_token": access,
+		"token_type":   "Bearer",
+	}
+
+	if refresh, ok := reqCtx.Values[types.JWTTokenTypeRefresh.String()].(string); ok && refresh != "" {
+		payload["refresh_token"] = refresh
+	}
+
+	reqCtx.SetJSONResponse(http.StatusOK, payload)
 	reqCtx.Handled = true
-
 	return nil
 }

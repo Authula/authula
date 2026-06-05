@@ -9,15 +9,10 @@ import (
 	"github.com/Authula/authula/plugins/jwt/types"
 )
 
-// RefreshTokenResponse contains the result of a token refresh operation
-type RefreshTokenResponse struct {
-	AccessToken  string
-	RefreshToken string
-}
-
-// JwtService defines the JWT operations
-type JwtService interface {
-	GenerateTokens(ctx context.Context, userID string, sessionID string) (*types.TokenPair, error)
+// TokenService defines token generation operations for both user and machine actors
+type TokenService interface {
+	GenerateUserToken(ctx context.Context, userID string, sessionID string) (*types.TokenPair, error)
+	GenerateMachineToken(ctx context.Context, clientID string, organizationID string, scopes []string) (*types.TokenPair, error)
 }
 
 // KeyService manages cryptographic key generation, rotation, and retrieval
@@ -37,15 +32,6 @@ type KeyService interface {
 	RotateKeysIfNeeded(ctx context.Context, rotationInterval time.Duration, gracePeriod time.Duration, invalidateCacheFunc func(context.Context) error) (bool, error)
 }
 
-// RefreshTokenStorage defines storage operations for refresh tokens
-type RefreshTokenStorage interface {
-	StoreRefreshToken(ctx context.Context, record *types.RefreshToken) error
-	GetRefreshToken(ctx context.Context, tokenHash string) (*types.RefreshToken, error)
-	RevokeRefreshToken(ctx context.Context, tokenHash string) error
-	SetLastReuseAttempt(ctx context.Context, tokenHash string) error
-	RevokeAllSessionTokens(ctx context.Context, sessionID string) error
-}
-
 // RefreshTokenRepository defines data access operations for refresh tokens
 type RefreshTokenRepository interface {
 	StoreRefreshToken(ctx context.Context, record *types.RefreshToken) error
@@ -59,7 +45,7 @@ type RefreshTokenRepository interface {
 // RefreshTokenService handles refresh token operations
 type RefreshTokenService interface {
 	// RefreshTokens refreshes the access and refresh tokens using the provided refresh token
-	RefreshTokens(ctx context.Context, refreshToken string) (*RefreshTokenResponse, error)
+	RefreshTokens(ctx context.Context, refreshToken string) (*types.RefreshTokenResponse, error)
 
 	// StoreInitialRefreshToken stores the initial refresh token along with its session ID and expiration time
 	StoreInitialRefreshToken(ctx context.Context, refreshToken string, sessionID string, expiresAt time.Time) error
