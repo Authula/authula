@@ -17,9 +17,9 @@ import (
 
 type nopTokenService struct{}
 
-func (nopTokenService) Generate() (string, error)            { return "", nil }
-func (nopTokenService) Hash(token string) string              { return token }
-func (nopTokenService) Encrypt(token string) (string, error)  { return token, nil }
+func (nopTokenService) Generate() (string, error)                { return "", nil }
+func (nopTokenService) Hash(token string) string                 { return token }
+func (nopTokenService) Encrypt(token string) (string, error)     { return token, nil }
 func (nopTokenService) Decrypt(encrypted string) (string, error) { return encrypted, nil }
 
 func setupKeyServiceTest(t *testing.T) (KeyService, repositories.JWKSRepository) {

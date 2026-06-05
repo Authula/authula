@@ -34,16 +34,16 @@ func TestValidateBearerToken(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		header     string
-		setupMock  func(*bearertests.MockJWTService)
+		name        string
+		header      string
+		setupMock   func(*bearertests.MockJWTService)
 		preSetActor *models.Actor
 		wantHandled bool
 		wantStatus  int
 		wantActor   *models.Actor
 	}{
 		{
-			name: "actor_already_set",
+			name:        "actor_already_set",
 			preSetActor: &models.Actor{ID: "existing-user", Type: models.ActorUser},
 			setupMock: func(m *bearertests.MockJWTService) {
 			},
@@ -123,7 +123,7 @@ func TestValidateBearerTokenOptional(t *testing.T) {
 		wantActor   *models.Actor
 	}{
 		{
-			name: "actor_already_set_optional",
+			name:        "actor_already_set_optional",
 			preSetActor: &models.Actor{ID: "existing-user", Type: models.ActorUser},
 			setupMock: func(m *bearertests.MockJWTService) {
 			},

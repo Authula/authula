@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Authula/authula/models"
 	internalmocks "github.com/Authula/authula/internal/tests"
+	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/tests"
 	"github.com/Authula/authula/plugins/jwt/types"
 )

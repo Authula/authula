@@ -189,7 +189,6 @@ func TestKeyRotationInterval_ConfigPreservation(t *testing.T) {
 	}
 }
 
-
 func TestKeyRotationInterval_WithOtherConfigOptions(t *testing.T) {
 	config := types.JWTPluginConfig{
 		KeyRotationInterval: 45 * 24 * time.Hour,
