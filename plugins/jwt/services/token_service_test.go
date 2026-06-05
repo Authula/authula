@@ -30,8 +30,8 @@ func parseTestToken(t *testing.T, tokenStr string, f *serviceTestFixture) map[st
 	_ = parsed.Get("sub", &sub)
 	_ = parsed.Get("user_id", &userID)
 	_ = parsed.Get("session_id", &sessionID)
-	_ = parsed.Get("type", &tokenType)
-	_ = parsed.Get("act_type", &actType)
+	_ = parsed.Get("token_type", &tokenType)
+	_ = parsed.Get("actor_type", &actType)
 	_ = parsed.Get("org_id", &orgID)
 	_ = parsed.Get("scopes", &scopes)
 	_ = parsed.Get(jwt.JwtIDKey, &jti)
@@ -47,10 +47,10 @@ func parseTestToken(t *testing.T, tokenStr string, f *serviceTestFixture) map[st
 		result["session_id"] = sessionID
 	}
 	if tokenType != "" {
-		result["type"] = tokenType
+		result["token_type"] = tokenType
 	}
 	if actType != "" {
-		result["act_type"] = actType
+		result["actor_type"] = actType
 	}
 	if orgID != "" {
 		result["org_id"] = orgID
@@ -82,8 +82,8 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.SubjectKey:    "user-1",
 				"user_id":         "user-1",
 				"session_id":      "sess-1",
-				"type":            types.JWTTokenTypeAccess.String(),
-				"act_type":        "user",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
 				jwt.JwtIDKey:      "jti-1",
 				jwt.IssuedAtKey:   time.Now(),
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
@@ -101,12 +101,12 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			},
 		},
 		{
-			name: "valid_user_token_no_act_type",
+			name: "valid_user_token_no_actor_type",
 			claims: map[string]any{
 				jwt.SubjectKey:    "user-1",
 				"user_id":         "user-1",
 				"session_id":      "sess-1",
-				"type":            types.JWTTokenTypeAccess.String(),
+				"token_type":      types.JWTTokenTypeAccess.String(),
 				jwt.JwtIDKey:      "jti-2",
 				jwt.IssuedAtKey:   time.Now(),
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
@@ -126,8 +126,8 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			name: "valid_machine_token",
 			claims: map[string]any{
 				jwt.SubjectKey:    "client-1",
-				"type":            types.JWTTokenTypeAccess.String(),
-				"act_type":        "machine",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "machine",
 				"org_id":          "org-1",
 				"scopes":          []string{"read:users", "write:users"},
 				jwt.JwtIDKey:      "jti-3",
@@ -150,8 +150,8 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			name: "machine_token_no_optional_fields",
 			claims: map[string]any{
 				jwt.SubjectKey:    "client-2",
-				"type":            types.JWTTokenTypeAccess.String(),
-				"act_type":        "machine",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "machine",
 				jwt.JwtIDKey:      "jti-4",
 				jwt.IssuedAtKey:   time.Now(),
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
@@ -173,8 +173,8 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.SubjectKey:    "user-1",
 				"user_id":         "user-1",
 				"session_id":      "sess-1",
-				"type":            types.JWTTokenTypeAccess.String(),
-				"act_type":        "user",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
 				jwt.JwtIDKey:      "jti-5",
 				jwt.IssuedAtKey:   time.Now().Add(-2 * time.Hour),
 				jwt.ExpirationKey: time.Now().Add(-1 * time.Hour),
@@ -188,8 +188,8 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.SubjectKey:    "user-1",
 				"user_id":         "user-1",
 				"session_id":      "sess-1",
-				"type":            types.JWTTokenTypeAccess.String(),
-				"act_type":        "user",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
 				jwt.JwtIDKey:      "jti-6",
 				jwt.IssuedAtKey:   time.Now(),
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
@@ -204,8 +204,8 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			claims: map[string]any{
 				jwt.SubjectKey:    "user-1",
 				"session_id":      "sess-1",
-				"type":            types.JWTTokenTypeAccess.String(),
-				"act_type":        "user",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
 				jwt.JwtIDKey:      "jti-7",
 				jwt.IssuedAtKey:   time.Now(),
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
@@ -221,8 +221,8 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.SubjectKey:    "user-1",
 				"user_id":         "user-1",
 				"session_id":      "sess-1",
-				"type":            types.JWTTokenTypeAccess.String(),
-				"act_type":        "user",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
 				jwt.JwtIDKey:      "jti-8",
 				jwt.IssuedAtKey:   time.Now(),
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
@@ -286,8 +286,8 @@ func TestTokenService_GenerateUserToken(t *testing.T) {
 		require.Equal(t, "user-1", claims["sub"])
 		require.Equal(t, "user-1", claims["user_id"])
 		require.Equal(t, "sess-1", claims["session_id"])
-		require.Equal(t, "user", claims["act_type"])
-		require.Equal(t, "access_token", claims["type"])
+		require.Equal(t, "user", claims["actor_type"])
+		require.Equal(t, "access_token", claims["token_type"])
 		require.NotEmpty(t, claims["jti"])
 
 		f.keySvc.AssertExpectations(t)
@@ -329,9 +329,9 @@ func TestTokenService_GenerateMachineToken(t *testing.T) {
 
 		claims := parseTestToken(t, pair.AccessToken, f)
 		require.Equal(t, "client-1", claims["sub"])
-		require.Equal(t, "machine", claims["act_type"])
+		require.Equal(t, "machine", claims["actor_type"])
 		require.Equal(t, "org-1", claims["org_id"])
-		require.Equal(t, "access_token", claims["type"])
+		require.Equal(t, "access_token", claims["token_type"])
 		require.NotEmpty(t, claims["jti"])
 
 		scopes, ok := claims["scopes"].([]any)
@@ -359,7 +359,7 @@ func TestTokenService_GenerateMachineToken(t *testing.T) {
 
 		claims := parseTestToken(t, pair.AccessToken, f)
 		require.Equal(t, "client-2", claims["sub"])
-		require.Equal(t, "machine", claims["act_type"])
+		require.Equal(t, "machine", claims["actor_type"])
 		require.Empty(t, claims["org_id"])
 		require.Nil(t, claims["scopes"])
 

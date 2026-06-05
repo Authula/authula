@@ -100,11 +100,11 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 	if err := accessClaims.Set("session_id", sessionID); err != nil {
 		return nil, fmt.Errorf("failed to set session_id: %w", err)
 	}
-	if err := accessClaims.Set("type", types.JWTTokenTypeAccess.String()); err != nil {
-		return nil, fmt.Errorf("failed to set type: %w", err)
+	if err := accessClaims.Set("token_type", types.JWTTokenTypeAccess.String()); err != nil {
+		return nil, fmt.Errorf("failed to set token_type: %w", err)
 	}
-	if err := accessClaims.Set("act_type", "user"); err != nil {
-		return nil, fmt.Errorf("failed to set act_type: %w", err)
+	if err := accessClaims.Set("actor_type", "user"); err != nil {
+		return nil, fmt.Errorf("failed to set actor_type: %w", err)
 	}
 
 	accessTokenBytes, err := jwt.Sign(accessClaims, jwt.WithKey(keyAlgorithm, privKey))
@@ -131,11 +131,11 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 	if err := refreshClaims.Set("session_id", sessionID); err != nil {
 		return nil, fmt.Errorf("failed to set session_id in refresh token: %w", err)
 	}
-	if err := refreshClaims.Set("type", types.JWTTokenTypeRefresh.String()); err != nil {
-		return nil, fmt.Errorf("failed to set type in refresh token: %w", err)
+	if err := refreshClaims.Set("token_type", types.JWTTokenTypeRefresh.String()); err != nil {
+		return nil, fmt.Errorf("failed to set token_type in refresh token: %w", err)
 	}
-	if err := refreshClaims.Set("act_type", "user"); err != nil {
-		return nil, fmt.Errorf("failed to set act_type in refresh token: %w", err)
+	if err := refreshClaims.Set("actor_type", "user"); err != nil {
+		return nil, fmt.Errorf("failed to set actor_type in refresh token: %w", err)
 	}
 
 	refreshTokenBytes, err := jwt.Sign(refreshClaims, jwt.WithKey(keyAlgorithm, privKey))
@@ -188,11 +188,11 @@ func (s *tokenService) GenerateMachineToken(ctx context.Context, clientID string
 	if err := accessClaims.Set(jwt.JwtIDKey, jti); err != nil {
 		return nil, fmt.Errorf("failed to set JWT ID: %w", err)
 	}
-	if err := accessClaims.Set("type", types.JWTTokenTypeAccess.String()); err != nil {
-		return nil, fmt.Errorf("failed to set type: %w", err)
+	if err := accessClaims.Set("token_type", types.JWTTokenTypeAccess.String()); err != nil {
+		return nil, fmt.Errorf("failed to set token_type: %w", err)
 	}
-	if err := accessClaims.Set("act_type", "machine"); err != nil {
-		return nil, fmt.Errorf("failed to set act_type: %w", err)
+	if err := accessClaims.Set("actor_type", "machine"); err != nil {
+		return nil, fmt.Errorf("failed to set actor_type: %w", err)
 	}
 
 	if organizationID != "" {
@@ -240,24 +240,24 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 	}
 
 	var tokenType string
-	if err := parsedToken.Get("type", &tokenType); err != nil {
-		return nil, errors.New("missing token type claim")
+	if err := parsedToken.Get("token_type", &tokenType); err != nil {
+		return nil, errors.New("missing token_type claim")
 	}
 
 	if tokenType != types.JWTTokenTypeAccess.String() {
-		return nil, errors.New("invalid token type")
+		return nil, errors.New("invalid token_type")
 	}
 
-	var actType string
-	if err := parsedToken.Get("act_type", &actType); err != nil || actType == "" {
-		actType = "user"
+	var actorType string
+	if err := parsedToken.Get("actor_type", &actorType); err != nil || actorType == "" {
+		actorType = "user"
 	}
 
 	actor := &models.Actor{
 		Metadata: map[string]any{"auth_mechanism": "jwt_bearer"},
 	}
 
-	if actType == "machine" {
+	if actorType == "machine" {
 		var sub string
 		if err := parsedToken.Get(jwt.SubjectKey, &sub); err != nil || sub == "" {
 			return nil, errors.New("missing subject claim")
