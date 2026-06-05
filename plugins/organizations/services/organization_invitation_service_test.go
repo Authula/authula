@@ -49,7 +49,7 @@ func newTestOrganizationInvitationService(
 	invRepo repositories.OrganizationInvitationRepository,
 	memberRepo repositories.OrganizationMemberRepository,
 ) *organizationInvitationService {
-	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}
+	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
 	return NewOrganizationInvitationService(
 		txRunner,
 		&models.Config{BaseURL: "https://example.com", BasePath: "/auth"},
@@ -577,7 +577,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				accessControlService = orgtests.NewAccessControlServiceStub()
 			}
 
-			serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}
+			serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
 			svc := NewOrganizationInvitationService(
 				&orgtests.MockOrganizationInvitationTxRunner{},
 				&models.Config{BaseURL: "https://example.com", BasePath: "/auth"},
@@ -592,7 +592,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				memberRepo,
 				serviceUtils,
 			)
-			inv, err := svc.CreateOrganizationInvitation(context.Background(), tt.actorUserID, tt.organizationID, tt.request)
+			inv, err := svc.CreateOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.request)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.Nil(t, inv)
@@ -702,7 +702,7 @@ func TestOrganizationInvitationService_GetOrganizationInvitation(t *testing.T) {
 			}
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
-			invitation, err := svc.GetOrganizationInvitation(context.Background(), tt.actorUserID, tt.organizationID, tt.invitationID)
+			invitation, err := svc.GetOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.invitationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -821,7 +821,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 			}
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
-			invitations, err := svc.GetAllOrganizationInvitations(context.Background(), tt.actorUserID, tt.organizationID)
+			invitations, err := svc.GetAllOrganizationInvitations(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -929,7 +929,7 @@ func TestOrganizationInvitationService_RevokeOrganizationInvitation(t *testing.T
 			}
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
-			invitation, err := svc.RevokeOrganizationInvitation(context.Background(), tt.actorUserID, tt.organizationID, tt.invitationID)
+			invitation, err := svc.RevokeOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.invitationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -1264,7 +1264,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 			}
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, userSvc, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
-			invitation, err := svc.AcceptOrganizationInvitation(context.Background(), tt.actorUserID, tt.organization, tt.invitationID)
+			invitation, err := svc.AcceptOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization, tt.invitationID)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				return
@@ -1430,7 +1430,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 			}
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, userSvc, orgtests.NewAccessControlServiceStub(), &orgtests.MockOrganizationRepository{}, invRepo, &orgtests.MockOrganizationMemberRepository{})
-			invitation, err := svc.RejectOrganizationInvitation(context.Background(), tt.actorUserID, tt.organization, tt.invitationID)
+			invitation, err := svc.RejectOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization, tt.invitationID)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				return

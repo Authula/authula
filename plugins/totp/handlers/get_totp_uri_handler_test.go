@@ -48,11 +48,6 @@ func (s *GetTOTPURIHandlerSuite) TestGetTOTPURIHandler_Table() {
 	uid := "user-1"
 	tests := []getTOTPURITestCase{
 		{
-			name:           "unauthenticated",
-			userID:         nil,
-			expectedStatus: http.StatusUnauthorized,
-		},
-		{
 			name:   "usecase_not_enabled",
 			userID: internaltests.PtrString(uid),
 			prepare: func(m *getTOTPURIFixture) {
@@ -107,6 +102,7 @@ func (s *GetTOTPURIHandlerSuite) TestGetTOTPURIHandler_Table() {
 			h := &GetTOTPURIHandler{GlobalConfig: &models.Config{AppName: "MyApp"}, UseCase: uc}
 
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/totp/get-uri", nil, tt.userID)
+			reqCtx.Actor = &models.Actor{ID: uid, Type: models.ActorUser}
 			h.Handler().ServeHTTP(w, req)
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)

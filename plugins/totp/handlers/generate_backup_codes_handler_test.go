@@ -159,6 +159,9 @@ func (s *GenerateBackupCodesHandlerSuite) TestGenerateBackupCodesHandler_Table()
 			h := &GenerateBackupCodesHandler{UseCase: uc}
 
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/totp/generate-backup-codes", nil, tt.userID)
+			if tt.userID != nil {
+				reqCtx.Actor = &models.Actor{ID: uid, Type: models.ActorUser}
+			}
 			h.Handler().ServeHTTP(w, req)
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)

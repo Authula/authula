@@ -3,6 +3,7 @@ package totp
 import (
 	"net/http"
 
+	"github.com/Authula/authula/middleware"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/totp/handlers"
 )
@@ -35,11 +36,53 @@ func Routes(p *TOTPPlugin) []models.Route {
 	}
 
 	return []models.Route{
-		{Method: http.MethodPost, Path: "/totp/enable", Handler: enableHandler.Handler()},
-		{Method: http.MethodPost, Path: "/totp/disable", Handler: disableHandler.Handler()},
-		{Method: http.MethodGet, Path: "/totp/get-uri", Handler: getTOTPURIHandler.Handler()},
-		{Method: http.MethodPost, Path: "/totp/verify", Handler: verifyTOTPHandler.Handler()},
-		{Method: http.MethodPost, Path: "/totp/verify-backup-code", Handler: verifyBackupCodeHandler.Handler()},
-		{Method: http.MethodPost, Path: "/totp/generate-backup-codes", Handler: generateBackupCodesHandler.Handler()},
+		{
+			Method: http.MethodPost,
+			Path:   "/totp/enable",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequireActor(models.ActorUser),
+			},
+			Handler: enableHandler.Handler(),
+		},
+		{
+			Method: http.MethodPost,
+			Path:   "/totp/disable",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequireActor(models.ActorUser),
+			},
+			Handler: disableHandler.Handler(),
+		},
+		{
+			Method: http.MethodGet,
+			Path:   "/totp/get-uri",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequireActor(models.ActorUser),
+			},
+			Handler: getTOTPURIHandler.Handler(),
+		},
+		{
+			Method: http.MethodPost,
+			Path:   "/totp/verify",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequirePublicOrUserActor(),
+			},
+			Handler: verifyTOTPHandler.Handler(),
+		},
+		{
+			Method: http.MethodPost,
+			Path:   "/totp/verify-backup-code",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequirePublicOrUserActor(),
+			},
+			Handler: verifyBackupCodeHandler.Handler(),
+		},
+		{
+			Method: http.MethodPost,
+			Path:   "/totp/generate-backup-codes",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequireActor(models.ActorUser),
+			},
+			Handler: generateBackupCodesHandler.Handler(),
+		},
 	}
 }

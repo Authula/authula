@@ -20,16 +20,7 @@ func (h *EnableHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
-				"message": "Unauthorized",
-			})
-			reqCtx.Handled = true
-			return
-		}
-
-		result, err := h.UseCase.Enable(ctx, userID, h.GlobalConfig.AppName)
+		result, err := h.UseCase.Enable(ctx, reqCtx.Actor.ID, h.GlobalConfig.AppName)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),

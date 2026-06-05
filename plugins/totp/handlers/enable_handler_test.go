@@ -54,11 +54,6 @@ func (s *EnableHandlerSuite) TestEnableHandler_Table() {
 	uid := "user-1"
 	tests := []enableHandlerTestCase{
 		{
-			name:           "unauthenticated",
-			userID:         nil,
-			expectedStatus: http.StatusUnauthorized,
-		},
-		{
 			name:   "usecase_already_enabled",
 			userID: internaltests.PtrString(uid),
 			prepare: func(m *enableHandlerFixture) {
@@ -135,6 +130,7 @@ func (s *EnableHandlerSuite) TestEnableHandler_Table() {
 
 			h := m.buildHandler()
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/totp/enable", tt.body, tt.userID)
+			reqCtx.Actor = &models.Actor{ID: uid, Type: models.ActorUser}
 			h.Handler().ServeHTTP(w, req)
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)

@@ -72,6 +72,7 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 	if !ok {
 		return fmt.Errorf("access control service not available in service registry")
 	}
+	authorizer := services.NewAuthorizer()
 
 	p.databaseHooks = NewOrganizationsHookExecutor(p.pluginConfig.DatabaseHooks)
 	p.organizationRepo = repositories.NewBunOrganizationRepository(ctx.DB, p.databaseHooks)
@@ -80,7 +81,7 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 	p.teamRepo = repositories.NewBunOrganizationTeamRepository(ctx.DB, p.databaseHooks)
 	p.teamMemberRepo = repositories.NewBunOrganizationTeamMemberRepository(ctx.DB, p.databaseHooks)
 
-	p.serviceUtils = services.NewServiceUtils(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo)
+	p.serviceUtils = services.NewServiceUtils(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo, authorizer)
 	p.organizationService = services.NewOrganizationService(p.organizationRepo, p.memberRepo, p.serviceUtils, accessControlService, p.pluginConfig.OrganizationsLimit, ctx.DB)
 	p.invitationService = services.NewOrganizationInvitationService(ctx.DB, p.globalConfig, &p.pluginConfig, p.logger, ctx.EventBus, userService, mailerService, accessControlService, p.organizationRepo, p.invitationRepo, p.memberRepo, p.serviceUtils)
 	p.memberService = services.NewOrganizationMemberService(userService, accessControlService, p.organizationRepo, p.memberRepo, p.pluginConfig.MembersLimit, ctx.DB, p.serviceUtils)

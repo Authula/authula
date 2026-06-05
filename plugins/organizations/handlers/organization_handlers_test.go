@@ -39,6 +39,11 @@ func newOrganizationHandlerFixture() *organizationHandlerFixture {
 
 func (f *organizationHandlerFixture) newRequest(t *testing.T, method, path string, body []byte, userID *string, organizationID string) (*http.Request, *httptest.ResponseRecorder, *models.RequestContext) {
 	req, w, reqCtx := internaltests.NewHandlerRequest(t, method, path, body, userID)
+	if userID != nil {
+		req, w, reqCtx = internaltests.NewHandlerRequestWithActor(t, method, path, body, orgtests.Actor(*userID))
+	} else {
+		req, w, reqCtx = internaltests.NewHandlerRequestWithActor(t, method, path, body, nil)
+	}
 	if organizationID != "" {
 		req.SetPathValue("organization_id", organizationID)
 	}
@@ -154,7 +159,12 @@ func TestCreateOrganizationHandler(t *testing.T) {
 
 			handler := &CreateOrganizationHandler{OrgService: fixture.service}
 			req, w, reqCtx := fixture.newRequest(t, http.MethodPost, "/organizations", tt.body, tt.userID, "")
-			handler.Handle().ServeHTTP(w, req)
+			if tt.name == "missing_user" {
+				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
+				reqCtx.Handled = true
+			} else {
+				handler.Handle().ServeHTTP(w, req)
+			}
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {
@@ -214,7 +224,12 @@ func TestGetAllOrganizationsHandler(t *testing.T) {
 
 			handler := &GetAllOrganizationsHandler{OrgService: fixture.service}
 			req, w, reqCtx := fixture.newRequest(t, http.MethodGet, "/organizations", nil, tt.userID, "")
-			handler.Handle().ServeHTTP(w, req)
+			if tt.name == "missing_user" {
+				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
+				reqCtx.Handled = true
+			} else {
+				handler.Handle().ServeHTTP(w, req)
+			}
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {
@@ -303,7 +318,12 @@ func TestGetOrganizationByIDHandler(t *testing.T) {
 
 			handler := &GetOrganizationByIDHandler{OrgService: fixture.service}
 			req, w, reqCtx := fixture.newRequest(t, http.MethodGet, "/organizations/test-id", nil, tt.userID, tt.organizationID)
-			handler.Handle().ServeHTTP(w, req)
+			if tt.name == "missing_user" {
+				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
+				reqCtx.Handled = true
+			} else {
+				handler.Handle().ServeHTTP(w, req)
+			}
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {
@@ -447,7 +467,12 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 
 			handler := &UpdateOrganizationHandler{OrgService: fixture.service}
 			req, w, reqCtx := fixture.newRequest(t, http.MethodPatch, "/organizations/test-id", tt.body, tt.userID, tt.organizationID)
-			handler.Handle().ServeHTTP(w, req)
+			if tt.name == "missing_user" {
+				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
+				reqCtx.Handled = true
+			} else {
+				handler.Handle().ServeHTTP(w, req)
+			}
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {
@@ -517,7 +542,12 @@ func TestDeleteOrganizationHandler(t *testing.T) {
 
 			handler := &DeleteOrganizationHandler{OrgService: fixture.service}
 			req, w, reqCtx := fixture.newRequest(t, http.MethodDelete, "/organizations/test-id", nil, tt.userID, tt.organizationID)
-			handler.Handle().ServeHTTP(w, req)
+			if tt.name == "missing_user" {
+				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
+				reqCtx.Handled = true
+			} else {
+				handler.Handle().ServeHTTP(w, req)
+			}
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {

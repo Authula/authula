@@ -48,7 +48,7 @@ func (h *CreateTodoHandler) Handle() http.HandlerFunc {
 
 		var request CreateTodoRequest
 		if err := util.ParseJSON(r, &request); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -60,7 +60,7 @@ func (h *CreateTodoHandler) Handle() http.HandlerFunc {
 
 		todoCreated, err := h.todoService.Create(ctx, &request)
 		if err != nil {
-			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -101,7 +101,7 @@ func (h *MarkTodoCompleteHandler) Handle() http.HandlerFunc {
 
 		var request MarkTodoCompleteRequest
 		if err := util.ParseJSON(r, &request); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}

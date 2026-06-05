@@ -23,17 +23,16 @@ type Actor struct {
 	// This can be nil if a user is operating in a personal/non-tenant scope.
 	OrganizationID *string
 
-	// Holds the static permissions granted to this specific request credential.
-	Permissions []string
+	// Holds the scopes granted to this specific request credential.
+	Scopes []string
 
 	// Flexible field to attach additional information about the actor.
 	Metadata map[string]any
 }
 
-func (actor *Actor) HasPermission(permission string) bool {
-	if actor == nil || permission == "" {
+func (actor *Actor) HasScopes(scope string) bool {
+	if actor == nil || scope == "" {
 		return false
 	}
-
-	return slices.Contains(actor.Permissions, permission)
+	return slices.Contains(actor.Scopes, scope)
 }

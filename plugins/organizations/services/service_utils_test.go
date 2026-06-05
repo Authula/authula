@@ -16,6 +16,12 @@ import (
 	"github.com/Authula/authula/plugins/organizations/types"
 )
 
+type noopAuthorizer struct{}
+
+func (a *noopAuthorizer) Authorize(_ context.Context, _ *models.Actor, _ AuthorizerAction, _ AuthorizerResource) error {
+	return nil
+}
+
 func TestServiceUtils_authorizeOwner(t *testing.T) {
 	t.Parallel()
 
@@ -77,12 +83,12 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			orgRepo := &orgtests.MockOrganizationRepository{}
-			if tt.setup != nil {
-				tt.setup(orgRepo)
-			}
+		orgRepo := &orgtests.MockOrganizationRepository{}
+		if tt.setup != nil {
+			tt.setup(orgRepo)
+		}
 
-			org, err := (&ServiceUtils{orgRepo: orgRepo}).authorizeOwner(context.Background(), tt.actorUserID, tt.organization)
+		org, err := (&ServiceUtils{orgRepo: orgRepo, authorizer: &noopAuthorizer{}}).authorizeOwner(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				require.Nil(t, org)
@@ -188,7 +194,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 				tt.setup(orgRepo, memberRepo)
 			}
 
-			org, member, err := (&ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}).authorizeOrganizationAccess(context.Background(), tt.actorUserID, tt.organization)
+			org, member, err := (&ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}).authorizeOrganizationAccess(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				require.Nil(t, org)

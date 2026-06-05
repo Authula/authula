@@ -37,8 +37,6 @@ type RequestContext struct {
 	Method  string
 	Headers http.Header
 
-	// User information (may be nil if not authenticated)
-	UserID *string
 	// Actor identity resolved by authentication, may be nil if unauthenticated
 	Actor    *Actor
 	ClientIP string
@@ -116,44 +114,20 @@ func (reqCtx *RequestContext) SetJSONResponse(status int, payload any) {
 	reqCtx.SetResponse(status, headers, data)
 }
 
-func GetUserIDFromContext(ctx context.Context) (string, bool) {
-	// First, check direct Go context (fast path for third-party plugins)
-	value := ctx.Value(ContextUserID)
-	if value != nil {
-		if id, ok := value.(string); ok {
-			return id, true
-		}
-	}
-
-	// Fallback: check RequestContext (for custom runtime)
-	if reqCtx, ok := GetRequestContext(ctx); ok && reqCtx.UserID != nil {
-		return *reqCtx.UserID, true
-	}
-
-	return "", false
-}
-
-// SetUserIDInContext sets the user ID in both the RequestContext and the underlying Go context.
-func (reqCtx *RequestContext) SetUserIDInContext(userID string) {
-	reqCtx.UserID = &userID
-	reqCtx.Request = reqCtx.Request.WithContext(context.WithValue(reqCtx.Request.Context(), ContextUserID, userID))
-}
-
 // SetActorInContext updates the actor in both the RequestContext and the underlying Go context stream.
 func (reqCtx *RequestContext) SetActorInContext(actor *Actor) {
 	reqCtx.Actor = actor
 	if reqCtx.Actor == nil {
 		return
 	}
-	if reqCtx.Actor.Permissions == nil {
-		reqCtx.Actor.Permissions = make([]string, 0)
+	if reqCtx.Actor.Scopes == nil {
+		reqCtx.Actor.Scopes = make([]string, 0)
 	}
 	if reqCtx.Actor.Metadata == nil {
 		reqCtx.Actor.Metadata = make(map[string]any)
 	}
 	reqCtx.Request = reqCtx.Request.WithContext(context.WithValue(reqCtx.Request.Context(), ContextAuthActor, actor))
 	if reqCtx.Actor.ID != "" {
-		reqCtx.UserID = &reqCtx.Actor.ID
 		reqCtx.Request = reqCtx.Request.WithContext(context.WithValue(reqCtx.Request.Context(), ContextUserID, reqCtx.Actor.ID))
 	}
 }

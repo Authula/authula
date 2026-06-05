@@ -240,14 +240,6 @@ func (auth *Auth) RegisterHooks(hooks []models.Hook) {
 	auth.router.RegisterHooks(hooks)
 }
 
-// GetUserIDFromContext retrieves the user ID from a context.
-// Returns the user ID and a boolean indicating whether it was found.
-// This is a convenience wrapper around models.GetUserIDFromContext to avoid
-// requiring application code to import the models package.
-func (auth *Auth) GetUserIDFromContext(ctx context.Context) (string, bool) {
-	return models.GetUserIDFromContext(ctx)
-}
-
 // GetActorFromContext retrieves the Actor from a context.
 // Returns the Actor and a boolean indicating whether it was found.
 // This is a convenience wrapper around models.GetActorFromContext to avoid

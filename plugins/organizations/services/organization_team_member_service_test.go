@@ -19,6 +19,7 @@ func newTestOrganizationTeamMemberService(orgRepo *orgtests.MockOrganizationRepo
 		orgMemberRepo:     memberRepo,
 		orgTeamRepo:       teamRepo,
 		orgTeamMemberRepo: teamMemberRepo,
+		authorizer:        &noopAuthorizer{},
 	}
 
 	return NewOrganizationTeamMemberService(orgRepo, memberRepo, teamRepo, teamMemberRepo, serviceUtils)
@@ -160,7 +161,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 			}
 
 			svc := newTestOrganizationTeamMemberService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-			members, err := svc.GetAllTeamMembers(context.Background(), tt.actorUserID, tt.organizationID, tt.teamID, 1, 10)
+			members, err := svc.GetAllTeamMembers(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.teamID, 1, 10)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -431,6 +432,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 				orgMemberRepo:     memberRepo,
 				orgTeamRepo:       teamRepo,
 				orgTeamMemberRepo: teamMemberRepo,
+				authorizer:        &noopAuthorizer{},
 			}
 
 			if tt.setup != nil {
@@ -438,7 +440,7 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 			}
 
 			svc := NewOrganizationTeamMemberService(orgRepo, memberRepo, teamRepo, teamMemberRepo, serviceUtils)
-			teamMember, err := svc.AddTeamMember(context.Background(), tt.actorUserID, tt.organizationID, tt.teamID, tt.request)
+			teamMember, err := svc.AddTeamMember(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.teamID, tt.request)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -636,7 +638,7 @@ func TestOrganizationTeamService_GetTeamMember(t *testing.T) {
 			}
 
 			svc := newTestOrganizationTeamMemberService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-			teamMember, err := svc.GetTeamMember(context.Background(), tt.actorUserID, tt.organizationID, tt.teamID, tt.memberID)
+			teamMember, err := svc.GetTeamMember(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.teamID, tt.memberID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -837,7 +839,7 @@ func TestOrganizationTeamService_RemoveTeamMember(t *testing.T) {
 			}
 
 			svc := newTestOrganizationTeamMemberService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-			err := svc.RemoveTeamMember(context.Background(), tt.actorUserID, tt.organizationID, tt.teamID, tt.memberID)
+			err := svc.RemoveTeamMember(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.teamID, tt.memberID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)

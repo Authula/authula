@@ -19,7 +19,7 @@ import (
 )
 
 func newTestOrganizationMemberService(userSvc *internaltests.MockUserService, accessControlService rootservices.AccessControlService, orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, membersLimit *int) *organizationMemberService {
-	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}
+	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
 	return NewOrganizationMemberService(userSvc, accessControlService, orgRepo, memberRepo, membersLimit, &orgtests.MockTxRunner{}, serviceUtils)
 }
 
@@ -283,7 +283,7 @@ func TestOrganizationMemberService_AddMember(t *testing.T) {
 			}
 
 			svc := newTestOrganizationMemberService(userSvc, accessControlService, orgRepo, memberRepo, tt.membersLimit)
-			member, err := svc.AddMember(context.Background(), tt.actorUserID, tt.organizationID, tt.request)
+			member, err := svc.AddMember(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.request)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				if strings.Contains(tt.name, "invalid role") {
@@ -381,7 +381,7 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 			}
 
 			svc := newTestOrganizationMemberService(userService, orgtests.NewAccessControlServiceStub(), orgRepo, memberRepo, nil)
-			members, err := svc.GetAllMembers(context.Background(), tt.actorUserID, tt.organizationID, 1, 10)
+			members, err := svc.GetAllMembers(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, 1, 10)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -522,7 +522,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 			}
 
 			svc := newTestOrganizationMemberService(userService, orgtests.NewAccessControlServiceStub(), orgRepo, memberRepo, nil)
-			member, err := svc.GetMember(context.Background(), tt.actorUserID, tt.organizationID, tt.memberID)
+			member, err := svc.GetMember(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.memberID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -729,7 +729,7 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 			}
 
 			svc := newTestOrganizationMemberService(userService, accessControlService, orgRepo, memberRepo, nil)
-			member, err := svc.UpdateMember(context.Background(), tt.actorUserID, tt.organizationID, tt.memberID, tt.request)
+			member, err := svc.UpdateMember(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.memberID, tt.request)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				if strings.Contains(tt.name, "invalid role") {
@@ -867,7 +867,7 @@ func TestOrganizationMemberService_RemoveMember(t *testing.T) {
 			}
 
 			svc := newTestOrganizationMemberService(userService, orgtests.NewAccessControlServiceStub(), orgRepo, memberRepo, nil)
-			err := svc.RemoveMember(context.Background(), tt.actorUserID, tt.organizationID, tt.memberID)
+			err := svc.RemoveMember(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.memberID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)

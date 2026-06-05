@@ -2,6 +2,7 @@ package accesscontrol
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
@@ -32,6 +33,50 @@ func (p *AccessControlPlugin) Hooks() []models.Hook {
 			Order:   20,
 		},
 	}
+}
+
+func (p *AccessControlPlugin) requireAccessControl(reqCtx *models.RequestContext) error {
+	ctx := reqCtx.Request.Context()
+
+	if reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
+		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
+		reqCtx.Handled = true
+		return nil
+	}
+
+	requiredPermissions := util.ReadStringSliceMetadata(reqCtx, "permissions")
+	if len(requiredPermissions) == 0 {
+		return nil // Opt-in mode: skip if no permission flags are set on the route
+	}
+
+	var allowed bool
+	var err error
+
+	switch reqCtx.Actor.Type {
+	case models.ActorMachine:
+		{
+			// For machine actors, we check if they have the required permissions directly in their scopes.
+			allowed = hasAllScopes(reqCtx.Actor.Scopes, requiredPermissions)
+		}
+	case models.ActorUser:
+		{
+			// For user actors, we need to check their assigned roles and permissions from the tables in the DB.
+			allowed, err = p.Api.HasPermissions(ctx, reqCtx.Actor.ID, requiredPermissions)
+			if err != nil {
+				reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": err.Error()})
+				reqCtx.Handled = true
+				return nil
+			}
+		}
+	}
+
+	if !allowed {
+		reqCtx.SetJSONResponse(http.StatusForbidden, map[string]any{"message": "Forbidden"})
+		reqCtx.Handled = true
+		return nil
+	}
+
+	return nil
 }
 
 func (p *AccessControlPlugin) assignRoleFromContextHook(reqCtx *models.RequestContext) error {
@@ -100,33 +145,12 @@ func accessControlAssignRoleContext(value any) (models.AccessControlAssignRoleCo
 	}
 }
 
-func (p *AccessControlPlugin) requireAccessControl(reqCtx *models.RequestContext) error {
-	ctx := reqCtx.Request.Context()
-
-	if reqCtx.UserID == nil || *reqCtx.UserID == "" {
-		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-		reqCtx.Handled = true
-		return nil
+func hasAllScopes(assignedScopes []string, requiredPermissions []string) bool {
+	for _, req := range requiredPermissions {
+		found := slices.Contains(assignedScopes, req)
+		if !found {
+			return false
+		}
 	}
-
-	requiredPermissions := util.ReadStringSliceMetadata(reqCtx, "permissions")
-	if len(requiredPermissions) == 0 {
-		// Opt-in mode: if no permissions metadata is present, skip access control enforcement.
-		return nil
-	}
-
-	allowed, err := p.Api.HasPermissions(ctx, *reqCtx.UserID, requiredPermissions)
-	if err != nil {
-		reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": err.Error()})
-		reqCtx.Handled = true
-		return nil
-	}
-
-	if !allowed {
-		reqCtx.SetJSONResponse(http.StatusForbidden, map[string]any{"message": "Forbidden"})
-		reqCtx.Handled = true
-		return nil
-	}
-
-	return nil
+	return true
 }

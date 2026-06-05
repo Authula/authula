@@ -163,7 +163,8 @@ func (p *CSRFPlugin) Middleware() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			reqCtx, ok := models.GetRequestContext(ctx)
-			if !ok || reqCtx.UserID == nil || *reqCtx.UserID == "" {
+
+			if !ok || reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
 				next.ServeHTTP(w, r)
 				return
 			}

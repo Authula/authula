@@ -74,7 +74,7 @@ type verifyTOTPFixture struct {
 }
 
 func (m *verifyTOTPFixture) newRequest(t *testing.T) (*http.Request, *httptest.ResponseRecorder, *models.RequestContext) {
-	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/totp/verify", m.requestBody, internaltests.PtrString(m.uid))
+	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/totp/verify", m.requestBody, nil)
 	if m.withCookie {
 		req.AddCookie(&http.Cookie{Name: constants.CookieTOTPPending, Value: m.pendingRaw})
 	}

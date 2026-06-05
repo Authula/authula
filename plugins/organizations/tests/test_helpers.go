@@ -17,6 +17,10 @@ import (
 	orgpluginmigrations "github.com/Authula/authula/plugins/organizations/migrationset"
 )
 
+func Actor(userID string) *models.Actor {
+	return &models.Actor{ID: userID, Type: models.ActorUser}
+}
+
 func SetupRepoDB(t *testing.T) *bun.DB {
 	t.Helper()
 

@@ -3,10 +3,10 @@ package handlers
 import "github.com/Authula/authula/models"
 
 func rolePermissionActorUserID(reqCtx *models.RequestContext) *string {
-	if reqCtx.UserID == nil || *reqCtx.UserID == "" {
+	if reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
 		return nil
 	}
-	return reqCtx.UserID
+	return &reqCtx.Actor.ID
 }
 
 func respondRolePermissionError(reqCtx *models.RequestContext, err error) {
@@ -19,10 +19,10 @@ func mapRolePermissionErrorStatus(err error) int {
 }
 
 func userActorUserID(reqCtx *models.RequestContext) *string {
-	if reqCtx.UserID == nil || *reqCtx.UserID == "" {
+	if reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
 		return nil
 	}
-	return reqCtx.UserID
+	return &reqCtx.Actor.ID
 }
 
 func respondUserHandlerError(reqCtx *models.RequestContext, err error) {

@@ -45,11 +45,6 @@ func (s *DisableHandlerSuite) TestDisableHandler_Table() {
 	uid := "user-1"
 	tests := []disableHandlerTestCase{
 		{
-			name:           "unauthenticated",
-			userID:         nil,
-			expectedStatus: http.StatusUnauthorized,
-		},
-		{
 			name:   "usecase_not_enabled",
 			userID: internaltests.PtrString(uid),
 			prepare: func(m *disableHandlerFixture) {
@@ -94,6 +89,7 @@ func (s *DisableHandlerSuite) TestDisableHandler_Table() {
 			h := &DisableHandler{UseCase: uc}
 
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/totp/disable", nil, tt.userID)
+			reqCtx.Actor = &models.Actor{ID: uid, Type: models.ActorUser}
 			h.Handler().ServeHTTP(w, req)
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)

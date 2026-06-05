@@ -18,20 +18,37 @@ type ServiceUtils struct {
 	orgMemberRepo     repositories.OrganizationMemberRepository
 	orgTeamRepo       repositories.OrganizationTeamRepository
 	orgTeamMemberRepo repositories.OrganizationTeamMemberRepository
+	authorizer        Authorizer
 }
 
-func NewServiceUtils(orgRepo repositories.OrganizationRepository, orgMemberRepo repositories.OrganizationMemberRepository, orgTeamRepo repositories.OrganizationTeamRepository, orgTeamMemberRepo repositories.OrganizationTeamMemberRepository) *ServiceUtils {
+func NewServiceUtils(orgRepo repositories.OrganizationRepository, orgMemberRepo repositories.OrganizationMemberRepository, orgTeamRepo repositories.OrganizationTeamRepository, orgTeamMemberRepo repositories.OrganizationTeamMemberRepository, authorizer Authorizer) *ServiceUtils {
 	return &ServiceUtils{
 		orgRepo:           orgRepo,
 		orgMemberRepo:     orgMemberRepo,
 		orgTeamRepo:       orgTeamRepo,
 		orgTeamMemberRepo: orgTeamMemberRepo,
+		authorizer:        authorizer,
 	}
 }
 
-func (s *ServiceUtils) authorizeOwner(ctx context.Context, actorUserID string, organizationID string) (*types.Organization, error) {
-	if actorUserID == "" || organizationID == "" {
+func (s *ServiceUtils) authorizerOrDefault() Authorizer {
+	if s != nil && s.authorizer != nil {
+		return s.authorizer
+	}
+
+	return NewDefaultAuthorizer()
+}
+
+func (s *ServiceUtils) authorizeOwner(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {
+	return s.authorizeOwnerForAction(ctx, actor, ActionOrganizationsDelete, organizationID)
+}
+
+func (s *ServiceUtils) authorizeOwnerForAction(ctx context.Context, actor *models.Actor, action AuthorizerAction, organizationID string) (*types.Organization, error) {
+	if actor == nil || actor.ID == "" || organizationID == "" {
 		return nil, internalerrors.ErrUnauthorized
+	}
+	if err := s.authorizerOrDefault().Authorize(ctx, actor, action, AuthorizerResource{OrganizationID: organizationID}); err != nil {
+		return nil, err
 	}
 
 	organization, err := s.orgRepo.GetByID(ctx, organizationID)
@@ -41,16 +58,26 @@ func (s *ServiceUtils) authorizeOwner(ctx context.Context, actorUserID string, o
 	if organization == nil {
 		return nil, internalerrors.ErrNotFound
 	}
-	if organization.OwnerID != actorUserID {
+	if actor.Type == models.ActorMachine {
+		return organization, nil
+	}
+	if organization.OwnerID != actor.ID {
 		return nil, internalerrors.ErrForbidden
 	}
 
 	return organization, nil
 }
 
-func (s *ServiceUtils) authorizeOrganizationAccess(ctx context.Context, actorUserID string, organizationID string) (*types.Organization, *types.OrganizationMember, error) {
-	if actorUserID == "" || organizationID == "" {
+func (s *ServiceUtils) authorizeOrganizationAccess(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, *types.OrganizationMember, error) {
+	return s.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsRead, organizationID)
+}
+
+func (s *ServiceUtils) authorizeOrganizationAccessForAction(ctx context.Context, actor *models.Actor, action AuthorizerAction, organizationID string) (*types.Organization, *types.OrganizationMember, error) {
+	if actor == nil || actor.ID == "" || organizationID == "" {
 		return nil, nil, internalerrors.ErrUnauthorized
+	}
+	if err := s.authorizerOrDefault().Authorize(ctx, actor, action, AuthorizerResource{OrganizationID: organizationID}); err != nil {
+		return nil, nil, err
 	}
 
 	organization, err := s.orgRepo.GetByID(ctx, organizationID)
@@ -60,11 +87,14 @@ func (s *ServiceUtils) authorizeOrganizationAccess(ctx context.Context, actorUse
 	if organization == nil {
 		return nil, nil, internalerrors.ErrNotFound
 	}
-	if organization.OwnerID == actorUserID {
+	if actor.Type == models.ActorMachine {
+		return organization, nil, nil
+	}
+	if organization.OwnerID == actor.ID {
 		return organization, nil, nil
 	}
 
-	member, err := s.orgMemberRepo.GetByOrganizationIDAndUserID(ctx, organizationID, actorUserID)
+	member, err := s.orgMemberRepo.GetByOrganizationIDAndUserID(ctx, organizationID, actor.ID)
 	if err != nil {
 		return nil, nil, err
 	}

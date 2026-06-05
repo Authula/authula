@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/totp/constants"
 )
 
 type TOTPPluginConfig struct {
@@ -58,9 +59,23 @@ type VerifyTOTPRequest struct {
 	TrustDevice bool   `json:"trust_device,omitempty"`
 }
 
+func (v *VerifyTOTPRequest) Validate() error {
+	if v.Code == "" {
+		return constants.ErrBackupCodeIsRequired
+	}
+	return nil
+}
+
 type VerifyBackupCodeRequest struct {
 	Code        string `json:"code"`
 	TrustDevice bool   `json:"trust_device,omitempty"`
+}
+
+func (v *VerifyBackupCodeRequest) Validate() error {
+	if v.Code == "" {
+		return constants.ErrBackupCodeIsRequired
+	}
+	return nil
 }
 
 // Response payloads

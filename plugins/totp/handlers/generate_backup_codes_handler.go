@@ -17,7 +17,7 @@ func (h *GenerateBackupCodesHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		userID, ok := models.GetUserIDFromContext(ctx)
+		actor, ok := models.GetActorFromContext(ctx)
 		if !ok {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
 				"message": "Unauthorized",
@@ -26,7 +26,7 @@ func (h *GenerateBackupCodesHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		codes, err := h.UseCase.Generate(ctx, userID)
+		codes, err := h.UseCase.Generate(ctx, actor.ID)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
 				"message": err.Error(),

@@ -126,13 +126,13 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 			repo := &orgtests.MockOrganizationRepository{}
 			memberRepo := &orgtests.MockOrganizationMemberRepository{}
 			hooks := &orgtests.MockOrganizationHooks{}
-			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
+			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
 			if tt.setup != nil {
 				tt.setup(repo, memberRepo, hooks, serviceUtils)
 			}
 
 			svc := NewOrganizationService(repo, memberRepo, serviceUtils, accessControlService, tt.organizationLimit, txRunner)
-			org, err := svc.CreateOrganization(context.Background(), tt.actorUserID, tt.request)
+			org, err := svc.CreateOrganization(context.Background(), orgtests.Actor(tt.actorUserID), tt.request)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -193,9 +193,9 @@ func TestOrganizationService_GetAllOrganizations(t *testing.T) {
 				tt.setup(repo, memberRepo)
 			}
 
-			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
+			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
 			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, nil, nil)
-			organizations, err := svc.GetAllOrganizations(context.Background(), tt.actorUserID)
+			organizations, err := svc.GetAllOrganizations(context.Background(), orgtests.Actor(tt.actorUserID))
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -258,9 +258,9 @@ func TestOrganizationService_GetOrganizationByID(t *testing.T) {
 				tt.setup(repo, memberRepo)
 			}
 
-			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
+			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
 			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, nil, nil)
-			org, err := svc.GetOrganizationByID(context.Background(), tt.actorUserID, tt.organizationID)
+			org, err := svc.GetOrganizationByID(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -343,13 +343,13 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 			repo := &orgtests.MockOrganizationRepository{}
 			hooks := &orgtests.MockOrganizationHooks{}
 			memberRepo := &orgtests.MockOrganizationMemberRepository{}
-			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
+			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
 			if tt.setup != nil {
 				tt.setup(repo, memberRepo, hooks, serviceUtils)
 			}
 
 			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, nil, nil)
-			org, err := svc.UpdateOrganization(context.Background(), tt.actorUserID, tt.organizationID, tt.request)
+			org, err := svc.UpdateOrganization(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.request)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -388,13 +388,13 @@ func TestOrganizationService_DeleteOrganization(t *testing.T) {
 
 			repo := &orgtests.MockOrganizationRepository{}
 			hooks := &orgtests.MockOrganizationHooks{}
-			serviceUtils := &ServiceUtils{orgRepo: repo}
+			serviceUtils := &ServiceUtils{orgRepo: repo, authorizer: &noopAuthorizer{}}
 			if tt.setup != nil {
 				tt.setup(repo, hooks, serviceUtils)
 			}
 
 			svc := NewOrganizationService(repo, nil, serviceUtils, nil, nil, nil)
-			err := svc.DeleteOrganization(context.Background(), tt.actorUserID, tt.organizationID)
+			err := svc.DeleteOrganization(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)

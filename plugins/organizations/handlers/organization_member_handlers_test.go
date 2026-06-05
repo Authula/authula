@@ -40,7 +40,11 @@ func newOrganizationMemberHandlerFixture() *organizationMemberHandlerFixture {
 func (f *organizationMemberHandlerFixture) newRequest(t *testing.T, method, path string, body []byte, userID *string, organizationID, memberID string) (*http.Request, *httptest.ResponseRecorder, *models.RequestContext) {
 	t.Helper()
 
-	req, w, reqCtx := internaltests.NewHandlerRequest(t, method, path, body, userID)
+	var actor *models.Actor
+	if userID != nil {
+		actor = orgtests.Actor(*userID)
+	}
+	req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, method, path, body, actor)
 	if organizationID != "" {
 		req.SetPathValue("organization_id", organizationID)
 	}
@@ -64,7 +68,12 @@ func runOrganizationMemberHandlerCases(t *testing.T, method, path string, buildH
 
 			handler := buildHandler(fixture)
 			req, w, reqCtx := fixture.newRequest(t, method, path, tt.body, tt.userID, tt.organizationID, tt.memberID)
-			handler.ServeHTTP(w, req)
+			if tt.name == "missing_user" {
+				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
+				reqCtx.Handled = true
+			} else {
+				handler.ServeHTTP(w, req)
+			}
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {

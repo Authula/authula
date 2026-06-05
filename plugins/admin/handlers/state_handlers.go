@@ -52,7 +52,7 @@ func (h *CreateUserStateHandler) Handler() http.HandlerFunc {
 
 		var payload types.CreateUserStateRequest
 		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -82,7 +82,7 @@ func (h *UpdateUserStateHandler) Handler() http.HandlerFunc {
 
 		var payload types.UpsertUserStateRequest
 		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -112,7 +112,7 @@ func (h *UpsertUserStateHandler) Handler() http.HandlerFunc {
 
 		var payload types.UpsertUserStateRequest
 		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -186,7 +186,7 @@ func (h *BanUserHandler) Handler() http.HandlerFunc {
 
 		var payload types.BanUserRequest
 		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -267,7 +267,7 @@ func (h *CreateSessionStateHandler) Handler() http.HandlerFunc {
 
 		var payload types.CreateSessionStateRequest
 		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -297,7 +297,7 @@ func (h *UpdateSessionStateHandler) Handler() http.HandlerFunc {
 
 		var payload types.UpsertSessionStateRequest
 		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -327,7 +327,7 @@ func (h *UpsertSessionStateHandler) Handler() http.HandlerFunc {
 
 		var payload types.UpsertSessionStateRequest
 		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -424,7 +424,7 @@ func (h *RevokeSessionHandler) Handler() http.HandlerFunc {
 
 		var payload types.RevokeSessionRequest
 		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -440,10 +440,10 @@ func (h *RevokeSessionHandler) Handler() http.HandlerFunc {
 }
 
 func stateActorUserID(reqCtx *models.RequestContext) *string {
-	if reqCtx == nil || reqCtx.UserID == nil || *reqCtx.UserID == "" {
+	if reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
 		return nil
 	}
-	return reqCtx.UserID
+	return &reqCtx.Actor.ID
 }
 
 func respondStateError(reqCtx *models.RequestContext, err error) {

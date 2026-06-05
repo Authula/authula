@@ -47,10 +47,10 @@ func (p *TOTPPlugin) interceptSignInHook(reqCtx *models.RequestContext) error {
 		return nil
 	}
 
-	if reqCtx.UserID == nil || *reqCtx.UserID == "" {
+	if reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
 		return nil
 	}
-	userID := *reqCtx.UserID
+	userID := reqCtx.Actor.ID
 
 	enabled, err := p.totpRepo.IsEnabled(ctx, userID)
 	if err != nil {

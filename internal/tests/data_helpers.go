@@ -32,6 +32,10 @@ func NewHandlerRequest(t *testing.T, method string, path string, body []byte, us
 	req := httptest.NewRequest(method, path, reader)
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
+	var actor *models.Actor
+	if userID != nil {
+		actor = &models.Actor{ID: *userID, Type: models.ActorUser}
+	}
 	reqCtx := &models.RequestContext{
 		Request:        req,
 		ResponseWriter: w,
@@ -40,9 +44,7 @@ func NewHandlerRequest(t *testing.T, method string, path string, body []byte, us
 		Headers:        req.Header,
 		ClientIP:       "127.0.0.1",
 		Values:         make(map[string]any),
-		UserID:         userID,
-		// Set to nil for now until handlers are refactored to use Actor instead of UserID
-		Actor: nil,
+		Actor:          actor,
 	}
 
 	ctx := models.SetRequestContext(context.Background(), reqCtx)
@@ -52,14 +54,8 @@ func NewHandlerRequest(t *testing.T, method string, path string, body []byte, us
 	return req, w, reqCtx
 }
 
-// TODO: rename this to the method above once all tests are using this new method that supports Actor instead of just UserID
 func NewHandlerRequestWithActor(t *testing.T, method string, path string, body []byte, actor *models.Actor) (*http.Request, *httptest.ResponseRecorder, *models.RequestContext) {
 	t.Helper()
-
-	var userID *string
-	if actor != nil && actor.Type == models.ActorUser {
-		userID = &actor.ID
-	}
 
 	reader := bytes.NewReader(body)
 	req := httptest.NewRequest(method, path, reader)
@@ -73,7 +69,6 @@ func NewHandlerRequestWithActor(t *testing.T, method string, path string, body [
 		Headers:        req.Header,
 		ClientIP:       "127.0.0.1",
 		Values:         make(map[string]any),
-		UserID:         userID,
 		Actor:          actor,
 	}
 

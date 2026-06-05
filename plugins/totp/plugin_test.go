@@ -209,7 +209,7 @@ func TestInterceptHook(t *testing.T) {
 				Values: map[string]any{
 					models.ContextAuthSuccess.String(): true,
 				},
-				UserID: &userID,
+				Actor: &models.Actor{ID: userID, Type: models.ActorUser},
 			}
 
 			err := plugin.interceptSignInHook(reqCtx)

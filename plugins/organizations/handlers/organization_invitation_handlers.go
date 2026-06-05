@@ -18,13 +18,7 @@ func (h *CreateOrganizationInvitationHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
+		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
 
@@ -40,7 +34,7 @@ func (h *CreateOrganizationInvitationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		invitation, err := h.OrgInvitationService.CreateOrganizationInvitation(ctx, userID, organizationID, request)
+		invitation, err := h.OrgInvitationService.CreateOrganizationInvitation(ctx, actor, organizationID, request)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -58,16 +52,10 @@ func (h *GetAllOrganizationInvitationsHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
+		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
-		invitations, err := h.OrgInvitationService.GetAllOrganizationInvitations(ctx, userID, organizationID)
+		invitations, err := h.OrgInvitationService.GetAllOrganizationInvitations(ctx, actor, organizationID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -85,17 +73,11 @@ func (h *GetOrganizationInvitationHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
+		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
 		invitationID := r.PathValue("invitation_id")
-		invitation, err := h.OrgInvitationService.GetOrganizationInvitation(ctx, userID, organizationID, invitationID)
+		invitation, err := h.OrgInvitationService.GetOrganizationInvitation(ctx, actor, organizationID, invitationID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -113,17 +95,11 @@ func (h *RevokeOrganizationInvitationHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
+		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
 		invitationID := r.PathValue("invitation_id")
-		invitation, err := h.OrgInvitationService.RevokeOrganizationInvitation(ctx, userID, organizationID, invitationID)
+		invitation, err := h.OrgInvitationService.RevokeOrganizationInvitation(ctx, actor, organizationID, invitationID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -141,24 +117,18 @@ func (h *AcceptOrganizationInvitationHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
+		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
 		invitationID := r.PathValue("invitation_id")
-		invitation, err := h.OrgInvitationService.AcceptOrganizationInvitation(ctx, userID, organizationID, invitationID)
+		invitation, err := h.OrgInvitationService.AcceptOrganizationInvitation(ctx, actor, organizationID, invitationID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
 		}
 
 		reqCtx.Values[models.ContextAccessControlAssignRole.String()] = &models.AccessControlAssignRoleContext{
-			UserID:         userID,
+			UserID:         actor.ID,
 			RoleName:       invitation.Role,
 			AssignerUserID: &invitation.InviterID,
 		}
@@ -188,9 +158,8 @@ func (h *RejectOrganizationInvitationHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
+		actor := reqCtx.Actor
+		if actor == nil || actor.ID == "" {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
 			reqCtx.Handled = true
 			return
@@ -198,7 +167,7 @@ func (h *RejectOrganizationInvitationHandler) Handle() http.HandlerFunc {
 
 		organizationID := r.PathValue("organization_id")
 		invitationID := r.PathValue("invitation_id")
-		invitation, err := h.OrgInvitationService.RejectOrganizationInvitation(ctx, userID, organizationID, invitationID)
+		invitation, err := h.OrgInvitationService.RejectOrganizationInvitation(ctx, actor, organizationID, invitationID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return

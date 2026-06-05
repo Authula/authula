@@ -6,6 +6,7 @@ var (
 	ErrTOTPNotEnabled          = errors.New("totp authentication is not enabled")
 	ErrTOTPAlreadyEnabled      = errors.New("totp authentication is already enabled")
 	ErrInvalidTOTPCode         = errors.New("invalid totp code")
+	ErrBackupCodeIsRequired    = errors.New("backup code is required")
 	ErrInvalidBackupCode       = errors.New("invalid backup code")
 	ErrInvalidPendingToken     = errors.New("invalid or expired pending token")
 	ErrPasswordRequired        = errors.New("password is required")

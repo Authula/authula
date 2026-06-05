@@ -27,7 +27,7 @@ func TestSignUpHandler(t *testing.T) {
 		prepare        func(*plugintests.MockSignUpUseCase, *plugintests.MockSendEmailVerificationUseCase)
 		expectedStatus int
 	}{
-		{name: "invalid_json", body: []byte("{"), expectedStatus: http.StatusBadRequest},
+		{name: "invalid_json", body: []byte("{"), expectedStatus: http.StatusUnprocessableEntity},
 		{name: "usecase_error", body: internaltests.MarshalToJSON(t, types.SignUpRequest{Name: "Jane", Email: "jane@example.com", Password: "password123"}), prepare: func(m *plugintests.MockSignUpUseCase, _ *plugintests.MockSendEmailVerificationUseCase) {
 			m.On("SignUp", mock.Anything, "Jane", "jane@example.com", "password123", (*string)(nil), mock.Anything, (*string)(nil), mock.Anything, mock.Anything).Return((*types.SignUpResult)(nil), errors.New("boom")).Once()
 		}, expectedStatus: http.StatusForbidden},

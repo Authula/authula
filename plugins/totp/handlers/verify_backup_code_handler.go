@@ -21,6 +21,14 @@ func (h *VerifyBackupCodeHandler) Handler() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
+		if reqCtx.Actor != nil {
+			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
+				"message": "you're already authenticated",
+			})
+			reqCtx.Handled = true
+			return
+		}
+
 		cookie, err := r.Cookie(constants.CookieTOTPPending)
 		if err != nil || cookie.Value == "" {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
@@ -30,10 +38,17 @@ func (h *VerifyBackupCodeHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		var payload types.VerifyBackupCodeRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
+		var request types.VerifyBackupCodeRequest
+		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
-				"message": "invalid request body",
+				"message": err.Error(),
+			})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
+				"message": err.Error(),
 			})
 			reqCtx.Handled = true
 			return
@@ -42,7 +57,7 @@ func (h *VerifyBackupCodeHandler) Handler() http.HandlerFunc {
 		clientIP := reqCtx.ClientIP
 		userAgent := r.UserAgent()
 
-		result, err := h.UseCase.Verify(ctx, cookie.Value, payload.Code, payload.TrustDevice, &clientIP, &userAgent)
+		result, err := h.UseCase.Verify(ctx, cookie.Value, request.Code, request.TrustDevice, &clientIP, &userAgent)
 		if err != nil {
 			status := http.StatusBadRequest
 			if errors.Is(err, constants.ErrInvalidBackupCode) || errors.Is(err, constants.ErrTOTPNotEnabled) || errors.Is(err, constants.ErrInvalidPendingToken) {
@@ -55,7 +70,10 @@ func (h *VerifyBackupCodeHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetUserIDInContext(result.User.ID)
+		reqCtx.SetActorInContext(&models.Actor{
+			ID:   result.User.ID,
+			Type: models.ActorUser,
+		})
 		reqCtx.Values[models.ContextSessionID.String()] = result.Session.ID
 		reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken
 		reqCtx.Values[models.ContextAuthSuccess.String()] = true

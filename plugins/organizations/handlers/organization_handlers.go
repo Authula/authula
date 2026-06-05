@@ -18,13 +18,7 @@ func (h *CreateOrganizationHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
+		actor := reqCtx.Actor
 
 		var request types.CreateOrganizationRequest
 		if err := util.ParseJSON(r, &request); err != nil {
@@ -38,14 +32,14 @@ func (h *CreateOrganizationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		organization, err := h.OrgService.CreateOrganization(ctx, userID, request)
+		organization, err := h.OrgService.CreateOrganization(ctx, actor, request)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
 		}
 
 		reqCtx.Values[models.ContextAccessControlAssignRole.String()] = &models.AccessControlAssignRoleContext{
-			UserID:         userID,
+			UserID:         actor.ID,
 			RoleName:       request.Role,
 			AssignerUserID: nil,
 		}
@@ -62,15 +56,8 @@ func (h *GetAllOrganizationsHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
-
-		organizations, err := h.OrgService.GetAllOrganizations(ctx, userID)
+		actor := reqCtx.Actor
+		organizations, err := h.OrgService.GetAllOrganizations(ctx, actor)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -88,16 +75,10 @@ func (h *GetOrganizationByIDHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
+		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
-		organization, err := h.OrgService.GetOrganizationByID(ctx, userID, organizationID)
+		organization, err := h.OrgService.GetOrganizationByID(ctx, actor, organizationID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -115,15 +96,10 @@ func (h *UpdateOrganizationHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
+		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
+
 		var request types.UpdateOrganizationRequest
 		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
@@ -136,7 +112,7 @@ func (h *UpdateOrganizationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		organization, err := h.OrgService.UpdateOrganization(ctx, userID, organizationID, request)
+		organization, err := h.OrgService.UpdateOrganization(ctx, actor, organizationID, request)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -154,16 +130,10 @@ func (h *DeleteOrganizationHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
-
-		userID, ok := models.GetUserIDFromContext(ctx)
-		if !ok {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
+		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
-		if err := h.OrgService.DeleteOrganization(ctx, userID, organizationID); err != nil {
+		if err := h.OrgService.DeleteOrganization(ctx, actor, organizationID); err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
 		}

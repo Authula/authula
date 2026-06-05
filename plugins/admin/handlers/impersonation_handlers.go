@@ -146,10 +146,10 @@ func (h *StopImpersonationHandler) Handler() http.HandlerFunc {
 }
 
 func getUserID(reqCtx *models.RequestContext) *string {
-	if reqCtx.UserID == nil || *reqCtx.UserID == "" {
+	if reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
 		return nil
 	}
-	return reqCtx.UserID
+	return &reqCtx.Actor.ID
 }
 
 func getSessionID(reqCtx *models.RequestContext) *string {

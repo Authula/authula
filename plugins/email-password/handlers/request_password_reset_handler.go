@@ -21,7 +21,7 @@ func (h *RequestPasswordResetHandler) Handler() http.HandlerFunc {
 		var request types.RequestPasswordResetRequest
 		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{
-				"message": "invalid request body",
+				"message": err.Error(),
 			})
 			reqCtx.Handled = true
 			return
