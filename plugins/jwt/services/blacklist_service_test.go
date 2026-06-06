@@ -11,7 +11,6 @@ import (
 	internaltests "github.com/Authula/authula/internal/tests"
 )
 
-// TestBlacklistService_BlacklistToken tests the BlacklistToken method
 func TestBlacklistService_BlacklistToken(t *testing.T) {
 	t.Parallel()
 
@@ -74,7 +73,6 @@ func TestBlacklistService_BlacklistToken(t *testing.T) {
 	}
 }
 
-// TestBlacklistService_IsBlacklisted tests the IsBlacklisted method
 func TestBlacklistService_IsBlacklisted(t *testing.T) {
 	t.Parallel()
 
@@ -136,7 +134,6 @@ func TestBlacklistService_IsBlacklisted(t *testing.T) {
 	}
 }
 
-// TestBlacklistService_BlacklistAllSessionTokens tests the BlacklistAllSessionTokens method
 func TestBlacklistService_BlacklistAllSessionTokens(t *testing.T) {
 	t.Parallel()
 
@@ -199,7 +196,6 @@ func TestBlacklistService_BlacklistAllSessionTokens(t *testing.T) {
 	}
 }
 
-// TestBlacklistService_CleanupExpired tests the CleanupExpired method
 func TestBlacklistService_CleanupExpired(t *testing.T) {
 	t.Parallel()
 

@@ -15,6 +15,7 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/stretchr/testify/mock"
 
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	jwttests "github.com/Authula/authula/plugins/jwt/tests"
 	"github.com/Authula/authula/plugins/jwt/types"
@@ -33,7 +34,6 @@ type serviceTestFixture struct {
 	refreshExpiresIn time.Duration
 }
 
-// newServiceTestFixture creates a test fixture with mocks and a real generated Ed25519 key
 func newServiceTestFixture(t *testing.T) *serviceTestFixture {
 	t.Helper()
 
@@ -50,7 +50,7 @@ func newServiceTestFixture(t *testing.T) *serviceTestFixture {
 	}
 
 	return &serviceTestFixture{
-		logger:           &mockLogger{},
+		logger:           &internaltests.MockLogger{},
 		sessionSvc:       &jwttests.MockSessionService{},
 		coreTokenSvc:     &jwttests.MockTokenServiceCore{},
 		keySvc:           &jwttests.MockKeyService{},
@@ -63,7 +63,6 @@ func newServiceTestFixture(t *testing.T) *serviceTestFixture {
 	}
 }
 
-// newJWTService creates a tokenService from the fixture mocks
 func (f *serviceTestFixture) newJWTService() *tokenService {
 	return &tokenService{
 		logger:           f.logger,
@@ -77,7 +76,6 @@ func (f *serviceTestFixture) newJWTService() *tokenService {
 	}
 }
 
-// signTestToken creates a signed Ed25519 JWT for testing using the fixture's key
 func (f *serviceTestFixture) signTestToken(t *testing.T, claims map[string]any) string {
 	t.Helper()
 
@@ -105,7 +103,6 @@ func (f *serviceTestFixture) signTestToken(t *testing.T, claims map[string]any) 
 	return string(signed)
 }
 
-// setupKeyServiceMock configures the key and cache mocks to return the fixture's active key
 func (f *serviceTestFixture) setupKeyServiceMock() {
 	f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil).Maybe()
 
@@ -126,7 +123,6 @@ func (f *serviceTestFixture) setupKeyServiceMock() {
 		panic(err)
 	}
 
-	// Convert to and from JSON to ensure proper key set format
 	data, err := json.Marshal(set)
 	if err != nil {
 		panic(err)
@@ -139,7 +135,6 @@ func (f *serviceTestFixture) setupKeyServiceMock() {
 	f.cacheSvc.On("GetJWKSWithFallback", mock.Anything).Return(parsedSet, nil).Maybe()
 }
 
-// generateEd25519KeyPair generates PEM-encoded Ed25519 key pair
 func generateEd25519KeyPair() (pubPEM, privPEM []byte, err error) {
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -168,11 +163,3 @@ func generateEd25519KeyPair() (pubPEM, privPEM []byte, err error) {
 
 	return pubPEM, privPEM, nil
 }
-
-// mockLogger implements models.Logger for tests
-type mockLogger struct{}
-
-func (m *mockLogger) Debug(msg string, args ...any) {}
-func (m *mockLogger) Info(msg string, args ...any)  {}
-func (m *mockLogger) Warn(msg string, args ...any)  {}
-func (m *mockLogger) Error(msg string, args ...any) {}

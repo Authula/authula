@@ -71,6 +71,13 @@ func (s *InMemoryStorage) Close() error {
 	return nil
 }
 
+type NopTokenService struct{}
+
+func (NopTokenService) Generate() (string, error)                { return "", nil }
+func (NopTokenService) Hash(token string) string                 { return token }
+func (NopTokenService) Encrypt(token string) (string, error)     { return token, nil }
+func (NopTokenService) Decrypt(encrypted string) (string, error) { return encrypted, nil }
+
 var _ repositories.JWKSRepository = (*MockJWKSRepository)(nil)
 
 type MockTokenService struct{ mock.Mock }

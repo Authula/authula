@@ -15,15 +15,9 @@ import (
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/plugins/jwt/migrationset"
 	"github.com/Authula/authula/plugins/jwt/repositories"
+	jwttests "github.com/Authula/authula/plugins/jwt/tests"
 	"github.com/Authula/authula/plugins/jwt/types"
 )
-
-type nopTokenService struct{}
-
-func (nopTokenService) Generate() (string, error)                { return "", nil }
-func (nopTokenService) Hash(token string) string                 { return token }
-func (nopTokenService) Encrypt(token string) (string, error)     { return token, nil }
-func (nopTokenService) Decrypt(encrypted string) (string, error) { return encrypted, nil }
 
 func setupKeyServiceTest(t *testing.T) (KeyService, repositories.JWKSRepository) {
 	t.Helper()
@@ -41,7 +35,7 @@ func setupKeyServiceTest(t *testing.T) (KeyService, repositories.JWKSRepository)
 
 	repo := repositories.NewBunJWKSRepository(db)
 	logger := &internaltests.MockLogger{}
-	coreTokenSvc := nopTokenService{}
+	coreTokenSvc := jwttests.NopTokenService{}
 
 	svc := NewKeyService(repo, logger, coreservices.TokenService(coreTokenSvc), "test-secret")
 	return svc, repo

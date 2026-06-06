@@ -267,11 +267,11 @@ func TestTokenService_GenerateUserToken(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		userID    string
-		sessionID string
+		name       string
+		userID     string
+		sessionID  string
 		setupMocks func(*serviceTestFixture)
-		wantErr   string
+		wantErr    string
 	}{
 		{
 			name:      "success",
@@ -283,11 +283,11 @@ func TestTokenService_GenerateUserToken(t *testing.T) {
 			},
 		},
 		{
-			name:      "empty session id",
-			userID:    "user-1",
-			sessionID: "",
+			name:       "empty session id",
+			userID:     "user-1",
+			sessionID:  "",
 			setupMocks: func(f *serviceTestFixture) {},
-			wantErr:   "session id is required",
+			wantErr:    "session id is required",
 		},
 		{
 			name:      "key service error",

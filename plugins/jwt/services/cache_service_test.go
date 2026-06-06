@@ -48,7 +48,7 @@ func newCacheTestFixture(t *testing.T) *cacheTestFixture {
 		db:      db,
 		repo:    repositories.NewBunJWKSRepository(db),
 		storage: jwttests.NewInMemoryStorage(),
-		logger:  &mockLogger{},
+		logger:  &internaltests.MockLogger{},
 		ttl:     24 * time.Hour,
 	}
 }
