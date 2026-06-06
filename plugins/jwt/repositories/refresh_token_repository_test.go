@@ -30,161 +30,295 @@ func setupRefreshTokenRepo(t *testing.T) (*bun.DB, *refreshTokenRepositoryImpl) 
 	return db, &refreshTokenRepositoryImpl{db: db}
 }
 
-func TestRefreshTokenRepository(t *testing.T) {
-	ctx := context.Background()
+func TestRefreshTokenRepository_Store(t *testing.T) {
+	t.Parallel()
 
-	t.Run("StoreRefreshToken", func(t *testing.T) {
-		_, repo := setupRefreshTokenRepo(t)
-		now := time.Now().Truncate(time.Millisecond)
-		record := &types.RefreshToken{
-			ID:        uuid.New().String(),
-			SessionID: uuid.New().String(),
-			TokenHash: uuid.New().String(),
-			ExpiresAt: now.Add(time.Hour),
-		}
-		err := repo.StoreRefreshToken(ctx, record)
-		require.NoError(t, err)
+	tests := []struct {
+		name   string
+		record func() *types.RefreshToken
+	}{
+		{
+			name: "stores and retrieves refresh token",
+			record: func() *types.RefreshToken {
+				return &types.RefreshToken{
+					ID:        uuid.New().String(),
+					SessionID: uuid.New().String(),
+					TokenHash: uuid.New().String(),
+					ExpiresAt: time.Now().Add(time.Hour),
+				}
+			},
+		},
+	}
 
-		got, err := repo.GetRefreshToken(ctx, record.TokenHash)
-		require.NoError(t, err)
-		require.NotNil(t, got)
-		require.Equal(t, record.ID, got.ID)
-		require.Equal(t, record.SessionID, got.SessionID)
-		require.Equal(t, record.TokenHash, got.TokenHash)
-		require.WithinDuration(t, record.ExpiresAt, got.ExpiresAt, time.Second)
-		require.False(t, got.IsRevoked)
-		require.Nil(t, got.RevokedAt)
-		require.Nil(t, got.LastReuseAttempt)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("GetRefreshToken_not_found", func(t *testing.T) {
-		_, repo := setupRefreshTokenRepo(t)
-		got, err := repo.GetRefreshToken(ctx, "nonexistent-hash")
-		require.NoError(t, err)
-		require.Nil(t, got)
-	})
+			_, repo := setupRefreshTokenRepo(t)
+			ctx := context.Background()
 
-	t.Run("RevokeRefreshToken", func(t *testing.T) {
-		_, repo := setupRefreshTokenRepo(t)
-		now := time.Now().Truncate(time.Millisecond)
-		record := &types.RefreshToken{
-			ID:        uuid.New().String(),
-			SessionID: uuid.New().String(),
-			TokenHash: uuid.New().String(),
-			ExpiresAt: now.Add(time.Hour),
-		}
-		err := repo.StoreRefreshToken(ctx, record)
-		require.NoError(t, err)
+			record := tt.record()
+			now := time.Now().Truncate(time.Millisecond)
 
-		err = repo.RevokeRefreshToken(ctx, record.TokenHash)
-		require.NoError(t, err)
+			err := repo.StoreRefreshToken(ctx, record)
+			require.NoError(t, err)
 
-		got, err := repo.GetRefreshToken(ctx, record.TokenHash)
-		require.NoError(t, err)
-		require.NotNil(t, got)
-		require.True(t, got.IsRevoked)
-		require.NotNil(t, got.RevokedAt)
-	})
+			got, err := repo.GetRefreshToken(ctx, record.TokenHash)
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			require.Equal(t, record.ID, got.ID)
+			require.Equal(t, record.SessionID, got.SessionID)
+			require.Equal(t, record.TokenHash, got.TokenHash)
+			require.WithinDuration(t, record.ExpiresAt, got.ExpiresAt, time.Second)
+			require.False(t, got.IsRevoked)
+			require.Nil(t, got.RevokedAt)
+			require.Nil(t, got.LastReuseAttempt)
+			require.WithinDuration(t, now, got.CreatedAt, time.Second)
+		})
+	}
+}
 
-	t.Run("RevokeAllSessionTokens", func(t *testing.T) {
-		_, repo := setupRefreshTokenRepo(t)
-		now := time.Now().Truncate(time.Millisecond)
-		sessionID := uuid.New().String()
-		otherSessionID := uuid.New().String()
+func TestRefreshTokenRepository_GetRefreshToken(t *testing.T) {
+	t.Parallel()
 
-		token1 := &types.RefreshToken{
-			ID:        uuid.New().String(),
-			SessionID: sessionID,
-			TokenHash: uuid.New().String(),
-			ExpiresAt: now.Add(time.Hour),
-		}
-		token2 := &types.RefreshToken{
-			ID:        uuid.New().String(),
-			SessionID: sessionID,
-			TokenHash: uuid.New().String(),
-			ExpiresAt: now.Add(time.Hour),
-		}
-		token3 := &types.RefreshToken{
-			ID:        uuid.New().String(),
-			SessionID: otherSessionID,
-			TokenHash: uuid.New().String(),
-			ExpiresAt: now.Add(time.Hour),
-		}
+	tests := []struct {
+		name      string
+		tokenHash string
+		wantNil   bool
+	}{
+		{
+			name:      "returns token when found",
+			tokenHash: uuid.New().String(),
+			wantNil:   false,
+		},
+		{
+			name:      "returns nil when not found",
+			tokenHash: "nonexistent-hash",
+			wantNil:   true,
+		},
+	}
 
-		require.NoError(t, repo.StoreRefreshToken(ctx, token1))
-		require.NoError(t, repo.StoreRefreshToken(ctx, token2))
-		require.NoError(t, repo.StoreRefreshToken(ctx, token3))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		err := repo.RevokeAllSessionTokens(ctx, sessionID)
-		require.NoError(t, err)
+			_, repo := setupRefreshTokenRepo(t)
+			ctx := context.Background()
 
-		got1, err := repo.GetRefreshToken(ctx, token1.TokenHash)
-		require.NoError(t, err)
-		require.True(t, got1.IsRevoked)
-		require.NotNil(t, got1.RevokedAt)
+			if !tt.wantNil {
+				err := repo.StoreRefreshToken(ctx, &types.RefreshToken{
+					ID:        uuid.New().String(),
+					SessionID: uuid.New().String(),
+					TokenHash: tt.tokenHash,
+					ExpiresAt: time.Now().Add(time.Hour),
+				})
+				require.NoError(t, err)
+			}
 
-		got2, err := repo.GetRefreshToken(ctx, token2.TokenHash)
-		require.NoError(t, err)
-		require.True(t, got2.IsRevoked)
-		require.NotNil(t, got2.RevokedAt)
+			got, err := repo.GetRefreshToken(ctx, tt.tokenHash)
 
-		got3, err := repo.GetRefreshToken(ctx, token3.TokenHash)
-		require.NoError(t, err)
-		require.NotNil(t, got3)
-		require.False(t, got3.IsRevoked)
-		require.Nil(t, got3.RevokedAt)
-	})
+			require.NoError(t, err)
+			if tt.wantNil {
+				require.Nil(t, got)
+			} else {
+				require.NotNil(t, got)
+				require.Equal(t, tt.tokenHash, got.TokenHash)
+			}
+		})
+	}
+}
 
-	t.Run("SetLastReuseAttempt", func(t *testing.T) {
-		_, repo := setupRefreshTokenRepo(t)
-		now := time.Now().Truncate(time.Millisecond)
-		record := &types.RefreshToken{
-			ID:        uuid.New().String(),
-			SessionID: uuid.New().String(),
-			TokenHash: uuid.New().String(),
-			ExpiresAt: now.Add(time.Hour),
-		}
-		err := repo.StoreRefreshToken(ctx, record)
-		require.NoError(t, err)
+func TestRefreshTokenRepository_RevokeRefreshToken(t *testing.T) {
+	t.Parallel()
 
-		err = repo.SetLastReuseAttempt(ctx, record.TokenHash)
-		require.NoError(t, err)
+	tests := []struct {
+		name   string
+		record *types.RefreshToken
+	}{
+		{
+			name: "revokes token and sets revoked_at",
+			record: &types.RefreshToken{
+				ID:        uuid.New().String(),
+				SessionID: uuid.New().String(),
+				TokenHash: uuid.New().String(),
+				ExpiresAt: time.Now().Add(time.Hour),
+			},
+		},
+	}
 
-		got, err := repo.GetRefreshToken(ctx, record.TokenHash)
-		require.NoError(t, err)
-		require.NotNil(t, got)
-		require.NotNil(t, got.LastReuseAttempt)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("CleanupExpiredTokens", func(t *testing.T) {
-		_, repo := setupRefreshTokenRepo(t)
-		now := time.Now().Truncate(time.Millisecond)
+			_, repo := setupRefreshTokenRepo(t)
+			ctx := context.Background()
 
-		expired := &types.RefreshToken{
-			ID:        uuid.New().String(),
-			SessionID: uuid.New().String(),
-			TokenHash: uuid.New().String(),
-			ExpiresAt: now.Add(-time.Hour),
-		}
-		valid := &types.RefreshToken{
-			ID:        uuid.New().String(),
-			SessionID: uuid.New().String(),
-			TokenHash: uuid.New().String(),
-			ExpiresAt: now.Add(time.Hour),
-		}
+			err := repo.StoreRefreshToken(ctx, tt.record)
+			require.NoError(t, err)
 
-		require.NoError(t, repo.StoreRefreshToken(ctx, expired))
-		require.NoError(t, repo.StoreRefreshToken(ctx, valid))
+			err = repo.RevokeRefreshToken(ctx, tt.record.TokenHash)
+			require.NoError(t, err)
 
-		err := repo.CleanupExpiredTokens(ctx)
-		require.NoError(t, err)
+			got, err := repo.GetRefreshToken(ctx, tt.record.TokenHash)
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			require.True(t, got.IsRevoked)
+			require.NotNil(t, got.RevokedAt)
+		})
+	}
+}
 
-		gotExpired, err := repo.GetRefreshToken(ctx, expired.TokenHash)
-		require.NoError(t, err)
-		require.Nil(t, gotExpired)
+func TestRefreshTokenRepository_RevokeAllSessionTokens(t *testing.T) {
+	t.Parallel()
 
-		gotValid, err := repo.GetRefreshToken(ctx, valid.TokenHash)
-		require.NoError(t, err)
-		require.NotNil(t, gotValid)
-	})
+	tests := []struct {
+		name          string
+		targetSession string
+		otherSession  string
+	}{
+		{
+			name:          "revokes only tokens for the target session",
+			targetSession: uuid.New().String(),
+			otherSession:  uuid.New().String(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, repo := setupRefreshTokenRepo(t)
+			ctx := context.Background()
+
+			token1 := &types.RefreshToken{
+				ID:        uuid.New().String(),
+				SessionID: tt.targetSession,
+				TokenHash: uuid.New().String(),
+				ExpiresAt: time.Now().Add(time.Hour),
+			}
+			token2 := &types.RefreshToken{
+				ID:        uuid.New().String(),
+				SessionID: tt.targetSession,
+				TokenHash: uuid.New().String(),
+				ExpiresAt: time.Now().Add(time.Hour),
+			}
+			token3 := &types.RefreshToken{
+				ID:        uuid.New().String(),
+				SessionID: tt.otherSession,
+				TokenHash: uuid.New().String(),
+				ExpiresAt: time.Now().Add(time.Hour),
+			}
+
+			require.NoError(t, repo.StoreRefreshToken(ctx, token1))
+			require.NoError(t, repo.StoreRefreshToken(ctx, token2))
+			require.NoError(t, repo.StoreRefreshToken(ctx, token3))
+
+			err := repo.RevokeAllSessionTokens(ctx, tt.targetSession)
+			require.NoError(t, err)
+
+			got1, err := repo.GetRefreshToken(ctx, token1.TokenHash)
+			require.NoError(t, err)
+			require.True(t, got1.IsRevoked)
+			require.NotNil(t, got1.RevokedAt)
+
+			got2, err := repo.GetRefreshToken(ctx, token2.TokenHash)
+			require.NoError(t, err)
+			require.True(t, got2.IsRevoked)
+			require.NotNil(t, got2.RevokedAt)
+
+			got3, err := repo.GetRefreshToken(ctx, token3.TokenHash)
+			require.NoError(t, err)
+			require.NotNil(t, got3)
+			require.False(t, got3.IsRevoked)
+			require.Nil(t, got3.RevokedAt)
+		})
+	}
+}
+
+func TestRefreshTokenRepository_SetLastReuseAttempt(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		record *types.RefreshToken
+	}{
+		{
+			name: "sets last_reuse_attempt on token",
+			record: &types.RefreshToken{
+				ID:        uuid.New().String(),
+				SessionID: uuid.New().String(),
+				TokenHash: uuid.New().String(),
+				ExpiresAt: time.Now().Add(time.Hour),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, repo := setupRefreshTokenRepo(t)
+			ctx := context.Background()
+
+			err := repo.StoreRefreshToken(ctx, tt.record)
+			require.NoError(t, err)
+
+			err = repo.SetLastReuseAttempt(ctx, tt.record.TokenHash)
+			require.NoError(t, err)
+
+			got, err := repo.GetRefreshToken(ctx, tt.record.TokenHash)
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			require.NotNil(t, got.LastReuseAttempt)
+		})
+	}
+}
+
+func TestRefreshTokenRepository_CleanupExpiredTokens(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		expiredRecord *types.RefreshToken
+		validRecord   *types.RefreshToken
+	}{
+		{
+			name: "removes expired tokens and keeps valid ones",
+			expiredRecord: &types.RefreshToken{
+				ID:        uuid.New().String(),
+				SessionID: uuid.New().String(),
+				TokenHash: uuid.New().String(),
+				ExpiresAt: time.Now().Add(-time.Hour),
+			},
+			validRecord: &types.RefreshToken{
+				ID:        uuid.New().String(),
+				SessionID: uuid.New().String(),
+				TokenHash: uuid.New().String(),
+				ExpiresAt: time.Now().Add(time.Hour),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, repo := setupRefreshTokenRepo(t)
+			ctx := context.Background()
+
+			require.NoError(t, repo.StoreRefreshToken(ctx, tt.expiredRecord))
+			require.NoError(t, repo.StoreRefreshToken(ctx, tt.validRecord))
+
+			err := repo.CleanupExpiredTokens(ctx)
+			require.NoError(t, err)
+
+			gotExpired, err := repo.GetRefreshToken(ctx, tt.expiredRecord.TokenHash)
+			require.NoError(t, err)
+			require.Nil(t, gotExpired)
+
+			gotValid, err := repo.GetRefreshToken(ctx, tt.validRecord.TokenHash)
+			require.NoError(t, err)
+			require.NotNil(t, gotValid)
+		})
+	}
 }
