@@ -2,6 +2,8 @@ package tests
 
 import (
 	"context"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/lestrrat-go/jwx/v3/jwk"
@@ -11,6 +13,63 @@ import (
 	"github.com/Authula/authula/plugins/jwt/repositories"
 	jwtservicesTypes "github.com/Authula/authula/plugins/jwt/types"
 )
+
+type InMemoryStorage struct {
+	mu   sync.RWMutex
+	data map[string]string
+}
+
+func NewInMemoryStorage() *InMemoryStorage {
+	return &InMemoryStorage{data: make(map[string]string)}
+}
+
+func (s *InMemoryStorage) Get(_ context.Context, key string) (any, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	val, ok := s.data[key]
+	if !ok {
+		return nil, nil
+	}
+	return val, nil
+}
+
+func (s *InMemoryStorage) Set(_ context.Context, key string, value any, _ *time.Duration) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data[key] = value.(string)
+	return nil
+}
+
+func (s *InMemoryStorage) Delete(_ context.Context, key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.data, key)
+	return nil
+}
+
+func (s *InMemoryStorage) Incr(_ context.Context, _ string, _ *time.Duration) (int, error) {
+	return 0, nil
+}
+
+func (s *InMemoryStorage) TTL(_ context.Context, _ string) (*time.Duration, error) {
+	return nil, nil
+}
+
+func (s *InMemoryStorage) Scan(_ context.Context, prefix string) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var keys []string
+	for key := range s.data {
+		if strings.HasPrefix(key, prefix) {
+			keys = append(keys, key)
+		}
+	}
+	return keys, nil
+}
+
+func (s *InMemoryStorage) Close() error {
+	return nil
+}
 
 var _ repositories.JWKSRepository = (*MockJWKSRepository)(nil)
 

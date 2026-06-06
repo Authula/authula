@@ -8,6 +8,7 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -265,105 +266,192 @@ func TestTokenService_ValidateToken(t *testing.T) {
 func TestTokenService_GenerateUserToken(t *testing.T) {
 	t.Parallel()
 
-	t.Run("success", func(t *testing.T) {
-		f := newServiceTestFixture(t)
-		svc := f.newJWTService()
+	tests := []struct {
+		name      string
+		userID    string
+		sessionID string
+		setupMocks func(*serviceTestFixture)
+		wantErr   string
+	}{
+		{
+			name:      "success",
+			userID:    "user-1",
+			sessionID: "sess-1",
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
+				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
+			},
+		},
+		{
+			name:      "empty session id",
+			userID:    "user-1",
+			sessionID: "",
+			setupMocks: func(f *serviceTestFixture) {},
+			wantErr:   "session id is required",
+		},
+		{
+			name:      "key service error",
+			userID:    "user-1",
+			sessionID: "sess-1",
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(nil, assert.AnError)
+			},
+			wantErr: "failed to get active key",
+		},
+		{
+			name:      "decrypt error",
+			userID:    "user-1",
+			sessionID: "sess-1",
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
+				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return("", assert.AnError)
+			},
+			wantErr: "failed to decrypt private key",
+		},
+	}
 
-		f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
-		f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		ctx := context.Background()
-		pair, err := svc.GenerateUserToken(ctx, "user-1", "sess-1")
+			f := newServiceTestFixture(t)
+			svc := f.newJWTService()
+			tt.setupMocks(f)
 
-		require.NoError(t, err)
-		require.NotNil(t, pair)
-		require.NotEmpty(t, pair.AccessToken)
-		require.NotEmpty(t, pair.RefreshToken)
-		require.Equal(t, 15*time.Minute, pair.ExpiresIn)
-		require.Equal(t, "Bearer", pair.TokenType)
+			ctx := context.Background()
+			pair, err := svc.GenerateUserToken(ctx, tt.userID, tt.sessionID)
 
-		claims := parseTestToken(t, pair.AccessToken, f)
-		require.Equal(t, "user-1", claims["sub"])
-		require.Equal(t, "user-1", claims["user_id"])
-		require.Equal(t, "sess-1", claims["session_id"])
-		require.Equal(t, "user", claims["actor_type"])
-		require.Equal(t, "access_token", claims["token_type"])
-		require.NotEmpty(t, claims["jti"])
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+				require.Nil(t, pair)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, pair)
+				require.NotEmpty(t, pair.AccessToken)
+				require.NotEmpty(t, pair.RefreshToken)
+				require.Equal(t, 15*time.Minute, pair.ExpiresIn)
+				require.Equal(t, "Bearer", pair.TokenType)
 
-		f.keySvc.AssertExpectations(t)
-		f.coreTokenSvc.AssertExpectations(t)
-	})
+				claims := parseTestToken(t, pair.AccessToken, f)
+				require.Equal(t, tt.userID, claims["sub"])
+				require.Equal(t, tt.userID, claims["user_id"])
+				require.Equal(t, tt.sessionID, claims["session_id"])
+				require.Equal(t, "user", claims["actor_type"])
+				require.Equal(t, "access_token", claims["token_type"])
+				require.NotEmpty(t, claims["jti"])
+			}
 
-	t.Run("empty_session_id", func(t *testing.T) {
-		f := newServiceTestFixture(t)
-		svc := f.newJWTService()
-
-		ctx := context.Background()
-		pair, err := svc.GenerateUserToken(ctx, "user-1", "")
-
-		require.Error(t, err)
-		require.Nil(t, pair)
-		require.Contains(t, err.Error(), "session id is required")
-	})
+			f.keySvc.AssertExpectations(t)
+			f.coreTokenSvc.AssertExpectations(t)
+		})
+	}
 }
 
 func TestTokenService_GenerateMachineToken(t *testing.T) {
 	t.Parallel()
 
-	t.Run("success", func(t *testing.T) {
-		f := newServiceTestFixture(t)
-		svc := f.newJWTService()
+	tests := []struct {
+		name           string
+		clientID       string
+		organizationID string
+		scopes         []string
+		setupMocks     func(*serviceTestFixture)
+		wantErr        string
+		wantOrgID      string
+		wantScopes     []any
+	}{
+		{
+			name:           "success",
+			clientID:       "client-1",
+			organizationID: "org-1",
+			scopes:         []string{"read", "write"},
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
+				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
+			},
+			wantOrgID:  "org-1",
+			wantScopes: []any{"read", "write"},
+		},
+		{
+			name:           "no optional fields",
+			clientID:       "client-2",
+			organizationID: "",
+			scopes:         nil,
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
+				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
+			},
+		},
+		{
+			name:           "key service error",
+			clientID:       "client-1",
+			organizationID: "org-1",
+			scopes:         []string{"read"},
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(nil, assert.AnError)
+			},
+			wantErr: "failed to get active key",
+		},
+		{
+			name:           "decrypt error",
+			clientID:       "client-1",
+			organizationID: "org-1",
+			scopes:         []string{"read"},
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
+				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return("", assert.AnError)
+			},
+			wantErr: "failed to decrypt private key",
+		},
+	}
 
-		f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
-		f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		ctx := context.Background()
-		pair, err := svc.GenerateMachineToken(ctx, "client-1", "org-1", []string{"read", "write"})
+			f := newServiceTestFixture(t)
+			svc := f.newJWTService()
+			tt.setupMocks(f)
 
-		require.NoError(t, err)
-		require.NotNil(t, pair)
-		require.NotEmpty(t, pair.AccessToken)
-		require.Empty(t, pair.RefreshToken)
-		require.Equal(t, 15*time.Minute, pair.ExpiresIn)
-		require.Equal(t, "Bearer", pair.TokenType)
+			ctx := context.Background()
+			pair, err := svc.GenerateMachineToken(ctx, tt.clientID, tt.organizationID, tt.scopes)
 
-		claims := parseTestToken(t, pair.AccessToken, f)
-		require.Equal(t, "client-1", claims["sub"])
-		require.Equal(t, "machine", claims["actor_type"])
-		require.Equal(t, "org-1", claims["org_id"])
-		require.Equal(t, "access_token", claims["token_type"])
-		require.NotEmpty(t, claims["jti"])
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+				require.Nil(t, pair)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, pair)
+				require.NotEmpty(t, pair.AccessToken)
+				require.Empty(t, pair.RefreshToken)
+				require.Equal(t, 15*time.Minute, pair.ExpiresIn)
+				require.Equal(t, "Bearer", pair.TokenType)
 
-		scopes, ok := claims["scopes"].([]any)
-		require.True(t, ok)
-		require.ElementsMatch(t, []string{"read", "write"}, []any{scopes[0], scopes[1]})
+				claims := parseTestToken(t, pair.AccessToken, f)
+				require.Equal(t, tt.clientID, claims["sub"])
+				require.Equal(t, "machine", claims["actor_type"])
+				require.Equal(t, "access_token", claims["token_type"])
+				require.NotEmpty(t, claims["jti"])
 
-		f.keySvc.AssertExpectations(t)
-		f.coreTokenSvc.AssertExpectations(t)
-	})
+				if tt.wantOrgID != "" {
+					require.Equal(t, tt.wantOrgID, claims["org_id"])
+				} else {
+					require.Empty(t, claims["org_id"])
+				}
 
-	t.Run("no_optional_fields", func(t *testing.T) {
-		f := newServiceTestFixture(t)
-		svc := f.newJWTService()
+				if tt.wantScopes != nil {
+					scopes, ok := claims["scopes"].([]any)
+					require.True(t, ok)
+					require.ElementsMatch(t, tt.wantScopes, scopes)
+				} else {
+					require.Nil(t, claims["scopes"])
+				}
+			}
 
-		f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
-		f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
-
-		ctx := context.Background()
-		pair, err := svc.GenerateMachineToken(ctx, "client-2", "", nil)
-
-		require.NoError(t, err)
-		require.NotNil(t, pair)
-		require.NotEmpty(t, pair.AccessToken)
-		require.Empty(t, pair.RefreshToken)
-
-		claims := parseTestToken(t, pair.AccessToken, f)
-		require.Equal(t, "client-2", claims["sub"])
-		require.Equal(t, "machine", claims["actor_type"])
-		require.Empty(t, claims["org_id"])
-		require.Nil(t, claims["scopes"])
-
-		f.keySvc.AssertExpectations(t)
-		f.coreTokenSvc.AssertExpectations(t)
-	})
+			f.keySvc.AssertExpectations(t)
+			f.coreTokenSvc.AssertExpectations(t)
+		})
+	}
 }

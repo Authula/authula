@@ -8,9 +8,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/Authula/authula/models"
 	coreservices "github.com/Authula/authula/services"
 
 	internaltests "github.com/Authula/authula/internal/tests"
+	"github.com/Authula/authula/migrations"
+	"github.com/Authula/authula/plugins/jwt/migrationset"
 	"github.com/Authula/authula/plugins/jwt/repositories"
 	"github.com/Authula/authula/plugins/jwt/types"
 )
@@ -25,13 +28,15 @@ func (nopTokenService) Decrypt(encrypted string) (string, error) { return encryp
 func setupKeyServiceTest(t *testing.T) (KeyService, repositories.JWKSRepository) {
 	t.Helper()
 	db := internaltests.NewSQLiteIntegrationDB(t)
-	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS jwks (
-		id TEXT PRIMARY KEY,
-		public_key TEXT NOT NULL,
-		private_key TEXT NOT NULL,
-		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		expires_at TIMESTAMP NULL
-	)`)
+
+	migrator, err := migrations.NewMigrator(db, &internaltests.MockLogger{})
+	require.NoError(t, err)
+	err = migrator.Migrate(context.Background(), []migrations.MigrationSet{
+		{
+			PluginID:   models.PluginJWT.String(),
+			Migrations: migrationset.JWTMigrationsForProvider("sqlite"),
+		},
+	})
 	require.NoError(t, err)
 
 	repo := repositories.NewBunJWKSRepository(db)
@@ -42,127 +47,207 @@ func setupKeyServiceTest(t *testing.T) (KeyService, repositories.JWKSRepository)
 	return svc, repo
 }
 
-func TestKeyService(t *testing.T) {
-	t.Run("GenerateKeysIfMissing_no_keys", func(t *testing.T) {
-		svc, repo := setupKeyServiceTest(t)
-		ctx := context.Background()
+func TestKeyService_GenerateKeysIfMissing(t *testing.T) {
+	t.Parallel()
 
-		keys, err := repo.GetJWKSKeys(ctx)
-		require.NoError(t, err)
-		require.Len(t, keys, 0)
+	tests := []struct {
+		name      string
+		setup     func(context.Context, repositories.JWKSRepository)
+		wantNewID bool
+	}{
+		{
+			name:      "no keys",
+			setup:     func(ctx context.Context, repo repositories.JWKSRepository) {},
+			wantNewID: true,
+		},
+		{
+			name: "keys exist",
+			setup: func(ctx context.Context, repo repositories.JWKSRepository) {
+				err := repo.StoreJWKSKey(ctx, &types.JWKS{
+					ID:         "pre-seeded-key",
+					PublicKey:  "pre-seeded-public-key",
+					PrivateKey: "pre-seeded-private-key",
+				})
+				require.NoError(t, err)
+			},
+			wantNewID: false,
+		},
+	}
 
-		err = svc.GenerateKeysIfMissing(ctx)
-		require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		keys, err = repo.GetJWKSKeys(ctx)
-		require.NoError(t, err)
-		require.Len(t, keys, 1)
-		require.NotEmpty(t, keys[0].ID)
-		assert.Contains(t, keys[0].PublicKey, "BEGIN PUBLIC KEY")
-		assert.Contains(t, keys[0].PrivateKey, "BEGIN PRIVATE KEY")
-	})
+			svc, repo := setupKeyServiceTest(t)
+			ctx := context.Background()
 
-	t.Run("GenerateKeysIfMissing_keys_exist", func(t *testing.T) {
-		svc, repo := setupKeyServiceTest(t)
-		ctx := context.Background()
+			tt.setup(ctx, repo)
 
-		preSeedKey := &types.JWKS{
-			ID:         "pre-seeded-key",
-			PublicKey:  "pre-seeded-public-key",
-			PrivateKey: "pre-seeded-private-key",
-		}
-		err := repo.StoreJWKSKey(ctx, preSeedKey)
-		require.NoError(t, err)
+			err := svc.GenerateKeysIfMissing(ctx)
+			require.NoError(t, err)
 
-		err = svc.GenerateKeysIfMissing(ctx)
-		require.NoError(t, err)
+			keys, err := repo.GetJWKSKeys(ctx)
+			require.NoError(t, err)
 
-		keys, err := repo.GetJWKSKeys(ctx)
-		require.NoError(t, err)
-		require.Len(t, keys, 1)
-		require.Equal(t, "pre-seeded-key", keys[0].ID)
-	})
+			if tt.wantNewID {
+				require.Len(t, keys, 1)
+				require.NotEmpty(t, keys[0].ID)
+				assert.Contains(t, keys[0].PublicKey, "BEGIN PUBLIC KEY")
+				assert.Contains(t, keys[0].PrivateKey, "BEGIN PRIVATE KEY")
+			} else {
+				require.Len(t, keys, 1)
+				require.Equal(t, "pre-seeded-key", keys[0].ID)
+			}
+		})
+	}
+}
 
-	t.Run("GetActiveKey", func(t *testing.T) {
-		svc, repo := setupKeyServiceTest(t)
-		ctx := context.Background()
+func TestKeyService_GetActiveKey(t *testing.T) {
+	t.Parallel()
 
-		now := time.Now()
-		key1 := &types.JWKS{
-			ID:         "key-1",
-			PublicKey:  "public-key-1",
-			PrivateKey: "private-key-1",
-			CreatedAt:  now.Add(-1 * time.Hour),
-		}
-		err := repo.StoreJWKSKey(ctx, key1)
-		require.NoError(t, err)
+	tests := []struct {
+		name    string
+		setup   func(context.Context, repositories.JWKSRepository)
+		wantID  string
+		wantErr string
+	}{
+		{
+			name:    "no keys",
+			setup:   func(ctx context.Context, repo repositories.JWKSRepository) {},
+			wantErr: "no active key found",
+		},
+		{
+			name: "single key",
+			setup: func(ctx context.Context, repo repositories.JWKSRepository) {
+				err := repo.StoreJWKSKey(ctx, &types.JWKS{
+					ID:         "single-key",
+					PublicKey:  "public-key-1",
+					PrivateKey: "private-key-1",
+					CreatedAt:  time.Now(),
+				})
+				require.NoError(t, err)
+			},
+			wantID: "single-key",
+		},
+		{
+			name: "returns most recent key",
+			setup: func(ctx context.Context, repo repositories.JWKSRepository) {
+				err := repo.StoreJWKSKey(ctx, &types.JWKS{
+					ID:         "old-key",
+					PublicKey:  "public-key-old",
+					PrivateKey: "private-key-old",
+					CreatedAt:  time.Now().Add(-1 * time.Hour),
+				})
+				require.NoError(t, err)
 
-		active, err := svc.GetActiveKey(ctx)
-		require.NoError(t, err)
-		require.NotNil(t, active)
-		require.Equal(t, "key-1", active.ID)
+				err = repo.StoreJWKSKey(ctx, &types.JWKS{
+					ID:         "new-key",
+					PublicKey:  "public-key-new",
+					PrivateKey: "private-key-new",
+					CreatedAt:  time.Now(),
+				})
+				require.NoError(t, err)
+			},
+			wantID: "new-key",
+		},
+	}
 
-		key2 := &types.JWKS{
-			ID:         "key-2",
-			PublicKey:  "public-key-2",
-			PrivateKey: "private-key-2",
-			CreatedAt:  now,
-		}
-		err = repo.StoreJWKSKey(ctx, key2)
-		require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		active, err = svc.GetActiveKey(ctx)
-		require.NoError(t, err)
-		require.NotNil(t, active)
-		require.Equal(t, "key-2", active.ID)
-	})
+			svc, repo := setupKeyServiceTest(t)
+			ctx := context.Background()
 
-	t.Run("RotateKeysIfNeeded_due", func(t *testing.T) {
-		svc, repo := setupKeyServiceTest(t)
-		ctx := context.Background()
+			tt.setup(ctx, repo)
 
-		oldKey := &types.JWKS{
-			ID:         "old-key",
-			PublicKey:  "old-public-key",
-			PrivateKey: "old-private-key",
-			CreatedAt:  time.Now().Add(-25 * time.Hour),
-		}
-		err := repo.StoreJWKSKey(ctx, oldKey)
-		require.NoError(t, err)
+			active, err := svc.GetActiveKey(ctx)
 
-		rotated, err := svc.RotateKeysIfNeeded(ctx, 24*time.Hour, 1*time.Hour, nil)
-		require.NoError(t, err)
-		require.True(t, rotated)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+				require.Nil(t, active)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, active)
+				require.Equal(t, tt.wantID, active.ID)
+			}
+		})
+	}
+}
 
-		storedOldKey, err := repo.GetJWKSKeyByID(ctx, "old-key")
-		require.NoError(t, err)
-		require.NotNil(t, storedOldKey)
-		require.NotNil(t, storedOldKey.ExpiresAt)
+func TestKeyService_RotateKeysIfNeeded(t *testing.T) {
+	t.Parallel()
 
-		keys, err := repo.GetJWKSKeys(ctx)
-		require.NoError(t, err)
-		require.Len(t, keys, 2)
-	})
+	rotationInterval := 24 * time.Hour
+	gracePeriod := 1 * time.Hour
 
-	t.Run("RotateKeysIfNeeded_not_due", func(t *testing.T) {
-		svc, repo := setupKeyServiceTest(t)
-		ctx := context.Background()
+	tests := []struct {
+		name        string
+		setup       func(context.Context, repositories.JWKSRepository)
+		wantRotated bool
+		wantErr     string
+	}{
+		{
+			name: "rotation due",
+			setup: func(ctx context.Context, repo repositories.JWKSRepository) {
+				err := repo.StoreJWKSKey(ctx, &types.JWKS{
+					ID:         "old-key",
+					PublicKey:  "old-public-key",
+					PrivateKey: "old-private-key",
+					CreatedAt:  time.Now().Add(-25 * time.Hour),
+				})
+				require.NoError(t, err)
+			},
+			wantRotated: true,
+		},
+		{
+			name: "not due",
+			setup: func(ctx context.Context, repo repositories.JWKSRepository) {
+				err := repo.StoreJWKSKey(ctx, &types.JWKS{
+					ID:         "recent-key",
+					PublicKey:  "recent-public-key",
+					PrivateKey: "recent-private-key",
+					CreatedAt:  time.Now().Add(-1 * time.Hour),
+				})
+				require.NoError(t, err)
+			},
+			wantRotated: false,
+		},
+	}
 
-		key := &types.JWKS{
-			ID:         "recent-key",
-			PublicKey:  "recent-public-key",
-			PrivateKey: "recent-private-key",
-			CreatedAt:  time.Now().Add(-1 * time.Hour),
-		}
-		err := repo.StoreJWKSKey(ctx, key)
-		require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		rotated, err := svc.RotateKeysIfNeeded(ctx, 24*time.Hour, 1*time.Hour, nil)
-		require.NoError(t, err)
-		require.False(t, rotated)
+			svc, repo := setupKeyServiceTest(t)
+			ctx := context.Background()
 
-		keys, err := repo.GetJWKSKeys(ctx)
-		require.NoError(t, err)
-		require.Len(t, keys, 1)
-	})
+			tt.setup(ctx, repo)
+
+			rotated, err := svc.RotateKeysIfNeeded(ctx, rotationInterval, gracePeriod, nil)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.wantRotated, rotated)
+
+				keys, err := repo.GetJWKSKeys(ctx)
+				require.NoError(t, err)
+
+				if tt.wantRotated {
+					require.Len(t, keys, 2)
+					// Old key should have expires_at set
+					oldKey, err := repo.GetJWKSKeyByID(ctx, "old-key")
+					require.NoError(t, err)
+					require.NotNil(t, oldKey)
+					require.NotNil(t, oldKey.ExpiresAt)
+				} else {
+					require.Len(t, keys, 1)
+				}
+			}
+		})
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -221,18 +222,53 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 }
 
 func TestRefreshTokenService_StoreInitialRefreshToken(t *testing.T) {
-	ctx := context.Background()
+	t.Parallel()
 
-	t.Run("success", func(t *testing.T) {
-		f := newRefreshTokenTestFixture()
-		f.eventBus.On("Publish", mock.Anything).Return(nil).Maybe()
-		f.repo.On("StoreRefreshToken", ctx, mock.Anything).Return(nil)
+	tests := []struct {
+		name         string
+		refreshToken string
+		sessionID    string
+		setupMock    func(f *refreshTokenTestFixture)
+		wantErr      string
+	}{
+		{
+			name:         "success",
+			refreshToken: "refresh-token",
+			sessionID:    "sess-1",
+			setupMock: func(f *refreshTokenTestFixture) {
+				f.repo.On("StoreRefreshToken", mock.Anything, mock.Anything).Return(nil)
+			},
+		},
+		{
+			name:         "storage error",
+			refreshToken: "refresh-token",
+			sessionID:    "sess-1",
+			setupMock: func(f *refreshTokenTestFixture) {
+				f.repo.On("StoreRefreshToken", mock.Anything, mock.Anything).Return(assert.AnError)
+			},
+			wantErr: assert.AnError.Error(),
+		},
+	}
 
-		svc := f.newService()
-		future := time.Now().Add(24 * time.Hour)
-		err := svc.StoreInitialRefreshToken(ctx, "refresh-token", "sess-1", future)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		require.NoError(t, err)
-		f.repo.AssertExpectations(t)
-	})
+			f := newRefreshTokenTestFixture()
+			f.eventBus.On("Publish", mock.Anything).Return(nil).Maybe()
+			tt.setupMock(f)
+			svc := f.newService()
+
+			future := time.Now().Add(24 * time.Hour)
+			err := svc.StoreInitialRefreshToken(context.Background(), tt.refreshToken, tt.sessionID, future)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			f.repo.AssertExpectations(t)
+		})
+	}
 }

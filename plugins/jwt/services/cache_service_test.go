@@ -6,8 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
-	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -16,72 +14,18 @@ import (
 	"github.com/uptrace/bun"
 
 	internaltests "github.com/Authula/authula/internal/tests"
+	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/jwt/migrationset"
 	"github.com/Authula/authula/plugins/jwt/repositories"
+	jwttests "github.com/Authula/authula/plugins/jwt/tests"
 	"github.com/Authula/authula/plugins/jwt/types"
 )
-
-type inMemoryStorage struct {
-	mu   sync.RWMutex
-	data map[string]string
-}
-
-func newInMemoryStorage() *inMemoryStorage {
-	return &inMemoryStorage{data: make(map[string]string)}
-}
-
-func (s *inMemoryStorage) Get(_ context.Context, key string) (any, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	val, ok := s.data[key]
-	if !ok {
-		return nil, nil
-	}
-	return val, nil
-}
-
-func (s *inMemoryStorage) Set(_ context.Context, key string, value any, _ *time.Duration) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.data[key] = value.(string)
-	return nil
-}
-
-func (s *inMemoryStorage) Delete(_ context.Context, key string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.data, key)
-	return nil
-}
-
-func (s *inMemoryStorage) Incr(_ context.Context, _ string, _ *time.Duration) (int, error) {
-	return 0, nil
-}
-
-func (s *inMemoryStorage) TTL(_ context.Context, _ string) (*time.Duration, error) {
-	return nil, nil
-}
-
-func (s *inMemoryStorage) Scan(_ context.Context, prefix string) ([]string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	var keys []string
-	for key := range s.data {
-		if strings.HasPrefix(key, prefix) {
-			keys = append(keys, key)
-		}
-	}
-	return keys, nil
-}
-
-func (s *inMemoryStorage) Close() error {
-	return nil
-}
 
 type cacheTestFixture struct {
 	db      *bun.DB
 	repo    repositories.JWKSRepository
-	storage *inMemoryStorage
+	storage *jwttests.InMemoryStorage
 	logger  models.Logger
 	ttl     time.Duration
 }
@@ -89,19 +33,21 @@ type cacheTestFixture struct {
 func newCacheTestFixture(t *testing.T) *cacheTestFixture {
 	t.Helper()
 	db := internaltests.NewSQLiteIntegrationDB(t)
-	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS jwks (
-		id TEXT PRIMARY KEY,
-		public_key TEXT NOT NULL,
-		private_key TEXT NOT NULL,
-		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		expires_at TIMESTAMP NULL
-	)`)
+
+	migrator, err := migrations.NewMigrator(db, &internaltests.MockLogger{})
+	require.NoError(t, err)
+	err = migrator.Migrate(context.Background(), []migrations.MigrationSet{
+		{
+			PluginID:   models.PluginJWT.String(),
+			Migrations: migrationset.JWTMigrationsForProvider("sqlite"),
+		},
+	})
 	require.NoError(t, err)
 
 	return &cacheTestFixture{
 		db:      db,
 		repo:    repositories.NewBunJWKSRepository(db),
-		storage: newInMemoryStorage(),
+		storage: jwttests.NewInMemoryStorage(),
 		logger:  &mockLogger{},
 		ttl:     24 * time.Hour,
 	}
@@ -147,80 +93,272 @@ func seedJWKSKeys(t *testing.T, ctx context.Context, repo repositories.JWKSRepos
 	return keys
 }
 
-func TestCacheService_GetJWKSWithFallback_cache_miss(t *testing.T) {
-	f := newCacheTestFixture(t)
-	ctx := context.Background()
+func TestCacheService_GetCachedJWKS(t *testing.T) {
+	t.Parallel()
 
-	seedJWKSKeys(t, ctx, f.repo, 1)
+	tests := []struct {
+		name      string
+		setupSvc  func(*cacheTestFixture) CacheService
+		setupMock func(*cacheTestFixture)
+		wantErr   string
+	}{
+		{
+			name: "no secondary storage",
+			setupSvc: func(f *cacheTestFixture) CacheService {
+				return &cacheService{
+					repo:             f.repo,
+					secondaryStorage: nil,
+					logger:           f.logger,
+					cacheTTL:         f.ttl,
+				}
+			},
+			wantErr: "secondary storage not available",
+		},
+		{
+			name: "empty cache",
+			setupSvc: func(f *cacheTestFixture) CacheService {
+				return &cacheService{
+					repo:             f.repo,
+					secondaryStorage: f.storage,
+					logger:           f.logger,
+					cacheTTL:         f.ttl,
+				}
+			},
+			wantErr: "cached JWKS is empty or invalid type",
+		},
+	}
 
-	svc := f.newCacheService()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	set, err := svc.GetJWKSWithFallback(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, set)
-	require.Equal(t, 1, set.Len())
+			f := newCacheTestFixture(t)
+			svc := tt.setupSvc(f)
+
+			_, err := svc.GetCachedJWKS(context.Background())
+
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
 }
 
-func TestCacheService_GetJWKSWithFallback_cache_hit(t *testing.T) {
-	f := newCacheTestFixture(t)
-	ctx := context.Background()
+func TestCacheService_FetchJWKSFromDatabase(t *testing.T) {
+	t.Parallel()
 
-	seedJWKSKeys(t, ctx, f.repo, 1)
+	tests := []struct {
+		name     string
+		setup    func(context.Context, *cacheTestFixture)
+		wantKeys int
+		wantErr  string
+	}{
+		{
+			name:    "no keys in database",
+			setup:   func(ctx context.Context, f *cacheTestFixture) {},
+			wantErr: "no valid keys found",
+		},
+		{
+			name: "keys found",
+			setup: func(ctx context.Context, f *cacheTestFixture) {
+				seedJWKSKeys(t, ctx, f.repo, 2)
+			},
+			wantKeys: 2,
+		},
+	}
 
-	svc := f.newCacheService()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	// First call — cache miss, populates cache from DB
-	set1, err := svc.GetJWKSWithFallback(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, set1)
-	require.Equal(t, 1, set1.Len())
+			f := newCacheTestFixture(t)
+			svc := f.newCacheService()
+			ctx := context.Background()
 
-	// Second call — should return from cache
-	set2, err := svc.GetJWKSWithFallback(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, set2)
-	require.Equal(t, 1, set2.Len())
+			tt.setup(ctx, f)
+
+			set, err := svc.FetchJWKSFromDatabase(ctx)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, set)
+				require.Equal(t, tt.wantKeys, set.Len())
+			}
+		})
+	}
+}
+
+func TestCacheService_GetJWKSWithFallback(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		setup      func(context.Context, *cacheTestFixture)
+		preCache   bool
+		wantErr    string
+		wantKeyLen int
+	}{
+		{
+			name: "cache miss",
+			setup: func(ctx context.Context, f *cacheTestFixture) {
+				seedJWKSKeys(t, ctx, f.repo, 1)
+			},
+			wantKeyLen: 1,
+		},
+		{
+			name: "cache hit",
+			setup: func(ctx context.Context, f *cacheTestFixture) {
+				seedJWKSKeys(t, ctx, f.repo, 1)
+			},
+			preCache:   true,
+			wantKeyLen: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newCacheTestFixture(t)
+			svc := f.newCacheService()
+			ctx := context.Background()
+
+			tt.setup(ctx, f)
+
+			// Pre-populate cache if requested
+			if tt.preCache {
+				_, err := svc.GetJWKSWithFallback(ctx)
+				require.NoError(t, err)
+			}
+
+			set, err := svc.GetJWKSWithFallback(ctx)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, set)
+				require.Equal(t, tt.wantKeyLen, set.Len())
+			}
+		})
+	}
 }
 
 func TestCacheService_InvalidateCache(t *testing.T) {
-	f := newCacheTestFixture(t)
-	ctx := context.Background()
+	t.Parallel()
 
-	seedJWKSKeys(t, ctx, f.repo, 2)
-
-	svc := f.newCacheService()
-
-	// Populate cache
-	_, err := svc.GetJWKSWithFallback(ctx)
-	require.NoError(t, err)
-
-	// Verify cache is populated
-	_, err = svc.GetCachedJWKS(ctx)
-	require.NoError(t, err)
-
-	// Invalidate the cache
-	err = svc.InvalidateCache(ctx)
-	require.NoError(t, err)
-
-	// Cache should be repopulated after InvalidateCache
-	set, err := svc.GetCachedJWKS(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, set)
-	require.Equal(t, 2, set.Len())
-}
-
-func TestCacheService_GetCachedJWKS_no_storage(t *testing.T) {
-	f := newCacheTestFixture(t)
-	ctx := context.Background()
-
-	svc := &cacheService{
-		repo:             f.repo,
-		secondaryStorage: nil,
-		logger:           f.logger,
-		cacheTTL:         f.ttl,
+	tests := []struct {
+		name      string
+		noStorage bool
+		setup     func(context.Context, *cacheTestFixture)
+		wantErr   string
+	}{
+		{
+			name:      "no secondary storage",
+			noStorage: true,
+			setup:     func(ctx context.Context, f *cacheTestFixture) {},
+		},
+		{
+			name: "success",
+			setup: func(ctx context.Context, f *cacheTestFixture) {
+				seedJWKSKeys(t, ctx, f.repo, 2)
+			},
+		},
 	}
 
-	_, err := svc.GetCachedJWKS(ctx)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "secondary storage not available")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newCacheTestFixture(t)
+
+			var svc CacheService
+			if tt.noStorage {
+				svc = &cacheService{
+					repo:             f.repo,
+					secondaryStorage: nil,
+					logger:           f.logger,
+					cacheTTL:         f.ttl,
+				}
+			} else {
+				svc = f.newCacheService()
+			}
+
+			ctx := context.Background()
+			tt.setup(ctx, f)
+
+			if tt.noStorage {
+				err := svc.InvalidateCache(ctx)
+				require.NoError(t, err)
+				return
+			}
+
+			// Populate cache first
+			_, err := svc.GetJWKSWithFallback(ctx)
+			require.NoError(t, err)
+
+			err = svc.InvalidateCache(ctx)
+			require.NoError(t, err)
+
+			// Cache should be repopulated
+			set, err := svc.GetCachedJWKS(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, set)
+		})
+	}
+}
+
+func TestCacheService_CacheJWKS(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		noStorage bool
+		wantErr   string
+	}{
+		{
+			name:      "no secondary storage",
+			noStorage: true,
+		},
+		{
+			name: "success",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newCacheTestFixture(t)
+
+			var svc CacheService
+			if tt.noStorage {
+				svc = &cacheService{
+					repo:             f.repo,
+					secondaryStorage: nil,
+					logger:           f.logger,
+					cacheTTL:         f.ttl,
+				}
+			} else {
+				svc = f.newCacheService()
+			}
+
+			ctx := context.Background()
+			seedJWKSKeys(t, ctx, f.repo, 1)
+			set, err := svc.FetchJWKSFromDatabase(ctx)
+			require.NoError(t, err)
+
+			err = svc.CacheJWKS(ctx, set)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }

@@ -11,84 +11,270 @@ import (
 	internaltests "github.com/Authula/authula/internal/tests"
 )
 
-func TestBlacklistService(t *testing.T) {
+// TestBlacklistService_BlacklistToken tests the BlacklistToken method
+func TestBlacklistService_BlacklistToken(t *testing.T) {
 	t.Parallel()
 
-	t.Run("BlacklistToken", func(t *testing.T) {
-		storage := new(internaltests.MockSecondaryStorage)
-		svc := NewBlacklistService(storage, &internaltests.MockLogger{})
+	tests := []struct {
+		name      string
+		jti       string
+		expiresAt time.Time
+		setupMock func(*internaltests.MockSecondaryStorage)
+		wantErr   string
+	}{
+		{
+			name:      "success",
+			jti:       "test-jti",
+			expiresAt: time.Now().Add(1 * time.Hour),
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Set", mock.Anything, "jwt:blacklist:token:test-jti", "1", mock.Anything).Return(nil)
+			},
+		},
+		{
+			name:      "empty jti",
+			jti:       "",
+			expiresAt: time.Now().Add(1 * time.Hour),
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {},
+			wantErr:   "jti cannot be empty",
+		},
+		{
+			name:      "expired token",
+			jti:       "test-jti",
+			expiresAt: time.Now().Add(-1 * time.Hour),
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {},
+		},
+		{
+			name:      "storage error",
+			jti:       "test-jti",
+			expiresAt: time.Now().Add(1 * time.Hour),
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Set", mock.Anything, "jwt:blacklist:token:test-jti", "1", mock.Anything).Return(assert.AnError)
+			},
+			wantErr: "failed to blacklist token",
+		},
+	}
 
-		ctx := context.Background()
-		futureTime := time.Now().Add(1 * time.Hour)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		storage.On("Set", ctx, "jwt:blacklist:token:test-jti", "1", mock.Anything).Return(nil)
+			storage := new(internaltests.MockSecondaryStorage)
+			svc := NewBlacklistService(storage, &internaltests.MockLogger{})
+			tt.setupMock(storage)
 
-		err := svc.BlacklistToken(ctx, "test-jti", futureTime)
-		assert.NoError(t, err)
-		storage.AssertExpectations(t)
-	})
+			err := svc.BlacklistToken(context.Background(), tt.jti, tt.expiresAt)
 
-	t.Run("BlacklistToken_empty_jti", func(t *testing.T) {
-		storage := new(internaltests.MockSecondaryStorage)
-		svc := NewBlacklistService(storage, &internaltests.MockLogger{})
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+			storage.AssertExpectations(t)
+		})
+	}
+}
 
-		ctx := context.Background()
-		futureTime := time.Now().Add(1 * time.Hour)
+// TestBlacklistService_IsBlacklisted tests the IsBlacklisted method
+func TestBlacklistService_IsBlacklisted(t *testing.T) {
+	t.Parallel()
 
-		err := svc.BlacklistToken(ctx, "", futureTime)
-		assert.EqualError(t, err, "jti cannot be empty")
-	})
+	tests := []struct {
+		name            string
+		jti             string
+		setupMock       func(*internaltests.MockSecondaryStorage)
+		wantBlacklisted bool
+		wantErr         string
+	}{
+		{
+			name: "blacklisted",
+			jti:  "test-jti",
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Get", mock.Anything, "jwt:blacklist:token:test-jti").Return("1", nil)
+			},
+			wantBlacklisted: true,
+		},
+		{
+			name: "not blacklisted",
+			jti:  "test-jti",
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Get", mock.Anything, "jwt:blacklist:token:test-jti").Return(nil, nil)
+			},
+		},
+		{
+			name:      "empty jti",
+			jti:       "",
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {},
+		},
+		{
+			name: "storage error",
+			jti:  "test-jti",
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Get", mock.Anything, "jwt:blacklist:token:test-jti").Return(nil, assert.AnError)
+			},
+			wantErr: "failed to check blacklist",
+		},
+	}
 
-	t.Run("IsBlacklisted_true", func(t *testing.T) {
-		storage := new(internaltests.MockSecondaryStorage)
-		svc := NewBlacklistService(storage, &internaltests.MockLogger{})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		ctx := context.Background()
+			storage := new(internaltests.MockSecondaryStorage)
+			svc := NewBlacklistService(storage, &internaltests.MockLogger{})
+			tt.setupMock(storage)
 
-		storage.On("Get", ctx, "jwt:blacklist:token:test-jti").Return("1", nil)
+			blacklisted, err := svc.IsBlacklisted(context.Background(), tt.jti)
 
-		blacklisted, err := svc.IsBlacklisted(ctx, "test-jti")
-		assert.NoError(t, err)
-		assert.True(t, blacklisted)
-		storage.AssertExpectations(t)
-	})
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantBlacklisted, blacklisted)
+			storage.AssertExpectations(t)
+		})
+	}
+}
 
-	t.Run("IsBlacklisted_false", func(t *testing.T) {
-		storage := new(internaltests.MockSecondaryStorage)
-		svc := NewBlacklistService(storage, &internaltests.MockLogger{})
+// TestBlacklistService_BlacklistAllSessionTokens tests the BlacklistAllSessionTokens method
+func TestBlacklistService_BlacklistAllSessionTokens(t *testing.T) {
+	t.Parallel()
 
-		ctx := context.Background()
+	tests := []struct {
+		name      string
+		sessionID string
+		expiresAt time.Time
+		setupMock func(*internaltests.MockSecondaryStorage)
+		wantErr   string
+	}{
+		{
+			name:      "success",
+			sessionID: "sess-1",
+			expiresAt: time.Now().Add(1 * time.Hour),
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Set", mock.Anything, "jwt:blacklist:session:sess-1", "1", mock.Anything).Return(nil)
+			},
+		},
+		{
+			name:      "empty sessionID",
+			sessionID: "",
+			expiresAt: time.Now().Add(1 * time.Hour),
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {},
+			wantErr:   "sessionID cannot be empty",
+		},
+		{
+			name:      "expired",
+			sessionID: "sess-1",
+			expiresAt: time.Now().Add(-1 * time.Hour),
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {},
+		},
+		{
+			name:      "storage error",
+			sessionID: "sess-1",
+			expiresAt: time.Now().Add(1 * time.Hour),
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Set", mock.Anything, "jwt:blacklist:session:sess-1", "1", mock.Anything).Return(assert.AnError)
+			},
+			wantErr: "failed to blacklist session tokens",
+		},
+	}
 
-		storage.On("Get", ctx, "jwt:blacklist:token:test-jti").Return(nil, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		blacklisted, err := svc.IsBlacklisted(ctx, "test-jti")
-		assert.NoError(t, err)
-		assert.False(t, blacklisted)
-		storage.AssertExpectations(t)
-	})
+			storage := new(internaltests.MockSecondaryStorage)
+			svc := NewBlacklistService(storage, &internaltests.MockLogger{})
+			tt.setupMock(storage)
 
-	t.Run("BlacklistAllSessionTokens", func(t *testing.T) {
-		storage := new(internaltests.MockSecondaryStorage)
-		svc := NewBlacklistService(storage, &internaltests.MockLogger{})
+			err := svc.BlacklistAllSessionTokens(context.Background(), tt.sessionID, tt.expiresAt)
 
-		ctx := context.Background()
-		futureTime := time.Now().Add(1 * time.Hour)
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+			storage.AssertExpectations(t)
+		})
+	}
+}
 
-		storage.On("Set", ctx, "jwt:blacklist:session:sess-1", "1", mock.Anything).Return(nil)
+// TestBlacklistService_CleanupExpired tests the CleanupExpired method
+func TestBlacklistService_CleanupExpired(t *testing.T) {
+	t.Parallel()
 
-		err := svc.BlacklistAllSessionTokens(ctx, "sess-1", futureTime)
-		assert.NoError(t, err)
-		storage.AssertExpectations(t)
-	})
+	tests := []struct {
+		name      string
+		setupMock func(*internaltests.MockSecondaryStorage)
+		wantErr   string
+	}{
+		{
+			name: "no keys to clean",
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Scan", mock.Anything, "jwt:blacklist:token:").Return([]string{}, nil)
+				storage.On("Scan", mock.Anything, "jwt:blacklist:session:").Return([]string{}, nil)
+			},
+		},
+		{
+			name: "scan error on first prefix",
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Scan", mock.Anything, "jwt:blacklist:token:").Return([]string{}, assert.AnError)
+			},
+			wantErr: "failed to scan blacklist keys",
+		},
+		{
+			name: "expired keys deleted",
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Scan", mock.Anything, "jwt:blacklist:token:").Return([]string{"jwt:blacklist:token:key1"}, nil)
+				storage.On("TTL", mock.Anything, "jwt:blacklist:token:key1").Return(nil, nil)
+				storage.On("Delete", mock.Anything, "jwt:blacklist:token:key1").Return(nil)
+				storage.On("Scan", mock.Anything, "jwt:blacklist:session:").Return([]string{}, nil)
+			},
+		},
+		{
+			name: "non-expired keys skipped",
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				dur := time.Hour
+				storage.On("Scan", mock.Anything, "jwt:blacklist:token:").Return([]string{"jwt:blacklist:token:key1"}, nil)
+				storage.On("TTL", mock.Anything, "jwt:blacklist:token:key1").Return(&dur, nil)
+				storage.On("Scan", mock.Anything, "jwt:blacklist:session:").Return([]string{}, nil)
+			},
+		},
+		{
+			name: "TTL error continues",
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Scan", mock.Anything, "jwt:blacklist:token:").Return([]string{"jwt:blacklist:token:key1"}, nil)
+				storage.On("TTL", mock.Anything, "jwt:blacklist:token:key1").Return(nil, assert.AnError)
+				storage.On("Scan", mock.Anything, "jwt:blacklist:session:").Return([]string{}, nil)
+			},
+		},
+		{
+			name: "Delete error continues",
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Scan", mock.Anything, "jwt:blacklist:token:").Return([]string{"jwt:blacklist:token:key1"}, nil)
+				storage.On("TTL", mock.Anything, "jwt:blacklist:token:key1").Return(nil, nil)
+				storage.On("Delete", mock.Anything, "jwt:blacklist:token:key1").Return(assert.AnError)
+				storage.On("Scan", mock.Anything, "jwt:blacklist:session:").Return([]string{}, nil)
+			},
+		},
+	}
 
-	t.Run("BlacklistAllSessionTokens_empty", func(t *testing.T) {
-		storage := new(internaltests.MockSecondaryStorage)
-		svc := NewBlacklistService(storage, &internaltests.MockLogger{})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		ctx := context.Background()
-		futureTime := time.Now().Add(1 * time.Hour)
+			storage := new(internaltests.MockSecondaryStorage)
+			svc := NewBlacklistService(storage, &internaltests.MockLogger{})
+			tt.setupMock(storage)
 
-		err := svc.BlacklistAllSessionTokens(ctx, "", futureTime)
-		assert.EqualError(t, err, "sessionID cannot be empty")
-	})
+			err := svc.CleanupExpired(context.Background())
+
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+			storage.AssertExpectations(t)
+		})
+	}
 }
