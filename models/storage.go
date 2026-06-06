@@ -25,6 +25,8 @@ type SecondaryStorage interface {
 	Incr(ctx context.Context, key string, ttl *time.Duration) (int, error)
 	// TTL retrieves the time-to-live (TTL) for the given key.
 	TTL(ctx context.Context, key string) (*time.Duration, error)
+	// Scan returns all keys matching the given prefix that have not expired.
+	Scan(ctx context.Context, prefix string) ([]string, error)
 	// Close closes the storage and releases any resources.
 	Close() error
 }

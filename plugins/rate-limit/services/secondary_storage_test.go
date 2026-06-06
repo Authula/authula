@@ -2,23 +2,24 @@ package services
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
 
-type fakeSecondaryStorage struct {
+type dummySecondaryStorage struct {
 	values map[string]any
 	ttls   map[string]time.Duration
 }
 
-func newFakeSecondaryStorage() *fakeSecondaryStorage {
-	return &fakeSecondaryStorage{values: map[string]any{}, ttls: map[string]time.Duration{}}
+func newDummySecondaryStorage() *dummySecondaryStorage {
+	return &dummySecondaryStorage{values: map[string]any{}, ttls: map[string]time.Duration{}}
 }
 
-func (s *fakeSecondaryStorage) Get(_ context.Context, key string) (any, error) {
+func (s *dummySecondaryStorage) Get(_ context.Context, key string) (any, error) {
 	return s.values[key], nil
 }
-func (s *fakeSecondaryStorage) Set(_ context.Context, key string, value any, ttl *time.Duration) error {
+func (s *dummySecondaryStorage) Set(_ context.Context, key string, value any, ttl *time.Duration) error {
 	s.values[key] = value
 	if ttl != nil {
 		s.ttls[key] = *ttl
@@ -27,12 +28,12 @@ func (s *fakeSecondaryStorage) Set(_ context.Context, key string, value any, ttl
 	}
 	return nil
 }
-func (s *fakeSecondaryStorage) Delete(_ context.Context, key string) error {
+func (s *dummySecondaryStorage) Delete(_ context.Context, key string) error {
 	delete(s.values, key)
 	delete(s.ttls, key)
 	return nil
 }
-func (s *fakeSecondaryStorage) Incr(_ context.Context, key string, ttl *time.Duration) (int, error) {
+func (s *dummySecondaryStorage) Incr(_ context.Context, key string, ttl *time.Duration) (int, error) {
 	if s.values[key] == nil {
 		s.values[key] = 1
 		if ttl != nil {
@@ -44,18 +45,28 @@ func (s *fakeSecondaryStorage) Incr(_ context.Context, key string, ttl *time.Dur
 	s.values[key] = count
 	return count, nil
 }
-func (s *fakeSecondaryStorage) TTL(_ context.Context, key string) (*time.Duration, error) {
+func (s *dummySecondaryStorage) TTL(_ context.Context, key string) (*time.Duration, error) {
 	if ttl, ok := s.ttls[key]; ok {
 		return &ttl, nil
 	}
 	return nil, nil
 }
-func (s *fakeSecondaryStorage) Close() error { return nil }
+func (s *dummySecondaryStorage) Scan(_ context.Context, prefix string) ([]string, error) {
+	var keys []string
+	for key := range s.values {
+		if strings.HasPrefix(key, prefix) {
+			keys = append(keys, key)
+		}
+	}
+	return keys, nil
+}
+
+func (s *dummySecondaryStorage) Close() error { return nil }
 
 func TestSecondaryStorageProviderRuleLifecycle(t *testing.T) {
 	t.Parallel()
 
-	storage := newFakeSecondaryStorage()
+	storage := newDummySecondaryStorage()
 	provider := NewSecondaryStorageProvider("custom", storage)
 	ctx := context.Background()
 	window := 4 * time.Minute

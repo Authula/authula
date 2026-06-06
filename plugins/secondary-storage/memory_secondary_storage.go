@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -232,6 +233,31 @@ func (storage *MemorySecondaryStorage) TTL(ctx context.Context, key string) (*ti
 
 	ttl := entry.expiresAt.Sub(now)
 	return &ttl, nil
+}
+
+// Scan returns all non-expired keys matching the given prefix.
+func (storage *MemorySecondaryStorage) Scan(ctx context.Context, prefix string) ([]string, error) {
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("context canceled: %w", ctx.Err())
+	default:
+	}
+
+	storage.mu.RLock()
+	defer storage.mu.RUnlock()
+
+	now := time.Now()
+	var keys []string
+	for key, entry := range storage.store {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		if entry.expiresAt != nil && now.After(*entry.expiresAt) {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	return keys, nil
 }
 
 // Close gracefully shuts down the storage by stopping the cleanup goroutine.

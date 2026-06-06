@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -59,6 +60,18 @@ func (s *inMemoryStorage) Incr(_ context.Context, _ string, _ *time.Duration) (i
 
 func (s *inMemoryStorage) TTL(_ context.Context, _ string) (*time.Duration, error) {
 	return nil, nil
+}
+
+func (s *inMemoryStorage) Scan(_ context.Context, prefix string) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var keys []string
+	for key := range s.data {
+		if strings.HasPrefix(key, prefix) {
+			keys = append(keys, key)
+		}
+	}
+	return keys, nil
 }
 
 func (s *inMemoryStorage) Close() error {

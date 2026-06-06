@@ -82,17 +82,39 @@ func (s *blacklistService) BlacklistAllSessionTokens(ctx context.Context, sessio
 	return nil
 }
 
+const (
+	jwtBlacklistTokenPrefix   = "jwt:blacklist:token:"
+	jwtBlacklistSessionPrefix = "jwt:blacklist:session:"
+)
+
 func (s *blacklistService) CleanupExpired(ctx context.Context) error {
-	// With storage TTL, cleanup happens automatically
-	// This method is a no-op for cache-based implementation
-	// If using database storage, implement cleanup logic here
+	prefixes := []string{jwtBlacklistTokenPrefix, jwtBlacklistSessionPrefix}
+	for _, prefix := range prefixes {
+		keys, err := s.storage.Scan(ctx, prefix)
+		if err != nil {
+			s.logger.Error("failed to scan blacklist keys", "prefix", prefix, "error", err)
+			return fmt.Errorf("failed to scan blacklist keys: %w", err)
+		}
+		for _, key := range keys {
+			ttl, err := s.storage.TTL(ctx, key)
+			if err != nil {
+				s.logger.Error("failed to check TTL for key", "key", key, "error", err)
+				continue
+			}
+			if ttl == nil || *ttl <= 0 {
+				if err := s.storage.Delete(ctx, key); err != nil {
+					s.logger.Error("failed to delete expired blacklist entry", "key", key, "error", err)
+				}
+			}
+		}
+	}
 	return nil
 }
 
 func (s *blacklistService) blacklistKey(jti string) string {
-	return fmt.Sprintf("jwt:blacklist:token:%s", jti)
+	return fmt.Sprintf("%s%s", jwtBlacklistTokenPrefix, jti)
 }
 
 func (s *blacklistService) sessionBlacklistKey(sessionID string) string {
-	return fmt.Sprintf("jwt:blacklist:session:%s", sessionID)
+	return fmt.Sprintf("%s%s", jwtBlacklistSessionPrefix, sessionID)
 }

@@ -313,3 +313,45 @@ func (m *MockServiceRegistry) Get(name string) any {
 	args := m.Called(name)
 	return args.Get(0)
 }
+
+type MockSecondaryStorage struct {
+	mock.Mock
+}
+
+func (m *MockSecondaryStorage) Get(ctx context.Context, key string) (any, error) {
+	args := m.Called(ctx, key)
+	return args.Get(0), args.Error(1)
+}
+
+func (m *MockSecondaryStorage) Set(ctx context.Context, key string, value any, ttl *time.Duration) error {
+	args := m.Called(ctx, key, value, ttl)
+	return args.Error(0)
+}
+
+func (m *MockSecondaryStorage) Delete(ctx context.Context, key string) error {
+	args := m.Called(ctx, key)
+	return args.Error(0)
+}
+
+func (m *MockSecondaryStorage) Incr(ctx context.Context, key string, ttl *time.Duration) (int, error) {
+	args := m.Called(ctx, key, ttl)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *MockSecondaryStorage) TTL(ctx context.Context, key string) (*time.Duration, error) {
+	args := m.Called(ctx, key)
+	if v := args.Get(0); v != nil {
+		return v.(*time.Duration), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockSecondaryStorage) Scan(ctx context.Context, prefix string) ([]string, error) {
+	args := m.Called(ctx, prefix)
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockSecondaryStorage) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
