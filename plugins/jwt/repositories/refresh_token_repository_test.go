@@ -10,22 +10,22 @@ import (
 	"github.com/uptrace/bun"
 
 	internaltests "github.com/Authula/authula/internal/tests"
+	"github.com/Authula/authula/migrations"
+	"github.com/Authula/authula/plugins/jwt/migrationset"
 	"github.com/Authula/authula/plugins/jwt/types"
 )
 
 func setupRefreshTokenRepo(t *testing.T) (*bun.DB, *refreshTokenRepositoryImpl) {
 	t.Helper()
 	db := internaltests.NewSQLiteIntegrationDB(t)
-	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS refresh_tokens (
-		id TEXT PRIMARY KEY,
-		session_id TEXT NOT NULL,
-		token_hash TEXT NOT NULL UNIQUE,
-		expires_at TIMESTAMP NOT NULL,
-		is_revoked INTEGER DEFAULT 0,
-		revoked_at TIMESTAMP NULL,
-		last_reuse_attempt TIMESTAMP NULL DEFAULT NULL,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	)`)
+	migrator, err := migrations.NewMigrator(db, &internaltests.MockLogger{})
+	require.NoError(t, err)
+	err = migrator.Migrate(context.Background(), []migrations.MigrationSet{
+		{
+			PluginID:   "jwt",
+			Migrations: migrationset.JWTMigrationsForProvider("sqlite"),
+		},
+	})
 	require.NoError(t, err)
 	return db, &refreshTokenRepositoryImpl{db: db}
 }

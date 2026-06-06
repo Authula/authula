@@ -10,19 +10,22 @@ import (
 	"github.com/uptrace/bun"
 
 	internaltests "github.com/Authula/authula/internal/tests"
+	"github.com/Authula/authula/migrations"
+	"github.com/Authula/authula/plugins/jwt/migrationset"
 	"github.com/Authula/authula/plugins/jwt/types"
 )
 
 func setupJWKSRepo(t *testing.T) (*bun.DB, *bunJWKSRepository) {
 	t.Helper()
 	db := internaltests.NewSQLiteIntegrationDB(t)
-	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS jwks (
-		id TEXT PRIMARY KEY,
-		public_key TEXT NOT NULL,
-		private_key TEXT NOT NULL,
-		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		expires_at TIMESTAMP NULL
-	)`)
+	migrator, err := migrations.NewMigrator(db, &internaltests.MockLogger{})
+	require.NoError(t, err)
+	err = migrator.Migrate(context.Background(), []migrations.MigrationSet{
+		{
+			PluginID:   "jwt",
+			Migrations: migrationset.JWTMigrationsForProvider("sqlite"),
+		},
+	})
 	require.NoError(t, err)
 	return db, &bunJWKSRepository{db: db}
 }
