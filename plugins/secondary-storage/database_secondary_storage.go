@@ -289,6 +289,30 @@ func (storage *DatabaseSecondaryStorage) TTL(ctx context.Context, key string) (*
 	return &ttl, nil
 }
 
+// Scan returns all non-expired keys matching the given prefix.
+func (storage *DatabaseSecondaryStorage) Scan(ctx context.Context, prefix string) ([]string, error) {
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("context canceled: %w", ctx.Err())
+	default:
+	}
+
+	var entries []KeyValueStore
+	err := storage.db.NewSelect().Model(&entries).
+		Where("key LIKE ?", prefix+"%").
+		Where("expires_at IS NULL OR expires_at > ?", time.Now()).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("database scan error: %w", err)
+	}
+
+	keys := make([]string, len(entries))
+	for i, entry := range entries {
+		keys[i] = entry.Key
+	}
+	return keys, nil
+}
+
 // Close gracefully shuts down the storage by stopping the cleanup goroutine.
 // This method is idempotent and safe to call multiple times.
 func (storage *DatabaseSecondaryStorage) Close() error {

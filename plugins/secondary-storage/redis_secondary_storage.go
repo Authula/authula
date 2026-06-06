@@ -150,6 +150,24 @@ func (rs *RedisSecondaryStorage) TTL(ctx context.Context, key string) (*time.Dur
 	return &ttl, nil
 }
 
+// Scan returns all keys matching the given prefix using Redis SCAN with MATCH.
+func (rs *RedisSecondaryStorage) Scan(ctx context.Context, prefix string) ([]string, error) {
+	var keys []string
+	var cursor uint64
+	for {
+		scanned, next, err := rs.client.Scan(ctx, cursor, prefix+"*", 100).Result()
+		if err != nil {
+			return nil, fmt.Errorf("redis scan error: %w", err)
+		}
+		keys = append(keys, scanned...)
+		cursor = next
+		if cursor == 0 {
+			break
+		}
+	}
+	return keys, nil
+}
+
 // Close closes the Redis connection
 func (rs *RedisSecondaryStorage) Close() error {
 	if rs.client != nil {

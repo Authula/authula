@@ -22,7 +22,6 @@ type cacheService struct {
 	cacheTTL         time.Duration
 }
 
-// NewCacheService creates a new cache service
 func NewCacheService(repo repositories.JWKSRepository, secondaryStorage models.SecondaryStorage, logger models.Logger, cacheTTL time.Duration) CacheService {
 	return &cacheService{
 		repo:             repo,
@@ -32,7 +31,6 @@ func NewCacheService(repo repositories.JWKSRepository, secondaryStorage models.S
 	}
 }
 
-// GetCachedJWKS retrieves JWKS from cache if available and not expired
 func (s *cacheService) GetCachedJWKS(ctx context.Context) (jwk.Set, error) {
 	if s.secondaryStorage == nil {
 		return nil, errors.New("secondary storage not available")
@@ -57,7 +55,6 @@ func (s *cacheService) GetCachedJWKS(ctx context.Context) (jwk.Set, error) {
 	return set, nil
 }
 
-// FetchJWKSFromDatabase loads all non-expired public keys from the database
 func (s *cacheService) FetchJWKSFromDatabase(ctx context.Context) (jwk.Set, error) {
 	jwksKeys, err := s.repo.GetJWKSKeys(ctx)
 	if err != nil {
@@ -72,25 +69,8 @@ func (s *cacheService) FetchJWKSFromDatabase(ctx context.Context) (jwk.Set, erro
 			continue
 		}
 
-		// Set the Key ID so JWT validation can match the token's kid to the correct key
 		_ = pubKey.Set(jwk.KeyIDKey, wk.ID)
-
-		// Ensure algorithm is properly set based on key type
-		// This helps the JWT library know which algorithm to use for verification
-		keyType := pubKey.KeyType().String()
-		var alg string
-		switch keyType {
-		case "OKP":
-			alg = "EdDSA"
-		case "RSA":
-			alg = "RS256"
-		case "EC":
-			alg = "ES256"
-		}
-		if alg != "" {
-			_ = pubKey.Set(jwk.AlgorithmKey, alg)
-		}
-
+		_ = pubKey.Set(jwk.AlgorithmKey, "EdDSA")
 		_ = set.AddKey(pubKey)
 	}
 
@@ -101,7 +81,6 @@ func (s *cacheService) FetchJWKSFromDatabase(ctx context.Context) (jwk.Set, erro
 	return set, nil
 }
 
-// CacheJWKS stores the JWKS in the cache with the configured TTL
 func (s *cacheService) CacheJWKS(ctx context.Context, set jwk.Set) error {
 	if s.secondaryStorage == nil {
 		return nil
@@ -119,7 +98,6 @@ func (s *cacheService) CacheJWKS(ctx context.Context, set jwk.Set) error {
 	return nil
 }
 
-// InvalidateCache removes the cached JWKS immediately and fetches fresh from DB
 func (s *cacheService) InvalidateCache(ctx context.Context) error {
 	if s.secondaryStorage == nil {
 		return nil
@@ -138,7 +116,6 @@ func (s *cacheService) InvalidateCache(ctx context.Context) error {
 	return s.CacheJWKS(ctx, set)
 }
 
-// GetJWKSWithFallback retrieves JWKS from cache with database fallback
 func (s *cacheService) GetJWKSWithFallback(ctx context.Context) (jwk.Set, error) {
 	set, err := s.GetCachedJWKS(ctx)
 	if err == nil {

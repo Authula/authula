@@ -21,7 +21,7 @@ type JWTPlugin struct {
 	Logger           models.Logger
 	sessionService   services.SessionService
 	tokenService     services.TokenService
-	jwtService       *jwtservices.JWTServiceImpl
+	jwtService       services.JWTService
 	refreshService   jwtservices.RefreshTokenService
 	keyService       jwtservices.KeyService
 	cacheService     jwtservices.CacheService
@@ -55,11 +55,6 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		return err
 	}
 
-	if err := p.pluginConfig.NormalizeAlgorithm(); err != nil {
-		p.Logger.Error("invalid jwt algorithm in plugin config", "error", err)
-		return err
-	}
-
 	sessionService, ok := ctx.ServiceRegistry.Get(models.ServiceSession.String()).(services.SessionService)
 	if !ok {
 		p.Logger.Error("session service not found")
@@ -81,7 +76,7 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 	jwksRepo := repositories.NewBunJWKSRepository(ctx.DB)
 	refreshTokenRepo := repositories.NewRefreshTokenRepository(ctx.DB)
 
-	p.keyService = jwtservices.NewKeyService(jwksRepo, p.Logger, p.tokenService, p.globalConfig.Secret, p.pluginConfig.Algorithm)
+	p.keyService = jwtservices.NewKeyService(jwksRepo, p.Logger, p.tokenService, p.globalConfig.Secret)
 	p.cacheService = jwtservices.NewCacheService(jwksRepo, p.secondaryStorage, p.Logger, p.pluginConfig.JWKSCacheTTL)
 
 	if p.secondaryStorage == nil {
@@ -113,7 +108,7 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		p.Logger.Warn("failed to pre-populate cache on startup", "error", err)
 	}
 
-	jwtServiceImpl, ok := jwtservices.NewJWTService(
+	p.jwtService = jwtservices.NewJWTService(
 		p.Logger,
 		p.sessionService,
 		p.tokenService,
@@ -122,29 +117,25 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		p.blacklistService,
 		p.pluginConfig.ExpiresIn,
 		p.pluginConfig.RefreshExpiresIn,
-	).(*jwtservices.JWTServiceImpl)
-	if !ok {
-		return errors.New("failed to create JWT service")
-	}
-	p.jwtService = jwtServiceImpl
+	)
 
 	p.refreshService = jwtservices.NewRefreshTokenService(
 		p.Logger,
 		ctx.EventBus,
 		p.sessionService,
-		p.jwtService,
+		p.jwtService.(jwtservices.TokenService),
 		refreshTokenRepo,
 		p.pluginConfig.RefreshGracePeriod,
 		p.pluginConfig.RefreshExpiresIn,
 	)
 
-	ctx.ServiceRegistry.Register(models.ServiceJWT.String(), jwtServiceImpl)
+	ctx.ServiceRegistry.Register(models.ServiceJWT.String(), p.jwtService)
 
 	return nil
 }
 
 func (p *JWTPlugin) Migrations(provider string) []migrations.Migration {
-	return jwtMigrationsForProvider(provider)
+	return JWTMigrationsForProvider(provider)
 }
 
 func (p *JWTPlugin) DependsOn() []string {

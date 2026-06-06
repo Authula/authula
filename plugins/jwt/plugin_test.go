@@ -15,24 +15,6 @@ func TestJWTPluginConfig_DefaultConfig(t *testing.T) {
 		check  func(*testing.T, types.JWTPluginConfig)
 	}{
 		{
-			name:   "sets default algorithm",
-			config: types.JWTPluginConfig{},
-			check: func(t *testing.T, c types.JWTPluginConfig) {
-				if c.Algorithm != types.JWTAlgEdDSA {
-					t.Errorf("Algorithm = %v, want %v", c.Algorithm, types.JWTAlgEdDSA)
-				}
-			},
-		},
-		{
-			name:   "preserves custom algorithm",
-			config: types.JWTPluginConfig{Algorithm: "rs256"},
-			check: func(t *testing.T, c types.JWTPluginConfig) {
-				if c.Algorithm != "rs256" {
-					t.Errorf("Algorithm = %v, want rs256", c.Algorithm)
-				}
-			},
-		},
-		{
 			name:   "sets default key rotation interval",
 			config: types.JWTPluginConfig{},
 			check: func(t *testing.T, c types.JWTPluginConfig) {
@@ -75,16 +57,12 @@ func TestJWTPluginConfig_DefaultConfig(t *testing.T) {
 		{
 			name: "preserves custom values",
 			config: types.JWTPluginConfig{
-				Algorithm:           "es256",
 				KeyRotationInterval: 30 * 24 * time.Hour,
 				ExpiresIn:           30 * time.Minute,
 				RefreshExpiresIn:    14 * 24 * time.Hour,
 				JWKSCacheTTL:        12 * time.Hour,
 			},
 			check: func(t *testing.T, c types.JWTPluginConfig) {
-				if c.Algorithm != "es256" {
-					t.Errorf("Algorithm = %v, want es256", c.Algorithm)
-				}
 				if c.KeyRotationInterval != 30*24*time.Hour {
 					t.Errorf("KeyRotationInterval not preserved")
 				}
@@ -134,7 +112,6 @@ func TestJWTPlugin_Metadata(t *testing.T) {
 
 func TestJWTPlugin_Config(t *testing.T) {
 	config := types.JWTPluginConfig{
-		Algorithm: "es256",
 		ExpiresIn: 30 * time.Minute,
 	}
 
@@ -150,8 +127,8 @@ func TestJWTPlugin_Config(t *testing.T) {
 		t.Fatal("Config() did not return types.JWTPluginConfig type")
 	}
 
-	if cfg.Algorithm != config.Algorithm {
-		t.Errorf("Config Algorithm = %v, want %v", cfg.Algorithm, config.Algorithm)
+	if cfg.ExpiresIn != config.ExpiresIn {
+		t.Errorf("Config ExpiresIn = %v, want %v", cfg.ExpiresIn, config.ExpiresIn)
 	}
 }
 
@@ -212,38 +189,8 @@ func TestKeyRotationInterval_ConfigPreservation(t *testing.T) {
 	}
 }
 
-func TestKeyRotationInterval_AlgorithmCompatibility(t *testing.T) {
-	algorithms := []types.JWTAlgorithm{
-		types.JWTAlgEdDSA,
-		types.JWTAlgRS256,
-		types.JWTAlgPS256,
-		types.JWTAlgES256,
-		types.JWTAlgES512,
-	}
-
-	for _, alg := range algorithms {
-		t.Run(string(alg), func(t *testing.T) {
-			config := types.JWTPluginConfig{
-				Algorithm:           alg,
-				KeyRotationInterval: 30 * 24 * time.Hour,
-			}
-			config.ApplyDefaults()
-
-			if config.Algorithm != alg {
-				t.Errorf("Algorithm changed from %v to %v", alg, config.Algorithm)
-			}
-
-			if config.KeyRotationInterval != 30*24*time.Hour {
-				t.Errorf("KeyRotationInterval = %v, want %v",
-					config.KeyRotationInterval, 30*24*time.Hour)
-			}
-		})
-	}
-}
-
 func TestKeyRotationInterval_WithOtherConfigOptions(t *testing.T) {
 	config := types.JWTPluginConfig{
-		Algorithm:           types.JWTAlgEdDSA,
 		KeyRotationInterval: 45 * 24 * time.Hour,
 		ExpiresIn:           5 * time.Minute,
 		RefreshExpiresIn:    30 * 24 * time.Hour,
@@ -254,10 +201,6 @@ func TestKeyRotationInterval_WithOtherConfigOptions(t *testing.T) {
 
 	if config.KeyRotationInterval != 45*24*time.Hour {
 		t.Errorf("KeyRotationInterval = %v, want %v", config.KeyRotationInterval, 45*24*time.Hour)
-	}
-
-	if config.Algorithm != types.JWTAlgEdDSA {
-		t.Errorf("Algorithm = %v, want %v", config.Algorithm, types.JWTAlgEdDSA)
 	}
 
 	if config.ExpiresIn != 5*time.Minute {
@@ -501,7 +444,6 @@ func TestKeyRotationGracePeriod_EdgeCases(t *testing.T) {
 
 func TestKeyRotationGracePeriod_ConfigWithOtherOptions(t *testing.T) {
 	config := types.JWTPluginConfig{
-		Algorithm:              types.JWTAlgEdDSA,
 		KeyRotationInterval:    45 * 24 * time.Hour,
 		KeyRotationGracePeriod: 30 * time.Minute,
 		ExpiresIn:              5 * time.Minute,
@@ -519,10 +461,6 @@ func TestKeyRotationGracePeriod_ConfigWithOtherOptions(t *testing.T) {
 	if config.KeyRotationGracePeriod != 30*time.Minute {
 		t.Errorf("KeyRotationGracePeriod = %v, want %v",
 			config.KeyRotationGracePeriod, 30*time.Minute)
-	}
-
-	if config.Algorithm != types.JWTAlgEdDSA {
-		t.Errorf("Algorithm = %v, want %v", config.Algorithm, types.JWTAlgEdDSA)
 	}
 
 	if config.ExpiresIn != 5*time.Minute {

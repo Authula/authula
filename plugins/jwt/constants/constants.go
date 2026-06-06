@@ -2,14 +2,12 @@ package constants
 
 import "errors"
 
-// Event type constants
 const (
 	EventTokenReuseRecovered = "jwt.token.reuse.recovered"
 	EventTokenReuseThrottled = "jwt.token.reuse.throttled"
 	EventTokenReuseMalicious = "jwt.token.reuse.malicious"
 )
 
-// Error definitions
 var (
 	ErrInvalidToken           = errors.New("provided token is invalid or malformed")
 	ErrTokenExpired           = errors.New("token has expired")

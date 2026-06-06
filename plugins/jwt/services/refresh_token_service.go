@@ -21,7 +21,7 @@ type refreshTokenService struct {
 	logger           models.Logger
 	eventBus         models.EventBus
 	sessionService   coreservices.SessionService
-	jwtService       JwtService
+	jwtService       TokenService
 	storage          RefreshTokenRepository
 	gracePeriod      time.Duration
 	refreshExpiresIn time.Duration
@@ -31,7 +31,7 @@ func NewRefreshTokenService(
 	logger models.Logger,
 	eventBus models.EventBus,
 	sessionService coreservices.SessionService,
-	jwtService JwtService,
+	jwtService TokenService,
 	storage RefreshTokenRepository,
 	gracePeriod time.Duration,
 	refreshExpiresIn time.Duration,
@@ -47,12 +47,12 @@ func NewRefreshTokenService(
 	}
 }
 
-func (s *refreshTokenService) RefreshTokens(ctx context.Context, refreshToken string) (*RefreshTokenResponse, error) {
+func (s *refreshTokenService) RefreshTokens(ctx context.Context, refreshToken string) (*types.RefreshTokenResponse, error) {
 	return s.RefreshTokensWithMetadata(ctx, refreshToken, events.AuditMetadata{})
 }
 
 // RefreshTokensWithMetadata refreshes tokens with optional audit metadata for event logging
-func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, refreshToken string, auditMeta events.AuditMetadata) (*RefreshTokenResponse, error) {
+func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, refreshToken string, auditMeta events.AuditMetadata) (*types.RefreshTokenResponse, error) {
 	// Hash the incoming refresh token
 	tokenHash := HashRefreshToken(refreshToken)
 
@@ -136,7 +136,7 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 }
 
 // completeTokenRotation handles the token rotation after validation passes
-func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHash string, record *types.RefreshToken) (*RefreshTokenResponse, error) {
+func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHash string, record *types.RefreshToken) (*types.RefreshTokenResponse, error) {
 	// Check if token is expired
 	if time.Now().After(record.ExpiresAt) {
 		return nil, fmt.Errorf("refresh token expired")
@@ -161,7 +161,7 @@ func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHa
 	}
 
 	// STEP 2: Generate new token pair
-	tokenPair, err := s.jwtService.GenerateTokens(ctx, session.UserID, record.SessionID)
+	tokenPair, err := s.jwtService.GenerateUserToken(ctx, session.UserID, record.SessionID)
 	if err != nil {
 		s.logger.Error("failed to generate new tokens", "user_id", session.UserID, "session_id", record.SessionID, "error", err)
 		return nil, fmt.Errorf("failed to generate tokens")
@@ -186,7 +186,7 @@ func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHa
 		return nil, fmt.Errorf("failed to rotate token")
 	}
 
-	return &RefreshTokenResponse{
+	return &types.RefreshTokenResponse{
 		AccessToken:  tokenPair.AccessToken,
 		RefreshToken: tokenPair.RefreshToken,
 	}, nil

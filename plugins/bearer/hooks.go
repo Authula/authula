@@ -49,7 +49,7 @@ func (p *BearerPlugin) validateBearerToken(reqCtx *models.RequestContext) error 
 		return nil
 	}
 
-	userID, err := p.jwtService.ValidateToken(token)
+	actor, err := p.jwtService.ValidateToken(reqCtx.Request.Context(), token)
 	if err != nil {
 		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
 			"message": "Bearer token invalid or expired",
@@ -58,10 +58,7 @@ func (p *BearerPlugin) validateBearerToken(reqCtx *models.RequestContext) error 
 		return nil
 	}
 
-	reqCtx.SetActorInContext(&models.Actor{
-		ID:   userID,
-		Type: models.ActorUser,
-	})
+	reqCtx.SetActorInContext(actor)
 
 	return nil
 }
@@ -78,15 +75,12 @@ func (p *BearerPlugin) validateBearerTokenOptional(reqCtx *models.RequestContext
 		return nil
 	}
 
-	userID, err := p.jwtService.ValidateToken(token)
+	actor, err := p.jwtService.ValidateToken(reqCtx.Request.Context(), token)
 	if err != nil {
 		return nil
 	}
 
-	reqCtx.SetActorInContext(&models.Actor{
-		ID:   userID,
-		Type: models.ActorUser,
-	})
+	reqCtx.SetActorInContext(actor)
 
 	return nil
 }
