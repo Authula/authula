@@ -61,11 +61,11 @@ func (uc *verifyEmailUseCase) VerifyEmail(ctx context.Context, tokenStr string) 
 	}
 
 	switch verification.Type {
-	case models.TypeEmailVerification:
+	case models.TypeEmailVerification, models.TypePasswordResetRequest:
 		if err := uc.handleEmailVerification(ctx, user, verification.ID); err != nil {
 			return "", err
 		}
-	case models.TypePasswordResetRequest, models.TypeEmailResetRequest:
+	case models.TypeEmailResetRequest:
 		if err := uc.handleEmailChangeVerificationEmail(ctx, *verification.UserID, tokenStr, verification.Identifier); err != nil {
 			return "", err
 		}
@@ -119,7 +119,9 @@ func (uc *verifyEmailUseCase) handleEmailChangeVerificationEmail(
 		return err
 	}
 
-	if verification == nil || verification.Type != models.TypeEmailResetRequest || verification.ExpiresAt.Before(time.Now()) {
+	if verification == nil ||
+		verification.ExpiresAt.Before(time.Now()) ||
+		verification.Type != models.TypeEmailResetRequest {
 		return constants.ErrInvalidOrExpiredToken
 	}
 

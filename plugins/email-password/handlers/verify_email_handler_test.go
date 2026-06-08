@@ -27,8 +27,8 @@ func TestVerifyEmailHandler(t *testing.T) {
 	}{
 		{name: "missing_token", path: "/email-password/verify-email", expectedStatus: http.StatusUnprocessableEntity},
 		{name: "usecase_error", path: "/email-password/verify-email?token=token-1", prepare: func(m *plugintests.MockVerifyEmailUseCase) {
-			m.On("VerifyEmail", mock.Anything, "token-1").Return(models.VerificationType(""), errors.New("boom")).Once()
-		}, expectedStatus: http.StatusUnprocessableEntity},
+			m.On("VerifyEmail", mock.Anything, "token-1").Return(models.VerificationType(""), errors.New("some error")).Once()
+		}, expectedStatus: http.StatusInternalServerError},
 		{name: "success_without_callback", path: "/email-password/verify-email?token=token-1", prepare: func(m *plugintests.MockVerifyEmailUseCase) {
 			m.On("VerifyEmail", mock.Anything, "token-1").Return(models.TypeEmailVerification, nil).Once()
 		}, expectedStatus: http.StatusOK},
