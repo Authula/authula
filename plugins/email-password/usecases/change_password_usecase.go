@@ -54,8 +54,8 @@ func (uc *changePasswordUseCase) ChangePassword(ctx context.Context, tokenValue 
 	}
 
 	if verification == nil ||
-		verification.Type != models.TypePasswordResetRequest ||
-		verification.ExpiresAt.Before(time.Now()) {
+		verification.ExpiresAt.Before(time.Now()) ||
+		verification.Type != models.TypePasswordResetRequest {
 		return constants.ErrInvalidOrExpiredToken
 	}
 

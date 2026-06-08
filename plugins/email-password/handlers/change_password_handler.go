@@ -38,7 +38,7 @@ func (h *ChangePasswordHandler) Handler() http.HandlerFunc {
 
 		err := h.UseCase.ChangePassword(ctx, request.Token, request.Password)
 		if err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{
+			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
 				"message": err.Error(),
 			})
 			reqCtx.Handled = true

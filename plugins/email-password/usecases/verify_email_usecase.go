@@ -61,10 +61,12 @@ func (uc *verifyEmailUseCase) VerifyEmail(ctx context.Context, tokenStr string) 
 	}
 
 	switch verification.Type {
-	case models.TypeEmailVerification, models.TypePasswordResetRequest:
+	case models.TypeEmailVerification:
 		if err := uc.handleEmailVerification(ctx, user, verification.ID); err != nil {
 			return "", err
 		}
+	case models.TypePasswordResetRequest:
+		// No action needed for password reset verification as the change password flow will handle deleting the verification record after password reset.
 	case models.TypeEmailResetRequest:
 		if err := uc.handleEmailChangeVerificationEmail(ctx, *verification.UserID, tokenStr, verification.Identifier); err != nil {
 			return "", err
