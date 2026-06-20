@@ -28,6 +28,7 @@ type Auth struct {
 	config           *models.Config
 	logger           models.Logger
 	db               bun.IDB
+	eventBus         models.EventBus
 	migrator         *migrations.Migrator
 	migrationManager *migrationmanager.Manager
 	router           *Router
@@ -137,6 +138,7 @@ func New(authConfig *AuthConfig) *Auth {
 		config:           authConfig.Config,
 		logger:           logger,
 		db:               db,
+		eventBus:         eventBus,
 		migrator:         migrator,
 		migrationManager: migrationManager,
 		router:           router,
@@ -339,6 +341,13 @@ func (auth *Auth) DB() bun.IDB {
 		return nil
 	}
 	return auth.db
+}
+
+func (auth *Auth) EventBus() models.EventBus {
+	if auth == nil {
+		return nil
+	}
+	return auth.eventBus
 }
 
 func (auth *Auth) Router() *Router {
