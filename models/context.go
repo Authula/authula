@@ -123,8 +123,8 @@ func (reqCtx *RequestContext) SetActorInContext(actor *Actor) {
 	if reqCtx.Actor.Scopes == nil {
 		reqCtx.Actor.Scopes = make([]string, 0)
 	}
-	if reqCtx.Actor.Metadata == nil {
-		reqCtx.Actor.Metadata = make(map[string]any)
+	if reqCtx.Actor.Claims == nil {
+		reqCtx.Actor.Claims = make(map[string]any)
 	}
 	reqCtx.Request = reqCtx.Request.WithContext(context.WithValue(reqCtx.Request.Context(), ContextAuthActor, actor))
 	if reqCtx.Actor.ID != "" {

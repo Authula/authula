@@ -254,7 +254,7 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 	}
 
 	actor := &models.Actor{
-		Metadata: map[string]any{"auth_mechanism": "jwt_bearer"},
+		Claims: map[string]any{"auth_mechanism": "jwt_bearer"},
 	}
 
 	if actorType == "machine" {
@@ -267,7 +267,7 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 
 		var orgID string
 		if err := parsedToken.Get("org_id", &orgID); err == nil && orgID != "" {
-			actor.OrganizationID = &orgID
+			actor.Claims["organization_id"] = orgID
 		}
 
 		var raw any

@@ -70,10 +70,11 @@ func (a *DefaultAuthorizer) Authorize(ctx context.Context, actor *models.Actor, 
 	}
 
 	if resource.OrganizationID != "" {
-		if actor.OrganizationID == nil || *actor.OrganizationID == "" {
+		orgID, ok := actor.GetClaimString("organization_id")
+		if !ok || orgID == "" {
 			return internalerrors.ErrForbidden
 		}
-		if *actor.OrganizationID != resource.OrganizationID {
+		if orgID != resource.OrganizationID {
 			return internalerrors.ErrForbidden
 		}
 	}

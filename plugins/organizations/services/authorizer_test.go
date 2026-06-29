@@ -8,9 +8,6 @@ import (
 )
 
 func TestDefaultAuthorizerAuthorize(t *testing.T) {
-	org1 := new("org-1")
-	org2 := new("org-2")
-
 	tests := []struct {
 		name     string
 		actor    *models.Actor
@@ -20,7 +17,7 @@ func TestDefaultAuthorizerAuthorize(t *testing.T) {
 	}{
 		{
 			name:     "allows user actors without permissions",
-			actor:    &models.Actor{ID: "user-1", Type: models.ActorUser, OrganizationID: new("org-1")},
+			actor:    &models.Actor{ID: "user-1", Type: models.ActorUser, Claims: map[string]any{"organization_id": "org-1"}},
 			action:   ActionOrganizationsDelete,
 			resource: AuthorizerResource{OrganizationID: "org-1"},
 			wantErr:  false,
@@ -34,21 +31,21 @@ func TestDefaultAuthorizerAuthorize(t *testing.T) {
 		},
 		{
 			name:     "allows machine actors with matching permission and organization",
-			actor:    &models.Actor{ID: "machine-1", Type: models.ActorMachine, OrganizationID: org1, Scopes: []string{"organizations:teams:create"}},
+			actor:    &models.Actor{ID: "machine-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}, Scopes: []string{"organizations:teams:create"}},
 			action:   ActionOrganizationsTeamsCreate,
 			resource: AuthorizerResource{OrganizationID: "org-1"},
 			wantErr:  false,
 		},
 		{
 			name:     "denies machine actors without matching organization",
-			actor:    &models.Actor{ID: "machine-1", Type: models.ActorMachine, OrganizationID: org2, Scopes: []string{"organizations:teams:create"}},
+			actor:    &models.Actor{ID: "machine-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-2"}, Scopes: []string{"organizations:teams:create"}},
 			action:   ActionOrganizationsTeamsCreate,
 			resource: AuthorizerResource{OrganizationID: "org-1"},
 			wantErr:  true,
 		},
 		{
 			name:     "allows wildcard permissions for machine actors",
-			actor:    &models.Actor{ID: "machine-1", Type: models.ActorMachine, OrganizationID: org1, Scopes: []string{"organizations:*"}},
+			actor:    &models.Actor{ID: "machine-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}, Scopes: []string{"organizations:*"}},
 			action:   ActionOrganizationsMembersRemove,
 			resource: AuthorizerResource{OrganizationID: "org-1"},
 			wantErr:  false,

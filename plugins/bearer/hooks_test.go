@@ -73,15 +73,15 @@ func TestValidateBearerToken(t *testing.T) {
 			setupMock: func(m *bearertests.MockJWTService) {
 				m.On("ValidateToken", mock.Anything, "valid-user-token").Return(&models.Actor{ID: "user-1", Type: models.ActorUser}, nil).Once()
 			},
-			wantActor: &models.Actor{ID: "user-1", Type: models.ActorUser, Scopes: []string{}, Metadata: map[string]any{}},
+			wantActor: &models.Actor{ID: "user-1", Type: models.ActorUser, Scopes: []string{}, Claims: map[string]any{}},
 		},
 		{
 			name:   "valid_machine_token",
 			header: "Bearer valid-machine-token",
 			setupMock: func(m *bearertests.MockJWTService) {
-				m.On("ValidateToken", mock.Anything, "valid-machine-token").Return(&models.Actor{ID: "client-1", Type: models.ActorMachine, OrganizationID: internaltests.PtrString("org-1"), Scopes: []string{"read"}}, nil).Once()
+				m.On("ValidateToken", mock.Anything, "valid-machine-token").Return(&models.Actor{ID: "client-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}, Scopes: []string{"read"}}, nil).Once()
 			},
-			wantActor: &models.Actor{ID: "client-1", Type: models.ActorMachine, OrganizationID: internaltests.PtrString("org-1"), Scopes: []string{"read"}, Metadata: map[string]any{}},
+			wantActor: &models.Actor{ID: "client-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}, Scopes: []string{"read"}},
 		},
 	}
 
@@ -151,7 +151,7 @@ func TestValidateBearerTokenOptional(t *testing.T) {
 			setupMock: func(m *bearertests.MockJWTService) {
 				m.On("ValidateToken", mock.Anything, "valid-user-token").Return(&models.Actor{ID: "user-1", Type: models.ActorUser}, nil).Once()
 			},
-			wantActor: &models.Actor{ID: "user-1", Type: models.ActorUser, Scopes: []string{}, Metadata: map[string]any{}},
+			wantActor: &models.Actor{ID: "user-1", Type: models.ActorUser, Scopes: []string{}, Claims: map[string]any{}},
 		},
 	}
 

@@ -97,8 +97,7 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			wantActor: func(t *testing.T, actor *models.Actor) {
 				require.Equal(t, "user-1", actor.ID)
 				require.Equal(t, models.ActorUser, actor.Type)
-				require.Nil(t, actor.OrganizationID)
-				require.Equal(t, "jwt_bearer", actor.Metadata["auth_mechanism"])
+				require.Equal(t, "jwt_bearer", actor.Claims["auth_mechanism"])
 			},
 		},
 		{
@@ -120,7 +119,7 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			wantActor: func(t *testing.T, actor *models.Actor) {
 				require.Equal(t, "user-1", actor.ID)
 				require.Equal(t, models.ActorUser, actor.Type)
-				require.Equal(t, "jwt_bearer", actor.Metadata["auth_mechanism"])
+				require.Equal(t, "jwt_bearer", actor.Claims["auth_mechanism"])
 			},
 		},
 		{
@@ -141,10 +140,11 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			wantActor: func(t *testing.T, actor *models.Actor) {
 				require.Equal(t, "client-1", actor.ID)
 				require.Equal(t, models.ActorMachine, actor.Type)
-				require.NotNil(t, actor.OrganizationID)
-				require.Equal(t, "org-1", *actor.OrganizationID)
+				orgID, ok := actor.GetClaimString("organization_id")
+				require.True(t, ok)
+				require.Equal(t, "org-1", orgID)
 				require.Equal(t, []string{"read:users", "write:users"}, actor.Scopes)
-				require.Equal(t, "jwt_bearer", actor.Metadata["auth_mechanism"])
+				require.Equal(t, "jwt_bearer", actor.Claims["auth_mechanism"])
 			},
 		},
 		{
@@ -163,9 +163,10 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			wantActor: func(t *testing.T, actor *models.Actor) {
 				require.Equal(t, "client-2", actor.ID)
 				require.Equal(t, models.ActorMachine, actor.Type)
-				require.Nil(t, actor.OrganizationID)
+				_, ok := actor.GetClaimString("organization_id")
+				require.False(t, ok)
 				require.Nil(t, actor.Scopes)
-				require.Equal(t, "jwt_bearer", actor.Metadata["auth_mechanism"])
+				require.Equal(t, "jwt_bearer", actor.Claims["auth_mechanism"])
 			},
 		},
 		{

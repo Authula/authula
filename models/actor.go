@@ -8,6 +8,7 @@ type ActorType string
 
 const (
 	ActorUser    ActorType = "user"
+	ActorAPIKey  ActorType = "api_key"
 	ActorMachine ActorType = "machine"
 )
 
@@ -19,15 +20,11 @@ type Actor struct {
 	// Indicates the type of actor
 	Type ActorType
 
-	// Identifies the tenant a user is actively operating inside an org.
-	// This can be nil if a user is operating in a personal/non-tenant scope.
-	OrganizationID *string
-
 	// Holds the scopes granted to this specific request credential.
 	Scopes []string
 
 	// Flexible field to attach additional information about the actor.
-	Metadata map[string]any
+	Claims map[string]any
 }
 
 func (actor *Actor) HasScopes(scope string) bool {
@@ -35,4 +32,16 @@ func (actor *Actor) HasScopes(scope string) bool {
 		return false
 	}
 	return slices.Contains(actor.Scopes, scope)
+}
+
+func (actor *Actor) GetClaimString(key string) (string, bool) {
+	if actor == nil || actor.Claims == nil {
+		return "", false
+	}
+	val, ok := actor.Claims[key]
+	if !ok {
+		return "", false
+	}
+	str, ok := val.(string)
+	return str, ok
 }

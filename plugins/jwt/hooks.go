@@ -54,21 +54,6 @@ func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
 	ctx := reqCtx.Request.Context()
 
 	switch reqCtx.Actor.Type {
-	case models.ActorMachine:
-		{
-			orgID := ""
-			if reqCtx.Actor.OrganizationID != nil {
-				orgID = *reqCtx.Actor.OrganizationID
-			}
-			tokenPair, err := p.jwtService.(jwtservices.TokenService).GenerateMachineToken(
-				ctx, reqCtx.Actor.ID, orgID, reqCtx.Actor.Scopes,
-			)
-			if err != nil {
-				p.Logger.Error("failed to generate machine JWT token", "client_id", reqCtx.Actor.ID, "error", err)
-				return fmt.Errorf("failed to generate machine authentication tokens: %w", err)
-			}
-			reqCtx.Values[types.JWTTokenTypeAccess.String()] = tokenPair.AccessToken
-		}
 	case models.ActorUser:
 		{
 			sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string)
@@ -90,6 +75,22 @@ func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
 
 			reqCtx.Values[types.JWTTokenTypeAccess.String()] = tokenPair.AccessToken
 			reqCtx.Values[types.JWTTokenTypeRefresh.String()] = tokenPair.RefreshToken
+		}
+	case models.ActorMachine:
+		{
+			orgID := ""
+			orgID, ok := reqCtx.Actor.GetClaimString("organization_id")
+			if !ok {
+				return fmt.Errorf("ActorMachine has no org_id in its claims failing to be associated with an organization")
+			}
+			tokenPair, err := p.jwtService.(jwtservices.TokenService).GenerateMachineToken(
+				ctx, reqCtx.Actor.ID, orgID, reqCtx.Actor.Scopes,
+			)
+			if err != nil {
+				p.Logger.Error("failed to generate machine JWT token", "client_id", reqCtx.Actor.ID, "error", err)
+				return fmt.Errorf("failed to generate machine authentication tokens: %w", err)
+			}
+			reqCtx.Values[types.JWTTokenTypeAccess.String()] = tokenPair.AccessToken
 		}
 	}
 

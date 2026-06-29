@@ -100,10 +100,10 @@ func TestIssueTokensHook(t *testing.T) {
 		{
 			name: "machine_success",
 			actor: &models.Actor{
-				ID:             "client-1",
-				Type:           models.ActorMachine,
-				OrganizationID: new("org-1"),
-				Scopes:         []string{"read", "write"},
+				ID:     "client-1",
+				Type:   models.ActorMachine,
+				Claims: map[string]any{"organization_id": "org-1"},
+				Scopes: []string{"read", "write"},
 			},
 			mock: func(tokenSvc *jwttests.MockTokenService, refreshSvc *jwttests.MockRefreshTokenService) {
 				pair := &types.TokenPair{AccessToken: "machine-access-token"}
@@ -118,12 +118,13 @@ func TestIssueTokensHook(t *testing.T) {
 		{
 			name: "machine_no_optional_fields",
 			actor: &models.Actor{
-				ID:   "client-2",
-				Type: models.ActorMachine,
+				ID:     "client-2",
+				Type:   models.ActorMachine,
+				Claims: map[string]any{"organization_id": "org-2"},
 			},
 			mock: func(tokenSvc *jwttests.MockTokenService, refreshSvc *jwttests.MockRefreshTokenService) {
 				pair := &types.TokenPair{AccessToken: "machine-access-token-2"}
-				tokenSvc.On("GenerateMachineToken", mock.Anything, "client-2", "", []string(nil)).Return(pair, nil)
+				tokenSvc.On("GenerateMachineToken", mock.Anything, "client-2", "org-2", []string(nil)).Return(pair, nil)
 			},
 			check: func(t *testing.T, reqCtx *models.RequestContext) {
 				require.Equal(t, "machine-access-token-2", reqCtx.Values[types.JWTTokenTypeAccess.String()])
@@ -132,11 +133,12 @@ func TestIssueTokensHook(t *testing.T) {
 		{
 			name: "machine_token_error",
 			actor: &models.Actor{
-				ID:   "client-3",
-				Type: models.ActorMachine,
+				ID:     "client-3",
+				Type:   models.ActorMachine,
+				Claims: map[string]any{"organization_id": "org-3"},
 			},
 			mock: func(tokenSvc *jwttests.MockTokenService, refreshSvc *jwttests.MockRefreshTokenService) {
-				tokenSvc.On("GenerateMachineToken", mock.Anything, "client-3", "", []string(nil)).Return(nil, errHookTest)
+				tokenSvc.On("GenerateMachineToken", mock.Anything, "client-3", "org-3", []string(nil)).Return(nil, errHookTest)
 			},
 			wantErr: "failed to generate machine authentication tokens",
 		},
@@ -220,9 +222,9 @@ func TestRespondHook(t *testing.T) {
 		{
 			name: "machine_success",
 			actor: &models.Actor{
-				ID:             "client-1",
-				Type:           models.ActorMachine,
-				OrganizationID: new("org-1"),
+				ID:     "client-1",
+				Type:   models.ActorMachine,
+				Claims: map[string]any{"organization_id": "org-1"},
 			},
 			setup: func(t *testing.T, reqCtx *models.RequestContext) {
 				reqCtx.Values[types.JWTTokenTypeAccess.String()] = "machine-access-1"
