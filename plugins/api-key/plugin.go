@@ -22,6 +22,8 @@ type ApiKeyPlugin struct {
 	pluginCtx            *models.PluginContext
 	accessControlService rootservices.AccessControlService
 	rateLimiterService   rootservices.RateLimiterService
+	userService          rootservices.UserService
+	organizationService  rootservices.OrganizationService
 	Api                  *API
 }
 
@@ -55,6 +57,7 @@ func (p *ApiKeyPlugin) Init(ctx *models.PluginContext) error {
 	if !ok {
 		return fmt.Errorf("required service %s is not registered", models.ServiceUser.String())
 	}
+	p.userService = userService
 
 	tokenService, ok := ctx.ServiceRegistry.Get(models.ServiceToken.String()).(rootservices.TokenService)
 	if !ok {
@@ -82,9 +85,11 @@ func (p *ApiKeyPlugin) Init(ctx *models.PluginContext) error {
 		}
 		organizationService = orgSvc
 	}
+	p.organizationService = organizationService
 
 	apiKeyRepo := apirepositories.NewBunApiKeyRepository(p.db)
-	service := apiservices.NewApiKeyService(p.config, userService, tokenService, accessControlService, rateLimiterService, organizationService, apiKeyRepo)
+	authorizer := rootservices.NewDefaultAuthorizer()
+	service := apiservices.NewApiKeyService(p.config, userService, tokenService, accessControlService, rateLimiterService, organizationService, authorizer, apiKeyRepo)
 
 	p.Api = NewAPI(service)
 

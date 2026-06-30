@@ -25,7 +25,7 @@ func (h *DeleteApiKeyHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		if err := h.Service.Delete(ctx, id); err != nil {
+		if err := h.Service.Delete(ctx, reqCtx.Actor, id); err != nil {
 			internalerrors.HandleError(err, reqCtx)
 			return
 		}

@@ -33,7 +33,7 @@ func TestGetAllApiKeysHandler(t *testing.T) {
 			name: "success_with_filters",
 			path: "/api-keys?page=2&limit=50&owner_type=user&owner_id=user-1",
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("GetAll", mock.Anything, types.GetApiKeysRequest{Page: 2, Limit: 50, OwnerType: &ownerType, OwnerID: &ownerID}).Return(resp, nil).Once()
+				m.On("GetAll", mock.Anything, mock.Anything, types.GetApiKeysRequest{Page: 2, Limit: 50, OwnerType: &ownerType, OwnerID: &ownerID}).Return(resp, nil).Once()
 			},
 			expectedStatus: http.StatusOK, checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
 				payload := internaltests.DecodeResponseJSON[types.GetAllApiKeysResponse](t, reqCtx)
@@ -47,7 +47,7 @@ func TestGetAllApiKeysHandler(t *testing.T) {
 			name: "service_error",
 			path: "/api-keys",
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("GetAll", mock.Anything, types.GetApiKeysRequest{Page: 1, Limit: 0}).Return((*types.GetAllApiKeysResponse)(nil), errors.New("some error")).Once()
+				m.On("GetAll", mock.Anything, mock.Anything, types.GetApiKeysRequest{Page: 1, Limit: 0}).Return((*types.GetAllApiKeysResponse)(nil), errors.New("some error")).Once()
 			},
 			expectedStatus: http.StatusBadRequest,
 		},
@@ -55,7 +55,7 @@ func TestGetAllApiKeysHandler(t *testing.T) {
 			name: "success_defaults",
 			path: "/api-keys",
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("GetAll", mock.Anything, types.GetApiKeysRequest{Page: 1, Limit: 0}).Return(resp, nil).Once()
+				m.On("GetAll", mock.Anything, mock.Anything, types.GetApiKeysRequest{Page: 1, Limit: 0}).Return(resp, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 		},

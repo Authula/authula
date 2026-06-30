@@ -34,7 +34,7 @@ func (h *GetAllApiKeysHandler) Handle() http.HandlerFunc {
 			req.OwnerID = &ownerID
 		}
 
-		resp, err := h.Service.GetAll(ctx, req)
+		resp, err := h.Service.GetAll(ctx, reqCtx.Actor, req)
 		if err != nil {
 			internalerrors.HandleError(err, reqCtx)
 			return

@@ -35,7 +35,7 @@ func TestGetApiKeyHandler(t *testing.T) {
 			name: "not_found",
 			path: "/api-keys/api-key-1",
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("GetByID", mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), internalerrors.ErrNotFound).Once()
+				m.On("GetByID", mock.Anything, mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), internalerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 		},
@@ -43,7 +43,7 @@ func TestGetApiKeyHandler(t *testing.T) {
 			name: "success",
 			path: "/api-keys/api-key-1",
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("GetByID", mock.Anything, "api-key-1").Return(apiKey, nil).Once()
+				m.On("GetByID", mock.Anything, mock.Anything, "api-key-1").Return(apiKey, nil).Once()
 			},
 			expectedStatus: http.StatusOK, checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
 				payload := internaltests.DecodeResponseJSON[types.GetApiKeyResponse](t, reqCtx)

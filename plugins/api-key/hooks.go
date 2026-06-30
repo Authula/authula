@@ -16,7 +16,7 @@ func (p *ApiKeyPlugin) buildHooks() []models.Hook {
 			Stage:   models.HookBefore,
 			Matcher: p.matchApiKeyHeader,
 			Handler: p.validateApiKeyHook(),
-			Order:   5,
+			Order:   10,
 		},
 	}
 }
@@ -44,7 +44,63 @@ func (p *ApiKeyPlugin) validateApiKeyHook() models.HookHandler {
 			return nil
 		}
 
-		apiKey, err := p.Api.Update(ctx, result.ApiKey.ID, types.UpdateApiKeyData{
+		apiKey := result.ApiKey
+		actor := &models.Actor{}
+
+		switch apiKey.OwnerType {
+		case types.OwnerTypeUser:
+			user, err := p.userService.GetByID(ctx, apiKey.OwnerID)
+			if err != nil {
+				p.logger.Error("failed to verify user for api key", "error", err, "user_id", apiKey.OwnerID)
+				reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": err.Error()})
+				reqCtx.Handled = true
+				return nil
+			}
+			if user == nil {
+				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "api key owner not found"})
+				reqCtx.Handled = true
+				return nil
+			}
+
+			actor.Type = models.ActorUser
+			actor.ID = apiKey.OwnerID
+			actor.Scopes = apiKey.Permissions
+
+		case types.OwnerTypeOrganization:
+			if p.organizationService == nil {
+				p.logger.Error("organization service is not available for org api key validation")
+				reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": "organization service unavailable"})
+				reqCtx.Handled = true
+				return nil
+			}
+
+			exists, err := p.organizationService.ExistsByID(ctx, apiKey.OwnerID)
+			if err != nil {
+				p.logger.Error("failed to verify organization for api key", "error", err, "organization_id", apiKey.OwnerID)
+				reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": err.Error()})
+				reqCtx.Handled = true
+				return nil
+			}
+			if !exists {
+				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "api key organization not found"})
+				reqCtx.Handled = true
+				return nil
+			}
+
+			actor.Type = models.ActorMachine
+			actor.ID = apiKey.ID
+			actor.Scopes = apiKey.Permissions
+			actor.Claims = map[string]any{"organization_id": apiKey.OwnerID}
+
+		default:
+			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": "invalid api key owner type"})
+			reqCtx.Handled = true
+			return nil
+		}
+
+		reqCtx.Actor = actor
+
+		apiKey, err = p.Api.Update(ctx, actor, apiKey.ID, types.UpdateApiKeyData{
 			LastRequestedAt: new(time.Now().UTC()),
 		})
 		if err != nil {
@@ -54,16 +110,12 @@ func (p *ApiKeyPlugin) validateApiKeyHook() models.HookHandler {
 			return nil
 		}
 
-		if reqCtx.Actor == nil {
-			reqCtx.Actor = &models.Actor{}
-		}
-		reqCtx.Actor.ID = result.ApiKey.OwnerID
-
 		p.applyApiKeyRateLimit(reqCtx, apiKey)
 
 		return nil
 	}
 }
+
 func (p *ApiKeyPlugin) applyApiKeyRateLimit(reqCtx *models.RequestContext, apiKey *types.ApiKey) {
 	ctx := reqCtx.Request.Context()
 

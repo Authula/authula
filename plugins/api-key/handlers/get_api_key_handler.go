@@ -25,7 +25,7 @@ func (h *GetApiKeyHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		apiKey, err := h.Service.GetByID(ctx, id)
+		apiKey, err := h.Service.GetByID(ctx, reqCtx.Actor, id)
 		if err != nil {
 			internalerrors.HandleError(err, reqCtx)
 			return

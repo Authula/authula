@@ -49,7 +49,7 @@ func TestUpdateApiKeyHandler(t *testing.T) {
 			path: "/api-keys/api-key-1",
 			body: internaltests.MarshalToJSON(t, types.UpdateApiKeyRequest{Name: &name}),
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("Update", mock.Anything, "api-key-1", types.UpdateApiKeyData{Name: &name}).Return((*types.ApiKey)(nil), internalerrors.ErrNotFound).Once()
+				m.On("Update", mock.Anything, mock.Anything, "api-key-1", types.UpdateApiKeyData{Name: &name}).Return((*types.ApiKey)(nil), internalerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 		},
@@ -58,7 +58,7 @@ func TestUpdateApiKeyHandler(t *testing.T) {
 			path: "/api-keys/api-key-1",
 			body: internaltests.MarshalToJSON(t, types.UpdateApiKeyRequest{Name: &name}),
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("Update", mock.Anything, "api-key-1", types.UpdateApiKeyData{Name: &name}).Return(apiKey, nil).Once()
+				m.On("Update", mock.Anything, mock.Anything, "api-key-1", types.UpdateApiKeyData{Name: &name}).Return(apiKey, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {

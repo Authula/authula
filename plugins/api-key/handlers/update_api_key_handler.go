@@ -38,25 +38,19 @@ func (h *UpdateApiKeyHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		apiKey, err := h.Service.Update(ctx, id, types.UpdateApiKeyData{
-			Name:             req.Name,
-			Enabled:          req.Enabled,
-			RateLimitEnabled: req.RateLimitEnabled,
-			ExpiresAt:        req.ExpiresAt,
-			Permissions:      req.Permissions,
-			Metadata:         req.Metadata,
+		apiKey, err := h.Service.Update(ctx, reqCtx.Actor, id, types.UpdateApiKeyData{
+			Name:                 req.Name,
+			Enabled:              req.Enabled,
+			RateLimitEnabled:     req.RateLimitEnabled,
+			RateLimitTimeWindow:  req.RateLimitTimeWindow,
+			RateLimitMaxRequests: req.RateLimitMaxRequests,
+			ExpiresAt:            req.ExpiresAt,
+			Permissions:          req.Permissions,
+			Metadata:             req.Metadata,
 		})
 		if err != nil {
 			internalerrors.HandleError(err, reqCtx)
 			return
-		}
-
-		if req.RateLimitEnabled != nil && *req.RateLimitEnabled && req.RateLimitTimeWindow != nil && req.RateLimitMaxRequests != nil {
-			reqCtx.Values[models.ContextRateLimitRule.String()] = &models.RateLimitRuleContext{
-				Key:           apiKey.KeyHash,
-				WindowSeconds: *req.RateLimitTimeWindow,
-				MaxRequests:   *req.RateLimitMaxRequests,
-			}
 		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, types.UpdateApiKeyResponse{ApiKey: apiKey})

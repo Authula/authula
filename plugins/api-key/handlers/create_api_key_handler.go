@@ -31,18 +31,10 @@ func (h *CreateApiKeyHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		result, err := h.Service.Create(ctx, req)
+		result, err := h.Service.Create(ctx, reqCtx.Actor, req)
 		if err != nil {
 			internalerrors.HandleError(err, reqCtx)
 			return
-		}
-
-		if req.RateLimitEnabled != nil && *req.RateLimitEnabled {
-			reqCtx.Values[models.ContextRateLimitRule.String()] = &models.RateLimitRuleContext{
-				Key:           result.ApiKey.KeyHash,
-				WindowSeconds: *req.RateLimitTimeWindow,
-				MaxRequests:   *req.RateLimitMaxRequests,
-			}
 		}
 
 		reqCtx.SetJSONResponse(http.StatusCreated, &types.CreateApiKeyResponse{

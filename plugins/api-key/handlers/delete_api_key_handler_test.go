@@ -32,13 +32,13 @@ func TestDeleteApiKeyHandler(t *testing.T) {
 		{
 			name: "service_error", path: "/api-keys/api-key-1",
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("Delete", mock.Anything, "api-key-1").Return(internalerrors.ErrNotFound).Once()
+				m.On("Delete", mock.Anything, mock.Anything, "api-key-1").Return(internalerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 		},
 		{
 			name: "success", path: "/api-keys/api-key-1", prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("Delete", mock.Anything, "api-key-1").Return(nil).Once()
+				m.On("Delete", mock.Anything, mock.Anything, "api-key-1").Return(nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {

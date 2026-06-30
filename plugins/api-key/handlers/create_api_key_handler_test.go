@@ -41,7 +41,7 @@ func TestCreateApiKeyHandler(t *testing.T) {
 			name: "service_error",
 			body: internaltests.MarshalToJSON(t, validReq),
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("Create", mock.Anything, validReq).Return((*types.CreateApiKeyResponse)(nil), internalerrors.ErrForbidden).Once()
+				m.On("Create", mock.Anything, mock.Anything, validReq).Return((*types.CreateApiKeyResponse)(nil), internalerrors.ErrForbidden).Once()
 			},
 			expectedStatus: http.StatusForbidden,
 		},
@@ -49,7 +49,7 @@ func TestCreateApiKeyHandler(t *testing.T) {
 			name: "success",
 			body: internaltests.MarshalToJSON(t, validReq),
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("Create", mock.Anything, validReq).Return(&types.CreateApiKeyResponse{RawApiKey: "raw-key", ApiKey: apiKey}, nil).Once()
+				m.On("Create", mock.Anything, mock.Anything, validReq).Return(&types.CreateApiKeyResponse{RawApiKey: "raw-key", ApiKey: apiKey}, nil).Once()
 			},
 			expectedStatus: http.StatusCreated,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {

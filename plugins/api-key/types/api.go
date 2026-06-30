@@ -96,13 +96,15 @@ func (r *UpdateApiKeyRequest) Validate() error {
 }
 
 type UpdateApiKeyData struct {
-	Name             *string
-	Enabled          *bool
-	RateLimitEnabled *bool
-	LastRequestedAt  *time.Time
-	ExpiresAt        *time.Time
-	Permissions      []string
-	Metadata         map[string]any
+	Name                 *string
+	Enabled              *bool
+	RateLimitEnabled     *bool
+	RateLimitTimeWindow  *int
+	RateLimitMaxRequests *int
+	LastRequestedAt      *time.Time
+	ExpiresAt            *time.Time
+	Permissions          []string
+	Metadata             map[string]any
 }
 
 type UpdateApiKeyResponse struct {

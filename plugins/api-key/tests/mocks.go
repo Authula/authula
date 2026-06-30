@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/uptrace/bun"
 
+	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/api-key/repositories"
 	"github.com/Authula/authula/plugins/api-key/types"
 )
@@ -34,48 +35,48 @@ type MockApiKeyService struct {
 	mock.Mock
 }
 
-func (m *MockApiKeyService) Create(ctx context.Context, req types.CreateApiKeyRequest) (*types.CreateApiKeyResponse, error) {
-	args := m.Called(ctx, req)
+func (m *MockApiKeyService) Create(ctx context.Context, actor *models.Actor, req types.CreateApiKeyRequest) (*types.CreateApiKeyResponse, error) {
+	args := m.Called(ctx, actor, req)
 	if resp, ok := args.Get(0).(*types.CreateApiKeyResponse); ok {
 		return resp, args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
-func (m *MockApiKeyService) GetByID(ctx context.Context, id string) (*types.ApiKey, error) {
-	args := m.Called(ctx, id)
+func (m *MockApiKeyService) GetByID(ctx context.Context, actor *models.Actor, id string) (*types.ApiKey, error) {
+	args := m.Called(ctx, actor, id)
 	if resp, ok := args.Get(0).(*types.ApiKey); ok {
 		return resp, args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
-func (m *MockApiKeyService) GetAll(ctx context.Context, req types.GetApiKeysRequest) (*types.GetAllApiKeysResponse, error) {
-	args := m.Called(ctx, req)
+func (m *MockApiKeyService) GetAll(ctx context.Context, actor *models.Actor, req types.GetApiKeysRequest) (*types.GetAllApiKeysResponse, error) {
+	args := m.Called(ctx, actor, req)
 	if resp, ok := args.Get(0).(*types.GetAllApiKeysResponse); ok {
 		return resp, args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
-func (m *MockApiKeyService) Update(ctx context.Context, id string, req types.UpdateApiKeyData) (*types.ApiKey, error) {
-	args := m.Called(ctx, id, req)
+func (m *MockApiKeyService) Update(ctx context.Context, actor *models.Actor, id string, req types.UpdateApiKeyData) (*types.ApiKey, error) {
+	args := m.Called(ctx, actor, id, req)
 	if resp, ok := args.Get(0).(*types.ApiKey); ok {
 		return resp, args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
-func (m *MockApiKeyService) Delete(ctx context.Context, id string) error {
-	return m.Called(ctx, id).Error(0)
+func (m *MockApiKeyService) Delete(ctx context.Context, actor *models.Actor, id string) error {
+	return m.Called(ctx, actor, id).Error(0)
 }
 
 func (m *MockApiKeyService) DeleteExpired(ctx context.Context) error {
 	return m.Called(ctx).Error(0)
 }
 
-func (m *MockApiKeyService) DeleteAllByOwner(ctx context.Context, ownerType string, ownerID string) error {
-	return m.Called(ctx, ownerType, ownerID).Error(0)
+func (m *MockApiKeyService) DeleteAllByOwner(ctx context.Context, actor *models.Actor, ownerType string, ownerID string) error {
+	return m.Called(ctx, actor, ownerType, ownerID).Error(0)
 }
 
 func (m *MockApiKeyService) Verify(ctx context.Context, req types.VerifyApiKeyRequest) (*types.VerifyApiKeyResult, error) {
