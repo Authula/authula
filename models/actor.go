@@ -8,9 +8,12 @@ type ActorType string
 
 const (
 	ActorUser    ActorType = "user"
-	ActorAPIKey  ActorType = "api_key"
 	ActorMachine ActorType = "machine"
 )
+
+func (t ActorType) ToString() string {
+	return string(t)
+}
 
 // Actor represents the fully resolved identity context of the caller.
 type Actor struct {

@@ -60,7 +60,7 @@ func TestGetUserPermissionsHandler(t *testing.T) {
 			}
 
 			handler := NewGetUserPermissionsHandler(newUserPermissionsUseCase(repo))
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/users/"+tc.userID+"/permissions", nil, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodGet, "/users/"+tc.userID+"/permissions", nil, internaltests.TestActor())
 			req.SetPathValue("user_id", tc.userID)
 
 			handler.Handler()(w, req)
@@ -132,7 +132,7 @@ func TestCheckUserPermissionsHandler(t *testing.T) {
 			}
 
 			handler := NewCheckUserPermissionsHandler(newUserPermissionsUseCase(repo))
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/users/"+tc.userID+"/permissions/check", tc.body, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodPost, "/users/"+tc.userID+"/permissions/check", tc.body, internaltests.TestActor())
 			req.SetPathValue("user_id", tc.userID)
 
 			handler.Handler()(w, req)
@@ -157,5 +157,5 @@ func TestCheckUserPermissionsHandler(t *testing.T) {
 }
 
 func newUserPermissionsUseCase(repo *accesscontroltests.MockUserPermissionsRepository) *usecases.UserPermissionsUseCase {
-	return usecases.NewUserPermissionsUseCase(services.NewUserPermissionsService(repo))
+	return usecases.NewUserPermissionsUseCase(services.NewUserPermissionsService(repo, &internaltests.NoopAuthorizer{}))
 }

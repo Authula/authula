@@ -78,10 +78,9 @@ func (p *JWTPlugin) issueTokensHook(reqCtx *models.RequestContext) error {
 		}
 	case models.ActorMachine:
 		{
-			orgID := ""
 			orgID, ok := reqCtx.Actor.GetClaimString("organization_id")
-			if !ok {
-				return fmt.Errorf("ActorMachine has no org_id in its claims failing to be associated with an organization")
+			if !ok || orgID == "" {
+				return fmt.Errorf("ActorMachine has no organization_id in its claims failing to be associated with an organization")
 			}
 			tokenPair, err := p.jwtService.(jwtservices.TokenService).GenerateMachineToken(
 				ctx, reqCtx.Actor.ID, orgID, reqCtx.Actor.Scopes,

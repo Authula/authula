@@ -23,7 +23,7 @@ type TokenClaims struct {
 	SessionID      string   `json:"session_id,omitempty"`
 	TokenType      string   `json:"token_type"`
 	ActorType      string   `json:"actor_type,omitempty"`
-	OrganizationID string   `json:"org_id,omitempty"`
+	OrganizationID string   `json:"organization_id,omitempty"`
 	Scopes         []string `json:"scopes,omitempty"`
 	JTI            string   `json:"jti"`
 	IssuedAt       int64    `json:"iat"`

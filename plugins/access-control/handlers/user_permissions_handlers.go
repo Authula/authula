@@ -21,9 +21,10 @@ func (h *GetUserPermissionsHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
-		permissions, err := h.useCase.GetUserPermissions(ctx, userID)
+		permissions, err := h.useCase.GetUserPermissions(ctx, actor, userID)
 		if err != nil {
 			respondUserHandlerError(reqCtx, err)
 			return
@@ -45,6 +46,7 @@ func (h *CheckUserPermissionsHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
 		var request types.CheckUserPermissionsRequest
@@ -59,7 +61,7 @@ func (h *CheckUserPermissionsHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		allowed, err := h.useCase.HasPermissions(ctx, userID, request.PermissionKeys)
+		allowed, err := h.useCase.HasPermissions(ctx, actor, userID, request.PermissionKeys)
 		if err != nil {
 			respondUserHandlerError(reqCtx, err)
 			return

@@ -81,8 +81,8 @@ func TestPermissionsServiceCreatePermission(t *testing.T) {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
-			permission, err := service.CreatePermission(context.Background(), tc.req)
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &noopAuthorizer{})
+			permission, err := service.CreatePermission(context.Background(), testActor(), tc.req)
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)
@@ -136,8 +136,8 @@ func TestPermissionsServiceGetAllPermissions(t *testing.T) {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
-			permissions, err := service.GetAllPermissions(context.Background())
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &noopAuthorizer{})
+			permissions, err := service.GetAllPermissions(context.Background(), testActor())
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)
@@ -198,8 +198,8 @@ func TestPermissionsServiceGetPermissionByID(t *testing.T) {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
-			permission, err := service.GetPermissionByID(context.Background(), tc.id)
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &noopAuthorizer{})
+			permission, err := service.GetPermissionByID(context.Background(), testActor(), tc.id)
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)
@@ -298,8 +298,8 @@ func TestPermissionsServiceUpdatePermission(t *testing.T) {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
-			permission, err := service.UpdatePermission(context.Background(), tc.id, tc.req)
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &noopAuthorizer{})
+			permission, err := service.UpdatePermission(context.Background(), testActor(), tc.id, tc.req)
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)
@@ -386,8 +386,8 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 				tc.setup(permissionsRepo, rolePermissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
-			err := service.DeletePermission(context.Background(), tc.id)
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &noopAuthorizer{})
+			err := service.DeletePermission(context.Background(), testActor(), tc.id)
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)

@@ -18,7 +18,11 @@ import (
 
 type noopAuthorizer struct{}
 
-func (a *noopAuthorizer) Authorize(_ context.Context, _ *models.Actor, _ AuthorizerAction, _ AuthorizerResource) error {
+func (a *noopAuthorizer) AuthorizeScope(_ context.Context, _ *models.Actor, _ string) error {
+	return nil
+}
+
+func (a *noopAuthorizer) AuthorizeOrganizationAccess(_ context.Context, _ *models.Actor, _ string, _ string) error {
 	return nil
 }
 

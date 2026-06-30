@@ -1,6 +1,7 @@
 package accesscontrol
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -17,11 +18,22 @@ import (
 	"github.com/Authula/authula/plugins/access-control/usecases"
 )
 
+type noopAuthorizer struct{}
+
+func (a *noopAuthorizer) AuthorizeScope(_ context.Context, _ *authmodels.Actor, _ string) error {
+	return nil
+}
+
+func (a *noopAuthorizer) AuthorizeOrganizationAccess(_ context.Context, _ *authmodels.Actor, _ string, _ string) error {
+	return nil
+}
+
 func newAccessControlHookTestPlugin(logger authmodels.Logger, rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) *AccessControlPlugin {
-	rolesService := services.NewRolesService(rolesRepo, nil, userRolesRepo)
-	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo)
+	authorizer := &noopAuthorizer{}
+	rolesService := services.NewRolesService(rolesRepo, nil, userRolesRepo, authorizer)
+	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo, authorizer)
 	accessControlService := services.NewAccessControlService(rolesService, userRolesService)
-	rolePermissionsService := services.NewRolePermissionsService(nil, nil, nil)
+	rolePermissionsService := services.NewRolePermissionsService(nil, nil, nil, authorizer)
 	useCases := usecases.NewAccessControlUseCases(
 		usecases.NewRolesUseCase(rolesService),
 		usecases.NewPermissionsUseCase(nil),

@@ -639,7 +639,7 @@ func TestDatabaseStorage_ContextDeadline(t *testing.T) {
 	}
 
 	// Wait for deadline to exceed
-	time.Sleep(101 * time.Millisecond)
+	<-ctx.Done()
 
 	// Try to set with expired context
 	err = storage.Set(ctx, "key2", "value2", nil)

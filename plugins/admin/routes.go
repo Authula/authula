@@ -34,7 +34,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/admin/users",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewCreateUserHandler(usecases.users).Handler(),
 		},
@@ -42,7 +42,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/admin/users",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewGetAllUsersHandler(usecases.users).Handler(),
 		},
@@ -50,7 +50,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/admin/users/{user_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewGetUserByIDHandler(usecases.users).Handler(),
 		},
@@ -58,7 +58,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPatch,
 			Path:   "/admin/users/{user_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewUpdateUserHandler(usecases.users).Handler(),
 		},
@@ -66,7 +66,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodDelete,
 			Path:   "/admin/users/{user_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewDeleteUserHandler(usecases.users).Handler(),
 		},
@@ -76,7 +76,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/admin/users/{user_id}/accounts",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewCreateAccountHandler(usecases.accounts).Handler(),
 		},
@@ -84,7 +84,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/admin/users/{user_id}/accounts",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewGetUserAccountsHandler(usecases.accounts).Handler(),
 		},
@@ -92,7 +92,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/admin/accounts/{id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewGetAccountByIDHandler(usecases.accounts).Handler(),
 		},
@@ -100,7 +100,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPatch,
 			Path:   "/admin/accounts/{id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewUpdateAccountHandler(usecases.accounts).Handler(),
 		},
@@ -108,7 +108,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodDelete,
 			Path:   "/admin/accounts/{id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewDeleteAccountHandler(usecases.accounts).Handler(),
 		},
@@ -118,7 +118,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/admin/users/{user_id}/state",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewGetUserStateHandler(usecases.state).Handler(),
 		},
@@ -126,7 +126,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/admin/users/{user_id}/state",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewCreateUserStateHandler(usecases.state).Handler(),
 		},
@@ -134,7 +134,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPatch,
 			Path:   "/admin/users/{user_id}/state",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewUpdateUserStateHandler(usecases.state).Handler(),
 		},
@@ -142,7 +142,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodDelete,
 			Path:   "/admin/users/{user_id}/state",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewDeleteUserStateHandler(usecases.state).Handler(),
 		},
@@ -150,7 +150,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/admin/users/states/banned",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewGetBannedUserStatesHandler(usecases.state).Handler(),
 		},
@@ -158,7 +158,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/admin/users/{user_id}/ban",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewBanUserHandler(usecases.state).Handler(),
 		},
@@ -166,7 +166,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/admin/users/{user_id}/unban",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewUnbanUserHandler(usecases.state).Handler(),
 		},
@@ -174,7 +174,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/admin/users/{user_id}/sessions",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewGetUserAdminSessionsHandler(usecases.state).Handler(),
 		},
@@ -184,7 +184,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/admin/sessions/{session_id}/state",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewGetSessionStateHandler(usecases.state).Handler(),
 		},
@@ -192,7 +192,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/admin/sessions/{session_id}/state",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewCreateSessionStateHandler(usecases.state).Handler(),
 		},
@@ -200,7 +200,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPatch,
 			Path:   "/admin/sessions/{session_id}/state",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewUpdateSessionStateHandler(usecases.state).Handler(),
 		},
@@ -208,7 +208,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodDelete,
 			Path:   "/admin/sessions/{session_id}/state",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewDeleteSessionStateHandler(usecases.state).Handler(),
 		},
@@ -216,7 +216,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/admin/sessions/states/revoked",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewGetRevokedSessionStatesHandler(usecases.state).Handler(),
 		},
@@ -224,7 +224,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/admin/sessions/{session_id}/revoke",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewRevokeSessionHandler(usecases.state).Handler(),
 		},
@@ -234,7 +234,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/admin/impersonations",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewGetAllImpersonationsHandler(usecases.impersonation).Handler(),
 		},
@@ -242,7 +242,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/admin/impersonations/{impersonation_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewGetImpersonationByIDHandler(usecases.impersonation).Handler(),
 		},
@@ -250,7 +250,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/admin/impersonations",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewStartImpersonationHandler(usecases.impersonation).Handler(),
 		},
@@ -258,7 +258,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/admin/impersonations/{impersonation_id}/stop",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: adminhandlers.NewStopImpersonationHandler(usecases.impersonation).Handler(),
 		},

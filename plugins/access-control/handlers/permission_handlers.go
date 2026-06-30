@@ -21,6 +21,7 @@ func (h *CreatePermissionHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 
 		var request types.CreatePermissionRequest
 		if err := util.ParseJSON(r, &request); err != nil {
@@ -34,7 +35,7 @@ func (h *CreatePermissionHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		permission, err := h.useCase.CreatePermission(ctx, request)
+		permission, err := h.useCase.CreatePermission(ctx, actor, request)
 		if err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
@@ -58,8 +59,9 @@ func (h *GetAllPermissionsHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 
-		permissions, err := h.useCase.GetAllPermissions(ctx)
+		permissions, err := h.useCase.GetAllPermissions(ctx, actor)
 		if err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
@@ -81,9 +83,10 @@ func (h *GetPermissionByIDHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		permissionID := r.PathValue("permission_id")
 
-		permission, err := h.useCase.GetPermissionByID(ctx, permissionID)
+		permission, err := h.useCase.GetPermissionByID(ctx, actor, permissionID)
 		if err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
@@ -105,6 +108,7 @@ func (h *UpdatePermissionHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		permissionID := r.PathValue("permission_id")
 
 		var request types.UpdatePermissionRequest
@@ -114,7 +118,7 @@ func (h *UpdatePermissionHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		permission, err := h.useCase.UpdatePermission(ctx, permissionID, request)
+		permission, err := h.useCase.UpdatePermission(ctx, actor, permissionID, request)
 		if err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
@@ -138,9 +142,10 @@ func (h *DeletePermissionHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		permissionID := r.PathValue("permission_id")
 
-		if err := h.useCase.DeletePermission(ctx, permissionID); err != nil {
+		if err := h.useCase.DeletePermission(ctx, actor, permissionID); err != nil {
 			respondRolePermissionError(reqCtx, err)
 			return
 		}

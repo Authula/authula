@@ -9,12 +9,13 @@ import (
 
 var (
 	// HTTP Errors
-	ErrBadRequest          = errors.New("bad request")
-	ErrUnauthorized        = errors.New("unauthorized")
-	ErrForbidden           = errors.New("forbidden")
-	ErrNotFound            = errors.New("not found")
-	ErrConflict            = errors.New("conflict")
-	ErrUnprocessableEntity = errors.New("unprocessable entity")
+	ErrBadRequest             = errors.New("bad request")
+	ErrUnauthorized           = errors.New("unauthorized")
+	ErrForbidden              = errors.New("forbidden")
+	ErrNotFound               = errors.New("not found")
+	ErrConflict               = errors.New("conflict")
+	ErrUnprocessableEntity    = errors.New("unprocessable entity")
+	ErrInsufficientPermissions = errors.New("insufficient permissions")
 
 	// User Errors
 	ErrEmailRequired = errors.New("email is required")
@@ -28,7 +29,7 @@ func HandleError(err error, reqCtx *models.RequestContext) {
 	switch err {
 	case ErrUnauthorized:
 		status = http.StatusUnauthorized
-	case ErrForbidden:
+	case ErrForbidden, ErrInsufficientPermissions:
 		status = http.StatusForbidden
 	case ErrNotFound:
 		status = http.StatusNotFound

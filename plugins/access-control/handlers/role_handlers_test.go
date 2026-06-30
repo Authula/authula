@@ -97,7 +97,7 @@ func TestCreateRoleHandler(t *testing.T) {
 
 			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			handler := NewCreateRoleHandler(useCase)
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/roles", tc.body, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodPost, "/roles", tc.body, internaltests.TestActor())
 
 			handler.Handler()(w, req)
 
@@ -205,7 +205,7 @@ func TestGetAllRolesHandler(t *testing.T) {
 
 			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			handler := NewGetAllRolesHandler(useCase)
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/roles", nil, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodGet, "/roles", nil, internaltests.TestActor())
 
 			handler.Handler()(w, req)
 
@@ -317,7 +317,7 @@ func TestGetRoleByIDHandler(t *testing.T) {
 
 			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			handler := NewGetRoleByIDHandler(useCase)
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/roles/"+tc.roleID, nil, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodGet, "/roles/"+tc.roleID, nil, internaltests.TestActor())
 			req.SetPathValue("role_id", tc.roleID)
 
 			handler.Handler()(w, req)
@@ -407,7 +407,7 @@ func TestGetRoleByNameHandler(t *testing.T) {
 
 			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			handler := NewGetRoleByNameHandler(useCase)
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/roles/by-name/"+tc.roleName, nil, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodGet, "/roles/by-name/"+tc.roleName, nil, internaltests.TestActor())
 			req.SetPathValue("role_name", tc.roleName)
 
 			handler.Handler()(w, req)
@@ -522,7 +522,7 @@ func TestUpdateRoleHandler(t *testing.T) {
 
 			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			handler := NewUpdateRoleHandler(useCase)
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/roles/role-1", tc.body, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodPut, "/roles/role-1", tc.body, internaltests.TestActor())
 			req.SetPathValue("role_id", "role-1")
 
 			handler.Handler()(w, req)
@@ -599,7 +599,7 @@ func TestDeleteRoleHandler(t *testing.T) {
 
 			useCase := newRolesUseCase(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			handler := NewDeleteRoleHandler(useCase)
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/roles/"+tc.roleID, nil, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodDelete, "/roles/"+tc.roleID, nil, internaltests.TestActor())
 			req.SetPathValue("role_id", tc.roleID)
 
 			handler.Handler()(w, req)
@@ -627,7 +627,7 @@ func TestDeleteRoleHandler(t *testing.T) {
 }
 
 func newRolesUseCase(rolesRepo *accesscontroltests.MockRolesRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) *usecases.RolesUseCase {
-	return usecases.NewRolesUseCase(services.NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo))
+	return usecases.NewRolesUseCase(services.NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo, &internaltests.NoopAuthorizer{}))
 }
 
 func assertRolesEqual(t *testing.T, got []types.Role, want []types.Role) {

@@ -25,7 +25,7 @@ func parseTestToken(t *testing.T, tokenStr string, f *serviceTestFixture) map[st
 	parsed, err := jwt.Parse([]byte(tokenStr), jwt.WithKey(jwa.EdDSA(), pubKey), jwt.WithValidate(false))
 	require.NoError(t, err)
 
-	var sub, userID, sessionID, tokenType, actType, orgID, jti string
+	var sub, userID, sessionID, tokenType, actType, jti, orgID string
 	var scopes []any
 
 	_ = parsed.Get("sub", &sub)
@@ -33,9 +33,9 @@ func parseTestToken(t *testing.T, tokenStr string, f *serviceTestFixture) map[st
 	_ = parsed.Get("session_id", &sessionID)
 	_ = parsed.Get("token_type", &tokenType)
 	_ = parsed.Get("actor_type", &actType)
-	_ = parsed.Get("org_id", &orgID)
 	_ = parsed.Get("scopes", &scopes)
 	_ = parsed.Get(jwt.JwtIDKey, &jti)
+	_ = parsed.Get("organization_id", &orgID)
 
 	result := make(map[string]any)
 	if sub != "" {
@@ -53,14 +53,14 @@ func parseTestToken(t *testing.T, tokenStr string, f *serviceTestFixture) map[st
 	if actType != "" {
 		result["actor_type"] = actType
 	}
-	if orgID != "" {
-		result["org_id"] = orgID
-	}
 	if len(scopes) > 0 {
 		result["scopes"] = scopes
 	}
 	if jti != "" {
 		result["jti"] = jti
+	}
+	if orgID != "" {
+		result["organization_id"] = orgID
 	}
 	return result
 }
@@ -128,7 +128,7 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.SubjectKey:    "client-1",
 				"token_type":      types.JWTTokenTypeAccess.String(),
 				"actor_type":      "machine",
-				"org_id":          "org-1",
+				"organization_id": "org-1",
 				"scopes":          []string{"read:users", "write:users"},
 				jwt.JwtIDKey:      "jti-3",
 				jwt.IssuedAtKey:   time.Now(),
@@ -437,9 +437,9 @@ func TestTokenService_GenerateMachineToken(t *testing.T) {
 				require.NotEmpty(t, claims["jti"])
 
 				if tt.wantOrgID != "" {
-					require.Equal(t, tt.wantOrgID, claims["org_id"])
+					require.Equal(t, tt.wantOrgID, claims["organization_id"])
 				} else {
-					require.Empty(t, claims["org_id"])
+					require.Empty(t, claims["organization_id"])
 				}
 
 				if tt.wantScopes != nil {

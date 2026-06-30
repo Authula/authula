@@ -8,19 +8,26 @@ import (
 	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
+	"github.com/Authula/authula/models"
+	rootservices "github.com/Authula/authula/services"
 )
 
 type RolesService struct {
 	rolesRepo           repositories.RolesRepository
 	rolePermissionsRepo repositories.RolePermissionsRepository
 	userRolesRepo       repositories.UserRolesRepository
+	authorizer          rootservices.Authorizer
 }
 
-func NewRolesService(rolesRepo repositories.RolesRepository, rolePermissionsRepo repositories.RolePermissionsRepository, userRolesRepo repositories.UserRolesRepository) *RolesService {
-	return &RolesService{rolesRepo: rolesRepo, rolePermissionsRepo: rolePermissionsRepo, userRolesRepo: userRolesRepo}
+func NewRolesService(rolesRepo repositories.RolesRepository, rolePermissionsRepo repositories.RolePermissionsRepository, userRolesRepo repositories.UserRolesRepository, authorizer rootservices.Authorizer) *RolesService {
+	return &RolesService{rolesRepo: rolesRepo, rolePermissionsRepo: rolePermissionsRepo, userRolesRepo: userRolesRepo, authorizer: authorizer}
 }
 
-func (s *RolesService) CreateRole(ctx context.Context, req types.CreateRoleRequest) (*types.Role, error) {
+func (s *RolesService) CreateRole(ctx context.Context, actor *models.Actor, req types.CreateRoleRequest) (*types.Role, error) {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, accesscontrolconstants.RolesCreatePermission); err != nil {
+		return nil, err
+	}
+
 	if req.Name == "" {
 		return nil, internalerrors.ErrBadRequest
 	}
@@ -49,11 +56,15 @@ func (s *RolesService) CreateRole(ctx context.Context, req types.CreateRoleReque
 	return role, nil
 }
 
-func (s *RolesService) GetAllRoles(ctx context.Context) ([]types.Role, error) {
+func (s *RolesService) GetAllRoles(ctx context.Context, actor *models.Actor) ([]types.Role, error) {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, accesscontrolconstants.RolesListPermission); err != nil {
+		return nil, err
+	}
+
 	return s.rolesRepo.GetAllRoles(ctx)
 }
 
-func (s *RolesService) GetRoleByName(ctx context.Context, roleName string) (*types.Role, error) {
+func (s *RolesService) getRoleByNameInternal(ctx context.Context, roleName string) (*types.Role, error) {
 	if roleName == "" {
 		return nil, internalerrors.ErrBadRequest
 	}
@@ -69,7 +80,19 @@ func (s *RolesService) GetRoleByName(ctx context.Context, roleName string) (*typ
 	return role, nil
 }
 
-func (s *RolesService) GetRoleByID(ctx context.Context, roleID string) (*types.RoleDetails, error) {
+func (s *RolesService) GetRoleByName(ctx context.Context, actor *models.Actor, roleName string) (*types.Role, error) {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, accesscontrolconstants.RolesReadPermission); err != nil {
+		return nil, err
+	}
+
+	return s.getRoleByNameInternal(ctx, roleName)
+}
+
+func (s *RolesService) GetRoleByID(ctx context.Context, actor *models.Actor, roleID string) (*types.RoleDetails, error) {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, accesscontrolconstants.RolesReadPermission); err != nil {
+		return nil, err
+	}
+
 	if roleID == "" {
 		return nil, internalerrors.ErrBadRequest
 	}
@@ -90,7 +113,11 @@ func (s *RolesService) GetRoleByID(ctx context.Context, roleID string) (*types.R
 	return &types.RoleDetails{Role: *role, Permissions: permissions}, nil
 }
 
-func (s *RolesService) UpdateRole(ctx context.Context, roleID string, req types.UpdateRoleRequest) (*types.Role, error) {
+func (s *RolesService) UpdateRole(ctx context.Context, actor *models.Actor, roleID string, req types.UpdateRoleRequest) (*types.Role, error) {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, accesscontrolconstants.RolesUpdatePermission); err != nil {
+		return nil, err
+	}
+
 	if roleID == "" {
 		return nil, internalerrors.ErrBadRequest
 	}
@@ -147,7 +174,11 @@ func (s *RolesService) UpdateRole(ctx context.Context, roleID string, req types.
 	return role, nil
 }
 
-func (s *RolesService) DeleteRole(ctx context.Context, roleID string) error {
+func (s *RolesService) DeleteRole(ctx context.Context, actor *models.Actor, roleID string) error {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, accesscontrolconstants.RolesDeletePermission); err != nil {
+		return err
+	}
+
 	if roleID == "" {
 		return internalerrors.ErrBadRequest
 	}

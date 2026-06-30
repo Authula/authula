@@ -22,8 +22,8 @@ func TestRolesServiceGetRoleByID(t *testing.T) {
 	rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "admin"}, nil).Once()
 	rolePermissionsRepo.On("GetRolePermissions", mock.Anything, "role-1").Return([]types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "users.read"}}, nil).Once()
 
-	service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
-	details, err := service.GetRoleByID(context.Background(), "role-1")
+	service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo, &noopAuthorizer{})
+	details, err := service.GetRoleByID(context.Background(), testActor(), "role-1")
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -78,8 +78,8 @@ func TestRolesServiceGetRoleByName(t *testing.T) {
 				tc.setup(rolesRepo, userRolesRepo)
 			}
 
-			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
-			role, err := service.GetRoleByName(context.Background(), tc.roleName)
+			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo, &noopAuthorizer{})
+			role, err := service.GetRoleByName(context.Background(), testActor(), tc.roleName)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
 			}
@@ -123,7 +123,7 @@ func TestRolesServiceRoleWeightOperations(t *testing.T) {
 				}).Return(nil).Once()
 			},
 			run: func(ctx context.Context, service *RolesService) (*types.Role, error) {
-				return service.CreateRole(ctx, types.CreateRoleRequest{Name: "editor", Description: func() *string { s := "default weighted role"; return &s }(), IsSystem: false})
+				return service.CreateRole(ctx, testActor(), types.CreateRoleRequest{Name: "editor", Description: func() *string { s := "default weighted role"; return &s }(), IsSystem: false})
 			},
 			wantRole: func(role *types.Role) bool { return role != nil && role.Weight == 10 && role.ID == "role-1" },
 		},
@@ -142,7 +142,7 @@ func TestRolesServiceRoleWeightOperations(t *testing.T) {
 			run: func(ctx context.Context, service *RolesService) (*types.Role, error) {
 				updatedDescription := "updated role description"
 				weight := 40
-				return service.UpdateRole(ctx, "role-1", types.UpdateRoleRequest{Description: &updatedDescription, Weight: &weight})
+				return service.UpdateRole(ctx, testActor(), "role-1", types.UpdateRoleRequest{Description: &updatedDescription, Weight: &weight})
 			},
 			wantRole: func(role *types.Role) bool {
 				return role != nil && role.Weight == 40 && role.Description != nil && *role.Description == "updated role description"
@@ -161,7 +161,7 @@ func TestRolesServiceRoleWeightOperations(t *testing.T) {
 				tc.setup(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			}
 
-			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
+			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo, &noopAuthorizer{})
 			role, err := tc.run(context.Background(), service)
 			if err != nil {
 				t.Fatalf("expected nil err, got %v", err)
@@ -214,8 +214,8 @@ func TestRolesServiceDeleteRole(t *testing.T) {
 				tc.setup(rolesRepo, userRolesRepo)
 			}
 
-			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
-			err := service.DeleteRole(context.Background(), "role-1")
+			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo, &noopAuthorizer{})
+			err := service.DeleteRole(context.Background(), testActor(), "role-1")
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
 			}

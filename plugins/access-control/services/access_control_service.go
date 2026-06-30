@@ -17,7 +17,7 @@ func NewAccessControlService(rolesService *RolesService, userRolesService *UserR
 }
 
 func (s *AccessControlService) RoleExists(ctx context.Context, roleName string) (bool, error) {
-	role, err := s.rolesService.GetRoleByName(ctx, roleName)
+	role, err := s.rolesService.getRoleByNameInternal(ctx, roleName)
 	if err != nil {
 		return false, err
 	}
@@ -26,7 +26,7 @@ func (s *AccessControlService) RoleExists(ctx context.Context, roleName string) 
 }
 
 func (s *AccessControlService) ValidateRoleAssignment(ctx context.Context, roleName string, assignerUserID *string) (bool, error) {
-	role, err := s.rolesService.GetRoleByName(ctx, roleName)
+	role, err := s.rolesService.getRoleByNameInternal(ctx, roleName)
 	if err != nil {
 		return false, err
 	}
@@ -38,7 +38,7 @@ func (s *AccessControlService) ValidateRoleAssignment(ctx context.Context, roleN
 		return false, nil
 	}
 
-	assignerRoles, err := s.userRolesService.GetUserRoles(ctx, *assignerUserID)
+	assignerRoles, err := s.userRolesService.getUserRolesInternal(ctx, *assignerUserID)
 	if err != nil {
 		return false, err
 	}

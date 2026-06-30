@@ -196,8 +196,8 @@ func (s *tokenService) GenerateMachineToken(ctx context.Context, clientID string
 	}
 
 	if organizationID != "" {
-		if err := accessClaims.Set("org_id", organizationID); err != nil {
-			return nil, fmt.Errorf("failed to set org_id: %w", err)
+		if err := accessClaims.Set("organization_id", organizationID); err != nil {
+			return nil, fmt.Errorf("failed to set organization_id: %w", err)
 		}
 	}
 
@@ -254,10 +254,11 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 	}
 
 	actor := &models.Actor{
+		Type:   models.ActorType(actorType),
 		Claims: map[string]any{"auth_mechanism": "jwt_bearer"},
 	}
 
-	if actorType == "machine" {
+	if actorType == models.ActorMachine.ToString() {
 		var sub string
 		if err := parsedToken.Get(jwt.SubjectKey, &sub); err != nil || sub == "" {
 			return nil, errors.New("missing subject claim")
@@ -266,7 +267,7 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 		actor.Type = models.ActorMachine
 
 		var orgID string
-		if err := parsedToken.Get("org_id", &orgID); err == nil && orgID != "" {
+		if err := parsedToken.Get("organization_id", &orgID); err == nil && orgID != "" {
 			actor.Claims["organization_id"] = orgID
 		}
 
@@ -314,6 +315,7 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 	if err != nil || session == nil {
 		return nil, errors.New("session not found or invalid")
 	}
+	actor.Claims["session_id"] = session.ID
 
 	actor.ID = userID
 	actor.Type = models.ActorUser

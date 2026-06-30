@@ -53,8 +53,8 @@ func TestUserPermissionsServiceGetUserPermissions(t *testing.T) {
 				tc.setupMock(repo)
 			}
 
-			service := NewUserPermissionsService(repo)
-			permissions, err := service.GetUserPermissions(context.Background(), tc.userID)
+			service := NewUserPermissionsService(repo, &noopAuthorizer{})
+			permissions, err := service.GetUserPermissions(context.Background(), testActor(), tc.userID)
 			if tc.expectedErr != nil {
 				if err != tc.expectedErr {
 					t.Fatalf("expected err %v, got %v", tc.expectedErr, err)
@@ -118,8 +118,8 @@ func TestUserPermissionsServiceHasPermissions(t *testing.T) {
 				tc.setupMock(repo)
 			}
 
-			service := NewUserPermissionsService(repo)
-			hasPermissions, err := service.HasPermissions(context.Background(), tc.userID, tc.permissionKeys)
+			service := NewUserPermissionsService(repo, &noopAuthorizer{})
+			hasPermissions, err := service.HasPermissions(context.Background(), testActor(), tc.userID, tc.permissionKeys)
 			if tc.expectedErr != nil {
 				if err != tc.expectedErr {
 					t.Fatalf("expected err %v, got %v", tc.expectedErr, err)

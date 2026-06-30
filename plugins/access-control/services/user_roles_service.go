@@ -5,20 +5,24 @@ import (
 	"time"
 
 	internalerrors "github.com/Authula/authula/internal/errors"
+	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
+	rootservices "github.com/Authula/authula/services"
 )
 
 type UserRolesService struct {
 	userRolesRepo repositories.UserRolesRepository
 	rolesRepo     repositories.RolesRepository
+	authorizer    rootservices.Authorizer
 }
 
-func NewUserRolesService(userRolesRepo repositories.UserRolesRepository, rolesRepo repositories.RolesRepository) *UserRolesService {
-	return &UserRolesService{userRolesRepo: userRolesRepo, rolesRepo: rolesRepo}
+func NewUserRolesService(userRolesRepo repositories.UserRolesRepository, rolesRepo repositories.RolesRepository, authorizer rootservices.Authorizer) *UserRolesService {
+	return &UserRolesService{userRolesRepo: userRolesRepo, rolesRepo: rolesRepo, authorizer: authorizer}
 }
 
-func (s *UserRolesService) GetUserRoles(ctx context.Context, userID string) ([]types.UserRoleInfo, error) {
+func (s *UserRolesService) getUserRolesInternal(ctx context.Context, userID string) ([]types.UserRoleInfo, error) {
 	if userID == "" {
 		return nil, internalerrors.ErrUnprocessableEntity
 	}
@@ -26,7 +30,19 @@ func (s *UserRolesService) GetUserRoles(ctx context.Context, userID string) ([]t
 	return s.userRolesRepo.GetUserRoles(ctx, userID)
 }
 
-func (s *UserRolesService) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error {
+func (s *UserRolesService) GetUserRoles(ctx context.Context, actor *models.Actor, userID string) ([]types.UserRoleInfo, error) {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.UserRolesReadPermission); err != nil {
+		return nil, err
+	}
+
+	return s.getUserRolesInternal(ctx, userID)
+}
+
+func (s *UserRolesService) ReplaceUserRoles(ctx context.Context, actor *models.Actor, userID string, roleIDs []string, assignedByUserID *string) error {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.UserRolesAssignPermission); err != nil {
+		return err
+	}
+
 	if userID == "" {
 		return internalerrors.ErrBadRequest
 	}
@@ -71,7 +87,11 @@ func (s *UserRolesService) ReplaceUserRoles(ctx context.Context, userID string, 
 	return s.userRolesRepo.ReplaceUserRoles(ctx, userID, normalized, assignedByUserID)
 }
 
-func (s *UserRolesService) AssignRoleToUser(ctx context.Context, userID string, req types.AssignUserRoleRequest, assignedByUserID *string) error {
+func (s *UserRolesService) AssignRoleToUser(ctx context.Context, actor *models.Actor, userID string, req types.AssignUserRoleRequest, assignedByUserID *string) error {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.UserRolesAssignPermission); err != nil {
+		return err
+	}
+
 	if userID == "" {
 		return internalerrors.ErrBadRequest
 	}
@@ -100,7 +120,11 @@ func (s *UserRolesService) AssignRoleToUser(ctx context.Context, userID string, 
 	return s.userRolesRepo.AssignUserRole(ctx, userID, roleID, assignedByUserID, req.ExpiresAt)
 }
 
-func (s *UserRolesService) RemoveRoleFromUser(ctx context.Context, userID string, roleID string) error {
+func (s *UserRolesService) RemoveRoleFromUser(ctx context.Context, actor *models.Actor, userID string, roleID string) error {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.UserRolesRemovePermission); err != nil {
+		return err
+	}
+
 	if userID == "" || roleID == "" {
 		return internalerrors.ErrBadRequest
 	}

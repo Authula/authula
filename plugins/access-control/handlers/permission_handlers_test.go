@@ -93,7 +93,7 @@ func TestGetAllPermissionsHandler(t *testing.T) {
 
 			useCase := newPermissionsUseCase(permissionsRepo, rolePermissionsRepo)
 			handler := NewGetAllPermissionsHandler(useCase)
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/permissions", nil, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodGet, "/permissions", nil, internaltests.TestActor())
 
 			handler.Handler()(w, req)
 
@@ -193,7 +193,7 @@ func TestCreatePermissionHandler(t *testing.T) {
 
 			useCase := newPermissionsUseCase(permissionsRepo, rolePermissionsRepo)
 			handler := NewCreatePermissionHandler(useCase)
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/permissions", tc.body, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodPost, "/permissions", tc.body, internaltests.TestActor())
 
 			handler.Handler()(w, req)
 
@@ -275,7 +275,7 @@ func TestGetPermissionByIDHandler(t *testing.T) {
 
 			useCase := newPermissionsUseCase(permissionsRepo, rolePermissionsRepo)
 			handler := NewGetPermissionByIDHandler(useCase)
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/permissions/"+tc.permissionID, nil, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodGet, "/permissions/"+tc.permissionID, nil, internaltests.TestActor())
 			req.SetPathValue("permission_id", tc.permissionID)
 
 			handler.Handler()(w, req)
@@ -379,7 +379,7 @@ func TestUpdatePermissionHandler(t *testing.T) {
 
 			useCase := newPermissionsUseCase(permissionsRepo, rolePermissionsRepo)
 			handler := NewUpdatePermissionHandler(useCase)
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPut, "/permissions/"+tc.permissionID, tc.body, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodPut, "/permissions/"+tc.permissionID, tc.body, internaltests.TestActor())
 			req.SetPathValue("permission_id", tc.permissionID)
 
 			handler.Handler()(w, req)
@@ -448,7 +448,7 @@ func TestDeletePermissionHandler(t *testing.T) {
 
 			useCase := newPermissionsUseCase(permissionsRepo, rolePermissionsRepo)
 			handler := NewDeletePermissionHandler(useCase)
-			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, "/permissions/"+tc.permissionID, nil, nil)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodDelete, "/permissions/"+tc.permissionID, nil, internaltests.TestActor())
 			req.SetPathValue("permission_id", tc.permissionID)
 
 			handler.Handler()(w, req)
@@ -474,7 +474,7 @@ func TestDeletePermissionHandler(t *testing.T) {
 }
 
 func newPermissionsUseCase(permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) *usecases.PermissionsUseCase {
-	return usecases.NewPermissionsUseCase(services.NewPermissionsService(permissionsRepo, rolePermissionsRepo))
+	return usecases.NewPermissionsUseCase(services.NewPermissionsService(permissionsRepo, rolePermissionsRepo, &internaltests.NoopAuthorizer{}))
 }
 
 func assertPermissionsEqual(t *testing.T, got []types.Permission, want []types.Permission) {

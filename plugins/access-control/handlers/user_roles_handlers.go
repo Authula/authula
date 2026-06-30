@@ -23,9 +23,10 @@ func (h *GetUserRolesHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
-		roles, err := h.useCase.GetUserRoles(r.Context(), userID)
+		roles, err := h.useCase.GetUserRoles(ctx, actor, userID)
 		if err != nil {
 			respondUserHandlerError(reqCtx, err)
 			return
@@ -49,6 +50,7 @@ func (h *ReplaceUserRolesHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
 		var request types.ReplaceUserRolesRequest
@@ -63,7 +65,7 @@ func (h *ReplaceUserRolesHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		if err := h.useCase.ReplaceUserRoles(ctx, userID, request.RoleIDs, userActorUserID(reqCtx)); err != nil {
+		if err := h.useCase.ReplaceUserRoles(ctx, actor, userID, request.RoleIDs, userActorUserID(reqCtx)); err != nil {
 			respondUserHandlerError(reqCtx, err)
 			return
 		}
@@ -84,6 +86,7 @@ func (h *AssignUserRoleHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
 		var request types.AssignUserRoleRequest
@@ -98,7 +101,7 @@ func (h *AssignUserRoleHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		if err := h.useCase.AssignRoleToUser(ctx, userID, request, userActorUserID(reqCtx)); err != nil {
+		if err := h.useCase.AssignRoleToUser(ctx, actor, userID, request, userActorUserID(reqCtx)); err != nil {
 			respondUserHandlerError(reqCtx, err)
 			return
 		}
@@ -119,10 +122,11 @@ func (h *RemoveUserRoleHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 		roleID := r.PathValue("role_id")
 
-		if err := h.useCase.RemoveRoleFromUser(ctx, userID, roleID); err != nil {
+		if err := h.useCase.RemoveRoleFromUser(ctx, actor, userID, roleID); err != nil {
 			respondUserHandlerError(reqCtx, err)
 			return
 		}

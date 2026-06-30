@@ -58,7 +58,7 @@ func TestAccessControlServiceRoleExists(t *testing.T) {
 				tc.setup(rolesRepo)
 			}
 
-			service := NewAccessControlService(NewRolesService(rolesRepo, nil, nil), NewUserRolesService(nil, nil))
+			service := NewAccessControlService(NewRolesService(rolesRepo, nil, nil, &noopAuthorizer{}), NewUserRolesService(nil, nil, &noopAuthorizer{}))
 			ok, err := service.RoleExists(context.Background(), tc.roleName)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
@@ -151,7 +151,7 @@ func TestAccessControlServiceValidateRoleAssignment(t *testing.T) {
 				tc.setup(rolesRepo, userRolesRepo)
 			}
 
-			service := NewAccessControlService(NewRolesService(rolesRepo, nil, userRolesRepo), NewUserRolesService(userRolesRepo, rolesRepo))
+			service := NewAccessControlService(NewRolesService(rolesRepo, nil, userRolesRepo, &noopAuthorizer{}), NewUserRolesService(userRolesRepo, rolesRepo, &noopAuthorizer{}))
 			ok, err := service.ValidateRoleAssignment(context.Background(), tc.roleName, tc.assigner)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)

@@ -78,7 +78,11 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 	}
 	actorID := actor.ID
 
-	organization, _, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsInvitationsCreate, organizationID)
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, orgconstants.OrganizationsInvitationsCreatePermission); err != nil {
+		return nil, err
+	}
+
+	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -260,8 +264,11 @@ func (s *organizationInvitationService) GetAllOrganizationInvitations(ctx contex
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	_, _, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsInvitationsList, organizationID)
-	if err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, orgconstants.OrganizationsInvitationsListPermission); err != nil {
+		return nil, err
+	}
+
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -278,8 +285,11 @@ func (s *organizationInvitationService) GetOrganizationInvitation(ctx context.Co
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	_, _, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsInvitationsRead, organizationID)
-	if err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, orgconstants.OrganizationsInvitationsReadPermission); err != nil {
+		return nil, err
+	}
+
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -299,8 +309,11 @@ func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	_, _, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsInvitationsRevoke, organizationID)
-	if err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, orgconstants.OrganizationsInvitationsRevokePermission); err != nil {
+		return nil, err
+	}
+
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -331,7 +344,7 @@ func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context
 	if actor == nil || actor.ID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
-	if err := s.serviceUtils.authorizerOrDefault().Authorize(ctx, actor, ActionOrganizationsInvitationsAccept, AuthorizerResource{OrganizationID: organizationID}); err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeScope(ctx, actor, orgconstants.OrganizationsInvitationsProcessPermission); err != nil {
 		return nil, err
 	}
 
@@ -373,7 +386,7 @@ func (s *organizationInvitationService) RejectOrganizationInvitation(ctx context
 	if actor == nil || actor.ID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
-	if err := s.serviceUtils.authorizerOrDefault().Authorize(ctx, actor, ActionOrganizationsInvitationsReject, AuthorizerResource{OrganizationID: organizationID}); err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeScope(ctx, actor, orgconstants.OrganizationsInvitationsProcessPermission); err != nil {
 		return nil, err
 	}
 

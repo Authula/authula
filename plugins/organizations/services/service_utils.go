@@ -18,10 +18,10 @@ type ServiceUtils struct {
 	orgMemberRepo     repositories.OrganizationMemberRepository
 	orgTeamRepo       repositories.OrganizationTeamRepository
 	orgTeamMemberRepo repositories.OrganizationTeamMemberRepository
-	authorizer        Authorizer
+	authorizer        rootservices.Authorizer
 }
 
-func NewServiceUtils(orgRepo repositories.OrganizationRepository, orgMemberRepo repositories.OrganizationMemberRepository, orgTeamRepo repositories.OrganizationTeamRepository, orgTeamMemberRepo repositories.OrganizationTeamMemberRepository, authorizer Authorizer) *ServiceUtils {
+func NewServiceUtils(orgRepo repositories.OrganizationRepository, orgMemberRepo repositories.OrganizationMemberRepository, orgTeamRepo repositories.OrganizationTeamRepository, orgTeamMemberRepo repositories.OrganizationTeamMemberRepository, authorizer rootservices.Authorizer) *ServiceUtils {
 	return &ServiceUtils{
 		orgRepo:           orgRepo,
 		orgMemberRepo:     orgMemberRepo,
@@ -31,24 +31,17 @@ func NewServiceUtils(orgRepo repositories.OrganizationRepository, orgMemberRepo 
 	}
 }
 
-func (s *ServiceUtils) authorizerOrDefault() Authorizer {
+func (s *ServiceUtils) authorizerOrDefault() rootservices.Authorizer {
 	if s != nil && s.authorizer != nil {
 		return s.authorizer
 	}
 
-	return NewDefaultAuthorizer()
+	return rootservices.NewDefaultAuthorizer()
 }
 
 func (s *ServiceUtils) authorizeOwner(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {
-	return s.authorizeOwnerForAction(ctx, actor, ActionOrganizationsDelete, organizationID)
-}
-
-func (s *ServiceUtils) authorizeOwnerForAction(ctx context.Context, actor *models.Actor, action AuthorizerAction, organizationID string) (*types.Organization, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" {
 		return nil, internalerrors.ErrUnauthorized
-	}
-	if err := s.authorizerOrDefault().Authorize(ctx, actor, action, AuthorizerResource{OrganizationID: organizationID}); err != nil {
-		return nil, err
 	}
 
 	organization, err := s.orgRepo.GetByID(ctx, organizationID)
@@ -58,7 +51,7 @@ func (s *ServiceUtils) authorizeOwnerForAction(ctx context.Context, actor *model
 	if organization == nil {
 		return nil, internalerrors.ErrNotFound
 	}
-	if actor.Type == models.ActorMachine {
+	if _, ok := actor.GetClaimString("organization_id"); ok {
 		return organization, nil
 	}
 	if organization.OwnerID != actor.ID {
@@ -69,15 +62,8 @@ func (s *ServiceUtils) authorizeOwnerForAction(ctx context.Context, actor *model
 }
 
 func (s *ServiceUtils) authorizeOrganizationAccess(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, *types.OrganizationMember, error) {
-	return s.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsRead, organizationID)
-}
-
-func (s *ServiceUtils) authorizeOrganizationAccessForAction(ctx context.Context, actor *models.Actor, action AuthorizerAction, organizationID string) (*types.Organization, *types.OrganizationMember, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" {
 		return nil, nil, internalerrors.ErrUnauthorized
-	}
-	if err := s.authorizerOrDefault().Authorize(ctx, actor, action, AuthorizerResource{OrganizationID: organizationID}); err != nil {
-		return nil, nil, err
 	}
 
 	organization, err := s.orgRepo.GetByID(ctx, organizationID)
@@ -87,7 +73,7 @@ func (s *ServiceUtils) authorizeOrganizationAccessForAction(ctx context.Context,
 	if organization == nil {
 		return nil, nil, internalerrors.ErrNotFound
 	}
-	if actor.Type == models.ActorMachine {
+	if _, ok := actor.GetClaimString("organization_id"); ok {
 		return organization, nil, nil
 	}
 	if organization.OwnerID == actor.ID {
@@ -174,4 +160,35 @@ func (s *ServiceUtils) slugify(input string) string {
 	}
 
 	return strings.Trim(builder.String(), "-")
+}
+
+func (s *ServiceUtils) authorizeTeamAccess(ctx context.Context, actor *models.Actor, orgID string, teamID string) error {
+	team, err := s.orgTeamRepo.GetByID(ctx, teamID)
+	if err != nil {
+		return err
+	}
+	if team == nil || team.OrganizationID != orgID {
+		return internalerrors.ErrNotFound
+	}
+
+	if _, ok := actor.GetClaimString("organization_id"); ok {
+		return nil
+	}
+
+	member, err := s.orgMemberRepo.GetByOrganizationIDAndUserID(ctx, orgID, actor.ID)
+	if err != nil {
+		return err
+	}
+	if member == nil {
+		return internalerrors.ErrForbidden
+	}
+
+	tm, err := s.orgTeamMemberRepo.GetByTeamIDAndMemberID(ctx, teamID, member.ID)
+	if err != nil {
+		return err
+	}
+	if tm == nil {
+		return internalerrors.ErrForbidden
+	}
+	return nil
 }

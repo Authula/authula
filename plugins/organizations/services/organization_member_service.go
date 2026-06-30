@@ -9,6 +9,7 @@ import (
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/organizations/constants"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"
 	rootservices "github.com/Authula/authula/services"
@@ -33,7 +34,11 @@ func NewOrganizationMemberService(userService rootservices.UserService, accessCo
 }
 
 func (s *organizationMemberService) AddMember(ctx context.Context, actor *models.Actor, organizationID string, request types.AddOrganizationMemberRequest) (*types.OrganizationMember, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsMembersAdd, organizationID); err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsMembersAddPermission); err != nil {
+		return nil, err
+	}
+
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -106,7 +111,11 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actor *models
 }
 
 func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMember, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsMembersList, organizationID); err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsMembersListPermission); err != nil {
+		return nil, err
+	}
+
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -114,7 +123,11 @@ func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor *mo
 }
 
 func (s *organizationMemberService) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMember, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsMembersRead, organizationID); err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsMembersReadPermission); err != nil {
+		return nil, err
+	}
+
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -134,7 +147,11 @@ func (s *organizationMemberService) GetMember(ctx context.Context, actor *models
 }
 
 func (s *organizationMemberService) UpdateMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error) {
-	_, actorMember, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsMembersUpdate, organizationID)
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsMembersUpdatePermission); err != nil {
+		return nil, err
+	}
+
+	_, actorMember, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +199,11 @@ func (s *organizationMemberService) UpdateMember(ctx context.Context, actor *mod
 }
 
 func (s *organizationMemberService) RemoveMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) error {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsMembersRemove, organizationID); err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsMembersRemovePermission); err != nil {
+		return err
+	}
+
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return err
 	}
 

@@ -72,7 +72,7 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 	if !ok {
 		return fmt.Errorf("access control service not available in service registry")
 	}
-	authorizer := services.NewAuthorizer()
+	authorizer := rootservices.NewDefaultAuthorizer()
 
 	p.databaseHooks = NewOrganizationsHookExecutor(p.pluginConfig.DatabaseHooks)
 	p.organizationRepo = repositories.NewBunOrganizationRepository(ctx.DB, p.databaseHooks)

@@ -8,6 +8,7 @@ import (
 	"github.com/Authula/authula/plugins/access-control/services"
 	"github.com/Authula/authula/plugins/access-control/types"
 	"github.com/Authula/authula/plugins/access-control/usecases"
+	rootservices "github.com/Authula/authula/services"
 )
 
 type AccessControlPlugin struct {
@@ -49,11 +50,13 @@ func (p *AccessControlPlugin) Init(ctx *models.PluginContext) error {
 	userRolesRepo := repositories.NewBunUserRolesRepository(ctx.DB)
 	userPermissionsRepo := repositories.NewBunUserPermissionsRepository(ctx.DB)
 
-	rolesService := services.NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
-	permissionsService := services.NewPermissionsService(permissionsRepo, rolePermissionsRepo)
-	rolePermissionsService := services.NewRolePermissionsService(rolesRepo, permissionsRepo, rolePermissionsRepo)
-	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo)
-	userPermissionsService := services.NewUserPermissionsService(userPermissionsRepo)
+	authorizer := rootservices.NewDefaultAuthorizer()
+
+	rolesService := services.NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo, authorizer)
+	permissionsService := services.NewPermissionsService(permissionsRepo, rolePermissionsRepo, authorizer)
+	rolePermissionsService := services.NewRolePermissionsService(rolesRepo, permissionsRepo, rolePermissionsRepo, authorizer)
+	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo, authorizer)
+	userPermissionsService := services.NewUserPermissionsService(userPermissionsRepo, authorizer)
 
 	accessControlService := services.NewAccessControlService(rolesService, userRolesService)
 	p.accessControlService = accessControlService

@@ -4,28 +4,18 @@ import (
 	"net/http"
 	"slices"
 
+	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
 
-type AccessControlHookID string
-
-const (
-	HookIDAccessControlEnforce AccessControlHookID = "access_control.enforce"
-)
-
-func (id AccessControlHookID) String() string {
-	return string(id)
-}
-
 func (p *AccessControlPlugin) Hooks() []models.Hook {
 	return []models.Hook{
 		{
-			Stage:    models.HookBefore,
-			PluginID: HookIDAccessControlEnforce.String(),
-			Handler:  p.requireAccessControl,
-			Order:    20,
+			Stage:   models.HookBefore,
+			Handler: p.requireAccessControl,
+			Order:   20,
 		},
 		{
 			Stage:   models.HookAfter,
@@ -36,46 +26,54 @@ func (p *AccessControlPlugin) Hooks() []models.Hook {
 }
 
 func (p *AccessControlPlugin) requireAccessControl(reqCtx *models.RequestContext) error {
-	ctx := reqCtx.Request.Context()
-
 	if reqCtx.Actor == nil || reqCtx.Actor.ID == "" {
-		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
+		return nil
+	}
+
+	if err := p.hydrateActorScopes(reqCtx); err != nil {
+		reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": err.Error()})
 		reqCtx.Handled = true
 		return nil
 	}
 
 	requiredPermissions := util.ReadStringSliceMetadata(reqCtx, "permissions")
 	if len(requiredPermissions) == 0 {
-		return nil // Opt-in mode: skip if no permission flags are set on the route
-	}
-
-	var allowed bool
-	var err error
-
-	switch reqCtx.Actor.Type {
-	case models.ActorMachine:
-		{
-			// For machine actors, we check if they have the required permissions directly in their scopes.
-			allowed = hasAllScopes(reqCtx.Actor.Scopes, requiredPermissions)
-		}
-	case models.ActorUser:
-		{
-			// For user actors, we need to check their assigned roles and permissions from the tables in the DB.
-			allowed, err = p.Api.HasPermissions(ctx, reqCtx.Actor.ID, requiredPermissions)
-			if err != nil {
-				reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": err.Error()})
-				reqCtx.Handled = true
-				return nil
-			}
-		}
-	}
-
-	if !allowed {
-		reqCtx.SetJSONResponse(http.StatusForbidden, map[string]any{"message": "Forbidden"})
-		reqCtx.Handled = true
 		return nil
 	}
 
+	if !hasAllScopes(reqCtx.Actor.Scopes, requiredPermissions) {
+		reqCtx.SetJSONResponse(http.StatusForbidden, map[string]any{"message": "Forbidden"})
+		reqCtx.Handled = true
+	}
+
+	return nil
+}
+
+func (p *AccessControlPlugin) hydrateActorScopes(reqCtx *models.RequestContext) error {
+	ctx := reqCtx.Request.Context()
+
+	switch reqCtx.Actor.Type {
+	case models.ActorUser:
+		userPermissions, err := p.Api.GetUserPermissions(ctx, reqCtx.Actor, reqCtx.Actor.ID)
+		if err != nil {
+			return err
+		}
+		activeUserScopes := extractPermissionKeys(userPermissions)
+
+		if len(reqCtx.Actor.Scopes) == 0 {
+			// This is a standard user session -> grant full active scopes
+			reqCtx.Actor.Scopes = activeUserScopes
+		} else {
+			// This is a Personal API Key -> Validate against stale/revoked permissions
+			for _, apiKeyScope := range reqCtx.Actor.Scopes {
+				if !hasScope(activeUserScopes, apiKeyScope) {
+					// Strict Invalidation: The user lost this permission, kill the flight
+					return internalerrors.ErrForbidden
+				}
+			}
+		}
+	case models.ActorMachine:
+	}
 	return nil
 }
 
@@ -92,13 +90,13 @@ func (p *AccessControlPlugin) assignRoleFromContextHook(reqCtx *models.RequestCo
 		return nil
 	}
 
-	targetRole, err := p.Api.GetRoleByName(ctx, assignCtx.RoleName)
+	targetRole, err := p.Api.GetRoleByName(ctx, reqCtx.Actor, assignCtx.RoleName)
 	if err != nil {
 		p.logAssignRoleHookError("failed to resolve role", assignCtx, err)
 		return nil
 	}
 
-	userRoles, err := p.Api.GetUserRoles(ctx, assignCtx.UserID)
+	userRoles, err := p.Api.GetUserRoles(ctx, reqCtx.Actor, assignCtx.UserID)
 	if err != nil {
 		p.logAssignRoleHookError("failed to load user roles", assignCtx, err)
 		return nil
@@ -110,7 +108,7 @@ func (p *AccessControlPlugin) assignRoleFromContextHook(reqCtx *models.RequestCo
 		}
 	}
 
-	if err := p.Api.AssignRoleToUser(ctx, assignCtx.UserID, types.AssignUserRoleRequest{RoleID: targetRole.ID}, assignCtx.AssignerUserID); err != nil {
+	if err := p.Api.AssignRoleToUser(ctx, reqCtx.Actor, assignCtx.UserID, types.AssignUserRoleRequest{RoleID: targetRole.ID}, assignCtx.AssignerUserID); err != nil {
 		p.logAssignRoleHookError("failed to assign role", assignCtx, err)
 	}
 
@@ -145,6 +143,10 @@ func accessControlAssignRoleContext(value any) (models.AccessControlAssignRoleCo
 	}
 }
 
+func hasScope(scopes []string, target string) bool {
+	return slices.Contains(scopes, target)
+}
+
 func hasAllScopes(assignedScopes []string, requiredPermissions []string) bool {
 	for _, req := range requiredPermissions {
 		found := slices.Contains(assignedScopes, req)
@@ -153,4 +155,12 @@ func hasAllScopes(assignedScopes []string, requiredPermissions []string) bool {
 		}
 	}
 	return true
+}
+
+func extractPermissionKeys(permissions []types.UserPermissionInfo) []string {
+	keys := make([]string, len(permissions))
+	for i, p := range permissions {
+		keys[i] = p.PermissionKey
+	}
+	return keys
 }

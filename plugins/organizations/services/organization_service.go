@@ -30,8 +30,22 @@ type organizationTxRunner interface {
 	RunInTx(ctx context.Context, opts *sql.TxOptions, fn func(context.Context, bun.Tx) error) error
 }
 
-func NewOrganizationService(orgRepo repositories.OrganizationRepository, orgMemberRepo repositories.OrganizationMemberRepository, serviceUtils *ServiceUtils, accessControlService rootservices.AccessControlService, organizationsLimit *int, txRunner organizationTxRunner) *organizationService {
-	return &organizationService{orgRepo: orgRepo, orgMemberRepo: orgMemberRepo, serviceUtils: serviceUtils, accessControlService: accessControlService, organizationsLimit: organizationsLimit, txRunner: txRunner}
+func NewOrganizationService(
+	orgRepo repositories.OrganizationRepository,
+	orgMemberRepo repositories.OrganizationMemberRepository,
+	serviceUtils *ServiceUtils,
+	accessControlService rootservices.AccessControlService,
+	organizationsLimit *int,
+	txRunner organizationTxRunner,
+) *organizationService {
+	return &organizationService{
+		orgRepo:              orgRepo,
+		orgMemberRepo:        orgMemberRepo,
+		serviceUtils:         serviceUtils,
+		accessControlService: accessControlService,
+		organizationsLimit:   organizationsLimit,
+		txRunner:             txRunner,
+	}
 }
 
 func (s *organizationService) CreateOrganization(ctx context.Context, actor *models.Actor, request types.CreateOrganizationRequest) (*types.Organization, error) {
@@ -39,7 +53,7 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actor *mod
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	if err := s.serviceUtils.authorizerOrDefault().Authorize(ctx, actor, ActionOrganizationsCreate, AuthorizerResource{}); err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeScope(ctx, actor, constants.OrganizationsCreatePermission); err != nil {
 		return nil, err
 	}
 
@@ -181,7 +195,7 @@ func (s *organizationService) GetAllOrganizations(ctx context.Context, actor *mo
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	if err := s.serviceUtils.authorizerOrDefault().Authorize(ctx, actor, ActionOrganizationsList, AuthorizerResource{}); err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeScope(ctx, actor, constants.OrganizationsListPermission); err != nil {
 		return nil, err
 	}
 
@@ -234,7 +248,11 @@ func (s *organizationService) GetAllOrganizations(ctx context.Context, actor *mo
 }
 
 func (s *organizationService) GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {
-	organization, err := s.authorizeMember(ctx, actor, organizationID, ActionOrganizationsRead)
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsReadPermission); err != nil {
+		return nil, err
+	}
+
+	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +261,11 @@ func (s *organizationService) GetOrganizationByID(ctx context.Context, actor *mo
 }
 
 func (s *organizationService) UpdateOrganization(ctx context.Context, actor *models.Actor, organizationID string, request types.UpdateOrganizationRequest) (*types.Organization, error) {
-	organization, err := s.authorizeMember(ctx, actor, organizationID, ActionOrganizationsUpdate)
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsUpdatePermission); err != nil {
+		return nil, err
+	}
+
+	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +309,11 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, actor *mod
 }
 
 func (s *organizationService) DeleteOrganization(ctx context.Context, actor *models.Actor, organizationID string) error {
-	_, err := s.serviceUtils.authorizeOwnerForAction(ctx, actor, ActionOrganizationsDelete, organizationID)
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsDeletePermission); err != nil {
+		return err
+	}
+
+	_, err := s.serviceUtils.authorizeOwner(ctx, actor, organizationID)
 	if err != nil {
 		return err
 	}
@@ -297,13 +323,4 @@ func (s *organizationService) DeleteOrganization(ctx context.Context, actor *mod
 	}
 
 	return nil
-}
-
-func (s *organizationService) authorizeMember(ctx context.Context, actor *models.Actor, organizationID string, action AuthorizerAction) (*types.Organization, error) {
-	organization, _, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, action, organizationID)
-	if err != nil {
-		return nil, err
-	}
-
-	return organization, nil
 }

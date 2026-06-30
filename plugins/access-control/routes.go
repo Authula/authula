@@ -36,7 +36,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/access-control/roles",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewCreateRoleHandler(usecases.roles).Handler(),
 		},
@@ -44,7 +44,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/access-control/roles",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewGetAllRolesHandler(usecases.roles).Handler(),
 		},
@@ -52,7 +52,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/access-control/roles/by-name/{role_name}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewGetRoleByNameHandler(usecases.roles).Handler(),
 		},
@@ -60,7 +60,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/access-control/roles/{role_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewGetRoleByIDHandler(usecases.roles).Handler(),
 		},
@@ -68,7 +68,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPatch,
 			Path:   "/access-control/roles/{role_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewUpdateRoleHandler(usecases.roles).Handler(),
 		},
@@ -76,7 +76,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodDelete,
 			Path:   "/access-control/roles/{role_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewDeleteRoleHandler(usecases.roles).Handler(),
 		},
@@ -86,7 +86,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/access-control/permissions",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewCreatePermissionHandler(usecases.permissions).Handler(),
 		},
@@ -94,7 +94,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/access-control/permissions",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewGetAllPermissionsHandler(usecases.permissions).Handler(),
 		},
@@ -102,7 +102,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/access-control/permissions/{permission_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewGetPermissionByIDHandler(usecases.permissions).Handler(),
 		},
@@ -110,7 +110,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPatch,
 			Path:   "/access-control/permissions/{permission_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewUpdatePermissionHandler(usecases.permissions).Handler(),
 		},
@@ -118,7 +118,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodDelete,
 			Path:   "/access-control/permissions/{permission_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewDeletePermissionHandler(usecases.permissions).Handler(),
 		},
@@ -128,7 +128,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/access-control/roles/{role_id}/permissions",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewAddRolePermissionHandler(usecases.rolePermissions).Handler(),
 		},
@@ -136,7 +136,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/access-control/roles/{role_id}/permissions",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewGetRolePermissionsHandler(usecases.rolePermissions).Handler(),
 		},
@@ -144,7 +144,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPut,
 			Path:   "/access-control/roles/{role_id}/permissions",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewReplaceRolePermissionsHandler(usecases.rolePermissions).Handler(),
 		},
@@ -152,7 +152,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodDelete,
 			Path:   "/access-control/roles/{role_id}/permissions/{permission_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewRemoveRolePermissionHandler(usecases.rolePermissions).Handler(),
 		},
@@ -162,7 +162,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/access-control/users/{user_id}/roles",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewGetUserRolesHandler(usecases.userRoles).Handler(),
 		},
@@ -170,7 +170,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPut,
 			Path:   "/access-control/users/{user_id}/roles",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewReplaceUserRolesHandler(usecases.userRoles).Handler(),
 		},
@@ -178,7 +178,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/access-control/users/{user_id}/roles",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewAssignUserRoleHandler(usecases.userRoles).Handler(),
 		},
@@ -186,7 +186,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodDelete,
 			Path:   "/access-control/users/{user_id}/roles/{role_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewRemoveUserRoleHandler(usecases.userRoles).Handler(),
 		},
@@ -196,7 +196,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/access-control/users/{user_id}/permissions",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewGetUserPermissionsHandler(usecases.userPermissions).Handler(),
 		},
@@ -204,7 +204,7 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/access-control/users/{user_id}/permissions/check",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser, models.ActorMachine),
+				middleware.RequireAuthenticated(),
 			},
 			Handler: handlers.NewCheckUserPermissionsHandler(usecases.userPermissions).Handler(),
 		},

@@ -9,6 +9,7 @@ import (
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/organizations/constants"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"
 )
@@ -38,7 +39,11 @@ func NewOrganizationTeamService(
 }
 
 func (s *organizationTeamService) CreateTeam(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationTeamRequest) (*types.OrganizationTeam, error) {
-	organization, actorMember, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsTeamsCreate, organizationID)
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsTeamsCreatePermission); err != nil {
+		return nil, err
+	}
+
+	organization, actorMember, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +130,11 @@ func (s *organizationTeamService) CreateTeam(ctx context.Context, actor *models.
 }
 
 func (s *organizationTeamService) GetAllTeams(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationTeam, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsTeamsList, organizationID); err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsTeamsListPermission); err != nil {
+		return nil, err
+	}
+
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -133,7 +142,15 @@ func (s *organizationTeamService) GetAllTeams(ctx context.Context, actor *models
 }
 
 func (s *organizationTeamService) GetTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string) (*types.OrganizationTeam, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsTeamsRead, organizationID); err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsTeamsReadPermission); err != nil {
+		return nil, err
+	}
+
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+		return nil, err
+	}
+
+	if err := s.serviceUtils.authorizeTeamAccess(ctx, actor, organizationID, teamID); err != nil {
 		return nil, err
 	}
 
@@ -149,7 +166,15 @@ func (s *organizationTeamService) GetTeam(ctx context.Context, actor *models.Act
 }
 
 func (s *organizationTeamService) UpdateTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string, request types.UpdateOrganizationTeamRequest) (*types.OrganizationTeam, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsTeamsUpdate, organizationID); err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsTeamsUpdatePermission); err != nil {
+		return nil, err
+	}
+
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+		return nil, err
+	}
+
+	if err := s.serviceUtils.authorizeTeamAccess(ctx, actor, organizationID, teamID); err != nil {
 		return nil, err
 	}
 
@@ -200,7 +225,15 @@ func (s *organizationTeamService) UpdateTeam(ctx context.Context, actor *models.
 }
 
 func (s *organizationTeamService) DeleteTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string) error {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccessForAction(ctx, actor, ActionOrganizationsTeamsDelete, organizationID); err != nil {
+	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsTeamsDeletePermission); err != nil {
+		return err
+	}
+
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+		return err
+	}
+
+	if err := s.serviceUtils.authorizeTeamAccess(ctx, actor, organizationID, teamID); err != nil {
 		return err
 	}
 
