@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	internalerrors "github.com/Authula/authula/internal/errors"
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	admintests "github.com/Authula/authula/plugins/admin/tests"
@@ -21,7 +22,7 @@ func TestUsersUseCase_Create(t *testing.T) {
 		t.Parallel()
 
 		useCase, _ := admintests.NewUsersUseCaseFixture()
-		_, err := useCase.Create(context.Background(), admintypes.CreateUserRequest{Name: "", Email: "foo@bar.com"})
+		_, err := useCase.Create(context.Background(), internaltests.TestActor(), admintypes.CreateUserRequest{Name: "", Email: "foo@bar.com"})
 		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
 	})
 
@@ -29,7 +30,7 @@ func TestUsersUseCase_Create(t *testing.T) {
 		t.Parallel()
 
 		useCase, _ := admintests.NewUsersUseCaseFixture()
-		_, err := useCase.Create(context.Background(), admintypes.CreateUserRequest{Name: "Name", Email: ""})
+		_, err := useCase.Create(context.Background(), internaltests.TestActor(), admintypes.CreateUserRequest{Name: "Name", Email: ""})
 		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
 	})
 
@@ -55,7 +56,7 @@ func TestUsersUseCase_Create(t *testing.T) {
 			Email: "  ALICE@EXAMPLE.COM  ",
 		}
 
-		u, err := useCase.Create(context.Background(), req)
+		u, err := useCase.Create(context.Background(), internaltests.TestActor(), req)
 		assert.NoError(t, err)
 		assert.NotNil(t, u)
 		assert.Equal(t, "Alice", seenName)
@@ -80,7 +81,7 @@ func TestUsersUseCase_GetAll(t *testing.T) {
 		}).Return([]models.User{{ID: "u1"}}, (*string)(nil), nil).Once()
 
 		cursor := "  cur-1  "
-		page, err := useCase.GetAll(context.Background(), &cursor, 0)
+		page, err := useCase.GetAll(context.Background(), internaltests.TestActor(), &cursor, 0)
 		assert.NoError(t, err)
 		assert.NotNil(t, page)
 		assert.Len(t, page.Users, 1)
@@ -98,7 +99,7 @@ func TestUsersUseCase_GetByID(t *testing.T) {
 		t.Parallel()
 
 		useCase, _ := admintests.NewUsersUseCaseFixture()
-		_, err := useCase.GetByID(context.Background(), "   ")
+		_, err := useCase.GetByID(context.Background(), internaltests.TestActor(), "   ")
 		assert.ErrorIs(t, err, adminconstants.ErrUserIDRequired)
 	})
 
@@ -109,7 +110,7 @@ func TestUsersUseCase_GetByID(t *testing.T) {
 		expected := &models.User{ID: "u1"}
 		repo.On("GetByID", mock.Anything, "u1").Return(expected, nil).Once()
 
-		u, err := useCase.GetByID(context.Background(), "u1")
+		u, err := useCase.GetByID(context.Background(), internaltests.TestActor(), "u1")
 		assert.NoError(t, err)
 		assert.Equal(t, expected, u)
 		repo.AssertExpectations(t)
@@ -123,7 +124,7 @@ func TestUsersUseCase_Update(t *testing.T) {
 		t.Parallel()
 
 		useCase, _ := admintests.NewUsersUseCaseFixture()
-		_, err := useCase.Update(context.Background(), "", admintypes.UpdateUserRequest{})
+		_, err := useCase.Update(context.Background(), internaltests.TestActor(), "", admintypes.UpdateUserRequest{})
 		assert.ErrorIs(t, err, adminconstants.ErrUserIDRequired)
 	})
 
@@ -131,7 +132,7 @@ func TestUsersUseCase_Update(t *testing.T) {
 		t.Parallel()
 
 		useCase, _ := admintests.NewUsersUseCaseFixture()
-		_, err := useCase.Update(context.Background(), "u1", admintypes.UpdateUserRequest{})
+		_, err := useCase.Update(context.Background(), internaltests.TestActor(), "u1", admintypes.UpdateUserRequest{})
 		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
 	})
 
@@ -149,7 +150,7 @@ func TestUsersUseCase_Update(t *testing.T) {
 
 		req := admintypes.UpdateUserRequest{Name: new(string)}
 		*req.Name = "NewName"
-		u, err := useCase.Update(context.Background(), "u1", req)
+		u, err := useCase.Update(context.Background(), internaltests.TestActor(), "u1", req)
 		assert.NoError(t, err)
 		assert.Equal(t, "u1", u.ID)
 		assert.Equal(t, "NewName", u.Name)
@@ -164,7 +165,7 @@ func TestUsersUseCase_Delete(t *testing.T) {
 		t.Parallel()
 
 		useCase, _ := admintests.NewUsersUseCaseFixture()
-		err := useCase.Delete(context.Background(), "  ")
+		err := useCase.Delete(context.Background(), internaltests.TestActor(), "  ")
 		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
 	})
 
@@ -175,7 +176,7 @@ func TestUsersUseCase_Delete(t *testing.T) {
 		repo.On("GetByID", mock.Anything, "u1").Return(&models.User{ID: "u1"}, nil).Once()
 		repo.On("Delete", mock.Anything, "u1").Return(nil).Once()
 
-		err := useCase.Delete(context.Background(), "u1")
+		err := useCase.Delete(context.Background(), internaltests.TestActor(), "u1")
 		assert.NoError(t, err)
 		repo.AssertExpectations(t)
 	})

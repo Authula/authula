@@ -21,6 +21,7 @@ func (h *CreateAccountHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
 		var request types.CreateAccountRequest
@@ -37,7 +38,7 @@ func (h *CreateAccountHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		account, err := h.useCase.Create(ctx, userID, request)
+		account, err := h.useCase.Create(ctx, actor, userID, request)
 		if err != nil {
 			respondAccountsError(reqCtx, err)
 			return
@@ -59,9 +60,10 @@ func (h *GetUserAccountsHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
-		accounts, err := h.useCase.GetByUserID(ctx, userID)
+		accounts, err := h.useCase.GetByUserID(ctx, actor, userID)
 		if err != nil {
 			respondAccountsError(reqCtx, err)
 			return
@@ -83,9 +85,10 @@ func (h *GetAccountByIDHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		accountID := r.PathValue("id")
 
-		account, err := h.useCase.GetByID(ctx, accountID)
+		account, err := h.useCase.GetByID(ctx, actor, accountID)
 		if err != nil {
 			respondAccountsError(reqCtx, err)
 			return
@@ -112,6 +115,7 @@ func (h *UpdateAccountHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		accountID := r.PathValue("id")
 
 		var request types.UpdateAccountRequest
@@ -128,7 +132,7 @@ func (h *UpdateAccountHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		account, err := h.useCase.Update(ctx, accountID, request)
+		account, err := h.useCase.Update(ctx, actor, accountID, request)
 		if err != nil {
 			respondAccountsError(reqCtx, err)
 			return
@@ -150,9 +154,10 @@ func (h *DeleteAccountHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		accountID := r.PathValue("id")
 
-		if err := h.useCase.Delete(ctx, accountID); err != nil {
+		if err := h.useCase.Delete(ctx, actor, accountID); err != nil {
 			respondAccountsError(reqCtx, err)
 			return
 		}

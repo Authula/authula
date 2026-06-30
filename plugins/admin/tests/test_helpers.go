@@ -27,7 +27,7 @@ func PtrTime(t *testing.T, offset int) *time.Time {
 
 func NewUsersUseCaseFixture() (usecases.UsersUseCase, *internaltests.MockUserRepository) {
 	mockUserRepo := &internaltests.MockUserRepository{}
-	service := adminservices.NewUsersService(mockUserRepo)
+	service := adminservices.NewUsersService(mockUserRepo, &internaltests.NoopAuthorizer{})
 	return usecases.NewUsersUseCase(service), mockUserRepo
 }
 
@@ -49,7 +49,7 @@ func NewAccountsUseCaseFixture() (usecases.AccountsUseCase, *adminservices.Accou
 	accountRepo := &internaltests.MockAccountRepository{}
 	userRepo := &internaltests.MockUserRepository{}
 	passwordSvc := &MockPasswordService{}
-	service := adminservices.NewAccountsService(accountRepo, userRepo, passwordSvc)
+	service := adminservices.NewAccountsService(accountRepo, userRepo, passwordSvc, &internaltests.NoopAuthorizer{})
 	return usecases.NewAccountsUseCase(service), service, accountRepo, userRepo, passwordSvc
 }
 
@@ -57,7 +57,7 @@ func NewAccountsServiceFixture() (*adminservices.AccountsService, *internaltests
 	accountRepo := &internaltests.MockAccountRepository{}
 	userRepo := &internaltests.MockUserRepository{}
 	passwordSvc := &MockPasswordService{}
-	return adminservices.NewAccountsService(accountRepo, userRepo, passwordSvc), accountRepo, userRepo, passwordSvc
+	return adminservices.NewAccountsService(accountRepo, userRepo, passwordSvc, &internaltests.NoopAuthorizer{}), accountRepo, userRepo, passwordSvc
 }
 
 type MockUserStateRepository struct {
@@ -210,8 +210,8 @@ func NewImpersonationUseCaseFixture(t *testing.T) (usecases.ImpersonationUseCase
 	sessionStateRepo := &MockSessionStateRepository{}
 	sessionSvc := &internaltests.MockSessionService{}
 	tokenSvc := &internaltests.MockTokenService{}
-	stateService := adminservices.NewStateService(userStateRepo, sessionStateRepo, impRepo)
-	service := adminservices.NewImpersonationService(impRepo, sessionStateRepo, sessionSvc, tokenSvc, 15*time.Minute, 15*time.Minute)
+	stateService := adminservices.NewStateService(userStateRepo, sessionStateRepo, impRepo, &internaltests.NoopAuthorizer{})
+	service := adminservices.NewImpersonationService(impRepo, sessionStateRepo, sessionSvc, tokenSvc, 15*time.Minute, 15*time.Minute, &internaltests.NoopAuthorizer{})
 	return usecases.NewImpersonationUseCase(stateService, service), impRepo, sessionStateRepo, sessionSvc, tokenSvc
 }
 
@@ -219,7 +219,7 @@ func NewStateUseCaseFixture() (usecases.StateUseCase, *MockUserStateRepository, 
 	userStateRepo := &MockUserStateRepository{}
 	sessionStateRepo := &MockSessionStateRepository{}
 	impRepo := &MockImpersonationRepository{}
-	service := adminservices.NewStateService(userStateRepo, sessionStateRepo, impRepo)
+	service := adminservices.NewStateService(userStateRepo, sessionStateRepo, impRepo, &internaltests.NoopAuthorizer{})
 	return usecases.NewStateUseCase(service), userStateRepo, sessionStateRepo, impRepo
 }
 
@@ -232,7 +232,7 @@ func NewStateServiceFixture() (*adminservices.StateService, *MockUserStateReposi
 	userStateRepo := &MockUserStateRepository{}
 	sessionStateRepo := &MockSessionStateRepository{}
 	impRepo := &MockImpersonationRepository{}
-	return adminservices.NewStateService(userStateRepo, sessionStateRepo, impRepo), userStateRepo, sessionStateRepo, impRepo
+	return adminservices.NewStateService(userStateRepo, sessionStateRepo, impRepo, &internaltests.NoopAuthorizer{}), userStateRepo, sessionStateRepo, impRepo
 }
 
 // impersonation service fixture returns service and all repos + helpers
@@ -241,6 +241,6 @@ func NewImpersonationServiceFixture() (*adminservices.ImpersonationService, *Moc
 	sessionStateRepo := &MockSessionStateRepository{}
 	sessSvc := &internaltests.MockSessionService{}
 	tokenSvc := &internaltests.MockTokenService{}
-	service := adminservices.NewImpersonationService(impRepo, sessionStateRepo, sessSvc, tokenSvc, 15*time.Minute, 15*time.Minute)
+	service := adminservices.NewImpersonationService(impRepo, sessionStateRepo, sessSvc, tokenSvc, 15*time.Minute, 15*time.Minute, &internaltests.NoopAuthorizer{})
 	return service, impRepo, sessionStateRepo, sessSvc, tokenSvc
 }

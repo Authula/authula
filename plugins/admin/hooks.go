@@ -24,7 +24,7 @@ func (p *AdminPlugin) enforceState(reqCtx *models.RequestContext) error {
 
 	ctx := reqCtx.Request.Context()
 
-	state, err := p.Api.GetUserState(ctx, reqCtx.Actor.ID)
+	state, err := p.Api.GetUserState(ctx, reqCtx.Actor, reqCtx.Actor.ID)
 	if err != nil {
 		reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": "failed to evaluate user state"})
 		reqCtx.Handled = true
@@ -49,7 +49,7 @@ func (p *AdminPlugin) enforceState(reqCtx *models.RequestContext) error {
 		return nil
 	}
 
-	sessionState, err := p.Api.GetSessionState(ctx, sessionID)
+	sessionState, err := p.Api.GetSessionState(ctx, reqCtx.Actor, sessionID)
 	if err != nil {
 		reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": "failed to evaluate session state"})
 		reqCtx.Handled = true

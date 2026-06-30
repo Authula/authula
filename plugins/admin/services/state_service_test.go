@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	internalerrors "github.com/Authula/authula/internal/errors"
+	internaltests "github.com/Authula/authula/internal/tests"
 	adminservices "github.com/Authula/authula/plugins/admin/services"
 	admintests "github.com/Authula/authula/plugins/admin/tests"
 	admintypes "github.com/Authula/authula/plugins/admin/types"
@@ -26,7 +27,7 @@ func TestStateService_GetUserState(t *testing.T) {
 
 	usr.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1"}, nil).Once()
 
-	state, err := svc.GetUserState(ctx, "u1")
+	state, err := svc.GetUserState(ctx, internaltests.TestActor(), "u1")
 	assert.NoError(t, err)
 	assert.Equal(t, "u1", state.UserID)
 	usr.AssertExpectations(t)
@@ -108,7 +109,7 @@ func TestStateService_UpsertUserState(t *testing.T) {
 				}
 			}
 
-			_, err := svc.UpsertUserState(ctx, "u1", tc.request, tc.actor)
+			_, err := svc.UpsertUserState(ctx, internaltests.TestActor(), "u1", tc.request, tc.actor)
 			if tc.wantErr != nil {
 				assert.ErrorIs(t, err, tc.wantErr)
 			} else if tc.hasRepoErr {
@@ -130,7 +131,7 @@ func TestStateService_DeleteUserState(t *testing.T) {
 	ctx := context.Background()
 
 	usr.On("Delete", mock.Anything, "u1").Return(nil).Once()
-	assert.NoError(t, svc.DeleteUserState(ctx, "u1"))
+	assert.NoError(t, svc.DeleteUserState(ctx, internaltests.TestActor(), "u1"))
 	usr.AssertExpectations(t)
 }
 
@@ -141,7 +142,7 @@ func TestStateService_GetBannedUserStates(t *testing.T) {
 	ctx := context.Background()
 
 	usr.On("GetBanned", mock.Anything).Return([]admintypes.AdminUserState{{UserID: "u1", Banned: true}}, nil).Once()
-	list, err := svc.GetBannedUserStates(ctx)
+	list, err := svc.GetBannedUserStates(ctx, internaltests.TestActor())
 	assert.NoError(t, err)
 	assert.Len(t, list, 1)
 	usr.AssertExpectations(t)
@@ -154,7 +155,7 @@ func TestStateService_GetSessionState(t *testing.T) {
 	ctx := context.Background()
 
 	sess.On("GetBySessionID", mock.Anything, "s1").Return(&admintypes.AdminSessionState{SessionID: "s1"}, nil).Once()
-	res, err := svc.GetSessionState(ctx, "s1")
+	res, err := svc.GetSessionState(ctx, internaltests.TestActor(), "s1")
 	assert.NoError(t, err)
 	assert.Equal(t, "s1", res.SessionID)
 	sess.AssertExpectations(t)
@@ -215,7 +216,7 @@ func TestStateService_UpsertSessionState(t *testing.T) {
 				}
 			}
 
-			_, err := svc.UpsertSessionState(ctx, "s1", tc.request, tc.actor)
+			_, err := svc.UpsertSessionState(ctx, internaltests.TestActor(), "s1", tc.request, tc.actor)
 			if tc.wantErr != nil {
 				assert.ErrorIs(t, err, tc.wantErr)
 			} else if tc.hasErr {
@@ -236,7 +237,7 @@ func TestStateService_DeleteSessionState(t *testing.T) {
 	ctx := context.Background()
 
 	sess.On("Delete", mock.Anything, "s1").Return(nil).Once()
-	assert.NoError(t, svc.DeleteSessionState(ctx, "s1"))
+	assert.NoError(t, svc.DeleteSessionState(ctx, internaltests.TestActor(), "s1"))
 	sess.AssertExpectations(t)
 }
 
@@ -249,7 +250,7 @@ func TestStateService_GetUserAdminSessions(t *testing.T) {
 	imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
 	sess.On("GetByUserID", mock.Anything, "u1").Return([]admintypes.AdminUserSession{}, nil).Once()
 
-	_, err := svc.GetUserAdminSessions(ctx, "u1")
+	_, err := svc.GetUserAdminSessions(ctx, internaltests.TestActor(), "u1")
 	assert.NoError(t, err)
 	imp.AssertExpectations(t)
 	sess.AssertExpectations(t)
@@ -265,11 +266,11 @@ func TestStateService_RevokeSessionAndRevokedList(t *testing.T) {
 	sess.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
 	sess.On("GetBySessionID", mock.Anything, "s1").Return(&admintypes.AdminSessionState{SessionID: "s1"}, nil).Once()
 
-	_, err := svc.RevokeSession(ctx, "s1", admintests.PtrString(t, "reason"), admintests.PtrString(t, "actor"))
+	_, err := svc.RevokeSession(ctx, internaltests.TestActor(), "s1", admintests.PtrString(t, "reason"), admintests.PtrString(t, "actor"))
 	assert.NoError(t, err)
 
 	sess.On("GetRevoked", mock.Anything).Return([]admintypes.AdminSessionState{{SessionID: "s1"}}, nil).Once()
-	list, err := svc.GetRevokedSessionStates(ctx)
+	list, err := svc.GetRevokedSessionStates(ctx, internaltests.TestActor())
 	assert.NoError(t, err)
 	assert.Len(t, list, 1)
 }
@@ -283,7 +284,7 @@ func TestStateService_BanAndUnbanUser(t *testing.T) {
 	imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
 	usr.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
 	usr.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1"}, nil).Once()
-	_, err := svc.BanUser(ctx, "u1", admintypes.BanUserRequest{Reason: admintests.PtrString(t, "r")}, admintests.PtrString(t, "actor"))
+	_, err := svc.BanUser(ctx, internaltests.TestActor(), "u1", admintypes.BanUserRequest{Reason: admintests.PtrString(t, "r")}, admintests.PtrString(t, "actor"))
 	assert.NoError(t, err)
 
 	imp.AssertExpectations(t)
@@ -292,6 +293,6 @@ func TestStateService_BanAndUnbanUser(t *testing.T) {
 	imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
 	usr.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
 	usr.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1"}, nil).Once()
-	_, err = svc.UnbanUser(ctx, "u1")
+	_, err = svc.UnbanUser(ctx, internaltests.TestActor(), "u1")
 	assert.NoError(t, err)
 }

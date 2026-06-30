@@ -5,10 +5,10 @@ import (
 
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
+	"github.com/Authula/authula/models"
 	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
-	"github.com/Authula/authula/models"
 	rootservices "github.com/Authula/authula/services"
 )
 

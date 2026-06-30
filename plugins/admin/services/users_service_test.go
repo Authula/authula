@@ -17,13 +17,14 @@ import (
 
 func newUsersServiceFixture() (*adminservices.UsersService, *internaltests.MockUserRepository) {
 	repo := &internaltests.MockUserRepository{}
-	return adminservices.NewUsersService(repo), repo
+	return adminservices.NewUsersService(repo, &internaltests.NoopAuthorizer{}), repo
 }
 
 func TestUsersService_Create(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
+	actor := internaltests.TestActor()
 
 	tests := []struct {
 		name         string
@@ -68,13 +69,12 @@ func TestUsersService_Create(t *testing.T) {
 			repo.ExpectedCalls = nil
 			repo.On("GetByEmail", mock.Anything, tc.request.Email).Return(tc.existing, tc.repoErr).Once()
 			if tc.expectCreate {
-				// return a simple user with matching email
 				repo.On("Create", mock.Anything, mock.Anything).
 					Return(&models.User{Email: tc.request.Email}, tc.createErr).
 					Once()
 			}
 
-			user, err := svc.Create(ctx, tc.request)
+			user, err := svc.Create(ctx, actor, tc.request)
 			if tc.wantErr != nil {
 				assert.ErrorIs(t, err, tc.wantErr)
 				assert.Nil(t, user)
@@ -96,10 +96,11 @@ func TestUsersService_GetAll(t *testing.T) {
 
 	svc, repo := newUsersServiceFixture()
 	ctx := context.Background()
+	actor := internaltests.TestActor()
 
 	repo.On("GetAll", mock.Anything, (*string)(nil), 10).Return([]models.User{{Email: "a"}}, nil, nil).Once()
 
-	page, err := svc.GetAll(ctx, nil, 10)
+	page, err := svc.GetAll(ctx, actor, nil, 10)
 	assert.NoError(t, err)
 	assert.Len(t, page.Users, 1)
 	repo.AssertExpectations(t)
@@ -110,9 +111,10 @@ func TestUsersService_GetByID(t *testing.T) {
 
 	svc, repo := newUsersServiceFixture()
 	ctx := context.Background()
+	actor := internaltests.TestActor()
 
 	repo.On("GetByID", mock.Anything, "u1").Return(&models.User{ID: "u1"}, nil).Once()
-	u, err := svc.GetByID(ctx, "u1")
+	u, err := svc.GetByID(ctx, actor, "u1")
 	assert.NoError(t, err)
 	assert.Equal(t, "u1", u.ID)
 	repo.AssertExpectations(t)
@@ -123,14 +125,14 @@ func TestUsersService_Update(t *testing.T) {
 
 	svc, repo := newUsersServiceFixture()
 	ctx := context.Background()
+	actor := internaltests.TestActor()
 
 	base := &models.User{ID: "u1", Email: "e", Name: "n", EmailVerified: false}
 	repo.On("GetByID", mock.Anything, "u1").Return(base, nil).Once()
-	// return same base so modifications are visible in result
 	repo.On("Update", mock.Anything, mock.Anything).Return(base, nil).Once()
 
 	req := admintypes.UpdateUserRequest{Email: new("x"), Name: new("y"), EmailVerified: func(b bool) *bool { return &b }(true)}
-	updated, err := svc.Update(ctx, "u1", req)
+	updated, err := svc.Update(ctx, actor, "u1", req)
 	assert.NoError(t, err)
 	assert.Equal(t, "x", updated.Email)
 	assert.Equal(t, "y", updated.Name)
@@ -143,9 +145,10 @@ func TestUsersService_Update_notFound(t *testing.T) {
 
 	svc, repo := newUsersServiceFixture()
 	ctx := context.Background()
+	actor := internaltests.TestActor()
 	repo.On("GetByID", mock.Anything, "u1").Return(nil, nil).Once()
 
-	_, err := svc.Update(ctx, "u1", admintypes.UpdateUserRequest{})
+	_, err := svc.Update(ctx, actor, "u1", admintypes.UpdateUserRequest{})
 	assert.ErrorIs(t, err, internalerrors.ErrNotFound)
 	repo.AssertExpectations(t)
 }
@@ -155,10 +158,11 @@ func TestUsersService_Delete(t *testing.T) {
 
 	svc, repo := newUsersServiceFixture()
 	ctx := context.Background()
+	actor := internaltests.TestActor()
 
 	repo.On("GetByID", mock.Anything, "u1").Return(&models.User{ID: "u1"}, nil).Once()
 	repo.On("Delete", mock.Anything, "u1").Return(nil).Once()
-	assert.NoError(t, svc.Delete(ctx, "u1"))
+	assert.NoError(t, svc.Delete(ctx, actor, "u1"))
 	repo.AssertExpectations(t)
 }
 
@@ -167,7 +171,8 @@ func TestUsersService_Delete_notFound(t *testing.T) {
 
 	svc, repo := newUsersServiceFixture()
 	ctx := context.Background()
+	actor := internaltests.TestActor()
 	repo.On("GetByID", mock.Anything, "u1").Return(nil, nil).Once()
-	assert.ErrorIs(t, svc.Delete(ctx, "u1"), internalerrors.ErrNotFound)
+	assert.ErrorIs(t, svc.Delete(ctx, actor, "u1"), internalerrors.ErrNotFound)
 	repo.AssertExpectations(t)
 }

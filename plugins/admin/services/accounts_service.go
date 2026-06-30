@@ -8,6 +8,7 @@ import (
 	corerepositories "github.com/Authula/authula/internal/repositories"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
+	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/types"
 	rootservices "github.com/Authula/authula/services"
 )
@@ -16,21 +17,29 @@ type AccountsService struct {
 	accountRepo     corerepositories.AccountRepository
 	userRepo        corerepositories.UserRepository
 	passwordService rootservices.PasswordService
+	authorizer      rootservices.Authorizer
 }
 
 func NewAccountsService(
 	accountRepo corerepositories.AccountRepository,
 	userRepo corerepositories.UserRepository,
 	passwordService rootservices.PasswordService,
+	authorizer rootservices.Authorizer,
 ) *AccountsService {
-	return &AccountsService{accountRepo: accountRepo, userRepo: userRepo, passwordService: passwordService}
+	return &AccountsService{accountRepo: accountRepo, userRepo: userRepo, passwordService: passwordService, authorizer: authorizer}
 }
 
-func (s *AccountsService) GetByID(ctx context.Context, accountID string) (*models.Account, error) {
+func (s *AccountsService) GetByID(ctx context.Context, actor *models.Actor, accountID string) (*models.Account, error) {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, adminconstants.AccountsReadPermission); err != nil {
+		return nil, err
+	}
 	return s.accountRepo.GetByID(ctx, accountID)
 }
 
-func (s *AccountsService) GetByUserID(ctx context.Context, userID string) ([]models.Account, error) {
+func (s *AccountsService) GetByUserID(ctx context.Context, actor *models.Actor, userID string) ([]models.Account, error) {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, adminconstants.AccountsListPermission); err != nil {
+		return nil, err
+	}
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -42,7 +51,10 @@ func (s *AccountsService) GetByUserID(ctx context.Context, userID string) ([]mod
 	return s.accountRepo.GetAllByUserID(ctx, userID)
 }
 
-func (s *AccountsService) Create(ctx context.Context, userID string, request types.CreateAccountRequest) (*models.Account, error) {
+func (s *AccountsService) Create(ctx context.Context, actor *models.Actor, userID string, request types.CreateAccountRequest) (*models.Account, error) {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, adminconstants.AccountsCreatePermission); err != nil {
+		return nil, err
+	}
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -88,7 +100,10 @@ func (s *AccountsService) Create(ctx context.Context, userID string, request typ
 	return s.accountRepo.Create(ctx, account)
 }
 
-func (s *AccountsService) Update(ctx context.Context, accountID string, request types.UpdateAccountRequest) (*models.Account, error) {
+func (s *AccountsService) Update(ctx context.Context, actor *models.Actor, accountID string, request types.UpdateAccountRequest) (*models.Account, error) {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, adminconstants.AccountsUpdatePermission); err != nil {
+		return nil, err
+	}
 	account, err := s.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
 		return nil, err
@@ -135,7 +150,10 @@ func (s *AccountsService) Update(ctx context.Context, accountID string, request 
 	return s.accountRepo.Update(ctx, account)
 }
 
-func (s *AccountsService) Delete(ctx context.Context, accountID string) error {
+func (s *AccountsService) Delete(ctx context.Context, actor *models.Actor, accountID string) error {
+	if err := s.authorizer.AuthorizeScope(ctx, actor, adminconstants.AccountsDeletePermission); err != nil {
+		return err
+	}
 	account, err := s.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
 		return err

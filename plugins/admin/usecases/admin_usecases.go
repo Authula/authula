@@ -30,9 +30,10 @@ func NewAdminUseCases(
 	sessionStateRepo repositories.SessionStateRepository,
 	impersonationRepo repositories.ImpersonationRepository,
 	sessionExpiresIn time.Duration,
+	authorizer rootservices.Authorizer,
 ) *AdminUseCases {
-	usersService := services.NewUsersService(userRepo)
-	accountsService := services.NewAccountsService(accountRepo, userRepo, passwordService)
+	usersService := services.NewUsersService(userRepo, authorizer)
+	accountsService := services.NewAccountsService(accountRepo, userRepo, passwordService, authorizer)
 	impersonationService := services.NewImpersonationService(
 		impersonationRepo,
 		sessionStateRepo,
@@ -40,8 +41,9 @@ func NewAdminUseCases(
 		tokenService,
 		sessionExpiresIn,
 		config.ImpersonationMaxExpiresIn,
+		authorizer,
 	)
-	stateService := services.NewStateService(userStateRepo, sessionStateRepo, impersonationRepo)
+	stateService := services.NewStateService(userStateRepo, sessionStateRepo, impersonationRepo, authorizer)
 
 	return &AdminUseCases{
 		users:         NewUsersUseCase(usersService),
@@ -67,122 +69,122 @@ func (u *AdminUseCases) ImpersonationUseCase() ImpersonationUseCase {
 	return u.impersonation
 }
 
-func (u *AdminUseCases) CreateUser(ctx context.Context, request types.CreateUserRequest) (*models.User, error) {
-	return u.users.Create(ctx, request)
+func (u *AdminUseCases) CreateUser(ctx context.Context, actor *models.Actor, request types.CreateUserRequest) (*models.User, error) {
+	return u.users.Create(ctx, actor, request)
 }
 
-func (u *AdminUseCases) GetAllUsers(ctx context.Context, cursor *string, limit int) (*types.UsersPage, error) {
-	return u.users.GetAll(ctx, cursor, limit)
+func (u *AdminUseCases) GetAllUsers(ctx context.Context, actor *models.Actor, cursor *string, limit int) (*types.UsersPage, error) {
+	return u.users.GetAll(ctx, actor, cursor, limit)
 }
 
-func (u *AdminUseCases) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
-	return u.users.GetByID(ctx, userID)
+func (u *AdminUseCases) GetUserByID(ctx context.Context, actor *models.Actor, userID string) (*models.User, error) {
+	return u.users.GetByID(ctx, actor, userID)
 }
 
-func (u *AdminUseCases) UpdateUser(ctx context.Context, userID string, request types.UpdateUserRequest) (*models.User, error) {
-	return u.users.Update(ctx, userID, request)
+func (u *AdminUseCases) UpdateUser(ctx context.Context, actor *models.Actor, userID string, request types.UpdateUserRequest) (*models.User, error) {
+	return u.users.Update(ctx, actor, userID, request)
 }
 
-func (u *AdminUseCases) DeleteUser(ctx context.Context, userID string) error {
-	return u.users.Delete(ctx, userID)
+func (u *AdminUseCases) DeleteUser(ctx context.Context, actor *models.Actor, userID string) error {
+	return u.users.Delete(ctx, actor, userID)
 }
 
-func (u *AdminUseCases) CreateAccount(ctx context.Context, userID string, request types.CreateAccountRequest) (*models.Account, error) {
-	return u.accounts.Create(ctx, userID, request)
+func (u *AdminUseCases) CreateAccount(ctx context.Context, actor *models.Actor, userID string, request types.CreateAccountRequest) (*models.Account, error) {
+	return u.accounts.Create(ctx, actor, userID, request)
 }
 
-func (u *AdminUseCases) GetAccountByID(ctx context.Context, accountID string) (*models.Account, error) {
-	return u.accounts.GetByID(ctx, accountID)
+func (u *AdminUseCases) GetAccountByID(ctx context.Context, actor *models.Actor, accountID string) (*models.Account, error) {
+	return u.accounts.GetByID(ctx, actor, accountID)
 }
 
-func (u *AdminUseCases) GetUserAccounts(ctx context.Context, userID string) ([]models.Account, error) {
-	return u.accounts.GetByUserID(ctx, userID)
+func (u *AdminUseCases) GetUserAccounts(ctx context.Context, actor *models.Actor, userID string) ([]models.Account, error) {
+	return u.accounts.GetByUserID(ctx, actor, userID)
 }
 
-func (u *AdminUseCases) UpdateAccount(ctx context.Context, accountID string, request types.UpdateAccountRequest) (*models.Account, error) {
-	return u.accounts.Update(ctx, accountID, request)
+func (u *AdminUseCases) UpdateAccount(ctx context.Context, actor *models.Actor, accountID string, request types.UpdateAccountRequest) (*models.Account, error) {
+	return u.accounts.Update(ctx, actor, accountID, request)
 }
 
-func (u *AdminUseCases) DeleteAccount(ctx context.Context, accountID string) error {
-	return u.accounts.Delete(ctx, accountID)
+func (u *AdminUseCases) DeleteAccount(ctx context.Context, actor *models.Actor, accountID string) error {
+	return u.accounts.Delete(ctx, actor, accountID)
 }
 
-func (u *AdminUseCases) GetAllImpersonations(ctx context.Context) ([]types.Impersonation, error) {
-	return u.impersonation.GetAllImpersonations(ctx)
+func (u *AdminUseCases) GetAllImpersonations(ctx context.Context, actor *models.Actor) ([]types.Impersonation, error) {
+	return u.impersonation.GetAllImpersonations(ctx, actor)
 }
 
-func (u *AdminUseCases) GetImpersonationByID(ctx context.Context, impersonationID string) (*types.Impersonation, error) {
-	return u.impersonation.GetImpersonationByID(ctx, impersonationID)
+func (u *AdminUseCases) GetImpersonationByID(ctx context.Context, actor *models.Actor, impersonationID string) (*types.Impersonation, error) {
+	return u.impersonation.GetImpersonationByID(ctx, actor, impersonationID)
 }
 
-func (u *AdminUseCases) StartImpersonation(ctx context.Context, actorUserID string, actorSessionID *string, ipAddress *string, userAgent *string, req types.StartImpersonationRequest) (*types.StartImpersonationResult, error) {
-	return u.impersonation.StartImpersonation(ctx, actorUserID, actorSessionID, ipAddress, userAgent, req)
+func (u *AdminUseCases) StartImpersonation(ctx context.Context, actor *models.Actor, actorUserID string, actorSessionID *string, ipAddress *string, userAgent *string, req types.StartImpersonationRequest) (*types.StartImpersonationResult, error) {
+	return u.impersonation.StartImpersonation(ctx, actor, actorUserID, actorSessionID, ipAddress, userAgent, req)
 }
 
-func (u *AdminUseCases) StopImpersonation(ctx context.Context, impersonatedUserID string, impersonatedSessionID string, request types.StopImpersonationRequest) error {
-	return u.impersonation.StopImpersonation(ctx, impersonatedUserID, impersonatedSessionID, request)
+func (u *AdminUseCases) StopImpersonation(ctx context.Context, actor *models.Actor, impersonatedUserID string, impersonatedSessionID string, request types.StopImpersonationRequest) error {
+	return u.impersonation.StopImpersonation(ctx, actor, impersonatedUserID, impersonatedSessionID, request)
 }
 
-func (u *AdminUseCases) GetUserState(ctx context.Context, userID string) (*types.AdminUserState, error) {
-	return u.state.GetUserState(ctx, userID)
+func (u *AdminUseCases) GetUserState(ctx context.Context, actor *models.Actor, userID string) (*types.AdminUserState, error) {
+	return u.state.GetUserState(ctx, actor, userID)
 }
 
-func (u *AdminUseCases) UpsertUserState(ctx context.Context, userID string, request types.UpsertUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
-	return u.state.UpsertUserState(ctx, userID, request, actorUserID)
+func (u *AdminUseCases) UpsertUserState(ctx context.Context, actor *models.Actor, userID string, request types.UpsertUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
+	return u.state.UpsertUserState(ctx, actor, userID, request, actorUserID)
 }
 
-func (u *AdminUseCases) CreateUserState(ctx context.Context, userID string, request types.CreateUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
-	return u.state.CreateUserState(ctx, userID, request, actorUserID)
+func (u *AdminUseCases) CreateUserState(ctx context.Context, actor *models.Actor, userID string, request types.CreateUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
+	return u.state.CreateUserState(ctx, actor, userID, request, actorUserID)
 }
 
-func (u *AdminUseCases) UpdateUserState(ctx context.Context, userID string, request types.UpsertUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
-	return u.state.UpdateUserState(ctx, userID, request, actorUserID)
+func (u *AdminUseCases) UpdateUserState(ctx context.Context, actor *models.Actor, userID string, request types.UpsertUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
+	return u.state.UpdateUserState(ctx, actor, userID, request, actorUserID)
 }
 
-func (u *AdminUseCases) DeleteUserState(ctx context.Context, userID string) error {
-	return u.state.DeleteUserState(ctx, userID)
+func (u *AdminUseCases) DeleteUserState(ctx context.Context, actor *models.Actor, userID string) error {
+	return u.state.DeleteUserState(ctx, actor, userID)
 }
 
-func (u *AdminUseCases) GetBannedUserStates(ctx context.Context) ([]types.AdminUserState, error) {
-	return u.state.GetBannedUserStates(ctx)
+func (u *AdminUseCases) GetBannedUserStates(ctx context.Context, actor *models.Actor) ([]types.AdminUserState, error) {
+	return u.state.GetBannedUserStates(ctx, actor)
 }
 
-func (u *AdminUseCases) BanUser(ctx context.Context, userID string, request types.BanUserRequest, actorUserID *string) (*types.AdminUserState, error) {
-	return u.state.BanUser(ctx, userID, request, actorUserID)
+func (u *AdminUseCases) BanUser(ctx context.Context, actor *models.Actor, userID string, request types.BanUserRequest, actorUserID *string) (*types.AdminUserState, error) {
+	return u.state.BanUser(ctx, actor, userID, request, actorUserID)
 }
 
-func (u *AdminUseCases) UnbanUser(ctx context.Context, userID string) (*types.AdminUserState, error) {
-	return u.state.UnbanUser(ctx, userID)
+func (u *AdminUseCases) UnbanUser(ctx context.Context, actor *models.Actor, userID string) (*types.AdminUserState, error) {
+	return u.state.UnbanUser(ctx, actor, userID)
 }
 
-func (u *AdminUseCases) GetSessionState(ctx context.Context, sessionID string) (*types.AdminSessionState, error) {
-	return u.state.GetSessionState(ctx, sessionID)
+func (u *AdminUseCases) GetSessionState(ctx context.Context, actor *models.Actor, sessionID string) (*types.AdminSessionState, error) {
+	return u.state.GetSessionState(ctx, actor, sessionID)
 }
 
-func (u *AdminUseCases) UpsertSessionState(ctx context.Context, sessionID string, request types.UpsertSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
-	return u.state.UpsertSessionState(ctx, sessionID, request, actorUserID)
+func (u *AdminUseCases) UpsertSessionState(ctx context.Context, actor *models.Actor, sessionID string, request types.UpsertSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
+	return u.state.UpsertSessionState(ctx, actor, sessionID, request, actorUserID)
 }
 
-func (u *AdminUseCases) CreateSessionState(ctx context.Context, sessionID string, request types.CreateSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
-	return u.state.CreateSessionState(ctx, sessionID, request, actorUserID)
+func (u *AdminUseCases) CreateSessionState(ctx context.Context, actor *models.Actor, sessionID string, request types.CreateSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
+	return u.state.CreateSessionState(ctx, actor, sessionID, request, actorUserID)
 }
 
-func (u *AdminUseCases) UpdateSessionState(ctx context.Context, sessionID string, request types.UpsertSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
-	return u.state.UpdateSessionState(ctx, sessionID, request, actorUserID)
+func (u *AdminUseCases) UpdateSessionState(ctx context.Context, actor *models.Actor, sessionID string, request types.UpsertSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
+	return u.state.UpdateSessionState(ctx, actor, sessionID, request, actorUserID)
 }
 
-func (u *AdminUseCases) DeleteSessionState(ctx context.Context, sessionID string) error {
-	return u.state.DeleteSessionState(ctx, sessionID)
+func (u *AdminUseCases) DeleteSessionState(ctx context.Context, actor *models.Actor, sessionID string) error {
+	return u.state.DeleteSessionState(ctx, actor, sessionID)
 }
 
-func (u *AdminUseCases) RevokeSession(ctx context.Context, sessionID string, reason *string, actorUserID *string) (*types.AdminSessionState, error) {
-	return u.state.RevokeSession(ctx, sessionID, reason, actorUserID)
+func (u *AdminUseCases) RevokeSession(ctx context.Context, actor *models.Actor, sessionID string, reason *string, actorUserID *string) (*types.AdminSessionState, error) {
+	return u.state.RevokeSession(ctx, actor, sessionID, reason, actorUserID)
 }
 
-func (u *AdminUseCases) GetUserAdminSessions(ctx context.Context, userID string) ([]types.AdminUserSession, error) {
-	return u.state.GetUserAdminSessions(ctx, userID)
+func (u *AdminUseCases) GetUserAdminSessions(ctx context.Context, actor *models.Actor, userID string) ([]types.AdminUserSession, error) {
+	return u.state.GetUserAdminSessions(ctx, actor, userID)
 }
 
-func (u *AdminUseCases) GetRevokedSessionStates(ctx context.Context) ([]types.AdminSessionState, error) {
-	return u.state.GetRevokedSessionStates(ctx)
+func (u *AdminUseCases) GetRevokedSessionStates(ctx context.Context, actor *models.Actor) ([]types.AdminSessionState, error) {
+	return u.state.GetRevokedSessionStates(ctx, actor)
 }

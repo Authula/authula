@@ -9,12 +9,12 @@ import (
 
 var (
 	// HTTP Errors
-	ErrBadRequest             = errors.New("bad request")
-	ErrUnauthorized           = errors.New("unauthorized")
-	ErrForbidden              = errors.New("forbidden")
-	ErrNotFound               = errors.New("not found")
-	ErrConflict               = errors.New("conflict")
-	ErrUnprocessableEntity    = errors.New("unprocessable entity")
+	ErrBadRequest              = errors.New("bad request")
+	ErrUnauthorized            = errors.New("unauthorized")
+	ErrForbidden               = errors.New("forbidden")
+	ErrNotFound                = errors.New("not found")
+	ErrConflict                = errors.New("conflict")
+	ErrUnprocessableEntity     = errors.New("unprocessable entity")
 	ErrInsufficientPermissions = errors.New("insufficient permissions")
 
 	// User Errors

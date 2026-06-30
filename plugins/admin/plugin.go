@@ -67,6 +67,8 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 		return fmt.Errorf("required service %s is not registered", models.ServicePassword.String())
 	}
 
+	authorizer := rootservices.NewDefaultAuthorizer()
+
 	adminUseCases := usecases.NewAdminUseCases(
 		p.config,
 		coreUserRepo,
@@ -78,6 +80,7 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 		sessionStateRepo,
 		impersonationRepo,
 		ctx.GetConfig().Session.ExpiresIn,
+		authorizer,
 	)
 	p.Api = NewAPI(
 		adminUseCases,
@@ -95,7 +98,7 @@ func (p *AdminPlugin) Migrations(provider string) []migrations.Migration {
 }
 
 func (p *AdminPlugin) DependsOn() []string {
-	return []string{}
+	return []string{models.PluginAccessControl.String()}
 }
 
 func (p *AdminPlugin) Routes() []models.Route {

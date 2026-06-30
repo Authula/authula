@@ -7,7 +7,7 @@ MIGRATE_CMD=CGO_ENABLED=1 go run ./cmd/migrate
 
 .PHONY: help build build-exe run dev test clean install setup
 .PHONY: test-coverage
-.PHONY: lint fmt vet deps-update all check quick-check ci
+.PHONY: lint format vet deps-update all check quick-check ci
 .PHONY: migrate-core-up migrate-core-down migrate-plugins-up migrate-plugins-down migrate-status
 
 # Help command
@@ -80,7 +80,7 @@ lint: # Run linter
 	@echo "Running linter..."
 	@golangci-lint run
 
-fmt: # Format code
+format: # Format code
 	@echo "Formatting code..."
 	@go fmt ./...
 
@@ -91,9 +91,9 @@ vet: # Run go vet
 # All-in-one commands
 all: clean install build check # Clean, install deps, build, and run all checks
 
-check: fmt vet lint test # Run all checks (format, vet, lint, test)
+check: format vet lint test # Run all checks (format, vet, lint, test)
 
-quick-check: fmt vet test # Run quick checks (format, vet, fast tests)
+quick-check: format vet test # Run quick checks (format, vet, fast tests)
 
 ci: clean install check # CI pipeline (clean, install, check)
 

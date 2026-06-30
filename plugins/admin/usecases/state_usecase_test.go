@@ -20,7 +20,7 @@ func TestStateUseCase_GetUserState(t *testing.T) {
 		t.Parallel()
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
-		_, err := useCase.GetUserState(context.Background(), "   ")
+		_, err := useCase.GetUserState(context.Background(), internaltests.TestActor(), "   ")
 		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
 	})
 
@@ -29,7 +29,7 @@ func TestStateUseCase_GetUserState(t *testing.T) {
 
 		useCase, userStateRepo, _, _ := admintests.NewStateUseCaseFixture()
 		userStateRepo.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1"}, nil).Once()
-		_, err := useCase.GetUserState(context.Background(), "  u1  ")
+		_, err := useCase.GetUserState(context.Background(), internaltests.TestActor(), "  u1  ")
 		assert.NoError(t, err)
 		userStateRepo.AssertExpectations(t)
 	})
@@ -42,7 +42,7 @@ func TestStateUseCase_UpsertUserState(t *testing.T) {
 		t.Parallel()
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
-		_, err := useCase.UpsertUserState(context.Background(), "  ", admintypes.UpsertUserStateRequest{}, nil)
+		_, err := useCase.UpsertUserState(context.Background(), internaltests.TestActor(), "  ", admintypes.UpsertUserStateRequest{}, nil)
 		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
 	})
 
@@ -57,7 +57,7 @@ func TestStateUseCase_UpsertUserState(t *testing.T) {
 		})).Return(nil).Once()
 		userStateRepo.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1", Banned: true}, nil).Once()
 
-		result, err := useCase.UpsertUserState(context.Background(), " u1 ", admintypes.UpsertUserStateRequest{Banned: true}, internaltests.PtrString("actor"))
+		result, err := useCase.UpsertUserState(context.Background(), internaltests.TestActor(), " u1 ", admintypes.UpsertUserStateRequest{Banned: true}, internaltests.PtrString("actor"))
 		assert.NoError(t, err)
 		assert.Equal(t, "u1", result.UserID)
 		impRepo.AssertExpectations(t)
@@ -72,7 +72,7 @@ func TestStateUseCase_DeleteUserState(t *testing.T) {
 		t.Parallel()
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
-		err := useCase.DeleteUserState(context.Background(), "   ")
+		err := useCase.DeleteUserState(context.Background(), internaltests.TestActor(), "   ")
 		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
 	})
 
@@ -81,7 +81,7 @@ func TestStateUseCase_DeleteUserState(t *testing.T) {
 
 		useCase, userStateRepo, _, _ := admintests.NewStateUseCaseFixture()
 		userStateRepo.On("Delete", mock.Anything, "u1").Return(nil).Once()
-		err := useCase.DeleteUserState(context.Background(), "  u1 ")
+		err := useCase.DeleteUserState(context.Background(), internaltests.TestActor(), "  u1 ")
 		assert.NoError(t, err)
 		userStateRepo.AssertExpectations(t)
 	})
@@ -93,7 +93,7 @@ func TestStateUseCase_GetBannedUserStates(t *testing.T) {
 	useCase, userStateRepo, _, _ := admintests.NewStateUseCaseFixture()
 	userStateRepo.On("GetBanned", mock.Anything).Return([]admintypes.AdminUserState{{UserID: "u1", Banned: true}}, nil).Once()
 
-	list, err := useCase.GetBannedUserStates(context.Background())
+	list, err := useCase.GetBannedUserStates(context.Background(), internaltests.TestActor())
 	assert.NoError(t, err)
 	assert.Len(t, list, 1)
 	userStateRepo.AssertExpectations(t)
@@ -105,7 +105,7 @@ func TestStateUseCase_GetSessionState(t *testing.T) {
 	t.Run("empty id", func(t *testing.T) {
 		t.Parallel()
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
-		_, err := useCase.GetSessionState(context.Background(), "")
+		_, err := useCase.GetSessionState(context.Background(), internaltests.TestActor(), "")
 		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
 	})
 
@@ -114,7 +114,7 @@ func TestStateUseCase_GetSessionState(t *testing.T) {
 
 		useCase, _, sessionStateRepo, _ := admintests.NewStateUseCaseFixture()
 		sessionStateRepo.On("GetBySessionID", mock.Anything, "s1").Return(&admintypes.AdminSessionState{SessionID: "s1"}, nil).Once()
-		_, err := useCase.GetSessionState(context.Background(), " s1 ")
+		_, err := useCase.GetSessionState(context.Background(), internaltests.TestActor(), " s1 ")
 		assert.NoError(t, err)
 		sessionStateRepo.AssertExpectations(t)
 	})
@@ -127,7 +127,7 @@ func TestStateUseCase_UpsertSessionState(t *testing.T) {
 		t.Parallel()
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
-		_, err := useCase.UpsertSessionState(context.Background(), "", admintypes.UpsertSessionStateRequest{}, nil)
+		_, err := useCase.UpsertSessionState(context.Background(), internaltests.TestActor(), "", admintypes.UpsertSessionStateRequest{}, nil)
 		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
 	})
 
@@ -141,7 +141,7 @@ func TestStateUseCase_UpsertSessionState(t *testing.T) {
 		})).Return(nil).Once()
 		sessionStateRepo.On("GetBySessionID", mock.Anything, "s1").Return(&admintypes.AdminSessionState{SessionID: "s1"}, nil).Once()
 
-		_, err := useCase.UpsertSessionState(context.Background(), " s1 ", admintypes.UpsertSessionStateRequest{Revoke: true}, internaltests.PtrString("actor"))
+		_, err := useCase.UpsertSessionState(context.Background(), internaltests.TestActor(), " s1 ", admintypes.UpsertSessionStateRequest{Revoke: true}, internaltests.PtrString("actor"))
 		assert.NoError(t, err)
 		sessionStateRepo.AssertExpectations(t)
 	})
@@ -154,7 +154,7 @@ func TestStateUseCase_DeleteSessionState(t *testing.T) {
 		t.Parallel()
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
-		err := useCase.DeleteSessionState(context.Background(), "   ")
+		err := useCase.DeleteSessionState(context.Background(), internaltests.TestActor(), "   ")
 		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
 	})
 
@@ -163,7 +163,7 @@ func TestStateUseCase_DeleteSessionState(t *testing.T) {
 
 		useCase, _, sessionStateRepo, _ := admintests.NewStateUseCaseFixture()
 		sessionStateRepo.On("Delete", mock.Anything, "s1").Return(nil).Once()
-		err := useCase.DeleteSessionState(context.Background(), " s1 ")
+		err := useCase.DeleteSessionState(context.Background(), internaltests.TestActor(), " s1 ")
 		assert.NoError(t, err)
 		sessionStateRepo.AssertExpectations(t)
 	})
@@ -176,7 +176,7 @@ func TestStateUseCase_GetUserAdminSessions(t *testing.T) {
 		t.Parallel()
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
-		_, err := useCase.GetUserAdminSessions(context.Background(), "")
+		_, err := useCase.GetUserAdminSessions(context.Background(), internaltests.TestActor(), "")
 		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
 	})
 
@@ -186,7 +186,7 @@ func TestStateUseCase_GetUserAdminSessions(t *testing.T) {
 		useCase, _, sessionStateRepo, impRepo := admintests.NewStateUseCaseFixture()
 		impRepo.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
 		sessionStateRepo.On("GetByUserID", mock.Anything, "u1").Return([]admintypes.AdminUserSession{}, nil).Once()
-		_, err := useCase.GetUserAdminSessions(context.Background(), " u1 ")
+		_, err := useCase.GetUserAdminSessions(context.Background(), internaltests.TestActor(), " u1 ")
 		assert.NoError(t, err)
 		impRepo.AssertExpectations(t)
 		sessionStateRepo.AssertExpectations(t)
@@ -201,7 +201,7 @@ func TestStateUseCase_RevokeSession(t *testing.T) {
 	sessionStateRepo.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
 	sessionStateRepo.On("GetBySessionID", mock.Anything, "s1").Return(&admintypes.AdminSessionState{SessionID: "s1"}, nil).Once()
 
-	_, err := useCase.RevokeSession(context.Background(), "s1", internaltests.PtrString("reason"), internaltests.PtrString("actor"))
+	_, err := useCase.RevokeSession(context.Background(), internaltests.TestActor(), "s1", internaltests.PtrString("reason"), internaltests.PtrString("actor"))
 	assert.NoError(t, err)
 	sessionStateRepo.AssertExpectations(t)
 }
@@ -211,7 +211,7 @@ func TestStateUseCase_GetRevokedSessionStates(t *testing.T) {
 
 	useCase, _, sessionStateRepo, _ := admintests.NewStateUseCaseFixture()
 	sessionStateRepo.On("GetRevoked", mock.Anything).Return([]admintypes.AdminSessionState{{SessionID: "s1"}}, nil).Once()
-	list, err := useCase.GetRevokedSessionStates(context.Background())
+	list, err := useCase.GetRevokedSessionStates(context.Background(), internaltests.TestActor())
 	assert.NoError(t, err)
 	assert.Len(t, list, 1)
 	sessionStateRepo.AssertExpectations(t)
@@ -228,7 +228,7 @@ func TestStateUseCase_BanAndUnbanUser(t *testing.T) {
 		impRepo.On("UserExists", mock.Anything, " u1 ").Return(true, nil).Once()
 		userStateRepo.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
 		userStateRepo.On("GetByUserID", mock.Anything, " u1 ").Return(&admintypes.AdminUserState{UserID: " u1 ", Banned: true}, nil).Once()
-		_, err := useCase.BanUser(context.Background(), " u1 ", admintypes.BanUserRequest{}, internaltests.PtrString("actor"))
+		_, err := useCase.BanUser(context.Background(), internaltests.TestActor(), " u1 ", admintypes.BanUserRequest{}, internaltests.PtrString("actor"))
 		assert.NoError(t, err)
 		impRepo.AssertExpectations(t)
 		userStateRepo.AssertExpectations(t)
@@ -241,7 +241,7 @@ func TestStateUseCase_BanAndUnbanUser(t *testing.T) {
 		impRepo.On("UserExists", mock.Anything, " u1 ").Return(true, nil).Once()
 		userStateRepo.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
 		userStateRepo.On("GetByUserID", mock.Anything, " u1 ").Return(&admintypes.AdminUserState{UserID: " u1 ", Banned: false}, nil).Once()
-		_, err := useCase.UnbanUser(context.Background(), " u1 ")
+		_, err := useCase.UnbanUser(context.Background(), internaltests.TestActor(), " u1 ")
 		assert.NoError(t, err)
 		impRepo.AssertExpectations(t)
 		userStateRepo.AssertExpectations(t)

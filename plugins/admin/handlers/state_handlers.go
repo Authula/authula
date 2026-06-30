@@ -20,9 +20,10 @@ func NewGetUserStateHandler(useCase usecases.StateUseCase) *GetUserStateHandler 
 func (h *GetUserStateHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
-		state, err := h.useCase.GetUserState(r.Context(), userID)
+		state, err := h.useCase.GetUserState(r.Context(), actor, userID)
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return
@@ -48,6 +49,7 @@ func NewCreateUserStateHandler(useCase usecases.StateUseCase) *CreateUserStateHa
 func (h *CreateUserStateHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
 		var payload types.CreateUserStateRequest
@@ -57,7 +59,7 @@ func (h *CreateUserStateHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		state, err := h.useCase.CreateUserState(r.Context(), userID, payload, stateActorUserID(reqCtx))
+		state, err := h.useCase.CreateUserState(r.Context(), actor, userID, payload, stateActorUserID(reqCtx))
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return
@@ -78,6 +80,7 @@ func NewUpdateUserStateHandler(useCase usecases.StateUseCase) *UpdateUserStateHa
 func (h *UpdateUserStateHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
 		var payload types.UpsertUserStateRequest
@@ -87,7 +90,7 @@ func (h *UpdateUserStateHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		state, err := h.useCase.UpdateUserState(r.Context(), userID, payload, stateActorUserID(reqCtx))
+		state, err := h.useCase.UpdateUserState(r.Context(), actor, userID, payload, stateActorUserID(reqCtx))
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return
@@ -108,6 +111,7 @@ func NewUpsertUserStateHandler(useCase usecases.StateUseCase) *UpsertUserStateHa
 func (h *UpsertUserStateHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
 		var payload types.UpsertUserStateRequest
@@ -117,7 +121,7 @@ func (h *UpsertUserStateHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		state, err := h.useCase.UpsertUserState(r.Context(), userID, payload, stateActorUserID(reqCtx))
+		state, err := h.useCase.UpsertUserState(r.Context(), actor, userID, payload, stateActorUserID(reqCtx))
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return
@@ -138,9 +142,10 @@ func NewDeleteUserStateHandler(useCase usecases.StateUseCase) *DeleteUserStateHa
 func (h *DeleteUserStateHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
-		if err := h.useCase.DeleteUserState(r.Context(), userID); err != nil {
+		if err := h.useCase.DeleteUserState(r.Context(), actor, userID); err != nil {
 			respondStateError(reqCtx, err)
 			return
 		}
@@ -160,8 +165,9 @@ func NewGetBannedUserStatesHandler(useCase usecases.StateUseCase) *GetBannedUser
 func (h *GetBannedUserStatesHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 
-		rows, err := h.useCase.GetBannedUserStates(r.Context())
+		rows, err := h.useCase.GetBannedUserStates(r.Context(), actor)
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return
@@ -182,6 +188,7 @@ func NewBanUserHandler(useCase usecases.StateUseCase) *BanUserHandler {
 func (h *BanUserHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
 		var payload types.BanUserRequest
@@ -191,7 +198,7 @@ func (h *BanUserHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		state, err := h.useCase.BanUser(r.Context(), userID, payload, stateActorUserID(reqCtx))
+		state, err := h.useCase.BanUser(r.Context(), actor, userID, payload, stateActorUserID(reqCtx))
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return
@@ -212,9 +219,10 @@ func NewUnbanUserHandler(useCase usecases.StateUseCase) *UnbanUserHandler {
 func (h *UnbanUserHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
-		state, err := h.useCase.UnbanUser(r.Context(), userID)
+		state, err := h.useCase.UnbanUser(r.Context(), actor, userID)
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return
@@ -235,9 +243,10 @@ func NewGetSessionStateHandler(useCase usecases.StateUseCase) *GetSessionStateHa
 func (h *GetSessionStateHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		sessionID := r.PathValue("session_id")
 
-		state, err := h.useCase.GetSessionState(r.Context(), sessionID)
+		state, err := h.useCase.GetSessionState(r.Context(), actor, sessionID)
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return
@@ -263,6 +272,7 @@ func NewCreateSessionStateHandler(useCase usecases.StateUseCase) *CreateSessionS
 func (h *CreateSessionStateHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		sessionID := r.PathValue("session_id")
 
 		var payload types.CreateSessionStateRequest
@@ -272,7 +282,7 @@ func (h *CreateSessionStateHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		state, err := h.useCase.CreateSessionState(r.Context(), sessionID, payload, stateActorUserID(reqCtx))
+		state, err := h.useCase.CreateSessionState(r.Context(), actor, sessionID, payload, stateActorUserID(reqCtx))
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return
@@ -293,6 +303,7 @@ func NewUpdateSessionStateHandler(useCase usecases.StateUseCase) *UpdateSessionS
 func (h *UpdateSessionStateHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		sessionID := r.PathValue("session_id")
 
 		var payload types.UpsertSessionStateRequest
@@ -302,7 +313,7 @@ func (h *UpdateSessionStateHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		state, err := h.useCase.UpdateSessionState(r.Context(), sessionID, payload, stateActorUserID(reqCtx))
+		state, err := h.useCase.UpdateSessionState(r.Context(), actor, sessionID, payload, stateActorUserID(reqCtx))
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return
@@ -323,6 +334,7 @@ func NewUpsertSessionStateHandler(useCase usecases.StateUseCase) *UpsertSessionS
 func (h *UpsertSessionStateHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		sessionID := r.PathValue("session_id")
 
 		var payload types.UpsertSessionStateRequest
@@ -332,7 +344,7 @@ func (h *UpsertSessionStateHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		state, err := h.useCase.UpsertSessionState(r.Context(), sessionID, payload, stateActorUserID(reqCtx))
+		state, err := h.useCase.UpsertSessionState(r.Context(), actor, sessionID, payload, stateActorUserID(reqCtx))
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return
@@ -353,9 +365,10 @@ func NewDeleteSessionStateHandler(useCase usecases.StateUseCase) *DeleteSessionS
 func (h *DeleteSessionStateHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		sessionID := r.PathValue("session_id")
 
-		if err := h.useCase.DeleteSessionState(r.Context(), sessionID); err != nil {
+		if err := h.useCase.DeleteSessionState(r.Context(), actor, sessionID); err != nil {
 			respondStateError(reqCtx, err)
 			return
 		}
@@ -375,8 +388,9 @@ func NewGetRevokedSessionStatesHandler(useCase usecases.StateUseCase) *GetRevoke
 func (h *GetRevokedSessionStatesHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 
-		rows, err := h.useCase.GetRevokedSessionStates(r.Context())
+		rows, err := h.useCase.GetRevokedSessionStates(r.Context(), actor)
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return
@@ -397,9 +411,10 @@ func NewGetUserAdminSessionsHandler(useCase usecases.StateUseCase) *GetUserAdmin
 func (h *GetUserAdminSessionsHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
-		rows, err := h.useCase.GetUserAdminSessions(r.Context(), userID)
+		rows, err := h.useCase.GetUserAdminSessions(r.Context(), actor, userID)
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return
@@ -420,6 +435,7 @@ func NewRevokeSessionHandler(useCase usecases.StateUseCase) *RevokeSessionHandle
 func (h *RevokeSessionHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		sessionID := r.PathValue("session_id")
 
 		var payload types.RevokeSessionRequest
@@ -429,7 +445,7 @@ func (h *RevokeSessionHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		state, err := h.useCase.RevokeSession(r.Context(), sessionID, payload.Reason, stateActorUserID(reqCtx))
+		state, err := h.useCase.RevokeSession(r.Context(), actor, sessionID, payload.Reason, stateActorUserID(reqCtx))
 		if err != nil {
 			respondStateError(reqCtx, err)
 			return

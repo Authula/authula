@@ -23,6 +23,7 @@ func (h *CreateUserHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 
 		var payload types.CreateUserRequest
 		if err := util.ParseJSON(r, &payload); err != nil {
@@ -31,7 +32,7 @@ func (h *CreateUserHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		user, err := h.useCase.Create(ctx, payload)
+		user, err := h.useCase.Create(ctx, actor, payload)
 		if err != nil {
 			respondUsersError(reqCtx, err)
 			return
@@ -55,6 +56,7 @@ func (h *GetAllUsersHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 
 		cursorValue := strings.TrimSpace(r.URL.Query().Get("cursor"))
 		var cursor *string
@@ -73,7 +75,7 @@ func (h *GetAllUsersHandler) Handler() http.HandlerFunc {
 			limit = value
 		}
 
-		page, err := h.useCase.GetAll(ctx, cursor, limit)
+		page, err := h.useCase.GetAll(ctx, actor, cursor, limit)
 		if err != nil {
 			respondUsersError(reqCtx, err)
 			return
@@ -97,9 +99,10 @@ func NewGetUserByIDHandler(useCase usecases.UsersUseCase) *GetUserByIDHandler {
 func (h *GetUserByIDHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
-		user, err := h.useCase.GetByID(r.Context(), userID)
+		user, err := h.useCase.GetByID(r.Context(), actor, userID)
 		if err != nil {
 			respondUsersError(reqCtx, err)
 			return
@@ -127,6 +130,7 @@ func NewUpdateUserHandler(useCase usecases.UsersUseCase) *UpdateUserHandler {
 func (h *UpdateUserHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
 		var payload types.UpdateUserRequest
@@ -136,7 +140,7 @@ func (h *UpdateUserHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		user, err := h.useCase.Update(r.Context(), userID, payload)
+		user, err := h.useCase.Update(r.Context(), actor, userID, payload)
 		if err != nil {
 			respondUsersError(reqCtx, err)
 			return
@@ -159,9 +163,10 @@ func NewDeleteUserHandler(useCase usecases.UsersUseCase) *DeleteUserHandler {
 func (h *DeleteUserHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
-		if err := h.useCase.Delete(r.Context(), userID); err != nil {
+		if err := h.useCase.Delete(r.Context(), actor, userID); err != nil {
 			respondUsersError(reqCtx, err)
 			return
 		}

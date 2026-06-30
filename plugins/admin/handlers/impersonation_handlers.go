@@ -20,8 +20,9 @@ func NewGetAllImpersonationsHandler(useCase usecases.ImpersonationUseCase) *GetA
 func (h *GetAllImpersonationsHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 
-		rows, err := h.useCase.GetAllImpersonations(r.Context())
+		rows, err := h.useCase.GetAllImpersonations(r.Context(), actor)
 		if err != nil {
 			respondImpersonationError(reqCtx, err)
 			return
@@ -42,9 +43,10 @@ func NewGetImpersonationByIDHandler(useCase usecases.ImpersonationUseCase) *GetI
 func (h *GetImpersonationByIDHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
+		actor := reqCtx.Actor
 		impersonationID := r.PathValue("impersonation_id")
 
-		impersonation, err := h.useCase.GetImpersonationByID(r.Context(), impersonationID)
+		impersonation, err := h.useCase.GetImpersonationByID(r.Context(), actor, impersonationID)
 		if err != nil {
 			respondImpersonationError(reqCtx, err)
 			return
@@ -66,6 +68,7 @@ func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		impersonatorUserID := getUserID(reqCtx)
 
 		if impersonatorUserID == nil {
@@ -82,7 +85,7 @@ func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 		}
 
 		userAgent := r.UserAgent()
-		result, err := h.useCase.StartImpersonation(r.Context(), *impersonatorUserID, getSessionID(reqCtx), &reqCtx.ClientIP, &userAgent, payload)
+		result, err := h.useCase.StartImpersonation(r.Context(), actor, *impersonatorUserID, getSessionID(reqCtx), &reqCtx.ClientIP, &userAgent, payload)
 		if err != nil {
 			respondImpersonationError(reqCtx, err)
 			return
@@ -124,6 +127,7 @@ func (h *StopImpersonationHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
 		impersonatedUserID := getUserID(reqCtx)
 		impersonatedSessionID := getSessionID(reqCtx)
 
@@ -134,7 +138,7 @@ func (h *StopImpersonationHandler) Handler() http.HandlerFunc {
 		}
 
 		impersonationID := r.PathValue("impersonation_id")
-		if err := h.useCase.StopImpersonation(r.Context(), *impersonatedUserID, *impersonatedSessionID, types.StopImpersonationRequest{ImpersonationID: &impersonationID}); err != nil {
+		if err := h.useCase.StopImpersonation(r.Context(), actor, *impersonatedUserID, *impersonatedSessionID, types.StopImpersonationRequest{ImpersonationID: &impersonationID}); err != nil {
 			respondImpersonationError(reqCtx, err)
 			return
 		}

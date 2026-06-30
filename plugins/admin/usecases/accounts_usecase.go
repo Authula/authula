@@ -19,23 +19,23 @@ func NewAccountsUseCase(service *services.AccountsService) AccountsUseCase {
 	return AccountsUseCase{service: service}
 }
 
-func (u AccountsUseCase) GetByID(ctx context.Context, accountID string) (*models.Account, error) {
+func (u AccountsUseCase) GetByID(ctx context.Context, actor *models.Actor, accountID string) (*models.Account, error) {
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
 		return nil, internalerrors.ErrBadRequest
 	}
-	return u.service.GetByID(ctx, accountID)
+	return u.service.GetByID(ctx, actor, accountID)
 }
 
-func (u AccountsUseCase) GetByUserID(ctx context.Context, userID string) ([]models.Account, error) {
+func (u AccountsUseCase) GetByUserID(ctx context.Context, actor *models.Actor, userID string) ([]models.Account, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
 		return nil, adminconstants.ErrUserIDRequired
 	}
-	return u.service.GetByUserID(ctx, userID)
+	return u.service.GetByUserID(ctx, actor, userID)
 }
 
-func (u AccountsUseCase) Create(ctx context.Context, userID string, request types.CreateAccountRequest) (*models.Account, error) {
+func (u AccountsUseCase) Create(ctx context.Context, actor *models.Actor, userID string, request types.CreateAccountRequest) (*models.Account, error) {
 	userID = strings.TrimSpace(userID)
 	request.ProviderID = strings.TrimSpace(strings.ToLower(request.ProviderID))
 	request.AccountID = strings.TrimSpace(request.AccountID)
@@ -51,10 +51,10 @@ func (u AccountsUseCase) Create(ctx context.Context, userID string, request type
 		return nil, internalerrors.ErrBadRequest
 	}
 
-	return u.service.Create(ctx, userID, request)
+	return u.service.Create(ctx, actor, userID, request)
 }
 
-func (u AccountsUseCase) Update(ctx context.Context, accountID string, request types.UpdateAccountRequest) (*models.Account, error) {
+func (u AccountsUseCase) Update(ctx context.Context, actor *models.Actor, accountID string, request types.UpdateAccountRequest) (*models.Account, error) {
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
 		return nil, internalerrors.ErrBadRequest
@@ -85,13 +85,13 @@ func (u AccountsUseCase) Update(ctx context.Context, accountID string, request t
 		request.Scope = &trimmed
 	}
 
-	return u.service.Update(ctx, accountID, request)
+	return u.service.Update(ctx, actor, accountID, request)
 }
 
-func (u AccountsUseCase) Delete(ctx context.Context, accountID string) error {
+func (u AccountsUseCase) Delete(ctx context.Context, actor *models.Actor, accountID string) error {
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
 		return internalerrors.ErrBadRequest
 	}
-	return u.service.Delete(ctx, accountID)
+	return u.service.Delete(ctx, actor, accountID)
 }

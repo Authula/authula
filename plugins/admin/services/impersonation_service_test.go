@@ -66,7 +66,7 @@ func TestImpersonationService_StartImpersonation_validation(t *testing.T) {
 
 			ipAddress := internaltests.PtrString("127.0.0.1")
 			userAgent := internaltests.PtrString("user-agent")
-			_, err := svc.StartImpersonation(ctx, tc.actor, nil, ipAddress, userAgent, tc.req)
+			_, err := svc.StartImpersonation(ctx, internaltests.TestActor(), tc.actor, nil, ipAddress, userAgent, tc.req)
 			if tc.want != nil {
 				require.ErrorIs(t, err, tc.want)
 			} else {
@@ -99,7 +99,7 @@ func TestImpersonationService_StartImpersonation_success(t *testing.T) {
 	req := admintypes.StartImpersonationRequest{TargetUserID: "target", Reason: "reason", ExpiresInSeconds: func(i int) *int { return &i }(60)}
 	ipAddress := internaltests.PtrString("127.0.0.1")
 	userAgent := internaltests.PtrString("user-agent")
-	res, err := svc.StartImpersonation(ctx, "actor", nil, ipAddress, userAgent, req)
+	res, err := svc.StartImpersonation(ctx, internaltests.TestActor(), "actor", nil, ipAddress, userAgent, req)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.NotNil(t, res.SessionID)
@@ -119,7 +119,7 @@ func TestImpersonationService_StartImpersonation_noSessionServices(t *testing.T)
 	impRepo := &admintests.MockImpersonationRepository{}
 	sessRepo := &admintests.MockSessionStateRepository{}
 	// Use constructor to create service with nil session/token services
-	svc := adminservices.NewImpersonationService(impRepo, sessRepo, nil, nil, time.Minute, time.Minute)
+	svc := adminservices.NewImpersonationService(impRepo, sessRepo, nil, nil, time.Minute, time.Minute, &internaltests.NoopAuthorizer{})
 	ctx := context.Background()
 
 	impRepo.On("UserExists", mock.Anything, "actor").Return(true, nil).Once()
@@ -129,7 +129,7 @@ func TestImpersonationService_StartImpersonation_noSessionServices(t *testing.T)
 	req := admintypes.StartImpersonationRequest{TargetUserID: "target", Reason: "reason"}
 	ipAddress := internaltests.PtrString("127.0.0.1")
 	userAgent := internaltests.PtrString("user-agent")
-	res, err := svc.StartImpersonation(ctx, "actor", nil, ipAddress, userAgent, req)
+	res, err := svc.StartImpersonation(ctx, internaltests.TestActor(), "actor", nil, ipAddress, userAgent, req)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.Nil(t, res.SessionID)
@@ -148,19 +148,19 @@ func TestImpersonationService_StopImpersonation(t *testing.T) {
 	imp := &admintypes.Impersonation{ID: "imp1", ActorUserID: "actor", TargetUserID: "target", ImpersonationSessionID: admintests.PtrString(t, "sess1"), Reason: "r", ExpiresAt: time.Now().UTC()}
 
 	// case: empty actor
-	err := svc.StopImpersonation(ctx, "", admintypes.StopImpersonationRequest{})
+	err := svc.StopImpersonation(ctx, internaltests.TestActor(), "", admintypes.StopImpersonationRequest{})
 	require.ErrorIs(t, err, internalerrors.ErrBadRequest)
 
 	// case: id not found
 	impRepo.On("GetActiveImpersonationByID", mock.Anything, "imp1").Return(nil, nil).Once()
-	err = svc.StopImpersonation(ctx, "actor", admintypes.StopImpersonationRequest{ImpersonationID: admintests.PtrString(t, "imp1")})
+	err = svc.StopImpersonation(ctx, internaltests.TestActor(), "actor", admintypes.StopImpersonationRequest{ImpersonationID: admintests.PtrString(t, "imp1")})
 	require.ErrorIs(t, err, internalerrors.ErrNotFound)
 	impRepo.AssertExpectations(t)
 
 	// case: found but wrong actor
 	impRepo.ExpectedCalls = nil
 	impRepo.On("GetActiveImpersonationByID", mock.Anything, "imp1").Return(imp, nil).Once()
-	err = svc.StopImpersonation(ctx, "other", admintypes.StopImpersonationRequest{ImpersonationID: admintests.PtrString(t, "imp1")})
+	err = svc.StopImpersonation(ctx, internaltests.TestActor(), "other", admintypes.StopImpersonationRequest{ImpersonationID: admintests.PtrString(t, "imp1")})
 	require.ErrorIs(t, err, internalerrors.ErrForbidden)
 	impRepo.AssertExpectations(t)
 
@@ -174,7 +174,7 @@ func TestImpersonationService_StopImpersonation(t *testing.T) {
 	sessSvc.On("Delete", mock.Anything, "sess1").Return(nil).Once()
 	impRepo.On("EndImpersonation", mock.Anything, "imp1", mock.Anything).Return(nil).Once()
 
-	err = svc.StopImpersonation(ctx, "actor", admintypes.StopImpersonationRequest{ImpersonationID: admintests.PtrString(t, "imp1")})
+	err = svc.StopImpersonation(ctx, internaltests.TestActor(), "actor", admintypes.StopImpersonationRequest{ImpersonationID: admintests.PtrString(t, "imp1")})
 	require.NoError(t, err)
 	impRepo.AssertExpectations(t)
 	sessRepo.AssertExpectations(t)
@@ -189,7 +189,7 @@ func TestImpersonationService_GetAllImpersonations(t *testing.T) {
 
 	list := []admintypes.Impersonation{{ID: "i1"}}
 	impRepo.On("GetAllImpersonations", mock.Anything).Return(list, nil).Once()
-	res, err := svc.GetAllImpersonations(ctx)
+	res, err := svc.GetAllImpersonations(ctx, internaltests.TestActor())
 	require.NoError(t, err)
 	require.Len(t, res, 1)
 	impRepo.AssertExpectations(t)
@@ -201,17 +201,17 @@ func TestImpersonationService_GetImpersonationByID(t *testing.T) {
 	svc, impRepo, _, _, _ := newImpersonationServiceFixture()
 	ctx := context.Background()
 
-	_, err := svc.GetImpersonationByID(ctx, "   ")
+	_, err := svc.GetImpersonationByID(ctx, internaltests.TestActor(), "   ")
 	require.ErrorIs(t, err, internalerrors.ErrBadRequest)
 
 	impRepo.On("GetImpersonationByID", mock.Anything, "i1").Return(nil, nil).Once()
-	_, err = svc.GetImpersonationByID(ctx, "i1")
+	_, err = svc.GetImpersonationByID(ctx, internaltests.TestActor(), "i1")
 	require.ErrorIs(t, err, internalerrors.ErrNotFound)
 
 	impObj := &admintypes.Impersonation{ID: "i1"}
 	impRepo.ExpectedCalls = nil
 	impRepo.On("GetImpersonationByID", mock.Anything, "i1").Return(impObj, nil).Once()
-	res, err := svc.GetImpersonationByID(ctx, " i1 ")
+	res, err := svc.GetImpersonationByID(ctx, internaltests.TestActor(), " i1 ")
 	require.NoError(t, err)
 	require.Equal(t, "i1", res.ID)
 	impRepo.AssertExpectations(t)
