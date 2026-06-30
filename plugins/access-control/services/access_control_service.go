@@ -5,15 +5,17 @@ import (
 	"time"
 
 	internalerrors "github.com/Authula/authula/internal/errors"
+	"github.com/Authula/authula/plugins/access-control/repositories"
 )
 
 type AccessControlService struct {
 	rolesService     *RolesService
 	userRolesService *UserRolesService
+	permissionsRepo  repositories.PermissionsRepository
 }
 
-func NewAccessControlService(rolesService *RolesService, userRolesService *UserRolesService) *AccessControlService {
-	return &AccessControlService{rolesService: rolesService, userRolesService: userRolesService}
+func NewAccessControlService(rolesService *RolesService, userRolesService *UserRolesService, permissionsRepo repositories.PermissionsRepository) *AccessControlService {
+	return &AccessControlService{rolesService: rolesService, userRolesService: userRolesService, permissionsRepo: permissionsRepo}
 }
 
 func (s *AccessControlService) RoleExists(ctx context.Context, roleName string) (bool, error) {
@@ -53,4 +55,17 @@ func (s *AccessControlService) ValidateRoleAssignment(ctx context.Context, roleN
 	}
 
 	return true, nil
+}
+
+func (s *AccessControlService) ValidatePermissionKeys(ctx context.Context, permissionKeys []string) error {
+	for _, key := range permissionKeys {
+		permission, err := s.permissionsRepo.GetPermissionByKey(ctx, key)
+		if err != nil {
+			return err
+		}
+		if permission == nil {
+			return internalerrors.ErrNotFound
+		}
+	}
+	return nil
 }

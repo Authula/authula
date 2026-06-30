@@ -58,7 +58,7 @@ func (p *AccessControlPlugin) Init(ctx *models.PluginContext) error {
 	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo, authorizer)
 	userPermissionsService := services.NewUserPermissionsService(userPermissionsRepo, authorizer)
 
-	accessControlService := services.NewAccessControlService(rolesService, userRolesService)
+	accessControlService := services.NewAccessControlService(rolesService, userRolesService, permissionsRepo)
 	p.accessControlService = accessControlService
 
 	useCases := usecases.NewAccessControlUseCases(

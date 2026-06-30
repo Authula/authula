@@ -32,7 +32,7 @@ func newAccessControlHookTestPlugin(logger authmodels.Logger, rolesRepo *accessc
 	authorizer := &noopAuthorizer{}
 	rolesService := services.NewRolesService(rolesRepo, nil, userRolesRepo, authorizer)
 	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo, authorizer)
-	accessControlService := services.NewAccessControlService(rolesService, userRolesService)
+	accessControlService := services.NewAccessControlService(rolesService, userRolesService, nil)
 	rolePermissionsService := services.NewRolePermissionsService(nil, nil, nil, authorizer)
 	useCases := usecases.NewAccessControlUseCases(
 		usecases.NewRolesUseCase(rolesService),
