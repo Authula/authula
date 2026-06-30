@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	internalerrors "github.com/Authula/authula/internal/errors"
+	internaltests "github.com/Authula/authula/internal/tests"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -69,8 +70,8 @@ func TestUserRolesServiceAssignRoleToUser(t *testing.T) {
 				tc.setup(userRolesRepo, rolesRepo)
 			}
 
-			service := NewUserRolesService(userRolesRepo, rolesRepo, &noopAuthorizer{})
-			err := service.AssignRoleToUser(context.Background(), testActor(), "user-1", tc.req, tc.assignedByUserID)
+			service := NewUserRolesService(userRolesRepo, rolesRepo, &internaltests.NoopAuthorizer{})
+			err := service.AssignRoleToUser(context.Background(), internaltests.TestActor(), "user-1", tc.req, tc.assignedByUserID)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
 			}
@@ -123,8 +124,8 @@ func TestUserRolesServiceReplaceUserRoles(t *testing.T) {
 				tc.setup(userRolesRepo, rolesRepo)
 			}
 
-			service := NewUserRolesService(userRolesRepo, rolesRepo, &noopAuthorizer{})
-			err := service.ReplaceUserRoles(context.Background(), testActor(), "user-1", tc.roleIDs, tc.assignedByUserID)
+			service := NewUserRolesService(userRolesRepo, rolesRepo, &internaltests.NoopAuthorizer{})
+			err := service.ReplaceUserRoles(context.Background(), internaltests.TestActor(), "user-1", tc.roleIDs, tc.assignedByUserID)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
 			}

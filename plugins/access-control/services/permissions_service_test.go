@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	internalerrors "github.com/Authula/authula/internal/errors"
+	internaltests "github.com/Authula/authula/internal/tests"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -81,8 +82,8 @@ func TestPermissionsServiceCreatePermission(t *testing.T) {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &noopAuthorizer{})
-			permission, err := service.CreatePermission(context.Background(), testActor(), tc.req)
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &internaltests.NoopAuthorizer{})
+			permission, err := service.CreatePermission(context.Background(), internaltests.TestActor(), tc.req)
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)
@@ -136,8 +137,8 @@ func TestPermissionsServiceGetAllPermissions(t *testing.T) {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &noopAuthorizer{})
-			permissions, err := service.GetAllPermissions(context.Background(), testActor())
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &internaltests.NoopAuthorizer{})
+			permissions, err := service.GetAllPermissions(context.Background(), internaltests.TestActor())
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)
@@ -198,8 +199,8 @@ func TestPermissionsServiceGetPermissionByID(t *testing.T) {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &noopAuthorizer{})
-			permission, err := service.GetPermissionByID(context.Background(), testActor(), tc.id)
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &internaltests.NoopAuthorizer{})
+			permission, err := service.GetPermissionByID(context.Background(), internaltests.TestActor(), tc.id)
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)
@@ -298,8 +299,8 @@ func TestPermissionsServiceUpdatePermission(t *testing.T) {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &noopAuthorizer{})
-			permission, err := service.UpdatePermission(context.Background(), testActor(), tc.id, tc.req)
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &internaltests.NoopAuthorizer{})
+			permission, err := service.UpdatePermission(context.Background(), internaltests.TestActor(), tc.id, tc.req)
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)
@@ -386,8 +387,8 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 				tc.setup(permissionsRepo, rolePermissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &noopAuthorizer{})
-			err := service.DeletePermission(context.Background(), testActor(), tc.id)
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &internaltests.NoopAuthorizer{})
+			err := service.DeletePermission(context.Background(), internaltests.TestActor(), tc.id)
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)

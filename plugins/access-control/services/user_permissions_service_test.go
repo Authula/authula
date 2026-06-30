@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	internalerrors "github.com/Authula/authula/internal/errors"
+	internaltests "github.com/Authula/authula/internal/tests"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -53,8 +54,8 @@ func TestUserPermissionsServiceGetUserPermissions(t *testing.T) {
 				tc.setupMock(repo)
 			}
 
-			service := NewUserPermissionsService(repo, &noopAuthorizer{})
-			permissions, err := service.GetUserPermissions(context.Background(), testActor(), tc.userID)
+			service := NewUserPermissionsService(repo, &internaltests.NoopAuthorizer{})
+			permissions, err := service.GetUserPermissions(context.Background(), internaltests.TestActor(), tc.userID)
 			if tc.expectedErr != nil {
 				if err != tc.expectedErr {
 					t.Fatalf("expected err %v, got %v", tc.expectedErr, err)
@@ -118,8 +119,8 @@ func TestUserPermissionsServiceHasPermissions(t *testing.T) {
 				tc.setupMock(repo)
 			}
 
-			service := NewUserPermissionsService(repo, &noopAuthorizer{})
-			hasPermissions, err := service.HasPermissions(context.Background(), testActor(), tc.userID, tc.permissionKeys)
+			service := NewUserPermissionsService(repo, &internaltests.NoopAuthorizer{})
+			hasPermissions, err := service.HasPermissions(context.Background(), internaltests.TestActor(), tc.userID, tc.permissionKeys)
 			if tc.expectedErr != nil {
 				if err != tc.expectedErr {
 					t.Fatalf("expected err %v, got %v", tc.expectedErr, err)
