@@ -1,0 +1,4 @@
+.git/
+bin/
+*.env
+config.toml
