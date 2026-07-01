@@ -26,6 +26,7 @@ const (
 	PluginMagicLink        PluginID = "magic_link"
 	PluginTOTP             PluginID = "totp"
 	PluginOrganizations    PluginID = "organizations"
+	PluginApiKey           PluginID = "api_key"
 )
 
 func (id PluginID) String() string {

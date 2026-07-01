@@ -52,6 +52,22 @@ func (p *DatabaseProvider) GetName() string {
 	return "database"
 }
 
+// GetValue returns a key's value
+func (p *DatabaseProvider) GetValue(ctx context.Context, key string) (any, error) {
+	value, err := p.repository.GetByKey(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	if value == nil {
+		return nil, nil
+	}
+
+	return types.RateLimitValue{
+		Count:     value.Count,
+		ExpiresAt: value.ExpiresAt,
+	}, nil
+}
+
 // CheckAndIncrement checks if a request is allowed and increments the counter
 func (p *DatabaseProvider) CheckAndIncrement(ctx context.Context, key string, window time.Duration, maxRequests int) (bool, int, time.Time, error) {
 	select {

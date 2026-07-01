@@ -308,6 +308,14 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, actor *mod
 	return updated, nil
 }
 
+func (s *organizationService) ExistsByID(ctx context.Context, organizationID string) (bool, error) {
+	org, err := s.orgRepo.GetByID(ctx, organizationID)
+	if err != nil {
+		return false, err
+	}
+	return org != nil, nil
+}
+
 func (s *organizationService) DeleteOrganization(ctx context.Context, actor *models.Actor, organizationID string) error {
 	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsDeletePermission); err != nil {
 		return err

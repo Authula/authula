@@ -121,6 +121,17 @@ func (s *StateService) GetBannedUserStates(ctx context.Context, actor *models.Ac
 	return s.userStateRepo.GetBanned(ctx)
 }
 
+func (s *StateService) GetSelfUserState(ctx context.Context, actor *models.Actor, userID string) (*types.AdminUserState, error) {
+	if actor.ID != userID {
+		return nil, internalerrors.ErrForbidden
+	}
+	return s.userStateRepo.GetByUserID(ctx, userID)
+}
+
+func (s *StateService) GetSelfSessionState(ctx context.Context, sessionID string) (*types.AdminSessionState, error) {
+	return s.sessionStateRepo.GetBySessionID(ctx, sessionID)
+}
+
 func (s *StateService) GetSessionState(ctx context.Context, actor *models.Actor, sessionID string) (*types.AdminSessionState, error) {
 	if err := s.authorizer.AuthorizeScope(ctx, actor, adminconstants.SessionStateReadPermission); err != nil {
 		return nil, err

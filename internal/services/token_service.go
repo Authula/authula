@@ -5,34 +5,28 @@ import (
 	"github.com/Authula/authula/services"
 )
 
-// TokenServiceImpl implements TokenService
-type TokenServiceImpl struct {
+type tokenService struct {
 	tokenRepo repositories.TokenRepository
 }
 
-// NewTokenService creates a new instance of TokenServiceImpl
 func NewTokenService(tokenRepo repositories.TokenRepository) services.TokenService {
-	return &TokenServiceImpl{
+	return &tokenService{
 		tokenRepo: tokenRepo,
 	}
 }
 
-// Generate generates a new token by delegating to the repository
-func (t *TokenServiceImpl) Generate() (string, error) {
+func (t *tokenService) Generate() (string, error) {
 	return t.tokenRepo.Generate()
 }
 
-// Hash hashes the token by delegating to the repository
-func (t *TokenServiceImpl) Hash(token string) string {
+func (t *tokenService) Hash(token string) string {
 	return t.tokenRepo.Hash(token)
 }
 
-// Encrypt encrypts the token by delegating to the repository
-func (t *TokenServiceImpl) Encrypt(token string) (string, error) {
+func (t *tokenService) Encrypt(token string) (string, error) {
 	return t.tokenRepo.Encrypt(token)
 }
 
-// Decrypt decrypts the token by delegating to the repository
-func (t *TokenServiceImpl) Decrypt(encryptedToken string) (string, error) {
+func (t *tokenService) Decrypt(encryptedToken string) (string, error) {
 	return t.tokenRepo.Decrypt(encryptedToken)
 }

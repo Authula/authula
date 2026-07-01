@@ -20,6 +20,18 @@ func NewUserPermissionsService(repo repositories.UserPermissionsRepository, auth
 	return &UserPermissionsService{repo: repo, authorizer: authorizer}
 }
 
+func (s *UserPermissionsService) GetSelfUserPermissions(ctx context.Context, actor *models.Actor, userID string) ([]types.UserPermissionInfo, error) {
+	if actor.ID != userID {
+		return nil, internalerrors.ErrForbidden
+	}
+
+	if userID == "" {
+		return nil, internalerrors.ErrUnprocessableEntity
+	}
+
+	return s.repo.GetUserPermissions(ctx, userID)
+}
+
 func (s *UserPermissionsService) GetUserPermissions(ctx context.Context, actor *models.Actor, userID string) ([]types.UserPermissionInfo, error) {
 	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.UserPermissionsReadPermission); err != nil {
 		return nil, err

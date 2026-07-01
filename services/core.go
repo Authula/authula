@@ -77,6 +77,8 @@ type RateLimitKeyRule struct {
 }
 
 type RateLimiterService interface {
+	// GetValue returns a key's value
+	GetValue(ctx context.Context, key string) (any, error)
 	// CheckAndIncrement checks the counter for an arbitrary key and increments it.
 	// Used for general IP-based rate limiting.
 	CheckAndIncrement(ctx context.Context, key string, window time.Duration, maxRequests int) (allowed bool, count int, resetAt time.Time, err error)

@@ -59,7 +59,7 @@ func TestAccessControlServiceRoleExists(t *testing.T) {
 				tc.setup(rolesRepo)
 			}
 
-			service := NewAccessControlService(NewRolesService(rolesRepo, nil, nil, &internaltests.NoopAuthorizer{}), NewUserRolesService(nil, nil, &internaltests.NoopAuthorizer{}))
+			service := NewAccessControlService(NewRolesService(rolesRepo, nil, nil, &internaltests.NoopAuthorizer{}), NewUserRolesService(nil, nil, &internaltests.NoopAuthorizer{}), nil)
 			ok, err := service.RoleExists(context.Background(), tc.roleName)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
@@ -73,6 +73,72 @@ func TestAccessControlServiceRoleExists(t *testing.T) {
 			}
 
 			rolesRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestAccessControlServiceValidatePermissionKeys(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		permissionKeys []string
+		setup          func(*accesscontroltests.MockPermissionsRepository)
+		wantErr        error
+	}{
+		{
+			name:           "empty keys returns nil",
+			permissionKeys: []string{},
+			wantErr:        nil,
+		},
+		{
+			name:           "all keys exist",
+			permissionKeys: []string{"read:users", "write:users"},
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
+				permissionsRepo.On("GetPermissionByKey", mock.Anything, "read:users").Return(&types.Permission{ID: "p1", Key: "read:users"}, nil).Once()
+				permissionsRepo.On("GetPermissionByKey", mock.Anything, "write:users").Return(&types.Permission{ID: "p2", Key: "write:users"}, nil).Once()
+			},
+			wantErr: nil,
+		},
+		{
+			name:           "single missing key returns ErrNotFound",
+			permissionKeys: []string{"read:users", "missing:key"},
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
+				permissionsRepo.On("GetPermissionByKey", mock.Anything, "read:users").Return(&types.Permission{ID: "p1", Key: "read:users"}, nil).Once()
+				permissionsRepo.On("GetPermissionByKey", mock.Anything, "missing:key").Return((*types.Permission)(nil), nil).Once()
+			},
+			wantErr: internalerrors.ErrNotFound,
+		},
+		{
+			name:           "repository error propagates",
+			permissionKeys: []string{"read:users"},
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
+				permissionsRepo.On("GetPermissionByKey", mock.Anything, "read:users").Return((*types.Permission)(nil), internalerrors.ErrForbidden).Once()
+			},
+			wantErr: internalerrors.ErrForbidden,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
+			if tc.setup != nil {
+				tc.setup(permissionsRepo)
+			}
+
+			service := NewAccessControlService(
+				NewRolesService(nil, nil, nil, &internaltests.NoopAuthorizer{}),
+				NewUserRolesService(nil, nil, &internaltests.NoopAuthorizer{}),
+				permissionsRepo,
+			)
+			err := service.ValidatePermissionKeys(context.Background(), tc.permissionKeys)
+			if err != tc.wantErr {
+				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
+			}
+
+			permissionsRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -152,7 +218,7 @@ func TestAccessControlServiceValidateRoleAssignment(t *testing.T) {
 				tc.setup(rolesRepo, userRolesRepo)
 			}
 
-			service := NewAccessControlService(NewRolesService(rolesRepo, nil, userRolesRepo, &internaltests.NoopAuthorizer{}), NewUserRolesService(userRolesRepo, rolesRepo, &internaltests.NoopAuthorizer{}))
+			service := NewAccessControlService(NewRolesService(rolesRepo, nil, userRolesRepo, &internaltests.NoopAuthorizer{}), NewUserRolesService(userRolesRepo, rolesRepo, &internaltests.NoopAuthorizer{}), nil)
 			ok, err := service.ValidateRoleAssignment(context.Background(), tc.roleName, tc.assigner)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)

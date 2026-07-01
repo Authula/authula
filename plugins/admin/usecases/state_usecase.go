@@ -112,6 +112,24 @@ func (u StateUseCase) DeleteSessionState(ctx context.Context, actor *models.Acto
 	return u.service.DeleteSessionState(ctx, actor, sessionID)
 }
 
+func (u StateUseCase) GetSelfUserState(ctx context.Context, actor *models.Actor, userID string) (*types.AdminUserState, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, internalerrors.ErrBadRequest
+	}
+
+	return u.service.GetSelfUserState(ctx, actor, userID)
+}
+
+func (u StateUseCase) GetSelfSessionState(ctx context.Context, sessionID string) (*types.AdminSessionState, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, internalerrors.ErrBadRequest
+	}
+
+	return u.service.GetSelfSessionState(ctx, sessionID)
+}
+
 func (u StateUseCase) GetUserAdminSessions(ctx context.Context, actor *models.Actor, userID string) ([]types.AdminUserSession, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {

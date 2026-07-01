@@ -33,6 +33,17 @@ func NewFakeRateLimitProvider() *FakeRateLimitProvider {
 
 func (p *FakeRateLimitProvider) GetName() string { return "fake" }
 
+func (p *FakeRateLimitProvider) GetValue(_ context.Context, key string) (any, error) {
+	record, ok := p.Store[key]
+	if !ok {
+		return nil, nil
+	}
+	return types.RateLimitValue{
+		Count:     record.MaxRequests,
+		ExpiresAt: time.Unix(int64(record.WindowSeconds), 0),
+	}, nil
+}
+
 func (p *FakeRateLimitProvider) WithCheckResult(allowed bool, count int, reset time.Time, err error) *FakeRateLimitProvider {
 	p.CheckAllowed = allowed
 	p.CheckCount = count

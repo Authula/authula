@@ -51,6 +51,19 @@ func (p *InMemoryProvider) GetName() string {
 	return "memory"
 }
 
+func (p *InMemoryProvider) GetValue(ctx context.Context, key string) (any, error) {
+	entry, exists := p.store[key]
+	if exists {
+		rateLimitValue := types.RateLimitValue{
+			Count:     entry.count,
+			ExpiresAt: entry.expiresAt,
+		}
+		return rateLimitValue, nil
+	}
+
+	return nil, nil
+}
+
 func (p *InMemoryProvider) CheckAndIncrement(ctx context.Context, key string, window time.Duration, maxRequests int) (bool, int, time.Time, error) {
 	select {
 	case <-ctx.Done():

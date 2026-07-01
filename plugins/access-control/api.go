@@ -102,6 +102,10 @@ func (a *API) ReplaceUserRoles(ctx context.Context, actor *models.Actor, userID 
 
 // User permissions
 
+func (a *API) GetSelfUserPermissions(ctx context.Context, actor *models.Actor, userID string) ([]types.UserPermissionInfo, error) {
+	return a.useCases.GetSelfUserPermissions(ctx, actor, userID)
+}
+
 func (a *API) GetUserPermissions(ctx context.Context, actor *models.Actor, userID string) ([]types.UserPermissionInfo, error) {
 	return a.useCases.GetUserPermissions(ctx, actor, userID)
 }

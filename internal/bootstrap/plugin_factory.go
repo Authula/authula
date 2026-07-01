@@ -9,6 +9,8 @@ import (
 	accesscontrolplugintypes "github.com/Authula/authula/plugins/access-control/types"
 	adminplugin "github.com/Authula/authula/plugins/admin"
 	adminplugintypes "github.com/Authula/authula/plugins/admin/types"
+	apikeyplugin "github.com/Authula/authula/plugins/api-key"
+	apikeyplugintypes "github.com/Authula/authula/plugins/api-key/types"
 	bearerplugin "github.com/Authula/authula/plugins/bearer"
 	csrfplugin "github.com/Authula/authula/plugins/csrf"
 	emailplugin "github.com/Authula/authula/plugins/email"
@@ -42,22 +44,6 @@ type PluginFactory struct {
 // pluginFactories is an ordered list of registered plugin factories.
 var pluginFactories = []PluginFactory{
 	{
-		ID:                models.PluginAdmin.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := adminplugintypes.AdminPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse admin plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return adminplugin.New(typedConfig.(adminplugintypes.AdminPluginConfig))
-		},
-	},
-	{
 		ID:                models.PluginSecondaryStorage.String(),
 		RequiredByDefault: false,
 		ConfigParser: func(rawConfig any) (any, error) {
@@ -71,6 +57,38 @@ var pluginFactories = []PluginFactory{
 		},
 		Constructor: func(typedConfig any) models.Plugin {
 			return secondarystorageplugin.New(typedConfig.(secondarystorageplugin.SecondaryStoragePluginConfig))
+		},
+	},
+	{
+		ID:                models.PluginAccessControl.String(),
+		RequiredByDefault: false,
+		ConfigParser: func(rawConfig any) (any, error) {
+			config := accesscontrolplugintypes.AccessControlPluginConfig{}
+			if rawConfig != nil {
+				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
+					return nil, fmt.Errorf("failed to parse access control plugin config: %w", err)
+				}
+			}
+			return config, nil
+		},
+		Constructor: func(typedConfig any) models.Plugin {
+			return accesscontrolplugin.New(typedConfig.(accesscontrolplugintypes.AccessControlPluginConfig))
+		},
+	},
+	{
+		ID:                models.PluginAdmin.String(),
+		RequiredByDefault: false,
+		ConfigParser: func(rawConfig any) (any, error) {
+			config := adminplugintypes.AdminPluginConfig{}
+			if rawConfig != nil {
+				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
+					return nil, fmt.Errorf("failed to parse admin plugin config: %w", err)
+				}
+			}
+			return config, nil
+		},
+		Constructor: func(typedConfig any) models.Plugin {
+			return adminplugin.New(typedConfig.(adminplugintypes.AdminPluginConfig))
 		},
 	},
 	{
@@ -218,22 +236,6 @@ var pluginFactories = []PluginFactory{
 		},
 	},
 	{
-		ID:                models.PluginAccessControl.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := accesscontrolplugintypes.AccessControlPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse access control plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return accesscontrolplugin.New(typedConfig.(accesscontrolplugintypes.AccessControlPluginConfig))
-		},
-	},
-	{
 		ID:                models.PluginOrganizations.String(),
 		RequiredByDefault: false,
 		ConfigParser: func(rawConfig any) (any, error) {
@@ -263,6 +265,22 @@ var pluginFactories = []PluginFactory{
 		},
 		Constructor: func(typedConfig any) models.Plugin {
 			return totpplugin.New(typedConfig.(totplugintypes.TOTPPluginConfig))
+		},
+	},
+	{
+		ID:                models.PluginApiKey.String(),
+		RequiredByDefault: false,
+		ConfigParser: func(rawConfig any) (any, error) {
+			config := apikeyplugintypes.ApiKeyPluginConfig{}
+			if rawConfig != nil {
+				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
+					return nil, fmt.Errorf("failed to parse api_key plugin config: %w", err)
+				}
+			}
+			return config, nil
+		},
+		Constructor: func(typedConfig any) models.Plugin {
+			return apikeyplugin.New(typedConfig.(apikeyplugintypes.ApiKeyPluginConfig))
 		},
 	},
 }

@@ -1,12 +1,14 @@
 package admin
 
 import (
+	"context"
 	"fmt"
 
 	coreinternalrepos "github.com/Authula/authula/internal/repositories"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
+	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/repositories"
 	"github.com/Authula/authula/plugins/admin/types"
 	"github.com/Authula/authula/plugins/admin/usecases"
@@ -14,10 +16,11 @@ import (
 )
 
 type AdminPlugin struct {
-	config types.AdminPluginConfig
-	ctx    *models.PluginContext
-	logger models.Logger
-	Api    *API
+	config               types.AdminPluginConfig
+	ctx                  *models.PluginContext
+	logger               models.Logger
+	Api                  *API
+	accessControlService rootservices.AccessControlService
 }
 
 func New(config types.AdminPluginConfig) *AdminPlugin {
@@ -67,6 +70,15 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 		return fmt.Errorf("required service %s is not registered", models.ServicePassword.String())
 	}
 
+	accessControlService, ok := ctx.ServiceRegistry.Get(models.ServiceAccessControl.String()).(rootservices.AccessControlService)
+	if !ok {
+		return fmt.Errorf("required service %s is not registered", models.ServiceAccessControl.String())
+	}
+	p.accessControlService = accessControlService
+	if err := p.ensurePermissions(); err != nil {
+		return err
+	}
+
 	authorizer := rootservices.NewDefaultAuthorizer()
 
 	adminUseCases := usecases.NewAdminUseCases(
@@ -106,5 +118,42 @@ func (p *AdminPlugin) Routes() []models.Route {
 }
 
 func (p *AdminPlugin) Close() error {
+	return nil
+}
+
+func (p *AdminPlugin) ensurePermissions() error {
+	if err := p.accessControlService.EnsurePermissions(context.Background(), []rootservices.PermissionDefinition{
+		{Key: adminconstants.UsersCreatePermission, Description: "Create users"},
+		{Key: adminconstants.UsersListPermission, Description: "List users"},
+		{Key: adminconstants.UsersReadPermission, Description: "Read user details"},
+		{Key: adminconstants.UsersUpdatePermission, Description: "Update user details"},
+		{Key: adminconstants.UsersDeletePermission, Description: "Delete users"},
+		{Key: adminconstants.AccountsCreatePermission, Description: "Create user accounts"},
+		{Key: adminconstants.AccountsListPermission, Description: "List user accounts"},
+		{Key: adminconstants.AccountsReadPermission, Description: "Read user account details"},
+		{Key: adminconstants.AccountsUpdatePermission, Description: "Update user accounts"},
+		{Key: adminconstants.AccountsDeletePermission, Description: "Delete user accounts"},
+		{Key: adminconstants.UserStateReadPermission, Description: "Read user state"},
+		{Key: adminconstants.UserStateCreatePermission, Description: "Create user state"},
+		{Key: adminconstants.UserStateUpdatePermission, Description: "Update user state"},
+		{Key: adminconstants.UserStateDeletePermission, Description: "Delete user state"},
+		{Key: adminconstants.UserStateBanPermission, Description: "Ban users"},
+		{Key: adminconstants.UserStateUnbanPermission, Description: "Unban users"},
+		{Key: adminconstants.UserStateListBannedPermission, Description: "List banned users"},
+		{Key: adminconstants.UserStateListSessionsPermission, Description: "List user sessions"},
+		{Key: adminconstants.SessionStateReadPermission, Description: "Read session state"},
+		{Key: adminconstants.SessionStateCreatePermission, Description: "Create session state"},
+		{Key: adminconstants.SessionStateUpdatePermission, Description: "Update session state"},
+		{Key: adminconstants.SessionStateDeletePermission, Description: "Delete session state"},
+		{Key: adminconstants.SessionStateRevokePermission, Description: "Revoke sessions"},
+		{Key: adminconstants.SessionStateListRevokedPermission, Description: "List revoked sessions"},
+		{Key: adminconstants.ImpersonationsListPermission, Description: "List impersonations"},
+		{Key: adminconstants.ImpersonationsReadPermission, Description: "Read impersonation details"},
+		{Key: adminconstants.ImpersonationsStartPermission, Description: "Start impersonation"},
+		{Key: adminconstants.ImpersonationsStopPermission, Description: "Stop impersonation"},
+	}); err != nil {
+		return fmt.Errorf("failed to ensure admin permissions: %w", err)
+	}
+
 	return nil
 }
