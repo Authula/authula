@@ -137,6 +137,10 @@ func (u *UseCases) RemoveRoleFromUser(ctx context.Context, actor *models.Actor, 
 
 // User Permissions
 
+func (u *UseCases) GetSelfUserPermissions(ctx context.Context, actor *models.Actor, userID string) ([]types.UserPermissionInfo, error) {
+	return u.userPermissions.GetSelfUserPermissions(ctx, actor, userID)
+}
+
 func (u *UseCases) GetUserPermissions(ctx context.Context, actor *models.Actor, userID string) ([]types.UserPermissionInfo, error) {
 	return u.userPermissions.GetUserPermissions(ctx, actor, userID)
 }

@@ -1,6 +1,7 @@
 package apikey
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/uptrace/bun"
@@ -8,6 +9,7 @@ import (
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
+	apiconstants "github.com/Authula/authula/plugins/api-key/constants"
 	apirepositories "github.com/Authula/authula/plugins/api-key/repositories"
 	apiservices "github.com/Authula/authula/plugins/api-key/services"
 	"github.com/Authula/authula/plugins/api-key/types"
@@ -69,6 +71,9 @@ func (p *ApiKeyPlugin) Init(ctx *models.PluginContext) error {
 		return fmt.Errorf("required service %s is not registered", models.ServiceAccessControl.String())
 	}
 	p.accessControlService = accessControlService
+	if err := p.ensurePermissions(); err != nil {
+		return err
+	}
 
 	rateLimiterService, ok := p.pluginCtx.ServiceRegistry.Get(models.ServiceRateLimit.String()).(rootservices.RateLimiterService)
 	if !ok {
@@ -113,5 +118,18 @@ func (p *ApiKeyPlugin) Hooks() []models.Hook {
 }
 
 func (p *ApiKeyPlugin) Close() error {
+	return nil
+}
+
+func (p *ApiKeyPlugin) ensurePermissions() error {
+	if err := p.accessControlService.EnsurePermissions(context.Background(), []rootservices.PermissionDefinition{
+		{Key: apiconstants.OrgApiKeyCreate, Description: "Create API keys for the organization"},
+		{Key: apiconstants.OrgApiKeyList, Description: "List API keys for the organization"},
+		{Key: apiconstants.OrgApiKeyRead, Description: "Read an API key for the organization"},
+		{Key: apiconstants.OrgApiKeyUpdate, Description: "Update an API key for the organization"},
+		{Key: apiconstants.OrgApiKeyDelete, Description: "Delete an API key for the organization"},
+	}); err != nil {
+		return fmt.Errorf("failed to ensure api key permissions: %w", err)
+	}
 	return nil
 }

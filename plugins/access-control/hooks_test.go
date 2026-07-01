@@ -49,6 +49,65 @@ func newAccessControlHookTestPlugin(logger authmodels.Logger, rolesRepo *accessc
 	}
 }
 
+func TestHasScope(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		scopes []string
+		target string
+		want   bool
+	}{
+		{name: "exact_match", scopes: []string{"admin:users:list"}, target: "admin:users:list", want: true},
+		{name: "universal_wildcard", scopes: []string{"*"}, target: "admin:users:list", want: true},
+		{name: "prefix_wildcard_match", scopes: []string{"admin:*"}, target: "admin:users:list", want: true},
+		{name: "prefix_wildcard_nested", scopes: []string{"admin:users:*"}, target: "admin:users:create", want: true},
+		{name: "prefix_wildcard_no_match", scopes: []string{"admin:*"}, target: "users:list", want: false},
+		{name: "no_match", scopes: []string{"admin:users:create"}, target: "admin:users:list", want: false},
+		{name: "empty_scopes", scopes: []string{}, target: "admin:users:list", want: false},
+		{name: "multiple_scopes_wildcard_match", scopes: []string{"org:read", "admin:*"}, target: "admin:users:list", want: true},
+		{name: "prefix_wildcard_middle", scopes: []string{"admin:auth:*"}, target: "admin:auth:login", want: true},
+		{name: "prefix_wildcard_wrong_domain", scopes: []string{"admin:auth:*"}, target: "admin:users:list", want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := hasScope(tc.scopes, tc.target)
+			if got != tc.want {
+				t.Errorf("hasScope(%v, %q) = %v, want %v", tc.scopes, tc.target, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestHasAllScopes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		assignedScopes []string
+		requiredScopes []string
+		want           bool
+	}{
+		{name: "all_exact_match", assignedScopes: []string{"read", "write"}, requiredScopes: []string{"read", "write"}, want: true},
+		{name: "wildcard_covers_multiple", assignedScopes: []string{"admin:*"}, requiredScopes: []string{"admin:users:list", "admin:users:create"}, want: true},
+		{name: "mixed_wildcard_and_exact", assignedScopes: []string{"read", "admin:*"}, requiredScopes: []string{"read", "admin:users:list"}, want: true},
+		{name: "missing_permission", assignedScopes: []string{"admin:*"}, requiredScopes: []string{"admin:users:list", "users:list"}, want: false},
+		{name: "empty_required", assignedScopes: []string{"admin:*"}, requiredScopes: []string{}, want: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := hasAllScopes(tc.assignedScopes, tc.requiredScopes)
+			if got != tc.want {
+				t.Errorf("hasAllScopes(%v, %v) = %v, want %v", tc.assignedScopes, tc.requiredScopes, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestAccessControlPluginHooksIncludesGlobalAssignRoleHook(t *testing.T) {
 	t.Parallel()
 

@@ -16,7 +16,7 @@ func (p *ApiKeyPlugin) buildHooks() []models.Hook {
 			Stage:   models.HookBefore,
 			Matcher: p.matchApiKeyHeader,
 			Handler: p.validateApiKeyHook(),
-			Order:   10,
+			Order:   7,
 		},
 	}
 }
@@ -100,9 +100,7 @@ func (p *ApiKeyPlugin) validateApiKeyHook() models.HookHandler {
 
 		reqCtx.Actor = actor
 
-		apiKey, err = p.Api.Update(ctx, actor, apiKey.ID, types.UpdateApiKeyData{
-			LastRequestedAt: new(time.Now().UTC()),
-		})
+		apiKey, err = p.Api.RecordLastRequest(ctx, apiKey.ID, time.Now().UTC())
 		if err != nil {
 			p.logger.Error("failed to update api key", "error", err)
 			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": err.Error()})

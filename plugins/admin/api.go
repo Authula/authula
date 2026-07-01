@@ -140,6 +140,14 @@ func (a *API) UnbanUser(ctx context.Context, actor *models.Actor, userID string)
 
 // Session state
 
+func (a *API) GetSelfUserState(ctx context.Context, actor *models.Actor, userID string) (*types.AdminUserState, error) {
+	return a.useCases.GetSelfUserState(ctx, actor, userID)
+}
+
+func (a *API) GetSelfSessionState(ctx context.Context, sessionID string) (*types.AdminSessionState, error) {
+	return a.useCases.GetSelfSessionState(ctx, sessionID)
+}
+
 func (a *API) GetSessionState(ctx context.Context, actor *models.Actor, sessionID string) (*types.AdminSessionState, error) {
 	return a.useCases.GetSessionState(ctx, actor, sessionID)
 }

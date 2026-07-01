@@ -2,6 +2,7 @@ package apikey
 
 import (
 	"context"
+	"time"
 
 	"github.com/Authula/authula/models"
 	apiservices "github.com/Authula/authula/plugins/api-key/services"
@@ -42,6 +43,10 @@ func (a *API) DeleteExpired(ctx context.Context) error {
 
 func (a *API) DeleteAllByOwner(ctx context.Context, actor *models.Actor, ownerType string, ownerID string) error {
 	return a.service.DeleteAllByOwner(ctx, actor, ownerType, ownerID)
+}
+
+func (a *API) RecordLastRequest(ctx context.Context, id string, timestamp time.Time) (*types.ApiKey, error) {
+	return a.service.RecordLastRequest(ctx, id, timestamp)
 }
 
 func (a *API) Verify(ctx context.Context, req types.VerifyApiKeyRequest) (*types.VerifyApiKeyResult, error) {

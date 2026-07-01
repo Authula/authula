@@ -394,6 +394,18 @@ func (s *apiKeyService) Verify(ctx context.Context, req types.VerifyApiKeyReques
 	return &types.VerifyApiKeyResult{Valid: true, ApiKey: apiKey}, nil
 }
 
+func (s *apiKeyService) RecordLastRequest(ctx context.Context, id string, timestamp time.Time) (*types.ApiKey, error) {
+	apiKey, err := s.apiKeyRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if apiKey == nil {
+		return nil, internalerrors.ErrNotFound
+	}
+	apiKey.LastRequestedAt = &timestamp
+	return s.apiKeyRepo.Update(ctx, apiKey)
+}
+
 func (s *apiKeyService) ValidatePermissionKeys(ctx context.Context, permissionKeys []string) error {
 	return s.validatePermissions(ctx, permissionKeys)
 }

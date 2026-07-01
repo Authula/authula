@@ -2,7 +2,7 @@ package accesscontrol
 
 import (
 	"net/http"
-	"slices"
+	"strings"
 
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
@@ -54,7 +54,7 @@ func (p *AccessControlPlugin) hydrateActorScopes(reqCtx *models.RequestContext) 
 
 	switch reqCtx.Actor.Type {
 	case models.ActorUser:
-		userPermissions, err := p.Api.GetUserPermissions(ctx, reqCtx.Actor, reqCtx.Actor.ID)
+		userPermissions, err := p.Api.GetSelfUserPermissions(ctx, reqCtx.Actor, reqCtx.Actor.ID)
 		if err != nil {
 			return err
 		}
@@ -144,13 +144,22 @@ func accessControlAssignRoleContext(value any) (models.AccessControlAssignRoleCo
 }
 
 func hasScope(scopes []string, target string) bool {
-	return slices.Contains(scopes, target)
+	for _, scope := range scopes {
+		if scope == "*" || scope == target {
+			return true
+		}
+		if before, ok := strings.CutSuffix(scope, "*"); ok {
+			if strings.HasPrefix(target, before) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func hasAllScopes(assignedScopes []string, requiredPermissions []string) bool {
 	for _, req := range requiredPermissions {
-		found := slices.Contains(assignedScopes, req)
-		if !found {
+		if !hasScope(assignedScopes, req) {
 			return false
 		}
 	}

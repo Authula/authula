@@ -1,9 +1,13 @@
 package accesscontrol
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
+	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/services"
 	"github.com/Authula/authula/plugins/access-control/types"
@@ -60,6 +64,9 @@ func (p *AccessControlPlugin) Init(ctx *models.PluginContext) error {
 
 	accessControlService := services.NewAccessControlService(rolesService, userRolesService, permissionsRepo)
 	p.accessControlService = accessControlService
+	if err := p.ensurePermissions(); err != nil {
+		return err
+	}
 
 	useCases := usecases.NewAccessControlUseCases(
 		usecases.NewRolesUseCase(rolesService),
@@ -88,5 +95,32 @@ func (p *AccessControlPlugin) Routes() []models.Route {
 }
 
 func (p *AccessControlPlugin) Close() error {
+	return nil
+}
+
+func (p *AccessControlPlugin) ensurePermissions() error {
+	if err := p.accessControlService.EnsurePermissions(context.Background(), []rootservices.PermissionDefinition{
+		{Key: accesscontrolconstants.RolesCreatePermission, Description: "Create roles in the access control system"},
+		{Key: accesscontrolconstants.RolesListPermission, Description: "List roles in the access control system"},
+		{Key: accesscontrolconstants.RolesReadPermission, Description: "Read a role in the access control system"},
+		{Key: accesscontrolconstants.RolesUpdatePermission, Description: "Update a role in the access control system"},
+		{Key: accesscontrolconstants.RolesDeletePermission, Description: "Delete a role from the access control system"},
+		{Key: accesscontrolconstants.PermissionsCreatePermission, Description: "Create permissions in the access control system"},
+		{Key: accesscontrolconstants.PermissionsListPermission, Description: "List permissions in the access control system"},
+		{Key: accesscontrolconstants.PermissionsReadPermission, Description: "Read a permission in the access control system"},
+		{Key: accesscontrolconstants.PermissionsUpdatePermission, Description: "Update a permission in the access control system"},
+		{Key: accesscontrolconstants.PermissionsDeletePermission, Description: "Delete a permission from the access control system"},
+		{Key: accesscontrolconstants.RolePermissionsAssignPermission, Description: "Assign permissions to a role"},
+		{Key: accesscontrolconstants.RolePermissionsReadPermission, Description: "Read permissions assigned to a role"},
+		{Key: accesscontrolconstants.RolePermissionsRemovePermission, Description: "Remove permissions from a role"},
+		{Key: accesscontrolconstants.UserRolesAssignPermission, Description: "Assign roles to a user"},
+		{Key: accesscontrolconstants.UserRolesReadPermission, Description: "Read roles assigned to a user"},
+		{Key: accesscontrolconstants.UserRolesRemovePermission, Description: "Remove roles from a user"},
+		{Key: accesscontrolconstants.UserPermissionsReadPermission, Description: "Read permissions for a user"},
+		{Key: accesscontrolconstants.UserPermissionsCheckPermission, Description: "Check permissions for a user"},
+	}); err != nil {
+		return fmt.Errorf("failed to ensure access control permissions: %w", err)
+	}
+
 	return nil
 }

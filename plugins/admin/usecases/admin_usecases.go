@@ -157,6 +157,14 @@ func (u *AdminUseCases) UnbanUser(ctx context.Context, actor *models.Actor, user
 	return u.state.UnbanUser(ctx, actor, userID)
 }
 
+func (u *AdminUseCases) GetSelfUserState(ctx context.Context, actor *models.Actor, userID string) (*types.AdminUserState, error) {
+	return u.state.GetSelfUserState(ctx, actor, userID)
+}
+
+func (u *AdminUseCases) GetSelfSessionState(ctx context.Context, sessionID string) (*types.AdminSessionState, error) {
+	return u.state.GetSelfSessionState(ctx, sessionID)
+}
+
 func (u *AdminUseCases) GetSessionState(ctx context.Context, actor *models.Actor, sessionID string) (*types.AdminSessionState, error) {
 	return u.state.GetSessionState(ctx, actor, sessionID)
 }

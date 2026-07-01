@@ -16,6 +16,10 @@ func NewUserPermissionsUseCase(service *services.UserPermissionsService) *UserPe
 	return &UserPermissionsUseCase{service: service}
 }
 
+func (u *UserPermissionsUseCase) GetSelfUserPermissions(ctx context.Context, actor *models.Actor, userID string) ([]types.UserPermissionInfo, error) {
+	return u.service.GetSelfUserPermissions(ctx, actor, userID)
+}
+
 func (u *UserPermissionsUseCase) GetUserPermissions(ctx context.Context, actor *models.Actor, userID string) ([]types.UserPermissionInfo, error) {
 	return u.service.GetUserPermissions(ctx, actor, userID)
 }

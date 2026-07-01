@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/uptrace/bun"
@@ -9,6 +10,7 @@ import (
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/api-key/repositories"
 	"github.com/Authula/authula/plugins/api-key/types"
+	rootservices "github.com/Authula/authula/services"
 )
 
 // Services
@@ -29,6 +31,10 @@ func (m *MockAccessControlService) ValidateRoleAssignment(ctx context.Context, r
 
 func (m *MockAccessControlService) ValidatePermissionKeys(ctx context.Context, permissionKeys []string) error {
 	return m.Called(ctx, permissionKeys).Error(0)
+}
+
+func (m *MockAccessControlService) EnsurePermissions(ctx context.Context, permissions []rootservices.PermissionDefinition) error {
+	return m.Called(ctx, permissions).Error(0)
 }
 
 type MockApiKeyService struct {
@@ -69,6 +75,14 @@ func (m *MockApiKeyService) Update(ctx context.Context, actor *models.Actor, id 
 
 func (m *MockApiKeyService) Delete(ctx context.Context, actor *models.Actor, id string) error {
 	return m.Called(ctx, actor, id).Error(0)
+}
+
+func (m *MockApiKeyService) RecordLastRequest(ctx context.Context, id string, timestamp time.Time) (*types.ApiKey, error) {
+	args := m.Called(ctx, id, timestamp)
+	if resp, ok := args.Get(0).(*types.ApiKey); ok {
+		return resp, args.Error(1)
+	}
+	return nil, args.Error(1)
 }
 
 func (m *MockApiKeyService) DeleteExpired(ctx context.Context) error {

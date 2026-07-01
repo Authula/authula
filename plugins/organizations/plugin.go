@@ -1,11 +1,13 @@
 package organizations
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
+	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/services"
 	"github.com/Authula/authula/plugins/organizations/types"
@@ -13,23 +15,24 @@ import (
 )
 
 type OrganizationsPlugin struct {
-	globalConfig        *models.Config
-	pluginConfig        types.OrganizationsPluginConfig
-	ctx                 *models.PluginContext
-	logger              models.Logger
-	Api                 *API
-	organizationRepo    repositories.OrganizationRepository
-	invitationRepo      repositories.OrganizationInvitationRepository
-	memberRepo          repositories.OrganizationMemberRepository
-	teamRepo            repositories.OrganizationTeamRepository
-	teamMemberRepo      repositories.OrganizationTeamMemberRepository
-	serviceUtils        *services.ServiceUtils
-	organizationService services.OrganizationService
-	invitationService   services.OrganizationInvitationService
-	memberService       services.OrganizationMemberService
-	teamService         services.OrganizationTeamService
-	teamMemberService   services.OrganizationTeamMemberService
-	databaseHooks       *OrganizationsHookExecutor
+	globalConfig         *models.Config
+	pluginConfig         types.OrganizationsPluginConfig
+	ctx                  *models.PluginContext
+	logger               models.Logger
+	Api                  *API
+	organizationRepo     repositories.OrganizationRepository
+	invitationRepo       repositories.OrganizationInvitationRepository
+	memberRepo           repositories.OrganizationMemberRepository
+	teamRepo             repositories.OrganizationTeamRepository
+	teamMemberRepo       repositories.OrganizationTeamMemberRepository
+	serviceUtils         *services.ServiceUtils
+	organizationService  services.OrganizationService
+	invitationService    services.OrganizationInvitationService
+	memberService        services.OrganizationMemberService
+	teamService          services.OrganizationTeamService
+	teamMemberService    services.OrganizationTeamMemberService
+	accessControlService rootservices.AccessControlService
+	databaseHooks        *OrganizationsHookExecutor
 }
 
 func New(config types.OrganizationsPluginConfig) *OrganizationsPlugin {
@@ -72,6 +75,11 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 	if !ok {
 		return fmt.Errorf("access control service not available in service registry")
 	}
+	p.accessControlService = accessControlService
+	if err := p.ensurePermissions(); err != nil {
+		return err
+	}
+
 	authorizer := rootservices.NewDefaultAuthorizer()
 
 	p.databaseHooks = NewOrganizationsHookExecutor(p.pluginConfig.DatabaseHooks)
@@ -108,5 +116,38 @@ func (p *OrganizationsPlugin) Routes() []models.Route {
 }
 
 func (p *OrganizationsPlugin) Close() error {
+	return nil
+}
+
+func (p *OrganizationsPlugin) ensurePermissions() error {
+	if err := p.accessControlService.EnsurePermissions(context.Background(), []rootservices.PermissionDefinition{
+		{Key: orgconstants.OrganizationsCreatePermission, Description: "Create organizations"},
+		{Key: orgconstants.OrganizationsListPermission, Description: "List organizations"},
+		{Key: orgconstants.OrganizationsReadPermission, Description: "Read organization details"},
+		{Key: orgconstants.OrganizationsUpdatePermission, Description: "Update organization details"},
+		{Key: orgconstants.OrganizationsDeletePermission, Description: "Delete organizations"},
+		{Key: orgconstants.OrganizationsMembersAddPermission, Description: "Add members to an organization"},
+		{Key: orgconstants.OrganizationsMembersListPermission, Description: "List organization members"},
+		{Key: orgconstants.OrganizationsMembersReadPermission, Description: "Read organization member details"},
+		{Key: orgconstants.OrganizationsMembersUpdatePermission, Description: "Update organization member details"},
+		{Key: orgconstants.OrganizationsMembersRemovePermission, Description: "Remove members from an organization"},
+		{Key: orgconstants.OrganizationsTeamsCreatePermission, Description: "Create organization teams"},
+		{Key: orgconstants.OrganizationsTeamsListPermission, Description: "List organization teams"},
+		{Key: orgconstants.OrganizationsTeamsReadPermission, Description: "Read organization team details"},
+		{Key: orgconstants.OrganizationsTeamsUpdatePermission, Description: "Update organization team details"},
+		{Key: orgconstants.OrganizationsTeamsDeletePermission, Description: "Delete organization teams"},
+		{Key: orgconstants.OrganizationsTeamMembersAddPermission, Description: "Add members to an organization team"},
+		{Key: orgconstants.OrganizationsTeamMembersListPermission, Description: "List organization team members"},
+		{Key: orgconstants.OrganizationsTeamMembersReadPermission, Description: "Read organization team member details"},
+		{Key: orgconstants.OrganizationsTeamMembersRemovePermission, Description: "Remove members from an organization team"},
+		{Key: orgconstants.OrganizationsInvitationsCreatePermission, Description: "Create organization invitations"},
+		{Key: orgconstants.OrganizationsInvitationsListPermission, Description: "List organization invitations"},
+		{Key: orgconstants.OrganizationsInvitationsReadPermission, Description: "Read organization invitation details"},
+		{Key: orgconstants.OrganizationsInvitationsRevokePermission, Description: "Revoke organization invitations"},
+		{Key: orgconstants.OrganizationsInvitationsProcessPermission, Description: "Process organization invitations"},
+	}); err != nil {
+		return fmt.Errorf("failed to ensure organization permissions: %w", err)
+	}
+
 	return nil
 }

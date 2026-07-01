@@ -197,7 +197,7 @@ func TestApiKeyPluginHook_ValidateApiKey(t *testing.T) {
 			service := &apiKeyTests.MockApiKeyService{}
 			service.On("Verify", mock.Anything, types.VerifyApiKeyRequest{Key: "good-key"}).Return(tc.verifyResult, nil).Once()
 			if tc.verifyResult != nil && tc.verifyResult.Valid && tc.verifyResult.ApiKey != nil {
-				service.On("Update", mock.Anything, mock.Anything, tc.verifyResult.ApiKey.ID, mock.Anything).Return(tc.verifyResult.ApiKey, nil).Maybe()
+				service.On("RecordLastRequest", mock.Anything, tc.verifyResult.ApiKey.ID, mock.Anything).Return(tc.verifyResult.ApiKey, nil).Maybe()
 			}
 
 			mockLogger := &internaltests.MockLogger{}
