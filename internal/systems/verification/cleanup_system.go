@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/Authula/authula/internal/cleanup"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/services"
 )
@@ -60,21 +61,9 @@ func (s *VerificationCleanupSystem) Close() error {
 }
 
 func (s *VerificationCleanupSystem) runCleanupLoop(interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	defer close(s.done)
-
-	for {
-		select {
-		case <-s.stopCleanup:
-			s.logger.Debug("Verification cleanup loop stopped")
-			return
-		case <-ticker.C:
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			if err := s.verificationService.DeleteExpired(ctx); err != nil {
-				s.logger.Error("Verification expired cleanup failed", "error", err)
-			}
-			cancel()
+	cleanup.RunLoop(s.stopCleanup, s.done, interval, func(ctx context.Context) {
+		if err := s.verificationService.DeleteExpired(ctx); err != nil {
+			s.logger.Error("Verification expired cleanup failed", "error", err)
 		}
-	}
+	})
 }

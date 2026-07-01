@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/Authula/authula/internal/cleanup"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/services"
 )
@@ -60,21 +61,7 @@ func (s *SessionCleanupSystem) Close() error {
 }
 
 func (s *SessionCleanupSystem) runCleanupLoop(interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	defer close(s.done)
-
-	for {
-		select {
-		case <-s.stopCleanup:
-			s.logger.Debug("session cleanup loop stopped")
-			return
-		case <-ticker.C:
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			s.cleanup(ctx)
-			cancel()
-		}
-	}
+	cleanup.RunLoop(s.stopCleanup, s.done, interval, s.cleanup)
 }
 
 func (s *SessionCleanupSystem) cleanup(ctx context.Context) {
