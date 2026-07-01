@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./authula-banner.png" width="800" alt="Authula Logo"/>
+  <img src="./project-banner.png" width="800" alt="Project Banner Image"/>
 </p>
 
 <div align="center">
