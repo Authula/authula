@@ -3,9 +3,11 @@ package apikey
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/uptrace/bun"
 
+	"github.com/Authula/authula/internal/cleanup"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
@@ -27,6 +29,8 @@ type ApiKeyPlugin struct {
 	userService          rootservices.UserService
 	organizationService  rootservices.OrganizationService
 	Api                  *API
+	stopCleanup          chan struct{}
+	done                 chan struct{}
 }
 
 func New(config types.ApiKeyPluginConfig) *ApiKeyPlugin {
@@ -98,6 +102,12 @@ func (p *ApiKeyPlugin) Init(ctx *models.PluginContext) error {
 
 	p.Api = NewAPI(service)
 
+	if p.config.AutoCleanup {
+		p.stopCleanup = make(chan struct{})
+		p.done = make(chan struct{})
+		go p.runCleanupLoop(p.config.CleanupInterval)
+	}
+
 	return nil
 }
 
@@ -118,7 +128,19 @@ func (p *ApiKeyPlugin) Hooks() []models.Hook {
 }
 
 func (p *ApiKeyPlugin) Close() error {
+	if p.config.AutoCleanup {
+		close(p.stopCleanup)
+		<-p.done
+	}
 	return nil
+}
+
+func (p *ApiKeyPlugin) runCleanupLoop(interval time.Duration) {
+	cleanup.RunLoop(p.stopCleanup, p.done, interval, func(ctx context.Context) {
+		if err := p.Api.DeleteExpired(ctx); err != nil {
+			p.logger.Error("api key expired cleanup failed", "error", err)
+		}
+	})
 }
 
 func (p *ApiKeyPlugin) ensurePermissions() error {
