@@ -6,9 +6,6 @@
   <a href="https://github.com/Authula/authula/stargazers" target="_parent">
     <img src="https://img.shields.io/github/stars/Authula/authula.svg?style=social&label=Star" alt="GitHub stars" />
   </a>
-  <a href="https://goreportcard.com/report/github.com/Authula/authula" target="_parent">
-    <img src="https://goreportcard.com/badge/github.com/Authula/authula" alt="Go Report Card" />
-  </a>
   <a href="https://pkg.go.dev/github.com/Authula/authula" target="_parent">
     <img src="https://pkg.go.dev/badge/github.com/Authula/authula.svg" alt="Go Reference" />
   </a>
