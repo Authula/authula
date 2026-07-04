@@ -64,9 +64,9 @@ func TestImpersonationService_StartImpersonation_validation(t *testing.T) {
 				tc.setup(impRepo)
 			}
 
-			ipAddress := internaltests.PtrString("127.0.0.1")
-			userAgent := internaltests.PtrString("user-agent")
-			_, err := svc.StartImpersonation(ctx, internaltests.TestActor(), tc.actor, nil, ipAddress, userAgent, tc.req)
+			ipAddress := new("127.0.0.1")
+			userAgent := new("user-agent")
+			_, err := svc.StartImpersonation(ctx, internaltests.TestActor(), tc.actor, nil, ipAddress, userAgent, tc.req, nil, "", 0)
 			if tc.want != nil {
 				require.ErrorIs(t, err, tc.want)
 			} else {
@@ -97,15 +97,19 @@ func TestImpersonationService_StartImpersonation_success(t *testing.T) {
 	sessRepo.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
 
 	req := admintypes.StartImpersonationRequest{TargetUserID: "target", Reason: "reason", ExpiresInSeconds: func(i int) *int { return &i }(60)}
-	ipAddress := internaltests.PtrString("127.0.0.1")
-	userAgent := internaltests.PtrString("user-agent")
-	res, err := svc.StartImpersonation(ctx, internaltests.TestActor(), "actor", nil, ipAddress, userAgent, req)
+	ipAddress := new("127.0.0.1")
+	userAgent := new("user-agent")
+	res, err := svc.StartImpersonation(ctx, internaltests.TestActor(), "actor", nil, ipAddress, userAgent, req, []string{"scope1"}, "orig-token", 100)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.NotNil(t, res.SessionID)
 	require.Equal(t, "sess1", *res.SessionID)
 	require.NotNil(t, res.SessionToken)
 	require.Equal(t, rawToken, *res.SessionToken)
+	require.Equal(t, "actor", res.ImpersonatorUserID)
+	require.Equal(t, []string{"scope1"}, res.ImpersonatorScopes)
+	require.Equal(t, "target", res.TargetUserID)
+	require.Equal(t, "orig-token", res.OriginalCookieToken)
 
 	impRepo.AssertExpectations(t)
 	sessRepo.AssertExpectations(t)
@@ -127,9 +131,9 @@ func TestImpersonationService_StartImpersonation_noSessionServices(t *testing.T)
 	impRepo.On("CreateImpersonation", mock.Anything, mock.Anything).Return(nil).Once()
 
 	req := admintypes.StartImpersonationRequest{TargetUserID: "target", Reason: "reason"}
-	ipAddress := internaltests.PtrString("127.0.0.1")
-	userAgent := internaltests.PtrString("user-agent")
-	res, err := svc.StartImpersonation(ctx, internaltests.TestActor(), "actor", nil, ipAddress, userAgent, req)
+	ipAddress := new("127.0.0.1")
+	userAgent := new("user-agent")
+	res, err := svc.StartImpersonation(ctx, internaltests.TestActor(), "actor", nil, ipAddress, userAgent, req, nil, "", 0)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.Nil(t, res.SessionID)
@@ -137,6 +141,36 @@ func TestImpersonationService_StartImpersonation_noSessionServices(t *testing.T)
 
 	impRepo.AssertExpectations(t)
 	sessRepo.AssertExpectations(t)
+}
+
+func TestImpersonationService_ValidateImpersonationCookie(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	t.Run("session not found returns forbidden", func(t *testing.T) {
+		t.Parallel()
+		svc, _, _, sessSvc, tokSvc := newImpersonationServiceFixture()
+		tokSvc.On("Hash", "orig-token").Return("hashed-orig").Once()
+		sessSvc.On("GetByToken", mock.Anything, "hashed-orig").Return((*models.Session)(nil), nil).Once()
+		_, err := svc.ValidateImpersonationCookie(ctx, "orig-token")
+		require.ErrorIs(t, err, internalerrors.ErrForbidden)
+		tokSvc.AssertExpectations(t)
+		sessSvc.AssertExpectations(t)
+	})
+
+	t.Run("success returns session", func(t *testing.T) {
+		t.Parallel()
+		svc, _, _, sessSvc, tokSvc := newImpersonationServiceFixture()
+		tokSvc.On("Hash", "orig-token").Return("hashed-orig").Once()
+		sessSvc.On("GetByToken", mock.Anything, "hashed-orig").Return(&models.Session{ID: "orig-sess", UserID: "actor-1"}, nil).Once()
+		sess, err := svc.ValidateImpersonationCookie(ctx, "orig-token")
+		require.NoError(t, err)
+		require.NotNil(t, sess)
+		require.Equal(t, "orig-sess", sess.ID)
+		tokSvc.AssertExpectations(t)
+		sessSvc.AssertExpectations(t)
+	})
 }
 
 func TestImpersonationService_StopImpersonation(t *testing.T) {

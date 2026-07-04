@@ -82,12 +82,20 @@ var _ repositories.JWKSRepository = (*MockJWKSRepository)(nil)
 
 type MockTokenService struct{ mock.Mock }
 
-func (m *MockTokenService) GenerateUserToken(ctx context.Context, userID string, sessionID string) (*jwtservicesTypes.TokenPair, error) {
-	args := m.Called(ctx, userID, sessionID)
+func (m *MockTokenService) GenerateUserToken(ctx context.Context, userID string, sessionID string, extraClaims map[string]any) (*jwtservicesTypes.TokenPair, error) {
+	args := m.Called(ctx, userID, sessionID, extraClaims)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*jwtservicesTypes.TokenPair), args.Error(1)
+}
+
+func (m *MockTokenService) ExtractClaims(ctx context.Context, token string) (map[string]any, error) {
+	args := m.Called(ctx, token)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]any), args.Error(1)
 }
 
 func (m *MockTokenService) GenerateMachineToken(ctx context.Context, clientID string, organizationID string, scopes []string) (*jwtservicesTypes.TokenPair, error) {

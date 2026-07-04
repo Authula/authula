@@ -117,12 +117,12 @@ func (u *AdminUseCases) GetImpersonationByID(ctx context.Context, actor *models.
 	return u.impersonation.GetImpersonationByID(ctx, actor, impersonationID)
 }
 
-func (u *AdminUseCases) StartImpersonation(ctx context.Context, actor *models.Actor, actorUserID string, actorSessionID *string, ipAddress *string, userAgent *string, req types.StartImpersonationRequest) (*types.StartImpersonationResult, error) {
-	return u.impersonation.StartImpersonation(ctx, actor, actorUserID, actorSessionID, ipAddress, userAgent, req)
+func (u *AdminUseCases) StartImpersonation(ctx context.Context, actor *models.Actor, actorUserID string, actorSessionID *string, ipAddress *string, userAgent *string, req types.StartImpersonationRequest, impersonatorScopes []string, originalCookieValue string, originalCookieMaxAge int) (*types.StartImpersonationResult, error) {
+	return u.impersonation.StartImpersonation(ctx, actor, actorUserID, actorSessionID, ipAddress, userAgent, req, impersonatorScopes, originalCookieValue, originalCookieMaxAge)
 }
 
-func (u *AdminUseCases) StopImpersonation(ctx context.Context, actor *models.Actor, impersonatedUserID string, impersonatedSessionID string, request types.StopImpersonationRequest) error {
-	return u.impersonation.StopImpersonation(ctx, actor, impersonatedUserID, impersonatedSessionID, request)
+func (u *AdminUseCases) StopImpersonation(ctx context.Context, actor *models.Actor, impersonatedUserID string, impersonatedSessionID string, originalCookieValue string, request types.StopImpersonationRequest) (*types.StopImpersonationResult, error) {
+	return u.impersonation.StopImpersonation(ctx, actor, impersonatedUserID, impersonatedSessionID, originalCookieValue, request)
 }
 
 func (u *AdminUseCases) GetUserState(ctx context.Context, actor *models.Actor, userID string) (*types.AdminUserState, error) {

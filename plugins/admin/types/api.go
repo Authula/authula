@@ -3,16 +3,21 @@ package types
 import (
 	"time"
 
+	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/constants"
 )
 
 type CreateUserRequest struct {
-	Name          string         `json:"name"`
-	Email         string         `json:"email"`
+	Name          string         `json:"name" validate:"required"`
+	Email         string         `json:"email" validate:"required,email"`
 	EmailVerified *bool          `json:"email_verified,omitempty"`
 	Image         *string        `json:"image,omitempty"`
 	Metadata      map[string]any `json:"metadata,omitempty"`
+}
+
+func (req *CreateUserRequest) Validate() error {
+	return util.ValidateStruct(req)
 }
 
 type CreateUserResponse struct {
@@ -24,11 +29,25 @@ type GetUserByIDResponse struct {
 }
 
 type UpdateUserRequest struct {
-	Name          *string        `json:"name,omitempty"`
-	Email         *string        `json:"email,omitempty"`
+	Name          *string        `json:"name,omitempty" validate:"omitempty"`
+	Email         *string        `json:"email,omitempty" validate:"omitempty,email"`
 	EmailVerified *bool          `json:"email_verified,omitempty"`
 	Image         *string        `json:"image,omitempty"`
 	Metadata      map[string]any `json:"metadata,omitempty"`
+}
+
+func (req *UpdateUserRequest) Validate() error {
+	if err := util.ValidateStruct(req); err != nil {
+		return err
+	}
+
+	if req.Name == nil && req.Email == nil &&
+		req.EmailVerified == nil && req.Image == nil &&
+		req.Metadata == nil {
+		return constants.ErrNoPropertiesProvided
+	}
+
+	return nil
 }
 
 type UpdateUserResponse struct {
@@ -45,8 +64,8 @@ type UsersPage struct {
 }
 
 type CreateAccountRequest struct {
-	ProviderID            string     `json:"provider_id"`
-	AccountID             string     `json:"account_id"`
+	ProviderID            string     `json:"provider_id" validate:"required"`
+	AccountID             string     `json:"account_id" validate:"required"`
 	AccessToken           *string    `json:"access_token,omitempty"`
 	RefreshToken          *string    `json:"refresh_token,omitempty"`
 	IDToken               *string    `json:"id_token,omitempty"`
@@ -57,11 +76,8 @@ type CreateAccountRequest struct {
 }
 
 func (req *CreateAccountRequest) Validate() error {
-	if req.ProviderID == "" {
-		return constants.ErrProviderIDRequired
-	}
-	if req.AccountID == "" {
-		return constants.ErrAccountIDRequired
+	if err := util.ValidateStruct(req); err != nil {
+		return err
 	}
 	if req.AccessTokenExpiresAt != nil && req.AccessTokenExpiresAt.Before(time.Now()) {
 		return constants.ErrAccessTokenExpiresAtBeforeNow
@@ -69,6 +85,7 @@ func (req *CreateAccountRequest) Validate() error {
 	if req.RefreshTokenExpiresAt != nil && req.RefreshTokenExpiresAt.Before(time.Now()) {
 		return constants.ErrRefreshTokenExpiresAtBeforeNow
 	}
+
 	return nil
 }
 
@@ -104,6 +121,7 @@ func (req *UpdateAccountRequest) Validate() error {
 		req.Password == nil {
 		return constants.ErrNoPropertiesProvided
 	}
+
 	return nil
 }
 
@@ -128,15 +146,39 @@ type UpsertUserStateResponse struct {
 }
 
 type CreateUserStateRequest struct {
-	Banned       bool       `json:"banned"`
+	Banned       bool       `json:"banned" validate:"required"`
 	BannedUntil  *time.Time `json:"banned_until,omitempty"`
 	BannedReason *string    `json:"banned_reason,omitempty"`
 }
 
+func (req *CreateUserStateRequest) Validate() error {
+	if err := util.ValidateStruct(req); err != nil {
+		return err
+	}
+
+	if req.Banned && req.BannedUntil != nil && req.BannedUntil.Before(time.Now()) {
+		return constants.ErrBannedUntilBeforeNow
+	}
+
+	return nil
+}
+
 type UpsertUserStateRequest struct {
-	Banned       bool       `json:"banned"`
+	Banned       bool       `json:"banned" validate:"required"`
 	BannedUntil  *time.Time `json:"banned_until,omitempty"`
 	BannedReason *string    `json:"banned_reason,omitempty"`
+}
+
+func (req *UpsertUserStateRequest) Validate() error {
+	if err := util.ValidateStruct(req); err != nil {
+		return err
+	}
+
+	if req.Banned && req.BannedUntil != nil && req.BannedUntil.Before(time.Now()) {
+		return constants.ErrBannedUntilBeforeNow
+	}
+
+	return nil
 }
 
 type DeleteUserStateResponse struct {
@@ -146,6 +188,18 @@ type DeleteUserStateResponse struct {
 type BanUserRequest struct {
 	BannedUntil *time.Time `json:"banned_until,omitempty"`
 	Reason      *string    `json:"reason,omitempty"`
+}
+
+func (req *BanUserRequest) Validate() error {
+	if err := util.ValidateStruct(req); err != nil {
+		return err
+	}
+
+	if req.BannedUntil != nil && req.BannedUntil.Before(time.Now()) {
+		return constants.ErrBannedUntilBeforeNow
+	}
+
+	return nil
 }
 
 type BanUserResponse struct {
@@ -161,19 +215,43 @@ type GetSessionStateResponse struct {
 }
 
 type CreateSessionStateRequest struct {
-	Revoke                 bool       `json:"revoke"`
+	Revoke                 bool       `json:"revoke" validate:"required"`
 	RevokedReason          *string    `json:"revoked_reason,omitempty"`
 	ImpersonatorUserID     *string    `json:"impersonator_user_id,omitempty"`
 	ImpersonationReason    *string    `json:"impersonation_reason,omitempty"`
 	ImpersonationExpiresAt *time.Time `json:"impersonation_expires_at,omitempty"`
 }
 
+func (req *CreateSessionStateRequest) Validate() error {
+	if err := util.ValidateStruct(req); err != nil {
+		return err
+	}
+
+	if req.ImpersonationExpiresAt != nil && req.ImpersonationExpiresAt.Before(time.Now()) {
+		return constants.ErrImpersonationExpiresAtBeforeNow
+	}
+
+	return nil
+}
+
 type UpsertSessionStateRequest struct {
-	Revoke                 bool       `json:"revoke"`
+	Revoke                 bool       `json:"revoke" validate:"required"`
 	RevokedReason          *string    `json:"revoked_reason,omitempty"`
 	ImpersonatorUserID     *string    `json:"impersonator_user_id,omitempty"`
 	ImpersonationReason    *string    `json:"impersonation_reason,omitempty"`
 	ImpersonationExpiresAt *time.Time `json:"impersonation_expires_at,omitempty"`
+}
+
+func (req *UpsertSessionStateRequest) Validate() error {
+	if err := util.ValidateStruct(req); err != nil {
+		return err
+	}
+
+	if req.ImpersonationExpiresAt != nil && req.ImpersonationExpiresAt.Before(time.Now()) {
+		return constants.ErrImpersonationExpiresAtBeforeNow
+	}
+
+	return nil
 }
 
 type UpsertSessionStateResponse struct {
@@ -197,15 +275,24 @@ type GetImpersonationByIDResponse struct {
 }
 
 type StartImpersonationRequest struct {
-	TargetUserID     string `json:"target_user_id"`
-	Reason           string `json:"reason"`
+	TargetUserID     string `json:"target_user_id" validate:"required"`
+	Reason           string `json:"reason" validate:"required"`
 	ExpiresInSeconds *int   `json:"expires_in_seconds,omitempty"`
 }
 
+func (req *StartImpersonationRequest) Validate() error {
+	return util.ValidateStruct(req)
+}
+
 type StartImpersonationResult struct {
-	Impersonation *Impersonation `json:"impersonation"`
-	SessionID     *string        `json:"session_id,omitempty"`
-	SessionToken  *string        `json:"session_token,omitempty"`
+	Impersonation        *Impersonation `json:"impersonation"`
+	SessionID            *string        `json:"session_id,omitempty"`
+	SessionToken         *string        `json:"session_token,omitempty"`
+	ImpersonatorUserID   string         `json:"-"`
+	ImpersonatorScopes   []string       `json:"-"`
+	OriginalCookieToken  string         `json:"-"`
+	OriginalCookieMaxAge int            `json:"-"`
+	TargetUserID         string         `json:"-"`
 }
 
 type StartImpersonationResponse struct {
@@ -214,6 +301,10 @@ type StartImpersonationResponse struct {
 
 type StopImpersonationRequest struct {
 	ImpersonationID *string `json:"impersonation_id,omitempty"`
+}
+
+type StopImpersonationResult struct {
+	OriginalSessionToken string `json:"-"`
 }
 
 type StopImpersonationResponse struct {

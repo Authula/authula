@@ -3,6 +3,7 @@ package constants
 // Permissions
 
 const (
+	All                                       = "organizations:*"
 	OrganizationsCreatePermission             = "organizations:create"
 	OrganizationsListPermission               = "organizations:list"
 	OrganizationsReadPermission               = "organizations:read"

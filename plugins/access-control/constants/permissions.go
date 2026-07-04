@@ -2,6 +2,7 @@ package constants
 
 // Access control permissions
 const (
+	All                             = "access-control:*"
 	RolesCreatePermission           = "access-control:roles:create"
 	RolesListPermission             = "access-control:roles:list"
 	RolesReadPermission             = "access-control:roles:read"

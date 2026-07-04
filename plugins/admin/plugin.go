@@ -16,10 +16,13 @@ import (
 )
 
 type AdminPlugin struct {
+	globalConfig         *models.Config
 	config               types.AdminPluginConfig
-	ctx                  *models.PluginContext
+	pluginCtx            *models.PluginContext
 	logger               models.Logger
 	Api                  *API
+	sessionService       rootservices.SessionService
+	tokenService         rootservices.TokenService
 	accessControlService rootservices.AccessControlService
 }
 
@@ -41,7 +44,8 @@ func (p *AdminPlugin) Config() any {
 }
 
 func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
-	p.ctx = ctx
+	p.globalConfig = ctx.GetConfig()
+	p.pluginCtx = ctx
 	p.logger = ctx.Logger
 
 	if err := util.LoadPluginConfig(ctx.GetConfig(), p.Metadata().ID, &p.config); err != nil {
@@ -59,11 +63,13 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 	if !ok {
 		return fmt.Errorf("required service %s is not registered", models.ServiceSession.String())
 	}
+	p.sessionService = sessionService
 
 	tokenService, ok := ctx.ServiceRegistry.Get(models.ServiceToken.String()).(rootservices.TokenService)
 	if !ok {
 		return fmt.Errorf("required service %s is not registered", models.ServiceToken.String())
 	}
+	p.tokenService = tokenService
 
 	passwordService, ok := ctx.ServiceRegistry.Get(models.ServicePassword.String()).(rootservices.PasswordService)
 	if !ok {
@@ -91,7 +97,7 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 		userStateRepo,
 		sessionStateRepo,
 		impersonationRepo,
-		ctx.GetConfig().Session.ExpiresIn,
+		p.globalConfig.Session.ExpiresIn,
 		authorizer,
 	)
 	p.Api = NewAPI(
@@ -114,7 +120,7 @@ func (p *AdminPlugin) DependsOn() []string {
 }
 
 func (p *AdminPlugin) Routes() []models.Route {
-	return Routes(p.Api)
+	return p.buildRoutes(p.Api)
 }
 
 func (p *AdminPlugin) Close() error {
@@ -123,6 +129,7 @@ func (p *AdminPlugin) Close() error {
 
 func (p *AdminPlugin) ensurePermissions() error {
 	if err := p.accessControlService.EnsurePermissions(context.Background(), []rootservices.PermissionDefinition{
+		{Key: adminconstants.All, Description: "All admin permissions"},
 		{Key: adminconstants.UsersCreatePermission, Description: "Create users"},
 		{Key: adminconstants.UsersListPermission, Description: "List users"},
 		{Key: adminconstants.UsersReadPermission, Description: "Read user details"},

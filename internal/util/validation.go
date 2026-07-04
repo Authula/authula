@@ -18,6 +18,9 @@ func InitValidator() {
 }
 
 func ValidateStruct(s any) error {
+	if Validate == nil {
+		InitValidator()
+	}
 	return Validate.Struct(s)
 }
 

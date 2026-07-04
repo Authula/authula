@@ -11,10 +11,22 @@ import (
 	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
+	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	adminhandlers "github.com/Authula/authula/plugins/admin/handlers"
 	admintests "github.com/Authula/authula/plugins/admin/tests"
 	"github.com/Authula/authula/plugins/admin/types"
 )
+
+func testGlobalConfig() *models.Config {
+	return &models.Config{
+		Session: models.SessionConfig{
+			CookieName: "authula.session_token",
+			HttpOnly:   true,
+			Secure:     false,
+			SameSite:   "lax",
+		},
+	}
+}
 
 func TestGetAllImpersonationsHandler(t *testing.T) {
 	t.Parallel()
@@ -100,7 +112,7 @@ func TestStartImpersonationHandler_Unauthorized(t *testing.T) {
 	t.Parallel()
 
 	useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-	handler := adminhandlers.NewStartImpersonationHandler(useCase)
+	handler := adminhandlers.NewStartImpersonationHandler(useCase, testGlobalConfig())
 
 	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}), nil)
 
@@ -113,7 +125,7 @@ func TestStartImpersonationHandler_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
 	useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-	handler := adminhandlers.NewStartImpersonationHandler(useCase)
+	handler := adminhandlers.NewStartImpersonationHandler(useCase, testGlobalConfig())
 
 	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", []byte("{invalid"), nil)
 	userID := "actor-1"
@@ -121,7 +133,7 @@ func TestStartImpersonationHandler_InvalidJSON(t *testing.T) {
 
 	handler.Handler()(w, req)
 
-	internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid request body")
+	internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid character 'i' looking for beginning of object key string")
 }
 
 func TestStartImpersonationHandler_UseCaseError(t *testing.T) {
@@ -131,7 +143,7 @@ func TestStartImpersonationHandler_UseCaseError(t *testing.T) {
 	impRepo.On("UserExists", mock.Anything, "actor-1").Return(true, nil).Once()
 	impRepo.On("UserExists", mock.Anything, "target-1").Return(true, nil).Once()
 	tokenSvc.On("Generate").Return("", internalerrors.ErrForbidden).Once()
-	handler := adminhandlers.NewStartImpersonationHandler(useCase)
+	handler := adminhandlers.NewStartImpersonationHandler(useCase, testGlobalConfig())
 
 	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}), nil)
 	userID := "actor-1"
@@ -167,7 +179,7 @@ func TestStartImpersonationHandler_SuccessSetsContextValues(t *testing.T) {
 	).Return(&models.Session{ID: sessionID, IPAddress: internaltests.PtrString(ipAddress), UserAgent: internaltests.PtrString(userAgent)}, nil).Once()
 	impRepo.On("CreateImpersonation", mock.Anything, mock.AnythingOfType("*types.Impersonation")).Return(nil).Once()
 	sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(nil).Once()
-	handler := adminhandlers.NewStartImpersonationHandler(useCase)
+	handler := adminhandlers.NewStartImpersonationHandler(useCase, testGlobalConfig())
 
 	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}), nil)
 	req.Header.Set("User-Agent", userAgent)
@@ -210,7 +222,7 @@ func TestStopImpersonationHandler(t *testing.T) {
 		t.Parallel()
 
 		useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		handler := adminhandlers.NewStopImpersonationHandler(useCase)
+		handler := adminhandlers.NewStopImpersonationHandler(useCase, testGlobalConfig())
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
 		req.SetPathValue("impersonation_id", "imp-1")
 
@@ -223,7 +235,7 @@ func TestStopImpersonationHandler(t *testing.T) {
 		t.Parallel()
 
 		useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		handler := adminhandlers.NewStopImpersonationHandler(useCase)
+		handler := adminhandlers.NewStopImpersonationHandler(useCase, testGlobalConfig())
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
 		req.SetPathValue("impersonation_id", "imp-1")
 		actorID := "actor-1"
@@ -234,40 +246,46 @@ func TestStopImpersonationHandler(t *testing.T) {
 		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnauthorized, "Unauthorized")
 	})
 
-	t.Run("error", func(t *testing.T) {
+	t.Run("no original cookie", func(t *testing.T) {
 		t.Parallel()
 
-		useCase, impRepo, sessionStateRepo, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		actorID := "actor-1"
-		sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return(&types.AdminSessionState{SessionID: "session-1", ImpersonatorUserID: &actorID}, nil).Once()
-		impRepo.On("GetActiveImpersonationByID", mock.Anything, "imp-1").Return((*types.Impersonation)(nil), nil).Once()
-		handler := adminhandlers.NewStopImpersonationHandler(useCase)
+		useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
+		handler := adminhandlers.NewStopImpersonationHandler(useCase, testGlobalConfig())
 
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
 		req.SetPathValue("impersonation_id", "imp-1")
-		reqCtx.Actor = &models.Actor{ID: actorID, Type: models.ActorUser}
+		reqCtx.Actor = &models.Actor{ID: "actor-1", Type: models.ActorUser}
 		reqCtx.Values[models.ContextSessionID.String()] = "session-1"
 
 		handler.Handler()(w, req)
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusNotFound, "not found")
-		impRepo.AssertExpectations(t)
-		sessionStateRepo.AssertExpectations(t)
+		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnauthorized, "no original session found")
 	})
 
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
 
 		actorID := "actor-1"
+		originalSessionToken := "orig-session-token"
 
-		useCase, impRepo, sessionStateRepo, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return(&types.AdminSessionState{SessionID: "session-1", ImpersonatorUserID: &actorID}, nil).Once()
-		impRepo.On("GetActiveImpersonationByID", mock.Anything, "imp-1").Return(&types.Impersonation{ID: "imp-1", ActorUserID: "actor-1"}, nil).Once()
+		useCase, impRepo, sessionStateRepo, sessSvc, tokenSvc := admintests.NewImpersonationUseCaseFixture(t)
+		origSessionID := "orig-session"
+		sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return(&types.AdminSessionState{SessionID: "session-1", ImpersonatorUserID: &actorID, ImpersonatorSessionID: &origSessionID}, nil).Once()
+		impRepo.On("GetActiveImpersonationByID", mock.Anything, "imp-1").Return(&types.Impersonation{ID: "imp-1", ActorUserID: "actor-1", ImpersonationSessionID: internaltests.PtrString("session-1")}, nil).Once()
+		sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(nil).Once()
+		sessSvc.On("Delete", mock.Anything, "session-1").Return(nil).Once()
 		impRepo.On("EndImpersonation", mock.Anything, "imp-1", mock.AnythingOfType("*string")).Return(nil).Once()
-		handler := adminhandlers.NewStopImpersonationHandler(useCase)
+		tokenSvc.On("Hash", originalSessionToken).Return("hashed-original").Once()
+		sessSvc.On("GetByToken", mock.Anything, "hashed-original").Return(&models.Session{ID: origSessionID, UserID: actorID}, nil).Once()
+		handler := adminhandlers.NewStopImpersonationHandler(useCase, testGlobalConfig())
 
+		cn := testGlobalConfig().Session.CookieName
 		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
 		req.SetPathValue("impersonation_id", "imp-1")
+		req.AddCookie(&http.Cookie{
+			Name:  cn + adminconstants.OriginalSessionCookieSuffix,
+			Value: originalSessionToken,
+		})
 		reqCtx.Actor = &models.Actor{ID: actorID, Type: models.ActorUser}
 		reqCtx.Values[models.ContextSessionID.String()] = "session-1"
 
@@ -282,5 +300,7 @@ func TestStopImpersonationHandler(t *testing.T) {
 		}
 		impRepo.AssertExpectations(t)
 		sessionStateRepo.AssertExpectations(t)
+		sessSvc.AssertExpectations(t)
+		tokenSvc.AssertExpectations(t)
 	})
 }

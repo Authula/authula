@@ -16,7 +16,7 @@ description: Implement HTTP handlers that parse requests, invoke use cases, and 
 
 ## Key principles
 
-1. **Thin handlers**: Business logic lives in services, not handlers.
+1. **Thin handlers**: Business logic lives in services, not handlers. Always remember to only extract and validate request data, invoke the appropriate service or use case, and format the response. Avoid embedding business logic directly in the handler to maintain separation of concerns and improve testability.
 2. **Service coordination**: Handlers invoke services which are interfaces
 3. **HTTP boundaries**: Handle only HTTP serialization and status codes, as well as request parsing and validation.
 4. **Error mapping**: Map domain errors returned from services to HTTP status codes via `constants/errors.go`.

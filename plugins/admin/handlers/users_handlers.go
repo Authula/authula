@@ -25,14 +25,19 @@ func (h *CreateUserHandler) Handler() http.HandlerFunc {
 		reqCtx, _ := models.GetRequestContext(ctx)
 		actor := reqCtx.Actor
 
-		var payload types.CreateUserRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+		var request types.CreateUserRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
 
-		user, err := h.useCase.Create(ctx, actor, payload)
+		user, err := h.useCase.Create(ctx, actor, request)
 		if err != nil {
 			respondUsersError(reqCtx, err)
 			return
@@ -133,14 +138,19 @@ func (h *UpdateUserHandler) Handler() http.HandlerFunc {
 		actor := reqCtx.Actor
 		userID := r.PathValue("user_id")
 
-		var payload types.UpdateUserRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+		var request types.UpdateUserRequest
+		if err := util.ParseJSON(r, &request); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+		if err := request.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
 
-		user, err := h.useCase.Update(r.Context(), actor, userID, payload)
+		user, err := h.useCase.Update(r.Context(), actor, userID, request)
 		if err != nil {
 			respondUsersError(reqCtx, err)
 			return
