@@ -43,7 +43,8 @@ type DatabaseConfig struct {
 }
 
 type LoggerConfig struct {
-	Level string `json:"level" toml:"level"`
+	Level  string `json:"level" toml:"level"`
+	Logger Logger `json:"-" toml:"-"`
 }
 
 type SessionConfig struct {

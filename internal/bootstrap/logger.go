@@ -12,11 +12,16 @@ import (
 
 // LoggerOptions configures logger initialization
 type LoggerOptions struct {
-	Level string
+	Level  string
+	Logger models.Logger
 }
 
 // InitLogger creates a configured logger instance
 func InitLogger(opts LoggerOptions) models.Logger {
+	if opts.Logger != nil {
+		return opts.Logger
+	}
+
 	environment := os.Getenv(env.EnvGoEnvironment)
 	var logger *slog.Logger
 

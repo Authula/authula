@@ -18,7 +18,10 @@ import (
 
 // InitLogger initializes the logger based on configuration
 func InitLogger(config *models.Config) models.Logger {
-	return internalbootstrap.InitLogger(internalbootstrap.LoggerOptions{Level: config.Logger.Level})
+	return internalbootstrap.InitLogger(internalbootstrap.LoggerOptions{
+		Level:  config.Logger.Level,
+		Logger: config.Logger.Logger,
+	})
 }
 
 // InitDatabase creates a Bun DB connection based on provider
