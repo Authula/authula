@@ -86,6 +86,9 @@ func (s *ImpersonationService) StartImpersonation(
 	ipAddress *string,
 	userAgent *string,
 	req types.StartImpersonationRequest,
+	impersonatorScopes []string,
+	originalCookieValue string,
+	originalCookieMaxAge int,
 ) (*types.StartImpersonationResult, error) {
 	if err := s.authorizer.AuthorizeScope(ctx, actor, adminconstants.ImpersonationsStartPermission); err != nil {
 		return nil, err
@@ -140,7 +143,7 @@ func (s *ImpersonationService) StartImpersonation(
 
 	var impersonationSessionID *string
 	var rawSessionToken *string
-	if s.sessionService != nil && s.tokenService != nil {
+	if s.tokenService != nil && s.sessionService != nil {
 		rawToken, err := s.tokenService.Generate()
 		if err != nil {
 			return nil, err
@@ -179,10 +182,11 @@ func (s *ImpersonationService) StartImpersonation(
 		return nil, err
 	}
 
-	if impersonationSessionID != nil && s.sessionStateRepo != nil {
+	if impersonationSessionID != nil {
 		state := &types.AdminSessionState{
 			SessionID:              *impersonationSessionID,
 			ImpersonatorUserID:     &actorUserID,
+			ImpersonatorSessionID:  actorSessionID,
 			ImpersonationReason:    &reason,
 			ImpersonationExpiresAt: &expiresAt,
 		}
@@ -191,11 +195,39 @@ func (s *ImpersonationService) StartImpersonation(
 		}
 	}
 
+	// Compute .original cookie value and max age
+	var originalCookieToken string
+	impersonationMaxAge := 0
+	if originalCookieValue != "" {
+		originalCookieToken = originalCookieValue
+		impersonationMaxAge = int(time.Until(expiresAt).Seconds())
+		if originalCookieMaxAge > 0 && originalCookieMaxAge < impersonationMaxAge {
+			impersonationMaxAge = originalCookieMaxAge
+		}
+		if impersonationMaxAge < 0 {
+			impersonationMaxAge = 0
+		}
+	}
+
 	return &types.StartImpersonationResult{
-		Impersonation: impersonation,
-		SessionID:     impersonationSessionID,
-		SessionToken:  rawSessionToken,
+		Impersonation:        impersonation,
+		SessionID:            impersonationSessionID,
+		SessionToken:         rawSessionToken,
+		ImpersonatorUserID:   actorUserID,
+		ImpersonatorScopes:   impersonatorScopes,
+		OriginalCookieToken:  originalCookieToken,
+		OriginalCookieMaxAge: impersonationMaxAge,
+		TargetUserID:         targetUserID,
 	}, nil
+}
+
+func (s *ImpersonationService) ValidateImpersonationCookie(ctx context.Context, originalCookieValue string) (*models.Session, error) {
+	hashedOriginal := s.tokenService.Hash(originalCookieValue)
+	originalSession, err := s.sessionService.GetByToken(ctx, hashedOriginal)
+	if err != nil || originalSession == nil {
+		return nil, internalerrors.ErrForbidden
+	}
+	return originalSession, nil
 }
 
 func (s *ImpersonationService) StopImpersonation(ctx context.Context, actor *models.Actor, actorUserID string, request types.StopImpersonationRequest) error {

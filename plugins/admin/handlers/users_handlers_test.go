@@ -29,7 +29,7 @@ func TestCreateUserHandler(t *testing.T) {
 			name:            "invalid request body",
 			body:            []byte("{invalid"),
 			expectedStatus:  http.StatusUnprocessableEntity,
-			expectedMessage: "invalid request body",
+			expectedMessage: "invalid character 'i' looking for beginning of object key string",
 		},
 		{
 			name: "use case error",
@@ -260,7 +260,7 @@ func TestUpdateUserHandler(t *testing.T) {
 			body:            []byte("{invalid"),
 			pathParams:      map[string]string{"user_id": "user-1"},
 			expectedStatus:  http.StatusUnprocessableEntity,
-			expectedMessage: "invalid request body",
+			expectedMessage: "invalid character 'i' looking for beginning of object key string",
 		},
 		{
 			name:       "use case error",

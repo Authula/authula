@@ -320,7 +320,7 @@ func TestTokenService_GenerateUserToken(t *testing.T) {
 			tt.setupMocks(f)
 
 			ctx := context.Background()
-			pair, err := svc.GenerateUserToken(ctx, tt.userID, tt.sessionID)
+			pair, err := svc.GenerateUserToken(ctx, tt.userID, tt.sessionID, nil)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)

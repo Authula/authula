@@ -100,6 +100,7 @@ func (p *AccessControlPlugin) Close() error {
 
 func (p *AccessControlPlugin) ensurePermissions() error {
 	if err := p.accessControlService.EnsurePermissions(context.Background(), []rootservices.PermissionDefinition{
+		{Key: accesscontrolconstants.All, Description: "All access control permissions"},
 		{Key: accesscontrolconstants.RolesCreatePermission, Description: "Create roles in the access control system"},
 		{Key: accesscontrolconstants.RolesListPermission, Description: "List roles in the access control system"},
 		{Key: accesscontrolconstants.RolesReadPermission, Description: "Read a role in the access control system"},

@@ -1,6 +1,7 @@
 package constants
 
 const (
+	All                               = "admin:*"
 	UsersCreatePermission             = "admin:users:create"
 	UsersListPermission               = "admin:users:list"
 	UsersReadPermission               = "admin:users:read"

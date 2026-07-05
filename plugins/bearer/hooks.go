@@ -60,6 +60,12 @@ func (p *BearerPlugin) validateBearerToken(reqCtx *models.RequestContext) error 
 
 	reqCtx.SetActorInContext(actor)
 
+	if sessionID, ok := actor.Claims[models.ContextSessionID.String()]; ok {
+		if sid, ok := sessionID.(string); ok && sid != "" {
+			reqCtx.Values[models.ContextSessionID.String()] = sid
+		}
+	}
+
 	return nil
 }
 
@@ -81,6 +87,12 @@ func (p *BearerPlugin) validateBearerTokenOptional(reqCtx *models.RequestContext
 	}
 
 	reqCtx.SetActorInContext(actor)
+
+	if sessionID, ok := actor.Claims[models.ContextSessionID.String()]; ok {
+		if sid, ok := sessionID.(string); ok && sid != "" {
+			reqCtx.Values[models.ContextSessionID.String()] = sid
+		}
+	}
 
 	return nil
 }

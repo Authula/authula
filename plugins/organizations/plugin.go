@@ -121,6 +121,7 @@ func (p *OrganizationsPlugin) Close() error {
 
 func (p *OrganizationsPlugin) ensurePermissions() error {
 	if err := p.accessControlService.EnsurePermissions(context.Background(), []rootservices.PermissionDefinition{
+		{Key: orgconstants.All, Description: "All organizations permissions"},
 		{Key: orgconstants.OrganizationsCreatePermission, Description: "Create organizations"},
 		{Key: orgconstants.OrganizationsListPermission, Description: "List organizations"},
 		{Key: orgconstants.OrganizationsReadPermission, Description: "Read organization details"},

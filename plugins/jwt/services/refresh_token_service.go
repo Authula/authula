@@ -98,7 +98,7 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 				s.emitTokenReuseRecoveredEvent(record.SessionID, tokenHash, deltaMs, gracePeriodMs, auditMeta)
 
 				// Continue with normal token rotation - user stays logged in
-				return s.completeTokenRotation(ctx, tokenHash, record)
+				return s.completeTokenRotation(ctx, tokenHash, record, refreshToken)
 			}
 		}
 
@@ -132,11 +132,11 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 	}
 
 	// Token not revoked - normal rotation flow
-	return s.completeTokenRotation(ctx, tokenHash, record)
+	return s.completeTokenRotation(ctx, tokenHash, record, refreshToken)
 }
 
 // completeTokenRotation handles the token rotation after validation passes
-func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHash string, record *types.RefreshToken) (*types.RefreshTokenResponse, error) {
+func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHash string, record *types.RefreshToken, rawRefreshToken string) (*types.RefreshTokenResponse, error) {
 	// Check if token is expired
 	if time.Now().After(record.ExpiresAt) {
 		return nil, fmt.Errorf("refresh token expired")
@@ -160,8 +160,27 @@ func (s *refreshTokenService) completeTokenRotation(ctx context.Context, tokenHa
 		return nil, fmt.Errorf("failed to rotate token")
 	}
 
-	// STEP 2: Generate new token pair
-	tokenPair, err := s.jwtService.GenerateUserToken(ctx, session.UserID, record.SessionID)
+	// STEP 2: Extract non-standard claims from old refresh token to carry forward
+	var extraClaims map[string]any
+	if s.jwtService != nil {
+		if claims, err := s.jwtService.ExtractClaims(ctx, rawRefreshToken); err == nil {
+			extraClaims = make(map[string]any)
+			for k, v := range claims {
+				switch k {
+				case "sub", "user_id", "session_id", "iat", "exp", "jti",
+					"token_type", "actor_type", "organization_id", "scopes":
+					continue
+				default:
+					extraClaims[k] = v
+				}
+			}
+			if len(extraClaims) == 0 {
+				extraClaims = nil
+			}
+		}
+	}
+
+	tokenPair, err := s.jwtService.GenerateUserToken(ctx, session.UserID, record.SessionID, extraClaims)
 	if err != nil {
 		s.logger.Error("failed to generate new tokens", "user_id", session.UserID, "session_id", record.SessionID, "error", err)
 		return nil, fmt.Errorf("failed to generate tokens")

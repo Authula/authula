@@ -145,6 +145,7 @@ func (p *ApiKeyPlugin) runCleanupLoop(interval time.Duration) {
 
 func (p *ApiKeyPlugin) ensurePermissions() error {
 	if err := p.accessControlService.EnsurePermissions(context.Background(), []rootservices.PermissionDefinition{
+		{Key: apiconstants.All, Description: "All organization API key permissions"},
 		{Key: apiconstants.OrgApiKeyCreate, Description: "Create API keys for the organization"},
 		{Key: apiconstants.OrgApiKeyList, Description: "List API keys for the organization"},
 		{Key: apiconstants.OrgApiKeyRead, Description: "Read an API key for the organization"},

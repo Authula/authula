@@ -49,11 +49,11 @@ func NewJWTService(
 	}
 }
 
-func (s *tokenService) detectAlgorithmFromKey(k jwk.Key) jwa.SignatureAlgorithm {
+func (s *tokenService) detectAlgorithmFromKey() jwa.SignatureAlgorithm {
 	return jwa.EdDSA()
 }
 
-func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, sessionID string) (*types.TokenPair, error) {
+func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, sessionID string, extraClaims map[string]any) (*types.TokenPair, error) {
 	if sessionID == "" {
 		return nil, errors.New("session id is required to generate tokens")
 	}
@@ -77,7 +77,7 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 		return nil, fmt.Errorf("failed to set key ID: %w", err)
 	}
 
-	keyAlgorithm := s.detectAlgorithmFromKey(privKey)
+	keyAlgorithm := s.detectAlgorithmFromKey()
 	now := time.Now()
 	jti := uuid.New().String()
 
@@ -105,6 +105,12 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 	}
 	if err := accessClaims.Set("actor_type", "user"); err != nil {
 		return nil, fmt.Errorf("failed to set actor_type: %w", err)
+	}
+
+	for k, v := range extraClaims {
+		if err := accessClaims.Set(k, v); err != nil {
+			return nil, fmt.Errorf("failed to set extra claim %s: %w", k, err)
+		}
 	}
 
 	accessTokenBytes, err := jwt.Sign(accessClaims, jwt.WithKey(keyAlgorithm, privKey))
@@ -136,6 +142,12 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 	}
 	if err := refreshClaims.Set("actor_type", "user"); err != nil {
 		return nil, fmt.Errorf("failed to set actor_type in refresh token: %w", err)
+	}
+
+	for k, v := range extraClaims {
+		if err := refreshClaims.Set(k, v); err != nil {
+			return nil, fmt.Errorf("failed to set extra claim %s in refresh token: %w", k, err)
+		}
 	}
 
 	refreshTokenBytes, err := jwt.Sign(refreshClaims, jwt.WithKey(keyAlgorithm, privKey))
@@ -171,7 +183,7 @@ func (s *tokenService) GenerateMachineToken(ctx context.Context, clientID string
 		return nil, fmt.Errorf("failed to set key ID: %w", err)
 	}
 
-	keyAlgorithm := s.detectAlgorithmFromKey(privKey)
+	keyAlgorithm := s.detectAlgorithmFromKey()
 	now := time.Now()
 	jti := uuid.New().String()
 
@@ -320,5 +332,36 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 	actor.ID = userID
 	actor.Type = models.ActorUser
 
+	// Passthrough any extra claims from the token into Actor.Claims
+	for _, key := range parsedToken.Keys() {
+		switch key {
+		case jwt.SubjectKey, jwt.IssuedAtKey, jwt.ExpirationKey, jwt.JwtIDKey,
+			"user_id", "session_id", "token_type", "actor_type",
+			"organization_id", "scopes":
+			continue
+		default:
+			var val any
+			if err := parsedToken.Get(key, &val); err == nil {
+				actor.Claims[key] = val
+			}
+		}
+	}
+
 	return actor, nil
+}
+
+func (s *tokenService) ExtractClaims(ctx context.Context, token string) (map[string]any, error) {
+	parsedToken, err := jwt.Parse([]byte(token), jwt.WithValidate(false))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse token: %w", err)
+	}
+
+	claims := make(map[string]any)
+	for _, key := range parsedToken.Keys() {
+		var val any
+		if err := parsedToken.Get(key, &val); err == nil {
+			claims[key] = val
+		}
+	}
+	return claims, nil
 }

@@ -70,7 +70,7 @@ func TestIssueTokensHook(t *testing.T) {
 					AccessToken:  "access-token-1",
 					RefreshToken: "refresh-token-1",
 				}
-				tokenSvc.On("GenerateUserToken", mock.Anything, "user-1", "sess-1").Return(pair, nil)
+				tokenSvc.On("GenerateUserToken", mock.Anything, "user-1", "sess-1", mock.Anything).Return(pair, nil)
 				refreshSvc.On("StoreInitialRefreshToken", mock.Anything, "refresh-token-1", "sess-1", mock.Anything).Return(nil)
 			},
 			check: func(t *testing.T, reqCtx *models.RequestContext) {
@@ -93,7 +93,7 @@ func TestIssueTokensHook(t *testing.T) {
 				reqCtx.Values[models.ContextSessionID.String()] = "sess-1"
 			},
 			mock: func(tokenSvc *jwttests.MockTokenService, refreshSvc *jwttests.MockRefreshTokenService) {
-				tokenSvc.On("GenerateUserToken", mock.Anything, "user-1", "sess-1").Return(nil, errHookTest)
+				tokenSvc.On("GenerateUserToken", mock.Anything, "user-1", "sess-1", mock.Anything).Return(nil, errHookTest)
 			},
 			wantErr: "failed to generate authentication tokens",
 		},

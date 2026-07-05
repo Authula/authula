@@ -5,6 +5,7 @@ import (
 
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/types"
 	"github.com/Authula/authula/plugins/admin/usecases"
 )
@@ -20,9 +21,8 @@ func NewGetAllImpersonationsHandler(useCase usecases.ImpersonationUseCase) *GetA
 func (h *GetAllImpersonationsHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
-		actor := reqCtx.Actor
 
-		rows, err := h.useCase.GetAllImpersonations(r.Context(), actor)
+		rows, err := h.useCase.GetAllImpersonations(r.Context(), reqCtx.Actor)
 		if err != nil {
 			respondImpersonationError(reqCtx, err)
 			return
@@ -43,10 +43,9 @@ func NewGetImpersonationByIDHandler(useCase usecases.ImpersonationUseCase) *GetI
 func (h *GetImpersonationByIDHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
-		actor := reqCtx.Actor
-		impersonationID := r.PathValue("impersonation_id")
 
-		impersonation, err := h.useCase.GetImpersonationByID(r.Context(), actor, impersonationID)
+		impersonationID := r.PathValue("impersonation_id")
+		impersonation, err := h.useCase.GetImpersonationByID(r.Context(), reqCtx.Actor, impersonationID)
 		if err != nil {
 			respondImpersonationError(reqCtx, err)
 			return
@@ -57,35 +56,62 @@ func (h *GetImpersonationByIDHandler) Handler() http.HandlerFunc {
 }
 
 type StartImpersonationHandler struct {
-	useCase usecases.ImpersonationUseCase
+	useCase      usecases.ImpersonationUseCase
+	globalConfig *models.Config
 }
 
-func NewStartImpersonationHandler(useCase usecases.ImpersonationUseCase) *StartImpersonationHandler {
-	return &StartImpersonationHandler{useCase: useCase}
+func NewStartImpersonationHandler(
+	useCase usecases.ImpersonationUseCase,
+	globalConfig *models.Config,
+) *StartImpersonationHandler {
+	return &StartImpersonationHandler{
+		useCase:      useCase,
+		globalConfig: globalConfig,
+	}
 }
 
 func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
+		reqCtx, _ := models.GetRequestContext(r.Context())
 		actor := reqCtx.Actor
 		impersonatorUserID := getUserID(reqCtx)
-
 		if impersonatorUserID == nil {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
 			reqCtx.Handled = true
 			return
 		}
 
-		var payload types.StartImpersonationRequest
-		if err := util.ParseJSON(r, &payload); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+		impersonatorScopes := make([]string, len(reqCtx.Actor.Scopes))
+		copy(impersonatorScopes, reqCtx.Actor.Scopes)
+
+		var req types.StartImpersonationRequest
+		if err := util.ParseJSON(r, &req); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
+			reqCtx.Handled = true
+			return
+		}
+		if err := req.Validate(); err != nil {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
 
+		originalCookieValue, _ := r.Cookie(h.globalConfig.Session.CookieName)
+		originalCookieMaxAge := 0
+		if originalCookieValue != nil {
+			originalCookieMaxAge = originalCookieValue.MaxAge
+		}
+		originalCookieVal := ""
+		if originalCookieValue != nil {
+			originalCookieVal = originalCookieValue.Value
+		}
+
 		userAgent := r.UserAgent()
-		result, err := h.useCase.StartImpersonation(r.Context(), actor, *impersonatorUserID, getSessionID(reqCtx), &reqCtx.ClientIP, &userAgent, payload)
+		result, err := h.useCase.StartImpersonation(
+			r.Context(), actor, *impersonatorUserID, getSessionID(reqCtx),
+			&reqCtx.ClientIP, &userAgent, req,
+			impersonatorScopes, originalCookieVal, originalCookieMaxAge,
+		)
 		if err != nil {
 			respondImpersonationError(reqCtx, err)
 			return
@@ -97,9 +123,28 @@ func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 			return
 		}
 
+		sessionConfig := h.globalConfig.Session
+		sameSite := sameSiteFromSessionConfig(&sessionConfig)
+
+		if result.OriginalCookieToken != "" {
+			http.SetCookie(w, &http.Cookie{
+				Name:     sessionConfig.CookieName + constants.OriginalSessionCookieSuffix,
+				Value:    result.OriginalCookieToken,
+				Path:     "/",
+				HttpOnly: sessionConfig.HttpOnly,
+				Secure:   sessionConfig.Secure,
+				SameSite: sameSite,
+				MaxAge:   result.OriginalCookieMaxAge,
+			})
+		}
+
 		reqCtx.SetActorInContext(&models.Actor{
-			ID:   result.Impersonation.TargetUserID,
+			ID:   result.TargetUserID,
 			Type: models.ActorUser,
+			Claims: map[string]any{
+				constants.ImpersonatorID:     result.ImpersonatorUserID,
+				constants.ImpersonatorScopes: result.ImpersonatorScopes,
+			},
 		})
 		if result.SessionID != nil && *result.SessionID != "" {
 			reqCtx.Values[models.ContextSessionID.String()] = *result.SessionID
@@ -116,18 +161,23 @@ func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 }
 
 type StopImpersonationHandler struct {
-	useCase usecases.ImpersonationUseCase
+	useCase      usecases.ImpersonationUseCase
+	globalConfig *models.Config
 }
 
-func NewStopImpersonationHandler(useCase usecases.ImpersonationUseCase) *StopImpersonationHandler {
-	return &StopImpersonationHandler{useCase: useCase}
+func NewStopImpersonationHandler(
+	useCase usecases.ImpersonationUseCase,
+	globalConfig *models.Config,
+) *StopImpersonationHandler {
+	return &StopImpersonationHandler{
+		useCase:      useCase,
+		globalConfig: globalConfig,
+	}
 }
 
 func (h *StopImpersonationHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
-		actor := reqCtx.Actor
+		reqCtx, _ := models.GetRequestContext(r.Context())
 		impersonatedUserID := getUserID(reqCtx)
 		impersonatedSessionID := getSessionID(reqCtx)
 
@@ -137,13 +187,57 @@ func (h *StopImpersonationHandler) Handler() http.HandlerFunc {
 			return
 		}
 
+		originalCookieValue := ""
+		originalCookie, err := r.Cookie(h.globalConfig.Session.CookieName + constants.OriginalSessionCookieSuffix)
+		if err == nil {
+			originalCookieValue = originalCookie.Value
+		}
+
+		if originalCookieValue == "" {
+			if reqCtx.Actor == nil || reqCtx.Actor.Claims == nil {
+				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "no original session found"})
+				reqCtx.Handled = true
+				return
+			}
+			if _, ok := reqCtx.Actor.Claims[constants.ImpersonatorID]; !ok {
+				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "no original session found"})
+				reqCtx.Handled = true
+				return
+			}
+		}
+
 		impersonationID := r.PathValue("impersonation_id")
-		if err := h.useCase.StopImpersonation(r.Context(), actor, *impersonatedUserID, *impersonatedSessionID, types.StopImpersonationRequest{ImpersonationID: &impersonationID}); err != nil {
+		result, err := h.useCase.StopImpersonation(
+			r.Context(), reqCtx.Actor, *impersonatedUserID, *impersonatedSessionID,
+			originalCookieValue,
+			types.StopImpersonationRequest{ImpersonationID: &impersonationID},
+		)
+		if err != nil {
 			respondImpersonationError(reqCtx, err)
 			return
 		}
 
-		reqCtx.Values[models.ContextAuthSignOut.String()] = true
+		sessionConfig := h.globalConfig.Session
+		sameSite := sameSiteFromSessionConfig(&sessionConfig)
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     sessionConfig.CookieName,
+			Value:    result.OriginalSessionToken,
+			Path:     "/",
+			HttpOnly: sessionConfig.HttpOnly,
+			Secure:   sessionConfig.Secure,
+			SameSite: sameSite,
+		})
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     sessionConfig.CookieName + constants.OriginalSessionCookieSuffix,
+			Value:    "",
+			Path:     "/",
+			HttpOnly: sessionConfig.HttpOnly,
+			Secure:   sessionConfig.Secure,
+			SameSite: sameSite,
+			MaxAge:   -1,
+		})
 
 		reqCtx.SetJSONResponse(http.StatusOK, &types.StopImpersonationResponse{Message: "Impersonation stopped"})
 	}
@@ -161,12 +255,10 @@ func getSessionID(reqCtx *models.RequestContext) *string {
 	if !ok || value == nil {
 		return nil
 	}
-
 	sessionID, ok := value.(string)
 	if !ok || sessionID == "" {
 		return nil
 	}
-
 	return &sessionID
 }
 
@@ -177,4 +269,17 @@ func respondImpersonationError(reqCtx *models.RequestContext, err error) {
 
 func mapImpersonationErrorStatus(err error) int {
 	return mapAdminHttpErrorStatus(err)
+}
+
+func sameSiteFromSessionConfig(sessionConfig *models.SessionConfig) http.SameSite {
+	switch sessionConfig.SameSite {
+	case "strict":
+		return http.SameSiteStrictMode
+	case "none":
+		return http.SameSiteNoneMode
+	case "lax":
+		return http.SameSiteLaxMode
+	default:
+		return http.SameSiteLaxMode
+	}
 }

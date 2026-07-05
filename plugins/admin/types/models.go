@@ -46,6 +46,7 @@ type AdminSessionState struct {
 	RevokedReason          *string    `json:"revoked_reason" bun:"column:revoked_reason"`
 	RevokedByUserID        *string    `json:"revoked_by_user_id" bun:"column:revoked_by_user_id"`
 	ImpersonatorUserID     *string    `json:"impersonator_user_id" bun:"column:impersonator_user_id"`
+	ImpersonatorSessionID  *string    `json:"impersonator_session_id" bun:"column:impersonator_session_id"`
 	ImpersonationReason    *string    `json:"impersonation_reason" bun:"column:impersonation_reason"`
 	ImpersonationExpiresAt *time.Time `json:"impersonation_expires_at" bun:"column:impersonation_expires_at"`
 	CreatedAt              time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp"`

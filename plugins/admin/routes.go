@@ -25,7 +25,7 @@ func newRouteUseCases(api *API) routeUseCases {
 	}
 }
 
-func Routes(api *API) []models.Route {
+func (p *AdminPlugin) buildRoutes(api *API) []models.Route {
 	usecases := newRouteUseCases(api)
 
 	return []models.Route{
@@ -250,17 +250,23 @@ func Routes(api *API) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/admin/impersonations",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireAuthenticated(),
+				middleware.RequireActor(models.ActorUser),
 			},
-			Handler: adminhandlers.NewStartImpersonationHandler(usecases.impersonation).Handler(),
+			Handler: adminhandlers.NewStartImpersonationHandler(
+				usecases.impersonation,
+				p.globalConfig,
+			).Handler(),
 		},
 		{
 			Method: http.MethodPost,
 			Path:   "/admin/impersonations/{impersonation_id}/stop",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireAuthenticated(),
+				middleware.RequireActor(models.ActorUser),
 			},
-			Handler: adminhandlers.NewStopImpersonationHandler(usecases.impersonation).Handler(),
+			Handler: adminhandlers.NewStopImpersonationHandler(
+				usecases.impersonation,
+				p.globalConfig,
+			).Handler(),
 		},
 	}
 }

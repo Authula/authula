@@ -81,7 +81,8 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 				f.repo.On("GetRefreshToken", ctx, mock.Anything).Return(record, nil)
 				f.sessionSvc.On("GetByID", ctx, "sess-1").Return(session, nil)
 				f.repo.On("RevokeRefreshToken", ctx, mock.Anything).Return(nil)
-				f.tokenSvc.On("GenerateUserToken", ctx, "user-1", "sess-1").Return(tokenPair, nil)
+				f.tokenSvc.On("ExtractClaims", mock.Anything, mock.Anything).Return(map[string]any{}, nil).Maybe()
+				f.tokenSvc.On("GenerateUserToken", ctx, "user-1", "sess-1", mock.Anything).Return(tokenPair, nil)
 				f.repo.On("StoreRefreshToken", ctx, mock.Anything).Return(nil)
 			},
 		},
@@ -150,7 +151,8 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 				f.repo.On("SetLastReuseAttempt", ctx, mock.Anything).Return(nil)
 				f.sessionSvc.On("GetByID", ctx, "sess-1").Return(session, nil)
 				f.repo.On("RevokeRefreshToken", ctx, mock.Anything).Return(nil)
-				f.tokenSvc.On("GenerateUserToken", ctx, "user-1", "sess-1").Return(tokenPair, nil)
+				f.tokenSvc.On("ExtractClaims", mock.Anything, mock.Anything).Return(map[string]any{}, nil).Maybe()
+				f.tokenSvc.On("GenerateUserToken", ctx, "user-1", "sess-1", mock.Anything).Return(tokenPair, nil)
 				f.repo.On("StoreRefreshToken", ctx, mock.Anything).Return(nil)
 			},
 		},

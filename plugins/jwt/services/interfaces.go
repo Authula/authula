@@ -10,8 +10,9 @@ import (
 )
 
 type TokenService interface {
-	GenerateUserToken(ctx context.Context, userID string, sessionID string) (*types.TokenPair, error)
+	GenerateUserToken(ctx context.Context, userID string, sessionID string, extraClaims map[string]any) (*types.TokenPair, error)
 	GenerateMachineToken(ctx context.Context, clientID string, organizationID string, scopes []string) (*types.TokenPair, error)
+	ExtractClaims(ctx context.Context, token string) (map[string]any, error)
 }
 
 type KeyService interface {

@@ -72,8 +72,10 @@ func (p *AccessControlPlugin) hydrateActorScopes(reqCtx *models.RequestContext) 
 				}
 			}
 		}
+
 	case models.ActorMachine:
 	}
+
 	return nil
 }
 
