@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	emailconstants "github.com/Authula/authula/internal/email/constants"
+	emailtmpl "github.com/Authula/authula/internal/email/template"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
 	"github.com/Authula/authula/plugins/email-password/types"
@@ -13,13 +15,14 @@ import (
 )
 
 type requestEmailChangeUseCase struct {
-	Logger              models.Logger
-	GlobalConfig        *models.Config
-	PluginConfig        types.EmailPasswordPluginConfig
-	UserService         rootservices.UserService
-	VerificationService rootservices.VerificationService
-	TokenService        rootservices.TokenService
-	MailerService       rootservices.MailerService
+	Logger               models.Logger
+	GlobalConfig         *models.Config
+	PluginConfig         types.EmailPasswordPluginConfig
+	UserService          rootservices.UserService
+	VerificationService  rootservices.VerificationService
+	TokenService         rootservices.TokenService
+	MailerService        rootservices.MailerService
+	EmailTemplateManager *emailtmpl.Manager
 }
 
 func NewRequestEmailChangeUseCase(
@@ -30,8 +33,9 @@ func NewRequestEmailChangeUseCase(
 	verificationService rootservices.VerificationService,
 	tokenService rootservices.TokenService,
 	mailerService rootservices.MailerService,
+	emailTemplateManager *emailtmpl.Manager,
 ) RequestEmailChangeUseCase {
-	return &requestEmailChangeUseCase{Logger: logger, GlobalConfig: globalConfig, PluginConfig: pluginConfig, UserService: userService, VerificationService: verificationService, TokenService: tokenService, MailerService: mailerService}
+	return &requestEmailChangeUseCase{Logger: logger, GlobalConfig: globalConfig, PluginConfig: pluginConfig, UserService: userService, VerificationService: verificationService, TokenService: tokenService, MailerService: mailerService, EmailTemplateManager: emailTemplateManager}
 }
 
 func (uc *requestEmailChangeUseCase) RequestChange(
@@ -119,28 +123,17 @@ func (uc *requestEmailChangeUseCase) RequestChange(
 }
 
 func (uc *requestEmailChangeUseCase) sendRequestEmailChangeEmail(ctx context.Context, user *models.User, newEmail string, verificationLink string) error {
-	expiryInHours := int(uc.PluginConfig.RequestEmailChangeExpiresIn.Hours())
-	hoursText := "hours"
-	if expiryInHours < 2 {
-		hoursText = "hour"
+	subject, textBody, htmlBody, err := uc.EmailTemplateManager.Render(emailconstants.EmailChangeRequestEmailTemplateName, types.EmailChangeRequestContext{
+		CommonContext: emailtmpl.NewCommonContext(uc.GlobalConfig.AppName, uc.GlobalConfig.BaseURL),
+		UserEmail:     user.Email,
+		OldEmail:      user.Email,
+		NewEmail:      newEmail,
+		ChangeLink:    verificationLink,
+		Expiry:        uc.PluginConfig.RequestEmailChangeExpiresIn,
+	})
+	if err != nil {
+		uc.Logger.Error("failed to render email change request template", "err", err.Error())
+		return err
 	}
-	subject := "Confirm Your Email Change"
-	textBody := fmt.Sprintf("Please confirm your email change to %s by clicking the following link: %s.", newEmail, verificationLink)
-	htmlBody := fmt.Sprintf(
-		`<html>
-			<body>
-				<p>Hello, %s</p>
-				<p>We received a request to change your account email to %s. If you made this request, please click the link below to confirm the change:</p>
-				<p><a href="%s">Confirm Email Change</a></p>
-				<p>This link will expire in %d %s.</p>
-				<p>If you did not request an email change, please ignore this email.</p>
-		</body>
-	</html>`,
-		user.Email,
-		newEmail,
-		verificationLink,
-		expiryInHours,
-		hoursText,
-	)
 	return uc.MailerService.SendEmail(ctx, newEmail, subject, textBody, htmlBody)
 }

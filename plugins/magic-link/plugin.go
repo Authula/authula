@@ -3,6 +3,7 @@ package magiclink
 import (
 	"fmt"
 
+	emailtmpl "github.com/Authula/authula/internal/email/template"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	types "github.com/Authula/authula/plugins/magic-link/types"
@@ -10,17 +11,18 @@ import (
 )
 
 type MagicLinkPlugin struct {
-	globalConfig        *models.Config
-	pluginConfig        *types.MagicLinkPluginConfig
-	logger              models.Logger
-	ctx                 *models.PluginContext
-	userService         rootservices.UserService
-	accountService      rootservices.AccountService
-	sessionService      rootservices.SessionService
-	verificationService rootservices.VerificationService
-	tokenService        rootservices.TokenService
-	mailerService       rootservices.MailerService
-	Api                 *API
+	globalConfig         *models.Config
+	pluginConfig         *types.MagicLinkPluginConfig
+	logger               models.Logger
+	ctx                  *models.PluginContext
+	userService          rootservices.UserService
+	accountService       rootservices.AccountService
+	sessionService       rootservices.SessionService
+	verificationService  rootservices.VerificationService
+	tokenService         rootservices.TokenService
+	mailerService        rootservices.MailerService
+	emailTemplateManager *emailtmpl.Manager
+	Api                  *API
 }
 
 func New(config types.MagicLinkPluginConfig) *MagicLinkPlugin {
@@ -89,6 +91,12 @@ func (p *MagicLinkPlugin) Init(ctx *models.PluginContext) error {
 	} else {
 		p.logger.Warn("mailer service not available in service registry: automatic email sending will be disabled for the magic link plugin")
 	}
+
+	emailTemplateManager, err := newMagicLinkEmailTemplateManager()
+	if err != nil {
+		return fmt.Errorf("failed to initialize magic link email templates: %w", err)
+	}
+	p.emailTemplateManager = emailTemplateManager
 
 	p.Api = BuildAPI(p)
 

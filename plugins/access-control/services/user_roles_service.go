@@ -120,6 +120,13 @@ func (s *UserRolesService) AssignRoleToUser(ctx context.Context, actor *models.A
 	return s.userRolesRepo.AssignUserRole(ctx, userID, roleID, assignedByUserID, req.ExpiresAt)
 }
 
+func (s *UserRolesService) assignRoleToUserInternal(ctx context.Context, userID string, roleID string, assignedByUserID *string) error {
+	if userID == "" || roleID == "" {
+		return internalerrors.ErrBadRequest
+	}
+	return s.userRolesRepo.AssignUserRole(ctx, userID, roleID, assignedByUserID, nil)
+}
+
 func (s *UserRolesService) RemoveRoleFromUser(ctx context.Context, actor *models.Actor, userID string, roleID string) error {
 	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.UserRolesRemovePermission); err != nil {
 		return err

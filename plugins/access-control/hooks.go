@@ -87,31 +87,15 @@ func (p *AccessControlPlugin) assignRoleFromContextHook(reqCtx *models.RequestCo
 		return nil
 	}
 
-	assignCtx, ok := accessControlAssignRoleContext(rawValue)
-	if !ok || assignCtx.UserID == "" || assignCtx.RoleName == "" {
+	assignRoleCtx, ok := accessControlAssignRoleContext(rawValue)
+	if !ok || assignRoleCtx.UserID == "" || assignRoleCtx.RoleName == "" {
 		return nil
 	}
 
-	targetRole, err := p.Api.GetRoleByName(ctx, reqCtx.Actor, assignCtx.RoleName)
-	if err != nil {
-		p.logAssignRoleHookError("failed to resolve role", assignCtx, err)
-		return nil
-	}
-
-	userRoles, err := p.Api.GetUserRoles(ctx, reqCtx.Actor, assignCtx.UserID)
-	if err != nil {
-		p.logAssignRoleHookError("failed to load user roles", assignCtx, err)
-		return nil
-	}
-
-	for _, userRole := range userRoles {
-		if userRole.RoleName == assignCtx.RoleName {
-			return nil
-		}
-	}
-
-	if err := p.Api.AssignRoleToUser(ctx, reqCtx.Actor, assignCtx.UserID, types.AssignUserRoleRequest{RoleID: targetRole.ID}, assignCtx.AssignerUserID); err != nil {
-		p.logAssignRoleHookError("failed to assign role", assignCtx, err)
+	if err := p.accessControlService.AssignRoleToUserIfMissing(
+		ctx, assignRoleCtx.UserID, assignRoleCtx.RoleName, assignRoleCtx.AssignerUserID,
+	); err != nil {
+		p.logAssignRoleHookError("failed to assign role", assignRoleCtx, err)
 	}
 
 	return nil

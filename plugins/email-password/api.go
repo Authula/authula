@@ -16,11 +16,11 @@ func BuildAPI(plugin *EmailPasswordPlugin) *API {
 func BuildUseCases(p *EmailPasswordPlugin) *usecases.UseCases {
 	signUpUseCase := usecases.NewSignUpUseCase(p.globalConfig, p.pluginConfig, p.logger, p.userService, p.accountService, p.sessionService, p.tokenService, p.passwordService, p.ctx.EventBus)
 	signInUseCase := usecases.NewSignInUseCase(p.globalConfig, p.pluginConfig, p.logger, p.userService, p.accountService, p.sessionService, p.tokenService, p.passwordService, p.ctx.EventBus)
-	verifyEmailUseCase := usecases.NewVerifyEmailUseCase(p.pluginConfig, p.logger, p.userService, p.accountService, p.verificationService, p.tokenService, p.mailerService, p.ctx.EventBus)
-	sendEmailVerificationUseCase := usecases.NewSendEmailVerificationUseCase(p.globalConfig, p.pluginConfig, p.logger, p.userService, p.verificationService, p.tokenService, p.mailerService)
-	requestPasswordResetUseCase := usecases.NewRequestPasswordResetUseCase(p.logger, p.globalConfig, p.pluginConfig, p.userService, p.verificationService, p.tokenService, p.mailerService)
-	changePasswordUseCase := usecases.NewChangePasswordUseCase(p.logger, p.pluginConfig, p.userService, p.accountService, p.verificationService, p.tokenService, p.passwordService, p.mailerService, p.ctx.EventBus)
-	requestEmailChangeUseCase := usecases.NewRequestEmailChangeUseCase(p.logger, p.globalConfig, p.pluginConfig, p.userService, p.verificationService, p.tokenService, p.mailerService)
+	verifyEmailUseCase := usecases.NewVerifyEmailUseCase(p.globalConfig, p.pluginConfig, p.logger, p.userService, p.accountService, p.verificationService, p.tokenService, p.mailerService, p.ctx.EventBus, p.emailTemplateManager)
+	sendEmailVerificationUseCase := usecases.NewSendEmailVerificationUseCase(p.globalConfig, p.pluginConfig, p.logger, p.userService, p.verificationService, p.tokenService, p.mailerService, p.emailTemplateManager)
+	requestPasswordResetUseCase := usecases.NewRequestPasswordResetUseCase(p.logger, p.globalConfig, p.pluginConfig, p.userService, p.verificationService, p.tokenService, p.mailerService, p.emailTemplateManager)
+	changePasswordUseCase := usecases.NewChangePasswordUseCase(p.globalConfig, p.logger, p.pluginConfig, p.userService, p.accountService, p.verificationService, p.tokenService, p.passwordService, p.mailerService, p.ctx.EventBus, p.emailTemplateManager)
+	requestEmailChangeUseCase := usecases.NewRequestEmailChangeUseCase(p.logger, p.globalConfig, p.pluginConfig, p.userService, p.verificationService, p.tokenService, p.mailerService, p.emailTemplateManager)
 
 	return &usecases.UseCases{
 		SignUpUseCase:                signUpUseCase,

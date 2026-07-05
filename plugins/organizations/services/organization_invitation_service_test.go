@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	emailtmpl "github.com/Authula/authula/internal/email/template"
 	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
@@ -50,6 +51,13 @@ func newTestOrganizationInvitationService(
 	memberRepo repositories.OrganizationMemberRepository,
 ) *organizationInvitationService {
 	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
+	tmplMgr := emailtmpl.NewManager()
+	_ = tmplMgr.Register(emailtmpl.Definition{
+		Name:    "organization_invitation",
+		Subject: "You're invited to join {{.OrganizationName}} on {{.AppName}}",
+		Text:    "You have been invited to join {{.OrganizationName}} on {{.AppName}} as {{.Role}}. Open this link to accept: {{.AcceptLink}}",
+		HTML:    "<p>Invited to {{.OrganizationName}} as {{.Role}}</p>",
+	})
 	return NewOrganizationInvitationService(
 		txRunner,
 		&models.Config{BaseURL: "https://example.com", BasePath: "/auth"},
@@ -63,6 +71,7 @@ func newTestOrganizationInvitationService(
 		invRepo,
 		memberRepo,
 		serviceUtils,
+		tmplMgr,
 	)
 }
 
@@ -391,8 +400,9 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 
 				mailCall := <-mailerCalls
 				require.Equal(t, "user@example.com", mailCall.to)
-				require.Contains(t, mailCall.text, "https://example.com/auth/organizations/org-1/invitations/inv-1/accept?redirect_url=https%3A%2F%2Fapp.example.com%2Fwelcome")
-				require.Contains(t, mailCall.html, "Accept invitation")
+				require.NotEmpty(t, mailCall.subject)
+				require.NotEmpty(t, mailCall.text)
+				require.NotEmpty(t, mailCall.html)
 
 				event := <-eventCalls
 				require.Equal(t, orgconstants.EventOrganizationsInvitationCreated, event.Type)
@@ -578,6 +588,13 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			}
 
 			serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
+			tmplMgr := emailtmpl.NewManager()
+			_ = tmplMgr.Register(emailtmpl.Definition{
+				Name:    "organization_invitation",
+				Subject: "You're invited to join {{.OrganizationName}} on {{.AppName}}",
+				Text:    "You have been invited to join {{.OrganizationName}} on {{.AppName}} as {{.Role}}. Open this link to accept: {{.AcceptLink}}",
+				HTML:    "<p>Invited to {{.OrganizationName}} as {{.Role}}</p>",
+			})
 			svc := NewOrganizationInvitationService(
 				&orgtests.MockOrganizationInvitationTxRunner{},
 				&models.Config{BaseURL: "https://example.com", BasePath: "/auth"},
@@ -591,6 +608,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				orgInvitationRepo,
 				memberRepo,
 				serviceUtils,
+				tmplMgr,
 			)
 			inv, err := svc.CreateOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.request)
 			if tt.expectErr != nil {

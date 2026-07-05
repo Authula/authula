@@ -1,0 +1,7 @@
+<div>
+    <h3>Hi {{.UserEmail}},</h3>
+    <p>We received a request to reset your password. If you made this request, please click the link below to reset your password:</p>
+    <p><a href="{{.ResetLink}}">Reset Password</a></p>
+    <p>This link will expire in {{humanDuration .Expiry}}.</p>
+    <p>If you did not request a password reset, please ignore this email. Your password will remain unchanged.</p>
+</div>

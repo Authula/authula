@@ -5,6 +5,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	emailtmpl "github.com/Authula/authula/internal/email/template"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
@@ -12,19 +13,20 @@ import (
 )
 
 type EmailPasswordPlugin struct {
-	globalConfig        *models.Config
-	pluginConfig        types.EmailPasswordPluginConfig
-	logger              models.Logger
-	ctx                 *models.PluginContext
-	db                  bun.IDB
-	userService         rootservices.UserService
-	accountService      rootservices.AccountService
-	sessionService      rootservices.SessionService
-	verificationService rootservices.VerificationService
-	tokenService        rootservices.TokenService
-	passwordService     rootservices.PasswordService
-	mailerService       rootservices.MailerService
-	Api                 *API
+	globalConfig         *models.Config
+	pluginConfig         types.EmailPasswordPluginConfig
+	logger               models.Logger
+	ctx                  *models.PluginContext
+	db                   bun.IDB
+	userService          rootservices.UserService
+	accountService       rootservices.AccountService
+	sessionService       rootservices.SessionService
+	verificationService  rootservices.VerificationService
+	tokenService         rootservices.TokenService
+	passwordService      rootservices.PasswordService
+	mailerService        rootservices.MailerService
+	emailTemplateManager *emailtmpl.Manager
+	Api                  *API
 }
 
 func New(config types.EmailPasswordPluginConfig) *EmailPasswordPlugin {
@@ -99,6 +101,12 @@ func (p *EmailPasswordPlugin) Init(ctx *models.PluginContext) error {
 	} else {
 		p.logger.Warn("mailer service not available in service registry: automatic email sending will be disabled for the email/password plugin")
 	}
+
+	emailTemplateManager, err := newEmailPasswordEmailTemplateManager()
+	if err != nil {
+		return fmt.Errorf("failed to initialize email templates: %w", err)
+	}
+	p.emailTemplateManager = emailTemplateManager
 
 	p.Api = BuildAPI(p)
 
