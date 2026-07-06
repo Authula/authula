@@ -1,0 +1,7 @@
+<div>
+  <h3>Hi {{.UserEmail}},</h3>
+  <p>Click the link below to sign in to your account:</p>
+  <p><a href="{{.MagicLink}}">Sign in</a></p>
+  <p>This link will expire in {{humanDuration .Expiry}}.</p>
+  <p>If you didn't request this, please ignore this email.</p>
+</div>

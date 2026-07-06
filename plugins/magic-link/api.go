@@ -46,14 +46,15 @@ func BuildAPI(plugin *MagicLinkPlugin) *API {
 func BuildUseCases(p *MagicLinkPlugin) *usecases.UseCases {
 	return &usecases.UseCases{
 		SignInUseCase: &usecases.SignInUseCaseImpl{
-			GlobalConfig:        p.globalConfig,
-			PluginConfig:        p.pluginConfig,
-			Logger:              p.logger,
-			UserService:         p.userService,
-			AccountService:      p.accountService,
-			VerificationService: p.verificationService,
-			TokenService:        p.tokenService,
-			MailerService:       p.mailerService,
+			GlobalConfig:         p.globalConfig,
+			PluginConfig:         p.pluginConfig,
+			Logger:               p.logger,
+			UserService:          p.userService,
+			AccountService:       p.accountService,
+			VerificationService:  p.verificationService,
+			TokenService:         p.tokenService,
+			MailerService:        p.mailerService,
+			EmailTemplateManager: p.emailTemplateManager,
 		},
 		VerifyUseCase: &usecases.VerifyUseCaseImpl{
 			GlobalConfig:        p.globalConfig,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"html"
 	"net/mail"
 	"net/url"
 	"strings"
@@ -12,6 +11,8 @@ import (
 
 	"github.com/uptrace/bun"
 
+	emailconstants "github.com/Authula/authula/internal/email/constants"
+	emailtmpl "github.com/Authula/authula/internal/email/template"
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
@@ -38,6 +39,7 @@ type organizationInvitationService struct {
 	orgInvitationRepo    repositories.OrganizationInvitationRepository
 	orgMemberRepo        repositories.OrganizationMemberRepository
 	serviceUtils         *ServiceUtils
+	emailTemplateManager *emailtmpl.Manager
 }
 
 func NewOrganizationInvitationService(
@@ -53,6 +55,7 @@ func NewOrganizationInvitationService(
 	orgInvitationRepo repositories.OrganizationInvitationRepository,
 	orgMemberRepo repositories.OrganizationMemberRepository,
 	serviceUtils *ServiceUtils,
+	emailTemplateManager *emailtmpl.Manager,
 ) *organizationInvitationService {
 	return &organizationInvitationService{
 		txRunner:             txRunner,
@@ -67,6 +70,7 @@ func NewOrganizationInvitationService(
 		orgInvitationRepo:    orgInvitationRepo,
 		orgMemberRepo:        orgMemberRepo,
 		serviceUtils:         serviceUtils,
+		emailTemplateManager: emailTemplateManager,
 	}
 }
 
@@ -197,28 +201,18 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 }
 
 func (s *organizationInvitationService) sendOrganizationInvitationEmail(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, acceptURL string) error {
-	appName := "Authula"
-	if s.globalConfig.AppName != "" {
-		appName = s.globalConfig.AppName
+	subject, textBody, htmlBody, err := s.emailTemplateManager.Render(emailconstants.OrganizationInvitationEmailTemplateName, types.OrganizationInvitationContext{
+		CommonContext:    emailtmpl.NewCommonContext(s.globalConfig.AppName, s.globalConfig.BaseURL),
+		InvitationEmail:  invitation.Email,
+		OrganizationName: organization.Name,
+		Role:             invitation.Role,
+		AcceptLink:       acceptURL,
+		Expiry:           s.pluginConfig.InvitationExpiresIn,
+	})
+	if err != nil {
+		s.logger.Error("failed to render organization invitation template", "err", err.Error())
+		return err
 	}
-	subject := fmt.Sprintf("You're invited to join %s on %s", organization.Name, appName)
-	textBody := fmt.Sprintf("You have been invited to join %s on %s as %s. Open this link to accept the invitation: %s", organization.Name, appName, invitation.Role, acceptURL)
-	htmlBody := fmt.Sprintf(`
-<div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #1f2937;">
-  <p>Hello,</p>
-  <p>You have been invited to join <strong>%s</strong> on <strong>%s</strong> as <strong>%s</strong>.</p>
-  <p><a href="%s" style="display:inline-block;background:#111827;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:8px;">Accept invitation</a></p>
-  <p>If the button does not work, copy this link:</p>
-  <p><a href="%s">%s</a></p>
-</div>`,
-		html.EscapeString(organization.Name),
-		html.EscapeString(appName),
-		html.EscapeString(invitation.Role),
-		html.EscapeString(acceptURL),
-		html.EscapeString(acceptURL),
-		html.EscapeString(acceptURL),
-	)
-
 	return s.mailerService.SendEmail(ctx, invitation.Email, subject, textBody, htmlBody)
 }
 
@@ -344,9 +338,6 @@ func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context
 	if actor == nil || actor.ID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeScope(ctx, actor, orgconstants.OrganizationsInvitationsProcessPermission); err != nil {
-		return nil, err
-	}
 
 	actorID := actor.ID
 	user, err := s.serviceUtils.ensureEmailVerifiedForInvitationAcceptance(ctx, s.userService, actorID, s.pluginConfig.RequireEmailVerifiedOnInvitation)
@@ -385,9 +376,6 @@ func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context
 func (s *organizationInvitationService) RejectOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
-	}
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeScope(ctx, actor, orgconstants.OrganizationsInvitationsProcessPermission); err != nil {
-		return nil, err
 	}
 
 	actorID := actor.ID

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	emailconstants "github.com/Authula/authula/internal/email/constants"
+	emailtmpl "github.com/Authula/authula/internal/email/template"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
@@ -13,17 +15,20 @@ import (
 )
 
 type verifyEmailUseCase struct {
-	PluginConfig        types.EmailPasswordPluginConfig
-	Logger              models.Logger
-	UserService         rootservices.UserService
-	AccountService      rootservices.AccountService
-	VerificationService rootservices.VerificationService
-	TokenService        rootservices.TokenService
-	MailerService       rootservices.MailerService
-	EventBus            models.EventBus
+	GlobalConfig         *models.Config
+	PluginConfig         types.EmailPasswordPluginConfig
+	Logger               models.Logger
+	UserService          rootservices.UserService
+	AccountService       rootservices.AccountService
+	VerificationService  rootservices.VerificationService
+	TokenService         rootservices.TokenService
+	MailerService        rootservices.MailerService
+	EventBus             models.EventBus
+	EmailTemplateManager *emailtmpl.Manager
 }
 
 func NewVerifyEmailUseCase(
+	globalConfig *models.Config,
 	pluginConfig types.EmailPasswordPluginConfig,
 	logger models.Logger,
 	userService rootservices.UserService,
@@ -32,8 +37,20 @@ func NewVerifyEmailUseCase(
 	tokenService rootservices.TokenService,
 	mailerService rootservices.MailerService,
 	eventBus models.EventBus,
+	emailTemplateManager *emailtmpl.Manager,
 ) VerifyEmailUseCase {
-	return &verifyEmailUseCase{PluginConfig: pluginConfig, Logger: logger, UserService: userService, AccountService: accountService, VerificationService: verificationService, TokenService: tokenService, MailerService: mailerService, EventBus: eventBus}
+	return &verifyEmailUseCase{
+		GlobalConfig:         globalConfig,
+		PluginConfig:         pluginConfig,
+		Logger:               logger,
+		UserService:          userService,
+		AccountService:       accountService,
+		VerificationService:  verificationService,
+		TokenService:         tokenService,
+		MailerService:        mailerService,
+		EventBus:             eventBus,
+		EmailTemplateManager: emailTemplateManager,
+	}
 }
 
 func (uc *verifyEmailUseCase) VerifyEmail(ctx context.Context, tokenStr string) (models.VerificationType, error) {
@@ -221,30 +238,30 @@ func (uc *verifyEmailUseCase) handleEmailChangeVerificationEmail(
 }
 
 func (uc *verifyEmailUseCase) sendChangedEmailEmails(ctx context.Context, oldEmail string, newEmail string) error {
-	subject := "Your email has been changed"
-	textBody := fmt.Sprintf("Your account email has been changed from %s to %s. If you did not perform this action, please contact support.", oldEmail, newEmail)
+	for _, recipient := range []struct {
+		addr string
+		user string
+	}{
+		{addr: oldEmail, user: oldEmail},
+		{addr: newEmail, user: newEmail},
+	} {
+		subject, textBody, htmlBody, err := uc.EmailTemplateManager.Render(emailconstants.EmailChangedEmailTemplateName, types.EmailChangedNotificationContext{
+			CommonContext: emailtmpl.NewCommonContext(uc.GlobalConfig.AppName, uc.GlobalConfig.BaseURL),
+			UserEmail:     recipient.user,
+			OldEmail:      oldEmail,
+			NewEmail:      newEmail,
+		})
+		if err != nil {
+			uc.Logger.Error("failed to render email changed notification template", "err", err.Error())
+			continue
+		}
 
-	if err := uc.MailerService.SendEmail(ctx, oldEmail, subject, textBody, getHtmlBody(oldEmail, oldEmail, newEmail)); err != nil {
-		uc.Logger.Error("failed to send email to old address via built-in email service", "err", err)
-	}
-
-	if err := uc.MailerService.SendEmail(ctx, newEmail, subject, textBody, getHtmlBody(newEmail, oldEmail, newEmail)); err != nil {
-		uc.Logger.Error("failed to send email to new address via built-in email service", "err", err)
+		if err := uc.MailerService.SendEmail(ctx, recipient.addr, subject, textBody, htmlBody); err != nil {
+			uc.Logger.Error("failed to send email to address via built-in email service", "addr", recipient.addr, "err", err)
+		}
 	}
 
 	return nil
-}
-
-func getHtmlBody(userEmail string, oldEmail string, newEmail string) string {
-	return fmt.Sprintf(
-		`<div>
-			<p>Hello %s,</p>
-			<p>Your account email has been changed from %s to %s. If you did not perform this action, please contact support immediately.</p>
-		</div>`,
-		userEmail,
-		oldEmail,
-		newEmail,
-	)
 }
 
 func (uc *verifyEmailUseCase) publishEmailChangedEvent(user *models.User, oldEmail string, newEmail string) {

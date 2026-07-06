@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	emailtmpl "github.com/Authula/authula/internal/email/template"
 	inttests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
@@ -21,9 +22,42 @@ type emailPasswordTestFixture struct {
 	mailerSvc       *inttests.MockMailerService
 	logger          *inttests.MockLogger
 	eventBus        *inttests.MockEventBus
+	tmplMgr         *emailtmpl.Manager
 }
 
 func newEmailPasswordTestFixture() *emailPasswordTestFixture {
+	tmplMgr := emailtmpl.NewManager()
+	_ = tmplMgr.Register(emailtmpl.Definition{
+		Name:    "verify_email",
+		Subject: "Verify your email",
+		Text:    "Verify your email by clicking the following link: {{.VerificationLink}}.",
+		HTML:    "<p>Hello {{.UserEmail}}, verify: {{.VerificationLink}}</p>",
+	})
+	_ = tmplMgr.Register(emailtmpl.Definition{
+		Name:    "password_reset",
+		Subject: "Reset Your Password",
+		Text:    "Reset link: {{.ResetLink}}",
+		HTML:    "<p>Reset: {{.ResetLink}}</p>",
+	})
+	_ = tmplMgr.Register(emailtmpl.Definition{
+		Name:    "password_changed",
+		Subject: "Your password has been changed",
+		Text:    "Password changed",
+		HTML:    "<p>Password changed for {{.UserEmail}}</p>",
+	})
+	_ = tmplMgr.Register(emailtmpl.Definition{
+		Name:    "email_change_request",
+		Subject: "Confirm Your Email Change",
+		Text:    "Change to {{.NewEmail}}: {{.ChangeLink}}",
+		HTML:    "<p>Change to {{.NewEmail}}: {{.ChangeLink}}</p>",
+	})
+	_ = tmplMgr.Register(emailtmpl.Definition{
+		Name:    "email_changed_notification",
+		Subject: "Your email has been changed",
+		Text:    "Changed from {{.OldEmail}} to {{.NewEmail}}",
+		HTML:    "<p>Changed from {{.OldEmail}} to {{.NewEmail}}</p>",
+	})
+
 	return &emailPasswordTestFixture{
 		globalConfig: &models.Config{
 			BaseURL:  "http://localhost",
@@ -49,6 +83,7 @@ func newEmailPasswordTestFixture() *emailPasswordTestFixture {
 		mailerSvc:       &inttests.MockMailerService{},
 		logger:          &inttests.MockLogger{},
 		eventBus:        &inttests.MockEventBus{},
+		tmplMgr:         tmplMgr,
 	}
 }
 
@@ -61,23 +96,23 @@ func (f *emailPasswordTestFixture) signInUseCase() SignInUseCase {
 }
 
 func (f *emailPasswordTestFixture) verifyEmailUseCase() VerifyEmailUseCase {
-	return NewVerifyEmailUseCase(f.pluginConfig, f.logger, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.eventBus)
+	return NewVerifyEmailUseCase(f.globalConfig, f.pluginConfig, f.logger, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.eventBus, f.tmplMgr)
 }
 
 func (f *emailPasswordTestFixture) sendEmailVerificationUseCase() SendEmailVerificationUseCase {
-	return NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, f.logger, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc)
+	return NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, f.logger, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr)
 }
 
 func (f *emailPasswordTestFixture) requestPasswordResetUseCase() RequestPasswordResetUseCase {
-	return NewRequestPasswordResetUseCase(f.logger, f.globalConfig, f.pluginConfig, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc)
+	return NewRequestPasswordResetUseCase(f.logger, f.globalConfig, f.pluginConfig, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr)
 }
 
 func (f *emailPasswordTestFixture) changePasswordUseCase() ChangePasswordUseCase {
-	return NewChangePasswordUseCase(f.logger, f.pluginConfig, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.passwordSvc, f.mailerSvc, f.eventBus)
+	return NewChangePasswordUseCase(f.globalConfig, f.logger, f.pluginConfig, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.passwordSvc, f.mailerSvc, f.eventBus, f.tmplMgr)
 }
 
 func (f *emailPasswordTestFixture) requestEmailChangeUseCase() RequestEmailChangeUseCase {
-	return NewRequestEmailChangeUseCase(f.logger, f.globalConfig, f.pluginConfig, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc)
+	return NewRequestEmailChangeUseCase(f.logger, f.globalConfig, f.pluginConfig, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr)
 }
 
 func testRequestContext() context.Context {

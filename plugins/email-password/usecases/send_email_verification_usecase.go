@@ -3,9 +3,10 @@ package usecases
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
+	emailconstants "github.com/Authula/authula/internal/email/constants"
+	emailtmpl "github.com/Authula/authula/internal/email/template"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
 	"github.com/Authula/authula/plugins/email-password/utils"
@@ -13,13 +14,14 @@ import (
 )
 
 type sendEmailVerificationUseCase struct {
-	GlobalConfig        *models.Config
-	PluginConfig        types.EmailPasswordPluginConfig
-	Logger              models.Logger
-	UserService         rootservices.UserService
-	VerificationService rootservices.VerificationService
-	TokenService        rootservices.TokenService
-	MailerService       rootservices.MailerService
+	GlobalConfig         *models.Config
+	PluginConfig         types.EmailPasswordPluginConfig
+	Logger               models.Logger
+	UserService          rootservices.UserService
+	VerificationService  rootservices.VerificationService
+	TokenService         rootservices.TokenService
+	MailerService        rootservices.MailerService
+	EmailTemplateManager *emailtmpl.Manager
 }
 
 func NewSendEmailVerificationUseCase(
@@ -30,8 +32,18 @@ func NewSendEmailVerificationUseCase(
 	verificationService rootservices.VerificationService,
 	tokenService rootservices.TokenService,
 	mailerService rootservices.MailerService,
+	emailTemplateManager *emailtmpl.Manager,
 ) SendEmailVerificationUseCase {
-	return &sendEmailVerificationUseCase{GlobalConfig: globalConfig, PluginConfig: pluginConfig, Logger: logger, UserService: userService, VerificationService: verificationService, TokenService: tokenService, MailerService: mailerService}
+	return &sendEmailVerificationUseCase{
+		GlobalConfig:         globalConfig,
+		PluginConfig:         pluginConfig,
+		Logger:               logger,
+		UserService:          userService,
+		VerificationService:  verificationService,
+		TokenService:         tokenService,
+		MailerService:        mailerService,
+		EmailTemplateManager: emailTemplateManager,
+	}
 }
 
 func (uc *sendEmailVerificationUseCase) Send(ctx context.Context, userID string, callbackURL *string) error {
@@ -122,26 +134,15 @@ func (uc *sendEmailVerificationUseCase) Send(ctx context.Context, userID string,
 }
 
 func (uc *sendEmailVerificationUseCase) sendEmailVerification(ctx context.Context, user *models.User, verificationLink string) error {
-	expiryInHours := int(uc.PluginConfig.EmailVerificationExpiresIn.Hours())
-	hoursText := "hours"
-	if expiryInHours < 2 {
-		hoursText = "hour"
+	subject, textBody, htmlBody, err := uc.EmailTemplateManager.Render(emailconstants.VerifyEmailEmailTemplateName, types.VerifyEmailContext{
+		CommonContext:    emailtmpl.NewCommonContext(uc.GlobalConfig.AppName, uc.GlobalConfig.BaseURL),
+		UserEmail:        user.Email,
+		VerificationLink: verificationLink,
+		Expiry:           uc.PluginConfig.EmailVerificationExpiresIn,
+	})
+	if err != nil {
+		uc.Logger.Error("failed to render email verification template", "err", err.Error())
+		return err
 	}
-	subject := "Verify your email"
-	textBody := fmt.Sprintf("Verify your email by clicking the following link: %s.", verificationLink)
-	htmlBody := fmt.Sprintf(
-		strings.TrimSpace(
-			`<div>
-				<p>Hello %s,</p>
-				<p>Please verify your email address by clicking the following link: <a href="%s">Verify your email</a></p>
-				<p>This link will expire in %d %s.</p>
-				<p>If you did not request this, please ignore this email.</p>
-			</div>`,
-		),
-		user.Email,
-		verificationLink,
-		expiryInHours,
-		hoursText,
-	)
 	return uc.MailerService.SendEmail(ctx, user.Email, subject, textBody, htmlBody)
 }

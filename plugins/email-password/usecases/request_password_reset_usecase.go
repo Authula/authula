@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	emailconstants "github.com/Authula/authula/internal/email/constants"
+	emailtmpl "github.com/Authula/authula/internal/email/template"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
 	"github.com/Authula/authula/plugins/email-password/utils"
@@ -12,13 +14,14 @@ import (
 )
 
 type requestPasswordResetUseCase struct {
-	Logger              models.Logger
-	GlobalConfig        *models.Config
-	PluginConfig        types.EmailPasswordPluginConfig
-	UserService         rootservices.UserService
-	VerificationService rootservices.VerificationService
-	TokenService        rootservices.TokenService
-	MailerService       rootservices.MailerService
+	Logger               models.Logger
+	GlobalConfig         *models.Config
+	PluginConfig         types.EmailPasswordPluginConfig
+	UserService          rootservices.UserService
+	VerificationService  rootservices.VerificationService
+	TokenService         rootservices.TokenService
+	MailerService        rootservices.MailerService
+	EmailTemplateManager *emailtmpl.Manager
 }
 
 func NewRequestPasswordResetUseCase(
@@ -29,8 +32,18 @@ func NewRequestPasswordResetUseCase(
 	verificationService rootservices.VerificationService,
 	tokenService rootservices.TokenService,
 	mailerService rootservices.MailerService,
+	emailTemplateManager *emailtmpl.Manager,
 ) RequestPasswordResetUseCase {
-	return &requestPasswordResetUseCase{Logger: logger, GlobalConfig: globalConfig, PluginConfig: pluginConfig, UserService: userService, VerificationService: verificationService, TokenService: tokenService, MailerService: mailerService}
+	return &requestPasswordResetUseCase{
+		Logger:               logger,
+		GlobalConfig:         globalConfig,
+		PluginConfig:         pluginConfig,
+		UserService:          userService,
+		VerificationService:  verificationService,
+		TokenService:         tokenService,
+		MailerService:        mailerService,
+		EmailTemplateManager: emailTemplateManager,
+	}
 }
 
 func (uc *requestPasswordResetUseCase) RequestReset(
@@ -95,7 +108,7 @@ func (uc *requestPasswordResetUseCase) RequestReset(
 			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
 			defer cancel()
 
-			if err := sendRequestPasswordResetEmail(taskCtx, user, verificationLink, uc.PluginConfig.PasswordResetExpiresIn, uc.MailerService); err != nil {
+			if err := uc.sendRequestPasswordResetEmail(taskCtx, user, verificationLink); err != nil {
 				uc.Logger.Error("failed to send password reset email via built-in email service", "err", err.Error())
 			}
 		}()
@@ -104,28 +117,16 @@ func (uc *requestPasswordResetUseCase) RequestReset(
 	return nil
 }
 
-func sendRequestPasswordResetEmail(ctx context.Context, user *models.User, verificationLink string, expiresIn time.Duration, mailerService rootservices.MailerService) error {
-	hours := int(expiresIn.Hours())
-	hoursText := "hours"
-	if hours == 1 {
-		hoursText = "hour"
+func (uc *requestPasswordResetUseCase) sendRequestPasswordResetEmail(ctx context.Context, user *models.User, verificationLink string) error {
+	subject, textBody, htmlBody, err := uc.EmailTemplateManager.Render(emailconstants.PasswordResetRequestEmailTemplateName, types.PasswordResetContext{
+		CommonContext: emailtmpl.NewCommonContext(uc.GlobalConfig.AppName, uc.GlobalConfig.BaseURL),
+		UserEmail:     user.Email,
+		ResetLink:     verificationLink,
+		Expiry:        uc.PluginConfig.PasswordResetExpiresIn,
+	})
+	if err != nil {
+		uc.Logger.Error("failed to render password reset template", "err", err.Error())
+		return err
 	}
-	subject := "Reset Your Password"
-	textBody := fmt.Sprintf("Please reset your password by clicking the following link: %s.", verificationLink)
-	htmlBody := fmt.Sprintf(
-		`<html>
-			<body>
-				<p>Hello, %s</p>
-				<p>We received a request to reset your password. If you made this request, please click the link below to reset your password:</p>
-				<p><a href="%s">Reset Password</a></p>
-				<p>This link will expire in %d %s.</p>
-				<p>If you did not request a password reset, please ignore this email. Your password will remain unchanged.</p>
-		</body>
-	</html>`,
-		user.Email,
-		verificationLink,
-		hours,
-		hoursText,
-	)
-	return mailerService.SendEmail(ctx, user.Email, subject, textBody, htmlBody)
+	return uc.MailerService.SendEmail(ctx, user.Email, subject, textBody, htmlBody)
 }

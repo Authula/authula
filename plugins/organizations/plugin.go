@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	emailtmpl "github.com/Authula/authula/internal/email/template"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
@@ -33,6 +34,7 @@ type OrganizationsPlugin struct {
 	teamMemberService    services.OrganizationTeamMemberService
 	accessControlService rootservices.AccessControlService
 	databaseHooks        *OrganizationsHookExecutor
+	emailTemplateManager *emailtmpl.Manager
 }
 
 func New(config types.OrganizationsPluginConfig) *OrganizationsPlugin {
@@ -91,7 +93,13 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 
 	p.serviceUtils = services.NewServiceUtils(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo, authorizer)
 	p.organizationService = services.NewOrganizationService(p.organizationRepo, p.memberRepo, p.serviceUtils, accessControlService, p.pluginConfig.OrganizationsLimit, ctx.DB)
-	p.invitationService = services.NewOrganizationInvitationService(ctx.DB, p.globalConfig, &p.pluginConfig, p.logger, ctx.EventBus, userService, mailerService, accessControlService, p.organizationRepo, p.invitationRepo, p.memberRepo, p.serviceUtils)
+	emailTemplateManager, err := newOrganizationEmailTemplateManager()
+	if err != nil {
+		return fmt.Errorf("failed to initialize organization email templates: %w", err)
+	}
+	p.emailTemplateManager = emailTemplateManager
+
+	p.invitationService = services.NewOrganizationInvitationService(ctx.DB, p.globalConfig, &p.pluginConfig, p.logger, ctx.EventBus, userService, mailerService, accessControlService, p.organizationRepo, p.invitationRepo, p.memberRepo, p.serviceUtils, p.emailTemplateManager)
 	p.memberService = services.NewOrganizationMemberService(userService, accessControlService, p.organizationRepo, p.memberRepo, p.pluginConfig.MembersLimit, ctx.DB, p.serviceUtils)
 	p.teamService = services.NewOrganizationTeamService(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo, p.serviceUtils, ctx.DB)
 	p.teamMemberService = services.NewOrganizationTeamMemberService(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo, p.serviceUtils)
@@ -145,7 +153,6 @@ func (p *OrganizationsPlugin) ensurePermissions() error {
 		{Key: orgconstants.OrganizationsInvitationsListPermission, Description: "List organization invitations"},
 		{Key: orgconstants.OrganizationsInvitationsReadPermission, Description: "Read organization invitation details"},
 		{Key: orgconstants.OrganizationsInvitationsRevokePermission, Description: "Revoke organization invitations"},
-		{Key: orgconstants.OrganizationsInvitationsProcessPermission, Description: "Process organization invitations"},
 	}); err != nil {
 		return fmt.Errorf("failed to ensure organization permissions: %w", err)
 	}

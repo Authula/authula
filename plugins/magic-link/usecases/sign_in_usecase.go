@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	emailconstants "github.com/Authula/authula/internal/email/constants"
+	emailtmpl "github.com/Authula/authula/internal/email/template"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/magic-link/types"
@@ -13,14 +15,15 @@ import (
 )
 
 type SignInUseCaseImpl struct {
-	GlobalConfig        *models.Config
-	PluginConfig        *types.MagicLinkPluginConfig
-	Logger              models.Logger
-	UserService         rootservices.UserService
-	AccountService      rootservices.AccountService
-	TokenService        rootservices.TokenService
-	VerificationService rootservices.VerificationService
-	MailerService       rootservices.MailerService
+	GlobalConfig         *models.Config
+	PluginConfig         *types.MagicLinkPluginConfig
+	Logger               models.Logger
+	UserService          rootservices.UserService
+	AccountService       rootservices.AccountService
+	TokenService         rootservices.TokenService
+	VerificationService  rootservices.VerificationService
+	MailerService        rootservices.MailerService
+	EmailTemplateManager *emailtmpl.Manager
 }
 
 func (uc *SignInUseCaseImpl) SignIn(
@@ -108,7 +111,7 @@ func (uc *SignInUseCaseImpl) SignIn(
 			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
 			defer cancel()
 
-			if err := uc.sendMagicLinkVerificationEmail(taskCtx, existingUser, verificationURL); err != nil {
+			if err := uc.sendMagicLinkVerificationEmail(taskCtx, existingUser.Email, verificationURL); err != nil {
 				uc.Logger.Error("failed to send magic link verification email via built-in email service", "err", err.Error())
 			}
 		}()
@@ -119,28 +122,16 @@ func (uc *SignInUseCaseImpl) SignIn(
 	}, nil
 }
 
-func (uc *SignInUseCaseImpl) sendMagicLinkVerificationEmail(ctx context.Context, user *models.User, verificationURL string) error {
-	expiresIn := util.FormatDuration(uc.PluginConfig.ExpiresIn)
-	greeting := user.Email
-	if user.Name != "" {
-		greeting = user.Name
+func (uc *SignInUseCaseImpl) sendMagicLinkVerificationEmail(ctx context.Context, userEmail string, verificationURL string) error {
+	subject, textBody, htmlBody, err := uc.EmailTemplateManager.Render(emailconstants.MagicLinkSignInEmailTemplateName, types.MagicLinkSignInContext{
+		CommonContext: emailtmpl.NewCommonContext(uc.GlobalConfig.AppName, uc.GlobalConfig.BaseURL),
+		UserEmail:     userEmail,
+		MagicLink:     verificationURL,
+		Expiry:        uc.PluginConfig.ExpiresIn,
+	})
+	if err != nil {
+		uc.Logger.Error("failed to render magic link sign in template", "err", err.Error())
+		return err
 	}
-	subject := fmt.Sprintf("Sign in to %s with your magic link", uc.GlobalConfig.AppName)
-	textBody := fmt.Sprintf(
-		"Hi %s,\n\nClick the link below to sign in to your account:\n\n%s\n\nThis link will expire in %s.\n\nIf you didn't request this, please ignore this email.\n\n",
-		greeting,
-		verificationURL,
-		expiresIn,
-	)
-	htmlBody := fmt.Sprintf(
-		`<p>Hi %s,</p>
-		<p>Click the link below to sign in to your account:</p>
-		<p><a href="%s">Sign in</a></p>
-		<p>This link will expire in %s.</p>
-		<p>If you didn't request this, please ignore this email.</p>`,
-		greeting,
-		verificationURL,
-		expiresIn,
-	)
-	return uc.MailerService.SendEmail(ctx, user.Email, subject, textBody, htmlBody)
+	return uc.MailerService.SendEmail(ctx, userEmail, subject, textBody, htmlBody)
 }

@@ -2,11 +2,11 @@ package usecases
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	emailconstants "github.com/Authula/authula/internal/email/constants"
+	emailtmpl "github.com/Authula/authula/internal/email/template"
 	"github.com/Authula/authula/internal/util"
-	internalutil "github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
 	"github.com/Authula/authula/plugins/email-password/types"
@@ -14,18 +14,21 @@ import (
 )
 
 type changePasswordUseCase struct {
-	Logger              models.Logger
-	PluginConfig        types.EmailPasswordPluginConfig
-	UserService         rootservices.UserService
-	AccountService      rootservices.AccountService
-	VerificationService rootservices.VerificationService
-	TokenService        rootservices.TokenService
-	PasswordService     rootservices.PasswordService
-	MailerService       rootservices.MailerService
-	EventBus            models.EventBus
+	GlobalConfig         *models.Config
+	Logger               models.Logger
+	PluginConfig         types.EmailPasswordPluginConfig
+	UserService          rootservices.UserService
+	AccountService       rootservices.AccountService
+	VerificationService  rootservices.VerificationService
+	TokenService         rootservices.TokenService
+	PasswordService      rootservices.PasswordService
+	MailerService        rootservices.MailerService
+	EventBus             models.EventBus
+	EmailTemplateManager *emailtmpl.Manager
 }
 
 func NewChangePasswordUseCase(
+	globalConfig *models.Config,
 	logger models.Logger,
 	pluginConfig types.EmailPasswordPluginConfig,
 	userService rootservices.UserService,
@@ -35,8 +38,21 @@ func NewChangePasswordUseCase(
 	passwordService rootservices.PasswordService,
 	mailerService rootservices.MailerService,
 	eventBus models.EventBus,
+	emailTemplateManager *emailtmpl.Manager,
 ) ChangePasswordUseCase {
-	return &changePasswordUseCase{Logger: logger, PluginConfig: pluginConfig, UserService: userService, AccountService: accountService, VerificationService: verificationService, TokenService: tokenService, PasswordService: passwordService, MailerService: mailerService, EventBus: eventBus}
+	return &changePasswordUseCase{
+		GlobalConfig:         globalConfig,
+		Logger:               logger,
+		PluginConfig:         pluginConfig,
+		UserService:          userService,
+		AccountService:       accountService,
+		VerificationService:  verificationService,
+		TokenService:         tokenService,
+		PasswordService:      passwordService,
+		MailerService:        mailerService,
+		EventBus:             eventBus,
+		EmailTemplateManager: emailTemplateManager,
+	}
 }
 
 func (uc *changePasswordUseCase) ChangePassword(ctx context.Context, tokenValue string, newPassword string) error {
@@ -122,24 +138,23 @@ func (uc *changePasswordUseCase) ChangePassword(ctx context.Context, tokenValue 
 }
 
 func (uc *changePasswordUseCase) sendChangedPasswordEmail(ctx context.Context, user *models.User) error {
-	subject := "Your password has been changed"
-	textBody := "Your password has been successfully changed. If you did not perform this action, please reset your password immediately by requesting a password reset."
-	htmlBody := fmt.Sprintf(
-		`<div>
-			<p>Hello %s,</p>
-			<p>Your password has been successfully changed. If you did not perform this action, please reset your password immediately by requesting a password reset.</p>
-		</div>`,
-		user.Email,
-	)
+	subject, textBody, htmlBody, err := uc.EmailTemplateManager.Render(emailconstants.PasswordChangedEmailTemplateName, types.PasswordChangedContext{
+		CommonContext: emailtmpl.NewCommonContext(uc.GlobalConfig.AppName, uc.GlobalConfig.BaseURL),
+		UserEmail:     user.Email,
+	})
+	if err != nil {
+		uc.Logger.Error("failed to render password changed template", "err", err.Error())
+		return err
+	}
 	return uc.MailerService.SendEmail(ctx, user.Email, subject, textBody, htmlBody)
 }
 
 func (uc *changePasswordUseCase) publishChangedPasswordEvent(user *models.User) {
-	internalutil.PublishEventAsync(
+	util.PublishEventAsync(
 		uc.EventBus,
 		uc.Logger,
 		models.Event{
-			ID:        internalutil.GenerateUUID(),
+			ID:        util.GenerateUUID(),
 			Type:      constants.EventUserChangedPassword,
 			Payload:   util.ToMap(user),
 			Metadata:  nil,

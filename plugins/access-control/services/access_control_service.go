@@ -73,6 +73,26 @@ func (s *AccessControlService) ValidatePermissionKeys(ctx context.Context, permi
 	return nil
 }
 
+func (s *AccessControlService) AssignRoleToUserIfMissing(ctx context.Context, userID string, roleName string, assignedByUserID *string) error {
+	role, err := s.rolesService.getRoleByNameInternal(ctx, roleName)
+	if err != nil {
+		return err
+	}
+
+	userRoles, err := s.userRolesService.getUserRolesInternal(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	for _, ur := range userRoles {
+		if ur.RoleName == roleName {
+			return nil
+		}
+	}
+
+	return s.userRolesService.assignRoleToUserInternal(ctx, userID, role.ID, assignedByUserID)
+}
+
 func (s *AccessControlService) EnsurePermissions(ctx context.Context, permissions []rootservices.PermissionDefinition) error {
 	for _, p := range permissions {
 		existing, err := s.permissionsRepo.GetPermissionByKey(ctx, p.Key)

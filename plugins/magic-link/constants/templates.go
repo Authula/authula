@@ -1,0 +1,7 @@
+package constants
+
+const (
+	EnvMagicLinkSignInSubject = "AUTHULA_TEMPLATE_MAGIC_LINK_SIGN_IN_SUBJECT"
+	EnvMagicLinkSignInText    = "AUTHULA_TEMPLATE_MAGIC_LINK_SIGN_IN_TEXT"
+	EnvMagicLinkSignInHTML    = "AUTHULA_TEMPLATE_MAGIC_LINK_SIGN_IN_HTML"
+)
