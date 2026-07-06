@@ -9,35 +9,35 @@ import (
 )
 
 func Routes(plugin *OrganizationsPlugin) []models.Route {
-	createOrganizationHandler := &handlers.CreateOrganizationHandler{OrgService: plugin.organizationService}
-	getAllOrganizationsHandler := &handlers.GetAllOrganizationsHandler{OrgService: plugin.organizationService}
-	getOrganizationByIDHandler := &handlers.GetOrganizationByIDHandler{OrgService: plugin.organizationService}
-	updateOrganizationHandler := &handlers.UpdateOrganizationHandler{OrgService: plugin.organizationService}
-	deleteOrganizationHandler := &handlers.DeleteOrganizationHandler{OrgService: plugin.organizationService}
+	createOrganizationHandler := &handlers.CreateOrganizationHandler{OrgService: plugin.useCases}
+	getAllOrganizationsHandler := &handlers.GetAllOrganizationsHandler{OrgService: plugin.useCases}
+	getOrganizationByIDHandler := &handlers.GetOrganizationByIDHandler{OrgService: plugin.useCases}
+	updateOrganizationHandler := &handlers.UpdateOrganizationHandler{OrgService: plugin.useCases}
+	deleteOrganizationHandler := &handlers.DeleteOrganizationHandler{OrgService: plugin.useCases}
 
-	createInvitationHandler := &handlers.CreateOrganizationInvitationHandler{OrgInvitationService: plugin.invitationService}
-	getInvitationHandler := &handlers.GetOrganizationInvitationHandler{OrgInvitationService: plugin.invitationService}
-	getAllInvitationsHandler := &handlers.GetAllOrganizationInvitationsHandler{OrgInvitationService: plugin.invitationService}
-	revokeInvitationHandler := &handlers.RevokeOrganizationInvitationHandler{OrgInvitationService: plugin.invitationService}
-	acceptInvitationHandler := &handlers.AcceptOrganizationInvitationHandler{OrgInvitationService: plugin.invitationService}
-	rejectInvitationHandler := &handlers.RejectOrganizationInvitationHandler{OrgInvitationService: plugin.invitationService}
+	createInvitationHandler := &handlers.CreateOrganizationInvitationHandler{OrgInvitationService: plugin.useCases}
+	getInvitationHandler := &handlers.GetOrganizationInvitationHandler{OrgInvitationService: plugin.useCases}
+	getAllInvitationsHandler := &handlers.GetAllOrganizationInvitationsHandler{OrgInvitationService: plugin.useCases}
+	revokeInvitationHandler := &handlers.RevokeOrganizationInvitationHandler{OrgInvitationService: plugin.useCases}
+	acceptInvitationHandler := &handlers.AcceptOrganizationInvitationHandler{OrgInvitationService: plugin.useCases}
+	rejectInvitationHandler := &handlers.RejectOrganizationInvitationHandler{OrgInvitationService: plugin.useCases}
 
-	addMemberHandler := &handlers.AddOrganizationMemberHandler{OrgMemberService: plugin.memberService}
-	getAllMembersHandler := &handlers.GetAllOrganizationMembersHandler{OrgMemberService: plugin.memberService}
-	getMemberHandler := &handlers.GetOrganizationMemberHandler{OrgMemberService: plugin.memberService}
-	updateMemberHandler := &handlers.UpdateOrganizationMemberHandler{OrgMemberService: plugin.memberService}
-	deleteMemberHandler := &handlers.DeleteOrganizationMemberHandler{OrgMemberService: plugin.memberService}
+	addMemberHandler := &handlers.AddOrganizationMemberHandler{OrgMemberService: plugin.useCases}
+	getAllMembersHandler := &handlers.GetAllOrganizationMembersHandler{OrgMemberService: plugin.useCases}
+	getMemberHandler := &handlers.GetOrganizationMemberHandler{OrgMemberService: plugin.useCases}
+	updateMemberHandler := &handlers.UpdateOrganizationMemberHandler{OrgMemberService: plugin.useCases}
+	deleteMemberHandler := &handlers.DeleteOrganizationMemberHandler{OrgMemberService: plugin.useCases}
 
-	createTeamHandler := &handlers.CreateOrganizationTeamHandler{OrgTeamService: plugin.teamService}
-	getAllTeamsHandler := &handlers.GetAllOrganizationTeamsHandler{OrgTeamService: plugin.teamService}
-	getTeamHandler := &handlers.GetOrganizationTeamHandler{OrgTeamService: plugin.teamService}
-	updateTeamHandler := &handlers.UpdateOrganizationTeamHandler{OrgTeamService: plugin.teamService}
-	deleteTeamHandler := &handlers.DeleteOrganizationTeamHandler{OrgTeamService: plugin.teamService}
+	createTeamHandler := &handlers.CreateOrganizationTeamHandler{OrgTeamService: plugin.useCases}
+	getAllTeamsHandler := &handlers.GetAllOrganizationTeamsHandler{OrgTeamService: plugin.useCases}
+	getTeamHandler := &handlers.GetOrganizationTeamHandler{OrgTeamService: plugin.useCases}
+	updateTeamHandler := &handlers.UpdateOrganizationTeamHandler{OrgTeamService: plugin.useCases}
+	deleteTeamHandler := &handlers.DeleteOrganizationTeamHandler{OrgTeamService: plugin.useCases}
 
-	addTeamMemberHandler := &handlers.AddOrganizationTeamMemberHandler{OrgTeamMemberService: plugin.teamMemberService}
-	getAllTeamMembersHandler := &handlers.GetAllOrganizationTeamMembersHandler{OrgTeamMemberService: plugin.teamMemberService}
-	getTeamMemberHandler := &handlers.GetOrganizationTeamMemberHandler{OrgTeamMemberService: plugin.teamMemberService}
-	deleteTeamMemberHandler := &handlers.DeleteOrganizationTeamMemberHandler{OrgTeamMemberService: plugin.teamMemberService}
+	addTeamMemberHandler := &handlers.AddOrganizationTeamMemberHandler{OrgTeamMemberService: plugin.useCases}
+	getAllTeamMembersHandler := &handlers.GetAllOrganizationTeamMembersHandler{OrgTeamMemberService: plugin.useCases}
+	getTeamMemberHandler := &handlers.GetOrganizationTeamMemberHandler{OrgTeamMemberService: plugin.useCases}
+	deleteTeamMemberHandler := &handlers.DeleteOrganizationTeamMemberHandler{OrgTeamMemberService: plugin.useCases}
 
 	return []models.Route{
 		// Organizations

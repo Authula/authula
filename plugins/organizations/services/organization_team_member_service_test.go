@@ -19,7 +19,6 @@ func newTestOrganizationTeamMemberService(orgRepo *orgtests.MockOrganizationRepo
 		orgMemberRepo:     memberRepo,
 		orgTeamRepo:       teamRepo,
 		orgTeamMemberRepo: teamMemberRepo,
-		authorizer:        &noopAuthorizer{},
 	}
 
 	return NewOrganizationTeamMemberService(orgRepo, memberRepo, teamRepo, teamMemberRepo, serviceUtils)
@@ -452,7 +451,6 @@ func TestOrganizationTeamService_AddTeamMember(t *testing.T) {
 				orgMemberRepo:     memberRepo,
 				orgTeamRepo:       teamRepo,
 				orgTeamMemberRepo: teamMemberRepo,
-				authorizer:        &noopAuthorizer{},
 			}
 
 			if tt.setup != nil {

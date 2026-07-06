@@ -17,18 +17,6 @@ func NewUserPermissionsService(repo repositories.UserPermissionsRepository) *Use
 	return &UserPermissionsService{repo: repo}
 }
 
-func (s *UserPermissionsService) GetSelfUserPermissions(ctx context.Context, actor *models.Actor, userID string) ([]types.UserPermissionInfo, error) {
-	if actor.ID != userID {
-		return nil, internalerrors.ErrForbidden
-	}
-
-	if userID == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
-	}
-
-	return s.repo.GetUserPermissions(ctx, userID)
-}
-
 func (s *UserPermissionsService) GetUserPermissions(ctx context.Context, actor *models.Actor, userID string) ([]types.UserPermissionInfo, error) {
 	if userID == "" {
 		return nil, internalerrors.ErrUnprocessableEntity

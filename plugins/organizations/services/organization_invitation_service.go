@@ -82,10 +82,6 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 	}
 	actorID := actor.ID
 
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, orgconstants.OrganizationsInvitationsCreatePermission); err != nil {
-		return nil, err
-	}
-
 	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
@@ -115,11 +111,11 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 		invitationRepo := s.orgInvitationRepo.WithTx(tx)
 		memberRepo := s.orgMemberRepo.WithTx(tx)
 
-		if err := s.serviceUtils.ensureOrganizationMembersLimit(ctx, memberRepo, organizationID, s.pluginConfig.MembersLimit); err != nil {
+		if err := ensureOrganizationMembersLimit(ctx, memberRepo, organizationID, s.pluginConfig.MembersLimit); err != nil {
 			return err
 		}
 
-		if err := s.serviceUtils.ensureOrganizationInvitationsLimit(ctx, invitationRepo, organizationID, request.Email, s.pluginConfig.InvitationsLimit); err != nil {
+		if err := ensureOrganizationInvitationsLimit(ctx, invitationRepo, organizationID, request.Email, s.pluginConfig.InvitationsLimit); err != nil {
 			return err
 		}
 
@@ -258,10 +254,6 @@ func (s *organizationInvitationService) GetAllOrganizationInvitations(ctx contex
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, orgconstants.OrganizationsInvitationsListPermission); err != nil {
-		return nil, err
-	}
-
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -277,10 +269,6 @@ func (s *organizationInvitationService) GetAllOrganizationInvitations(ctx contex
 func (s *organizationInvitationService) GetOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
-	}
-
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, orgconstants.OrganizationsInvitationsReadPermission); err != nil {
-		return nil, err
 	}
 
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
@@ -301,10 +289,6 @@ func (s *organizationInvitationService) GetOrganizationInvitation(ctx context.Co
 func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" || invitationID == "" {
 		return nil, internalerrors.ErrUnauthorized
-	}
-
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, orgconstants.OrganizationsInvitationsRevokePermission); err != nil {
-		return nil, err
 	}
 
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
@@ -340,7 +324,7 @@ func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context
 	}
 
 	actorID := actor.ID
-	user, err := s.serviceUtils.ensureEmailVerifiedForInvitationAcceptance(ctx, s.userService, actorID, s.pluginConfig.RequireEmailVerifiedOnInvitation)
+	user, err := ensureEmailVerifiedForInvitationAcceptance(ctx, s.userService, actorID, s.pluginConfig.RequireEmailVerifiedOnInvitation)
 	if err != nil {
 		return nil, err
 	}
@@ -425,7 +409,7 @@ func (s *organizationInvitationService) AcceptPendingOrganizationInvitationsForE
 	}
 
 	if s.pluginConfig.RequireEmailVerifiedOnInvitation {
-		if _, err := s.serviceUtils.ensureEmailVerifiedForInvitationAcceptance(ctx, s.userService, userID, true); err != nil {
+		if _, err := ensureEmailVerifiedForInvitationAcceptance(ctx, s.userService, userID, true); err != nil {
 			return nil, err
 		}
 	}
@@ -462,7 +446,7 @@ func (s *organizationInvitationService) acceptOrganizationInvitations(ctx contex
 				return err
 			}
 			if existingMember == nil {
-				if err := s.serviceUtils.ensureOrganizationMembersLimit(ctx, memberRepo, invitation.OrganizationID, s.pluginConfig.MembersLimit); err != nil {
+				if err := ensureOrganizationMembersLimit(ctx, memberRepo, invitation.OrganizationID, s.pluginConfig.MembersLimit); err != nil {
 					return err
 				}
 
@@ -514,4 +498,39 @@ func (s *organizationInvitationService) expireOrganizationInvitationIfNeeded(ctx
 	*invitation = *updated
 
 	return nil
+}
+
+func ensureOrganizationInvitationsLimit(ctx context.Context, invitationRepo repositories.OrganizationInvitationRepository, organizationID string, email string, invitationsLimit *int) error {
+	if invitationsLimit == nil || *invitationsLimit <= 0 {
+		return nil
+	}
+
+	invitationCount, err := invitationRepo.CountByOrganizationIDAndEmail(ctx, organizationID, email)
+	if err != nil {
+		return err
+	}
+	if invitationCount >= *invitationsLimit {
+		return orgconstants.ErrInvitationsQuotaExceeded
+	}
+
+	return nil
+}
+
+func ensureEmailVerifiedForInvitationAcceptance(ctx context.Context, userService rootservices.UserService, userID string, requireEmailVerified bool) (*models.User, error) {
+	if userID == "" {
+		return nil, internalerrors.ErrNotFound
+	}
+
+	user, err := userService.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil || user.Email == "" {
+		return nil, internalerrors.ErrNotFound
+	}
+	if requireEmailVerified && !user.EmailVerified {
+		return nil, internalerrors.ErrForbidden
+	}
+
+	return user, nil
 }

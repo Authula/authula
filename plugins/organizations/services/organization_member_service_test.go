@@ -19,7 +19,7 @@ import (
 )
 
 func newTestOrganizationMemberService(userSvc *internaltests.MockUserService, accessControlService rootservices.AccessControlService, orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, membersLimit *int) *organizationMemberService {
-	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
+	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}
 	return NewOrganizationMemberService(userSvc, accessControlService, orgRepo, memberRepo, membersLimit, &orgtests.MockTxRunner{}, serviceUtils)
 }
 

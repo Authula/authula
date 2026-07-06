@@ -16,16 +16,6 @@ import (
 	"github.com/Authula/authula/plugins/organizations/types"
 )
 
-type noopAuthorizer struct{}
-
-func (a *noopAuthorizer) AuthorizeScope(_ context.Context, _ *models.Actor, _ string) error {
-	return nil
-}
-
-func (a *noopAuthorizer) AuthorizeOrganizationAccess(_ context.Context, _ *models.Actor, _ string, _ string) error {
-	return nil
-}
-
 func TestServiceUtils_authorizeOwner(t *testing.T) {
 	t.Parallel()
 
@@ -92,7 +82,7 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 				tt.setup(orgRepo)
 			}
 
-			org, err := (&ServiceUtils{orgRepo: orgRepo, authorizer: &noopAuthorizer{}}).authorizeOwner(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization)
+			org, err := (&ServiceUtils{orgRepo: orgRepo}).authorizeOwner(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				require.Nil(t, org)
@@ -198,7 +188,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 				tt.setup(orgRepo, memberRepo)
 			}
 
-			org, member, err := (&ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}).authorizeOrganizationAccess(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization)
+			org, member, err := (&ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}).authorizeOrganizationAccess(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				require.Nil(t, org)
@@ -278,7 +268,7 @@ func TestServiceUtils_ensureOrganizationMembersLimit(t *testing.T) {
 				tt.setup(memberRepo)
 			}
 
-			err := (&ServiceUtils{}).ensureOrganizationMembersLimit(context.Background(), memberRepo, "org-1", tt.limit)
+			err := ensureOrganizationMembersLimit(context.Background(), memberRepo, "org-1", tt.limit)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				memberRepo.AssertExpectations(t)
@@ -347,7 +337,7 @@ func TestServiceUtils_ensureOrganizationInvitationsLimit(t *testing.T) {
 				tt.setup(invRepo)
 			}
 
-			err := (&ServiceUtils{}).ensureOrganizationInvitationsLimit(context.Background(), invRepo, "org-1", "user@example.com", tt.limit)
+			err := ensureOrganizationInvitationsLimit(context.Background(), invRepo, "org-1", "user@example.com", tt.limit)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				invRepo.AssertExpectations(t)
@@ -444,7 +434,7 @@ func TestServiceUtils_ensureEmailVerifiedForInvitationAcceptance(t *testing.T) {
 				tt.setup(userSvc)
 			}
 
-			user, err := (&ServiceUtils{}).ensureEmailVerifiedForInvitationAcceptance(context.Background(), userSvc, tt.userID, tt.requireEmailVerified)
+			user, err := ensureEmailVerifiedForInvitationAcceptance(context.Background(), userSvc, tt.userID, tt.requireEmailVerified)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				require.Nil(t, user)
@@ -477,11 +467,10 @@ func TestServiceUtils_slugify(t *testing.T) {
 		{name: "returns empty for punctuation only", input: "!!!", expect: ""},
 	}
 
-	utils := &ServiceUtils{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			require.Equal(t, tt.expect, utils.slugify(tt.input))
+			require.Equal(t, tt.expect, slugify(tt.input))
 		})
 	}
 }
