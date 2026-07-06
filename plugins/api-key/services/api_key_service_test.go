@@ -113,10 +113,10 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			},
 		},
 		{
-			name:   "org_create_privilege_escalation_rejected",
-			actor:  &models.Actor{ID: userID, Type: models.ActorUser, Scopes: []string{"org:api-key:create"}},
-			config: types.ApiKeyPluginConfig{AllowOrgKeys: true},
-			req:    types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID, Permissions: []string{"admin"}},
+			name:    "org_create_privilege_escalation_rejected",
+			actor:   &models.Actor{ID: userID, Type: models.ActorUser, Scopes: []string{"org:api-key:create"}},
+			config:  types.ApiKeyPluginConfig{AllowOrgKeys: true},
+			req:     types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID, Permissions: []string{"admin"}},
 			wantErr: internalerrors.ErrForbidden,
 		},
 		{
@@ -297,7 +297,6 @@ func TestApiKeyServiceGetAll(t *testing.T) {
 		})
 	}
 }
-
 
 func TestApiKeyServiceGetByID(t *testing.T) {
 	t.Parallel()
