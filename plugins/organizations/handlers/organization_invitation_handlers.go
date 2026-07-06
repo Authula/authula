@@ -6,12 +6,12 @@ import (
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
-	orgservices "github.com/Authula/authula/plugins/organizations/services"
 	"github.com/Authula/authula/plugins/organizations/types"
+	orgusecases "github.com/Authula/authula/plugins/organizations/usecases"
 )
 
 type CreateOrganizationInvitationHandler struct {
-	OrgInvitationService orgservices.OrganizationInvitationService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *CreateOrganizationInvitationHandler) Handle() http.HandlerFunc {
@@ -34,7 +34,7 @@ func (h *CreateOrganizationInvitationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		invitation, err := h.OrgInvitationService.CreateOrganizationInvitation(ctx, actor, organizationID, request)
+		invitation, err := h.UseCases.CreateOrganizationInvitation(ctx, actor, organizationID, request)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -45,7 +45,7 @@ func (h *CreateOrganizationInvitationHandler) Handle() http.HandlerFunc {
 }
 
 type GetAllOrganizationInvitationsHandler struct {
-	OrgInvitationService orgservices.OrganizationInvitationService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *GetAllOrganizationInvitationsHandler) Handle() http.HandlerFunc {
@@ -55,7 +55,7 @@ func (h *GetAllOrganizationInvitationsHandler) Handle() http.HandlerFunc {
 		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
-		invitations, err := h.OrgInvitationService.GetAllOrganizationInvitations(ctx, actor, organizationID)
+		invitations, err := h.UseCases.GetAllOrganizationInvitations(ctx, actor, organizationID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -66,7 +66,7 @@ func (h *GetAllOrganizationInvitationsHandler) Handle() http.HandlerFunc {
 }
 
 type GetOrganizationInvitationHandler struct {
-	OrgInvitationService orgservices.OrganizationInvitationService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *GetOrganizationInvitationHandler) Handle() http.HandlerFunc {
@@ -77,7 +77,7 @@ func (h *GetOrganizationInvitationHandler) Handle() http.HandlerFunc {
 
 		organizationID := r.PathValue("organization_id")
 		invitationID := r.PathValue("invitation_id")
-		invitation, err := h.OrgInvitationService.GetOrganizationInvitation(ctx, actor, organizationID, invitationID)
+		invitation, err := h.UseCases.GetOrganizationInvitation(ctx, actor, organizationID, invitationID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -88,7 +88,7 @@ func (h *GetOrganizationInvitationHandler) Handle() http.HandlerFunc {
 }
 
 type RevokeOrganizationInvitationHandler struct {
-	OrgInvitationService orgservices.OrganizationInvitationService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *RevokeOrganizationInvitationHandler) Handle() http.HandlerFunc {
@@ -99,7 +99,7 @@ func (h *RevokeOrganizationInvitationHandler) Handle() http.HandlerFunc {
 
 		organizationID := r.PathValue("organization_id")
 		invitationID := r.PathValue("invitation_id")
-		invitation, err := h.OrgInvitationService.RevokeOrganizationInvitation(ctx, actor, organizationID, invitationID)
+		invitation, err := h.UseCases.RevokeOrganizationInvitation(ctx, actor, organizationID, invitationID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -110,7 +110,7 @@ func (h *RevokeOrganizationInvitationHandler) Handle() http.HandlerFunc {
 }
 
 type AcceptOrganizationInvitationHandler struct {
-	OrgInvitationService orgservices.OrganizationInvitationService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *AcceptOrganizationInvitationHandler) Handle() http.HandlerFunc {
@@ -121,7 +121,7 @@ func (h *AcceptOrganizationInvitationHandler) Handle() http.HandlerFunc {
 
 		organizationID := r.PathValue("organization_id")
 		invitationID := r.PathValue("invitation_id")
-		invitation, err := h.OrgInvitationService.AcceptOrganizationInvitation(ctx, actor, organizationID, invitationID)
+		invitation, err := h.UseCases.AcceptOrganizationInvitation(ctx, actor, organizationID, invitationID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -151,7 +151,7 @@ func (h *AcceptOrganizationInvitationHandler) Handle() http.HandlerFunc {
 }
 
 type RejectOrganizationInvitationHandler struct {
-	OrgInvitationService orgservices.OrganizationInvitationService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *RejectOrganizationInvitationHandler) Handle() http.HandlerFunc {
@@ -167,7 +167,7 @@ func (h *RejectOrganizationInvitationHandler) Handle() http.HandlerFunc {
 
 		organizationID := r.PathValue("organization_id")
 		invitationID := r.PathValue("invitation_id")
-		invitation, err := h.OrgInvitationService.RejectOrganizationInvitation(ctx, actor, organizationID, invitationID)
+		invitation, err := h.UseCases.RejectOrganizationInvitation(ctx, actor, organizationID, invitationID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return

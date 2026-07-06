@@ -92,7 +92,7 @@ func TestCreateOrganizationInvitationHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationInvitationHandlerCases(t, http.MethodPost, "/organizations/org-1/invitations", func(fixture *organizationInvitationHandlerFixture) http.HandlerFunc {
-		return (&CreateOrganizationInvitationHandler{OrgInvitationService: fixture.service}).Handle()
+		return (&CreateOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.service)}).Handle()
 	}, []organizationInvitationHandlerCase{
 		{
 			name:            "missing_user",
@@ -155,7 +155,7 @@ func TestGetAllOrganizationInvitationsHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationInvitationHandlerCases(t, http.MethodGet, "/organizations/org-1/invitations", func(fixture *organizationInvitationHandlerFixture) http.HandlerFunc {
-		return (&GetAllOrganizationInvitationsHandler{OrgInvitationService: fixture.service}).Handle()
+		return (&GetAllOrganizationInvitationsHandler{UseCases: newInvitationUseCases(fixture.service)}).Handle()
 	}, []organizationInvitationHandlerCase{
 		{
 			name:            "missing_user",
@@ -195,7 +195,7 @@ func TestGetOrganizationInvitationHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationInvitationHandlerCases(t, http.MethodGet, "/organizations/org-1/invitations/inv-1", func(fixture *organizationInvitationHandlerFixture) http.HandlerFunc {
-		return (&GetOrganizationInvitationHandler{OrgInvitationService: fixture.service}).Handle()
+		return (&GetOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.service)}).Handle()
 	}, []organizationInvitationHandlerCase{
 		{
 			name:            "missing_user",
@@ -237,7 +237,7 @@ func TestRevokeOrganizationInvitationHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationInvitationHandlerCases(t, http.MethodPatch, "/organizations/org-1/invitations/inv-1", func(fixture *organizationInvitationHandlerFixture) http.HandlerFunc {
-		return (&RevokeOrganizationInvitationHandler{OrgInvitationService: fixture.service}).Handle()
+		return (&RevokeOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.service)}).Handle()
 	}, []organizationInvitationHandlerCase{
 		{
 			name:            "missing_user",
@@ -279,7 +279,7 @@ func TestAcceptOrganizationInvitationHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationInvitationHandlerCases(t, http.MethodPost, "/organizations/org-1/invitations/inv-1/accept", func(fixture *organizationInvitationHandlerFixture) http.HandlerFunc {
-		return (&AcceptOrganizationInvitationHandler{OrgInvitationService: fixture.service}).Handle()
+		return (&AcceptOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.service)}).Handle()
 	}, []organizationInvitationHandlerCase{
 		{
 			name:           "redirect_url",
@@ -349,7 +349,7 @@ func TestRejectOrganizationInvitationHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationInvitationHandlerCases(t, http.MethodPost, "/organizations/org-1/invitations/inv-1/reject", func(fixture *organizationInvitationHandlerFixture) http.HandlerFunc {
-		return (&RejectOrganizationInvitationHandler{OrgInvitationService: fixture.service}).Handle()
+		return (&RejectOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.service)}).Handle()
 	}, []organizationInvitationHandlerCase{
 		{
 			name:            "missing_user",

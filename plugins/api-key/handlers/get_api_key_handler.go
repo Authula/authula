@@ -5,12 +5,12 @@ import (
 
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/api-key/services"
 	"github.com/Authula/authula/plugins/api-key/types"
+	"github.com/Authula/authula/plugins/api-key/usecases"
 )
 
 type GetApiKeyHandler struct {
-	Service services.ApiKeyService
+	UseCases *usecases.UseCases
 }
 
 func (h *GetApiKeyHandler) Handle() http.HandlerFunc {
@@ -25,7 +25,7 @@ func (h *GetApiKeyHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		apiKey, err := h.Service.GetByID(ctx, reqCtx.Actor, id)
+		apiKey, err := h.UseCases.GetByID(ctx, reqCtx.Actor, id)
 		if err != nil {
 			internalerrors.HandleError(err, reqCtx)
 			return

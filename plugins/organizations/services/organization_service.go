@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"sort"
+	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/uptrace/bun"
 
@@ -53,10 +55,6 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actor *mod
 		return nil, internalerrors.ErrUnauthorized
 	}
 
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeScope(ctx, actor, constants.OrganizationsCreatePermission); err != nil {
-		return nil, err
-	}
-
 	name := request.Name
 	if name == "" {
 		return nil, internalerrors.ErrUnprocessableEntity
@@ -79,7 +77,7 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actor *mod
 		slug = *request.Slug
 	}
 	if slug == "" {
-		slug = s.serviceUtils.slugify(name)
+		slug = slugify(name)
 	}
 	if slug == "" {
 		return nil, internalerrors.ErrUnprocessableEntity
@@ -190,13 +188,9 @@ func (s *organizationService) ensureOrganizationLimit(ctx context.Context, actor
 	return nil
 }
 
-func (s *organizationService) GetAllOrganizations(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
+func (s *organizationService) GetAllOrganizationsByOwner(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
 	if actor == nil || actor.ID == "" {
 		return nil, internalerrors.ErrUnauthorized
-	}
-
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeScope(ctx, actor, constants.OrganizationsListPermission); err != nil {
-		return nil, err
 	}
 
 	ownedOrganizations, err := s.orgRepo.GetAllByOwnerID(ctx, actor.ID)
@@ -248,10 +242,6 @@ func (s *organizationService) GetAllOrganizations(ctx context.Context, actor *mo
 }
 
 func (s *organizationService) GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsReadPermission); err != nil {
-		return nil, err
-	}
-
 	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
@@ -261,10 +251,6 @@ func (s *organizationService) GetOrganizationByID(ctx context.Context, actor *mo
 }
 
 func (s *organizationService) UpdateOrganization(ctx context.Context, actor *models.Actor, organizationID string, request types.UpdateOrganizationRequest) (*types.Organization, error) {
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsUpdatePermission); err != nil {
-		return nil, err
-	}
-
 	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
@@ -280,7 +266,7 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, actor *mod
 		slug = *request.Slug
 	}
 	if slug == "" {
-		slug = s.serviceUtils.slugify(*name)
+		slug = slugify(*name)
 	}
 	if slug == "" {
 		return nil, internalerrors.ErrUnprocessableEntity
@@ -317,10 +303,6 @@ func (s *organizationService) ExistsByID(ctx context.Context, organizationID str
 }
 
 func (s *organizationService) DeleteOrganization(ctx context.Context, actor *models.Actor, organizationID string) error {
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsDeletePermission); err != nil {
-		return err
-	}
-
 	_, err := s.serviceUtils.authorizeOwner(ctx, actor, organizationID)
 	if err != nil {
 		return err
@@ -331,4 +313,24 @@ func (s *organizationService) DeleteOrganization(ctx context.Context, actor *mod
 	}
 
 	return nil
+}
+
+func slugify(input string) string {
+	input = strings.ToLower(input)
+	var builder strings.Builder
+	lastDash := false
+
+	for _, r := range input {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			builder.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			builder.WriteByte('-')
+			lastDash = true
+		}
+	}
+
+	return strings.Trim(builder.String(), "-")
 }

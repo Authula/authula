@@ -12,6 +12,7 @@ import (
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/services"
 	"github.com/Authula/authula/plugins/organizations/types"
+	"github.com/Authula/authula/plugins/organizations/usecases"
 	rootservices "github.com/Authula/authula/services"
 )
 
@@ -35,6 +36,7 @@ type OrganizationsPlugin struct {
 	accessControlService rootservices.AccessControlService
 	databaseHooks        *OrganizationsHookExecutor
 	emailTemplateManager *emailtmpl.Manager
+	useCases             *usecases.UseCases
 }
 
 func New(config types.OrganizationsPluginConfig) *OrganizationsPlugin {
@@ -82,8 +84,6 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 		return err
 	}
 
-	authorizer := rootservices.NewDefaultAuthorizer()
-
 	p.databaseHooks = NewOrganizationsHookExecutor(p.pluginConfig.DatabaseHooks)
 	p.organizationRepo = repositories.NewBunOrganizationRepository(ctx.DB, p.databaseHooks)
 	p.invitationRepo = repositories.NewBunOrganizationInvitationRepository(ctx.DB, p.databaseHooks)
@@ -91,7 +91,7 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 	p.teamRepo = repositories.NewBunOrganizationTeamRepository(ctx.DB, p.databaseHooks)
 	p.teamMemberRepo = repositories.NewBunOrganizationTeamMemberRepository(ctx.DB, p.databaseHooks)
 
-	p.serviceUtils = services.NewServiceUtils(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo, authorizer)
+	p.serviceUtils = services.NewServiceUtils(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo)
 	p.organizationService = services.NewOrganizationService(p.organizationRepo, p.memberRepo, p.serviceUtils, accessControlService, p.pluginConfig.OrganizationsLimit, ctx.DB)
 	emailTemplateManager, err := newOrganizationEmailTemplateManager()
 	if err != nil {
@@ -103,6 +103,9 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 	p.memberService = services.NewOrganizationMemberService(userService, accessControlService, p.organizationRepo, p.memberRepo, p.pluginConfig.MembersLimit, ctx.DB, p.serviceUtils)
 	p.teamService = services.NewOrganizationTeamService(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo, p.serviceUtils, ctx.DB)
 	p.teamMemberService = services.NewOrganizationTeamMemberService(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo, p.serviceUtils)
+
+	authorizer := rootservices.NewDefaultAuthorizer()
+	p.useCases = usecases.NewUseCases(p.organizationService, p.invitationService, p.memberService, p.teamService, p.teamMemberService, authorizer)
 
 	p.Api = BuildAPI(p)
 
@@ -130,8 +133,6 @@ func (p *OrganizationsPlugin) Close() error {
 func (p *OrganizationsPlugin) ensurePermissions() error {
 	if err := p.accessControlService.EnsurePermissions(context.Background(), []rootservices.PermissionDefinition{
 		{Key: orgconstants.All, Description: "All organizations permissions"},
-		{Key: orgconstants.OrganizationsCreatePermission, Description: "Create organizations"},
-		{Key: orgconstants.OrganizationsListPermission, Description: "List organizations"},
 		{Key: orgconstants.OrganizationsReadPermission, Description: "Read organization details"},
 		{Key: orgconstants.OrganizationsUpdatePermission, Description: "Update organization details"},
 		{Key: orgconstants.OrganizationsDeletePermission, Description: "Delete organizations"},

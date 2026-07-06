@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	apiKeyTests "github.com/Authula/authula/plugins/api-key/tests"
 	"github.com/Authula/authula/plugins/api-key/types"
+	"github.com/Authula/authula/plugins/api-key/usecases"
 )
 
 func TestUpdateApiKeyHandler(t *testing.T) {
@@ -49,7 +49,7 @@ func TestUpdateApiKeyHandler(t *testing.T) {
 			path: "/api-keys/api-key-1",
 			body: internaltests.MarshalToJSON(t, types.UpdateApiKeyRequest{Name: &name}),
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("Update", mock.Anything, mock.Anything, "api-key-1", types.UpdateApiKeyData{Name: &name}).Return((*types.ApiKey)(nil), internalerrors.ErrNotFound).Once()
+				m.On("GetByID", mock.Anything, mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), nil).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 		},
@@ -58,6 +58,7 @@ func TestUpdateApiKeyHandler(t *testing.T) {
 			path: "/api-keys/api-key-1",
 			body: internaltests.MarshalToJSON(t, types.UpdateApiKeyRequest{Name: &name}),
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
+				m.On("GetByID", mock.Anything, mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: "user-1"}, nil).Once()
 				m.On("Update", mock.Anything, mock.Anything, "api-key-1", types.UpdateApiKeyData{Name: &name}).Return(apiKey, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
@@ -77,7 +78,7 @@ func TestUpdateApiKeyHandler(t *testing.T) {
 				tt.prepare(service)
 			}
 
-			handler := &UpdateApiKeyHandler{Service: service}
+			handler := &UpdateApiKeyHandler{UseCases: usecases.NewUseCases(service, &internaltests.NoopAuthorizer{})}
 			path := tt.path
 			if path == "" {
 				path = "/api-keys/api-key-1"

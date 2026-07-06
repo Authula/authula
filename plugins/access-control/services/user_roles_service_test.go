@@ -70,7 +70,7 @@ func TestUserRolesServiceAssignRoleToUser(t *testing.T) {
 				tc.setup(userRolesRepo, rolesRepo)
 			}
 
-			service := NewUserRolesService(userRolesRepo, rolesRepo, &internaltests.NoopAuthorizer{})
+			service := NewUserRolesService(userRolesRepo, rolesRepo)
 			err := service.AssignRoleToUser(context.Background(), internaltests.TestActor(), "user-1", tc.req, tc.assignedByUserID)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
@@ -124,7 +124,7 @@ func TestUserRolesServiceReplaceUserRoles(t *testing.T) {
 				tc.setup(userRolesRepo, rolesRepo)
 			}
 
-			service := NewUserRolesService(userRolesRepo, rolesRepo, &internaltests.NoopAuthorizer{})
+			service := NewUserRolesService(userRolesRepo, rolesRepo)
 			err := service.ReplaceUserRoles(context.Background(), internaltests.TestActor(), "user-1", tc.roleIDs, tc.assignedByUserID)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)

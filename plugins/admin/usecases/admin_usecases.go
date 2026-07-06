@@ -32,8 +32,8 @@ func NewAdminUseCases(
 	sessionExpiresIn time.Duration,
 	authorizer rootservices.Authorizer,
 ) *AdminUseCases {
-	usersService := services.NewUsersService(userRepo, authorizer)
-	accountsService := services.NewAccountsService(accountRepo, userRepo, passwordService, authorizer)
+	usersService := services.NewUsersService(userRepo)
+	accountsService := services.NewAccountsService(accountRepo, userRepo, passwordService)
 	impersonationService := services.NewImpersonationService(
 		impersonationRepo,
 		sessionStateRepo,
@@ -41,15 +41,14 @@ func NewAdminUseCases(
 		tokenService,
 		sessionExpiresIn,
 		config.ImpersonationMaxExpiresIn,
-		authorizer,
 	)
-	stateService := services.NewStateService(userStateRepo, sessionStateRepo, impersonationRepo, authorizer)
+	stateService := services.NewStateService(userStateRepo, sessionStateRepo, impersonationRepo)
 
 	return &AdminUseCases{
-		users:         NewUsersUseCase(usersService),
-		accounts:      NewAccountsUseCase(accountsService),
-		state:         NewStateUseCase(stateService),
-		impersonation: NewImpersonationUseCase(stateService, impersonationService),
+		users:         NewUsersUseCase(usersService, authorizer),
+		accounts:      NewAccountsUseCase(accountsService, authorizer),
+		state:         NewStateUseCase(stateService, authorizer),
+		impersonation: NewImpersonationUseCase(stateService, impersonationService, authorizer),
 	}
 }
 

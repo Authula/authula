@@ -4,8 +4,6 @@ package constants
 
 const (
 	All                                      = "organizations:*"
-	OrganizationsCreatePermission            = "organizations:create"
-	OrganizationsListPermission              = "organizations:list"
 	OrganizationsReadPermission              = "organizations:read"
 	OrganizationsUpdatePermission            = "organizations:update"
 	OrganizationsDeletePermission            = "organizations:delete"

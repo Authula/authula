@@ -54,13 +54,11 @@ func (p *AccessControlPlugin) Init(ctx *models.PluginContext) error {
 	userRolesRepo := repositories.NewBunUserRolesRepository(ctx.DB)
 	userPermissionsRepo := repositories.NewBunUserPermissionsRepository(ctx.DB)
 
-	authorizer := rootservices.NewDefaultAuthorizer()
-
-	rolesService := services.NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo, authorizer)
-	permissionsService := services.NewPermissionsService(permissionsRepo, rolePermissionsRepo, authorizer)
-	rolePermissionsService := services.NewRolePermissionsService(rolesRepo, permissionsRepo, rolePermissionsRepo, authorizer)
-	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo, authorizer)
-	userPermissionsService := services.NewUserPermissionsService(userPermissionsRepo, authorizer)
+	rolesService := services.NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
+	permissionsService := services.NewPermissionsService(permissionsRepo, rolePermissionsRepo)
+	rolePermissionsService := services.NewRolePermissionsService(rolesRepo, permissionsRepo, rolePermissionsRepo)
+	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo)
+	userPermissionsService := services.NewUserPermissionsService(userPermissionsRepo)
 
 	accessControlService := services.NewAccessControlService(rolesService, userRolesService, permissionsRepo)
 	p.accessControlService = accessControlService
@@ -68,12 +66,14 @@ func (p *AccessControlPlugin) Init(ctx *models.PluginContext) error {
 		return err
 	}
 
+	authorizer := rootservices.NewDefaultAuthorizer()
+
 	useCases := usecases.NewAccessControlUseCases(
-		usecases.NewRolesUseCase(rolesService),
-		usecases.NewPermissionsUseCase(permissionsService),
-		usecases.NewRolePermissionsUseCase(rolePermissionsService),
-		usecases.NewUserRolesUseCase(userRolesService),
-		usecases.NewUserPermissionsUseCase(userPermissionsService),
+		usecases.NewRolesUseCase(rolesService, authorizer),
+		usecases.NewPermissionsUseCase(permissionsService, authorizer),
+		usecases.NewRolePermissionsUseCase(rolePermissionsService, authorizer),
+		usecases.NewUserRolesUseCase(userRolesService, authorizer),
+		usecases.NewUserPermissionsUseCase(userPermissionsService, authorizer),
 	)
 	p.Api = NewAPI(useCases)
 

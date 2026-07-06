@@ -6,7 +6,6 @@ import (
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/organizations/constants"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"
 )
@@ -33,10 +32,6 @@ func (s *organizationTeamMemberService) AddTeamMember(ctx context.Context, actor
 	orgMemberID := request.MemberID
 	if orgMemberID == "" {
 		return nil, internalerrors.ErrUnprocessableEntity
-	}
-
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsTeamMembersAddPermission); err != nil {
-		return nil, err
 	}
 
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
@@ -84,10 +79,6 @@ func (s *organizationTeamMemberService) AddTeamMember(ctx context.Context, actor
 }
 
 func (s *organizationTeamMemberService) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMember, error) {
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsTeamMembersListPermission); err != nil {
-		return nil, err
-	}
-
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -108,10 +99,6 @@ func (s *organizationTeamMemberService) GetAllTeamMembers(ctx context.Context, a
 }
 
 func (s *organizationTeamMemberService) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMember, error) {
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsTeamMembersReadPermission); err != nil {
-		return nil, err
-	}
-
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -148,10 +135,6 @@ func (s *organizationTeamMemberService) GetTeamMember(ctx context.Context, actor
 }
 
 func (s *organizationTeamMemberService) RemoveTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) error {
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsTeamMembersRemovePermission); err != nil {
-		return err
-	}
-
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return err
 	}

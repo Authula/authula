@@ -50,7 +50,7 @@ func newTestOrganizationInvitationService(
 	invRepo repositories.OrganizationInvitationRepository,
 	memberRepo repositories.OrganizationMemberRepository,
 ) *organizationInvitationService {
-	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
+	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}
 	tmplMgr := emailtmpl.NewManager()
 	_ = tmplMgr.Register(emailtmpl.Definition{
 		Name:    "organization_invitation",
@@ -587,7 +587,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				accessControlService = orgtests.NewAccessControlServiceStub()
 			}
 
-			serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
+			serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}
 			tmplMgr := emailtmpl.NewManager()
 			_ = tmplMgr.Register(emailtmpl.Definition{
 				Name:    "organization_invitation",

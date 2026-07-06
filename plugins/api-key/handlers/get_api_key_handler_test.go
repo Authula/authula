@@ -13,6 +13,7 @@ import (
 	"github.com/Authula/authula/models"
 	apiKeyTests "github.com/Authula/authula/plugins/api-key/tests"
 	"github.com/Authula/authula/plugins/api-key/types"
+	"github.com/Authula/authula/plugins/api-key/usecases"
 )
 
 func TestGetApiKeyHandler(t *testing.T) {
@@ -61,7 +62,7 @@ func TestGetApiKeyHandler(t *testing.T) {
 				tt.prepare(service)
 			}
 
-			handler := &GetApiKeyHandler{Service: service}
+			handler := &GetApiKeyHandler{UseCases: usecases.NewUseCases(service, &internaltests.NoopAuthorizer{})}
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, tt.path, nil, nil)
 			if tt.path != "/api-keys" {
 				req.SetPathValue("id", "api-key-1")

@@ -6,27 +6,20 @@ import (
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
-	rootservices "github.com/Authula/authula/services"
 )
 
 type PermissionsService struct {
 	permissionsRepo     repositories.PermissionsRepository
 	rolePermissionsRepo repositories.RolePermissionsRepository
-	authorizer          rootservices.Authorizer
 }
 
-func NewPermissionsService(permissionsRepo repositories.PermissionsRepository, rolePermissionsRepo repositories.RolePermissionsRepository, authorizer rootservices.Authorizer) *PermissionsService {
-	return &PermissionsService{permissionsRepo: permissionsRepo, rolePermissionsRepo: rolePermissionsRepo, authorizer: authorizer}
+func NewPermissionsService(permissionsRepo repositories.PermissionsRepository, rolePermissionsRepo repositories.RolePermissionsRepository) *PermissionsService {
+	return &PermissionsService{permissionsRepo: permissionsRepo, rolePermissionsRepo: rolePermissionsRepo}
 }
 
 func (s *PermissionsService) CreatePermission(ctx context.Context, actor *models.Actor, req types.CreatePermissionRequest) (*types.Permission, error) {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.PermissionsCreatePermission); err != nil {
-		return nil, err
-	}
-
 	if req.Key == "" {
 		return nil, internalerrors.ErrBadRequest
 	}
@@ -51,18 +44,10 @@ func (s *PermissionsService) CreatePermission(ctx context.Context, actor *models
 }
 
 func (s *PermissionsService) GetAllPermissions(ctx context.Context, actor *models.Actor) ([]types.Permission, error) {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.PermissionsListPermission); err != nil {
-		return nil, err
-	}
-
 	return s.permissionsRepo.GetAllPermissions(ctx)
 }
 
 func (s *PermissionsService) GetPermissionByID(ctx context.Context, actor *models.Actor, permissionID string) (*types.Permission, error) {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.PermissionsReadPermission); err != nil {
-		return nil, err
-	}
-
 	if permissionID == "" {
 		return nil, internalerrors.ErrBadRequest
 	}
@@ -79,10 +64,6 @@ func (s *PermissionsService) GetPermissionByID(ctx context.Context, actor *model
 }
 
 func (s *PermissionsService) GetPermissionByKey(ctx context.Context, actor *models.Actor, permissionKey string) (*types.Permission, error) {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.PermissionsReadPermission); err != nil {
-		return nil, err
-	}
-
 	if permissionKey == "" {
 		return nil, internalerrors.ErrBadRequest
 	}
@@ -99,10 +80,6 @@ func (s *PermissionsService) GetPermissionByKey(ctx context.Context, actor *mode
 }
 
 func (s *PermissionsService) UpdatePermission(ctx context.Context, actor *models.Actor, permissionID string, req types.UpdatePermissionRequest) (*types.Permission, error) {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.PermissionsUpdatePermission); err != nil {
-		return nil, err
-	}
-
 	if permissionID == "" {
 		return nil, internalerrors.ErrUnprocessableEntity
 	}
@@ -146,10 +123,6 @@ func (s *PermissionsService) UpdatePermission(ctx context.Context, actor *models
 }
 
 func (s *PermissionsService) DeletePermission(ctx context.Context, actor *models.Actor, permissionID string) error {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.PermissionsDeletePermission); err != nil {
-		return err
-	}
-
 	if permissionID == "" {
 		return internalerrors.ErrBadRequest
 	}

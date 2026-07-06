@@ -126,7 +126,7 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 			repo := &orgtests.MockOrganizationRepository{}
 			memberRepo := &orgtests.MockOrganizationMemberRepository{}
 			hooks := &orgtests.MockOrganizationHooks{}
-			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
+			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
 			if tt.setup != nil {
 				tt.setup(repo, memberRepo, hooks, serviceUtils)
 			}
@@ -156,7 +156,7 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 	}
 }
 
-func TestOrganizationService_GetAllOrganizations(t *testing.T) {
+func TestOrganizationService_GetAllOrganizationsByOwner(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -193,9 +193,9 @@ func TestOrganizationService_GetAllOrganizations(t *testing.T) {
 				tt.setup(repo, memberRepo)
 			}
 
-			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
+			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
 			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, nil, nil)
-			organizations, err := svc.GetAllOrganizations(context.Background(), orgtests.Actor(tt.actorUserID))
+			organizations, err := svc.GetAllOrganizationsByOwner(context.Background(), orgtests.Actor(tt.actorUserID))
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -258,7 +258,7 @@ func TestOrganizationService_GetOrganizationByID(t *testing.T) {
 				tt.setup(repo, memberRepo)
 			}
 
-			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
+			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
 			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, nil, nil)
 			org, err := svc.GetOrganizationByID(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID)
 			if tt.expectErr != nil {
@@ -343,7 +343,7 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 			repo := &orgtests.MockOrganizationRepository{}
 			hooks := &orgtests.MockOrganizationHooks{}
 			memberRepo := &orgtests.MockOrganizationMemberRepository{}
-			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo, authorizer: &noopAuthorizer{}}
+			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
 			if tt.setup != nil {
 				tt.setup(repo, memberRepo, hooks, serviceUtils)
 			}
@@ -388,7 +388,7 @@ func TestOrganizationService_DeleteOrganization(t *testing.T) {
 
 			repo := &orgtests.MockOrganizationRepository{}
 			hooks := &orgtests.MockOrganizationHooks{}
-			serviceUtils := &ServiceUtils{orgRepo: repo, authorizer: &noopAuthorizer{}}
+			serviceUtils := &ServiceUtils{orgRepo: repo}
 			if tt.setup != nil {
 				tt.setup(repo, hooks, serviceUtils)
 			}

@@ -9,7 +9,7 @@ import (
 
 type OrganizationService interface {
 	CreateOrganization(ctx context.Context, actor *models.Actor, request types.CreateOrganizationRequest) (*types.Organization, error)
-	GetAllOrganizations(ctx context.Context, actor *models.Actor) ([]types.Organization, error)
+	GetAllOrganizationsByOwner(ctx context.Context, actor *models.Actor) ([]types.Organization, error)
 	GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error)
 	UpdateOrganization(ctx context.Context, actor *models.Actor, organizationID string, request types.UpdateOrganizationRequest) (*types.Organization, error)
 	DeleteOrganization(ctx context.Context, actor *models.Actor, organizationID string) error

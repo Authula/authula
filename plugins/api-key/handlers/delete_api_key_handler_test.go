@@ -13,6 +13,7 @@ import (
 	"github.com/Authula/authula/models"
 	apiKeyTests "github.com/Authula/authula/plugins/api-key/tests"
 	"github.com/Authula/authula/plugins/api-key/types"
+	"github.com/Authula/authula/plugins/api-key/usecases"
 )
 
 func TestDeleteApiKeyHandler(t *testing.T) {
@@ -32,12 +33,14 @@ func TestDeleteApiKeyHandler(t *testing.T) {
 		{
 			name: "service_error", path: "/api-keys/api-key-1",
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
+				m.On("GetByID", mock.Anything, mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: "user-1"}, nil).Once()
 				m.On("Delete", mock.Anything, mock.Anything, "api-key-1").Return(internalerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 		},
 		{
 			name: "success", path: "/api-keys/api-key-1", prepare: func(m *apiKeyTests.MockApiKeyService) {
+				m.On("GetByID", mock.Anything, mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: "user-1"}, nil).Once()
 				m.On("Delete", mock.Anything, mock.Anything, "api-key-1").Return(nil).Once()
 			},
 			expectedStatus: http.StatusOK,
@@ -57,7 +60,7 @@ func TestDeleteApiKeyHandler(t *testing.T) {
 				tt.prepare(service)
 			}
 
-			handler := &DeleteApiKeyHandler{Service: service}
+			handler := &DeleteApiKeyHandler{UseCases: usecases.NewUseCases(service, &internaltests.NoopAuthorizer{})}
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodDelete, tt.path, nil, nil)
 			if tt.path != "/api-keys" {
 				req.SetPathValue("id", "api-key-1")

@@ -9,17 +9,22 @@ import (
 	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/services"
 	"github.com/Authula/authula/plugins/admin/types"
+	rootservices "github.com/Authula/authula/services"
 )
 
 type AccountsUseCase struct {
-	service *services.AccountsService
+	service    *services.AccountsService
+	authorizer rootservices.Authorizer
 }
 
-func NewAccountsUseCase(service *services.AccountsService) AccountsUseCase {
-	return AccountsUseCase{service: service}
+func NewAccountsUseCase(service *services.AccountsService, authorizer rootservices.Authorizer) AccountsUseCase {
+	return AccountsUseCase{service: service, authorizer: authorizer}
 }
 
 func (u AccountsUseCase) GetByID(ctx context.Context, actor *models.Actor, accountID string) (*models.Account, error) {
+	if err := u.authorizer.AuthorizeScope(ctx, actor, adminconstants.AccountsReadPermission); err != nil {
+		return nil, err
+	}
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
 		return nil, internalerrors.ErrBadRequest
@@ -28,6 +33,9 @@ func (u AccountsUseCase) GetByID(ctx context.Context, actor *models.Actor, accou
 }
 
 func (u AccountsUseCase) GetByUserID(ctx context.Context, actor *models.Actor, userID string) ([]models.Account, error) {
+	if err := u.authorizer.AuthorizeScope(ctx, actor, adminconstants.AccountsListPermission); err != nil {
+		return nil, err
+	}
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
 		return nil, adminconstants.ErrUserIDRequired
@@ -36,6 +44,9 @@ func (u AccountsUseCase) GetByUserID(ctx context.Context, actor *models.Actor, u
 }
 
 func (u AccountsUseCase) Create(ctx context.Context, actor *models.Actor, userID string, request types.CreateAccountRequest) (*models.Account, error) {
+	if err := u.authorizer.AuthorizeScope(ctx, actor, adminconstants.AccountsCreatePermission); err != nil {
+		return nil, err
+	}
 	userID = strings.TrimSpace(userID)
 	request.ProviderID = strings.TrimSpace(strings.ToLower(request.ProviderID))
 	request.AccountID = strings.TrimSpace(request.AccountID)
@@ -55,6 +66,9 @@ func (u AccountsUseCase) Create(ctx context.Context, actor *models.Actor, userID
 }
 
 func (u AccountsUseCase) Update(ctx context.Context, actor *models.Actor, accountID string, request types.UpdateAccountRequest) (*models.Account, error) {
+	if err := u.authorizer.AuthorizeScope(ctx, actor, adminconstants.AccountsUpdatePermission); err != nil {
+		return nil, err
+	}
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
 		return nil, internalerrors.ErrBadRequest
@@ -89,6 +103,9 @@ func (u AccountsUseCase) Update(ctx context.Context, actor *models.Actor, accoun
 }
 
 func (u AccountsUseCase) Delete(ctx context.Context, actor *models.Actor, accountID string) error {
+	if err := u.authorizer.AuthorizeScope(ctx, actor, adminconstants.AccountsDeletePermission); err != nil {
+		return err
+	}
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
 		return internalerrors.ErrBadRequest

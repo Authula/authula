@@ -34,10 +34,6 @@ func NewOrganizationMemberService(userService rootservices.UserService, accessCo
 }
 
 func (s *organizationMemberService) AddMember(ctx context.Context, actor *models.Actor, organizationID string, request types.AddOrganizationMemberRequest) (*types.OrganizationMember, error) {
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsMembersAddPermission); err != nil {
-		return nil, err
-	}
-
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -84,7 +80,7 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actor *models
 	var created *types.OrganizationMember
 	err = s.txRunner.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		memberRepo := s.orgMemberRepo.WithTx(tx)
-		if err := s.serviceUtils.ensureOrganizationMembersLimit(ctx, memberRepo, organizationID, s.membersLimit); err != nil {
+		if err := ensureOrganizationMembersLimit(ctx, memberRepo, organizationID, s.membersLimit); err != nil {
 			return err
 		}
 
@@ -111,10 +107,6 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actor *models
 }
 
 func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMember, error) {
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsMembersListPermission); err != nil {
-		return nil, err
-	}
-
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -123,10 +115,6 @@ func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor *mo
 }
 
 func (s *organizationMemberService) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMember, error) {
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsMembersReadPermission); err != nil {
-		return nil, err
-	}
-
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -147,10 +135,6 @@ func (s *organizationMemberService) GetMember(ctx context.Context, actor *models
 }
 
 func (s *organizationMemberService) UpdateMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error) {
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsMembersUpdatePermission); err != nil {
-		return nil, err
-	}
-
 	_, actorMember, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
@@ -199,10 +183,6 @@ func (s *organizationMemberService) UpdateMember(ctx context.Context, actor *mod
 }
 
 func (s *organizationMemberService) RemoveMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) error {
-	if err := s.serviceUtils.authorizerOrDefault().AuthorizeOrganizationAccess(ctx, actor, organizationID, constants.OrganizationsMembersRemovePermission); err != nil {
-		return err
-	}
-
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return err
 	}
@@ -217,6 +197,22 @@ func (s *organizationMemberService) RemoveMember(ctx context.Context, actor *mod
 
 	if err := s.orgMemberRepo.Delete(ctx, member.ID); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func ensureOrganizationMembersLimit(ctx context.Context, memberRepo repositories.OrganizationMemberRepository, organizationID string, membersLimit *int) error {
+	if membersLimit == nil || *membersLimit <= 0 {
+		return nil
+	}
+
+	memberCount, err := memberRepo.CountByOrganizationID(ctx, organizationID)
+	if err != nil {
+		return err
+	}
+	if memberCount >= *membersLimit {
+		return constants.ErrMembersQuotaExceeded
 	}
 
 	return nil

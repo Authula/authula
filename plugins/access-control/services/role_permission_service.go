@@ -5,28 +5,21 @@ import (
 
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
-	rootservices "github.com/Authula/authula/services"
 )
 
 type RolePermissionsService struct {
 	rolesRepo           repositories.RolesRepository
 	permissionsRepo     repositories.PermissionsRepository
 	rolePermissionsRepo repositories.RolePermissionsRepository
-	authorizer          rootservices.Authorizer
 }
 
-func NewRolePermissionsService(rolesRepo repositories.RolesRepository, permissionsRepo repositories.PermissionsRepository, rolePermissionsRepo repositories.RolePermissionsRepository, authorizer rootservices.Authorizer) *RolePermissionsService {
-	return &RolePermissionsService{rolesRepo: rolesRepo, permissionsRepo: permissionsRepo, rolePermissionsRepo: rolePermissionsRepo, authorizer: authorizer}
+func NewRolePermissionsService(rolesRepo repositories.RolesRepository, permissionsRepo repositories.PermissionsRepository, rolePermissionsRepo repositories.RolePermissionsRepository) *RolePermissionsService {
+	return &RolePermissionsService{rolesRepo: rolesRepo, permissionsRepo: permissionsRepo, rolePermissionsRepo: rolePermissionsRepo}
 }
 
 func (s *RolePermissionsService) GetRolePermissions(ctx context.Context, actor *models.Actor, roleID string) ([]types.UserPermissionInfo, error) {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.RolePermissionsReadPermission); err != nil {
-		return nil, err
-	}
-
 	if roleID == "" {
 		return nil, internalerrors.ErrUnprocessableEntity
 	}
@@ -43,10 +36,6 @@ func (s *RolePermissionsService) GetRolePermissions(ctx context.Context, actor *
 }
 
 func (s *RolePermissionsService) AddPermissionToRole(ctx context.Context, actor *models.Actor, roleID string, permissionID string, grantedByUserID *string) error {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.RolePermissionsAssignPermission); err != nil {
-		return err
-	}
-
 	if roleID == "" {
 		return internalerrors.ErrBadRequest
 	}
@@ -80,10 +69,6 @@ func (s *RolePermissionsService) AddPermissionToRole(ctx context.Context, actor 
 }
 
 func (s *RolePermissionsService) RemovePermissionFromRole(ctx context.Context, actor *models.Actor, roleID string, permissionID string) error {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.RolePermissionsRemovePermission); err != nil {
-		return err
-	}
-
 	if roleID == "" {
 		return internalerrors.ErrUnprocessableEntity
 	}
@@ -117,10 +102,6 @@ func (s *RolePermissionsService) RemovePermissionFromRole(ctx context.Context, a
 }
 
 func (s *RolePermissionsService) ReplaceRolePermissions(ctx context.Context, actor *models.Actor, roleID string, permissionIDs []string, grantedByUserID *string) error {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, constants.RolePermissionsAssignPermission); err != nil {
-		return err
-	}
-
 	if roleID == "" {
 		return internalerrors.ErrBadRequest
 	}

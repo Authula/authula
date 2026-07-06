@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	internalerrors "github.com/Authula/authula/internal/errors"
-	internaltests "github.com/Authula/authula/internal/tests"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -59,7 +58,7 @@ func TestAccessControlServiceRoleExists(t *testing.T) {
 				tc.setup(rolesRepo)
 			}
 
-			service := NewAccessControlService(NewRolesService(rolesRepo, nil, nil, &internaltests.NoopAuthorizer{}), NewUserRolesService(nil, nil, &internaltests.NoopAuthorizer{}), nil)
+			service := NewAccessControlService(NewRolesService(rolesRepo, nil, nil), NewUserRolesService(nil, nil), nil)
 			ok, err := service.RoleExists(context.Background(), tc.roleName)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
@@ -129,8 +128,8 @@ func TestAccessControlServiceValidatePermissionKeys(t *testing.T) {
 			}
 
 			service := NewAccessControlService(
-				NewRolesService(nil, nil, nil, &internaltests.NoopAuthorizer{}),
-				NewUserRolesService(nil, nil, &internaltests.NoopAuthorizer{}),
+				NewRolesService(nil, nil, nil),
+				NewUserRolesService(nil, nil),
 				permissionsRepo,
 			)
 			err := service.ValidatePermissionKeys(context.Background(), tc.permissionKeys)
@@ -218,7 +217,7 @@ func TestAccessControlServiceValidateRoleAssignment(t *testing.T) {
 				tc.setup(rolesRepo, userRolesRepo)
 			}
 
-			service := NewAccessControlService(NewRolesService(rolesRepo, nil, userRolesRepo, &internaltests.NoopAuthorizer{}), NewUserRolesService(userRolesRepo, rolesRepo, &internaltests.NoopAuthorizer{}), nil)
+			service := NewAccessControlService(NewRolesService(rolesRepo, nil, userRolesRepo), NewUserRolesService(userRolesRepo, rolesRepo), nil)
 			ok, err := service.ValidateRoleAssignment(context.Background(), tc.roleName, tc.assigner)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)

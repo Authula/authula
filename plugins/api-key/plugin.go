@@ -15,6 +15,7 @@ import (
 	apirepositories "github.com/Authula/authula/plugins/api-key/repositories"
 	apiservices "github.com/Authula/authula/plugins/api-key/services"
 	"github.com/Authula/authula/plugins/api-key/types"
+	"github.com/Authula/authula/plugins/api-key/usecases"
 	orgplugins "github.com/Authula/authula/plugins/organizations"
 	rootservices "github.com/Authula/authula/services"
 )
@@ -98,9 +99,10 @@ func (p *ApiKeyPlugin) Init(ctx *models.PluginContext) error {
 
 	apiKeyRepo := apirepositories.NewBunApiKeyRepository(p.db)
 	authorizer := rootservices.NewDefaultAuthorizer()
-	service := apiservices.NewApiKeyService(p.config, userService, tokenService, accessControlService, rateLimiterService, organizationService, authorizer, apiKeyRepo)
+	service := apiservices.NewApiKeyService(p.config, userService, tokenService, accessControlService, rateLimiterService, organizationService, apiKeyRepo)
+	useCases := usecases.NewUseCases(service, authorizer)
 
-	p.Api = NewAPI(service)
+	p.Api = NewAPI(useCases)
 
 	if p.config.AutoCleanup {
 		p.stopCleanup = make(chan struct{})

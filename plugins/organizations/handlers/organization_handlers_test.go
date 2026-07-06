@@ -159,7 +159,7 @@ func TestCreateOrganizationHandler(t *testing.T) {
 				tt.prepare(fixture)
 			}
 
-			handler := &CreateOrganizationHandler{OrgService: fixture.service}
+			handler := &CreateOrganizationHandler{UseCases: newOrgUseCases(fixture.service)}
 			req, w, reqCtx := fixture.newRequest(t, http.MethodPost, "/organizations", tt.body, tt.userID, "")
 			if tt.name == "missing_user" {
 				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
@@ -180,7 +180,7 @@ func TestCreateOrganizationHandler(t *testing.T) {
 	}
 }
 
-func TestGetAllOrganizationsHandler(t *testing.T) {
+func TestGetAllOrganizationsByOwnerHandler(t *testing.T) {
 	t.Parallel()
 
 	tests := []organizationHandlerCase{
@@ -193,7 +193,7 @@ func TestGetAllOrganizationsHandler(t *testing.T) {
 			name:   "service_error",
 			userID: new("user-1"),
 			prepare: func(f *organizationHandlerFixture) {
-				f.service.On("GetAllOrganizations", mock.Anything, "user-1").Return(([]orgtypes.Organization)(nil), errors.New("some error")).Once()
+				f.service.On("GetAllOrganizationsByOwner", mock.Anything, "user-1").Return(([]orgtypes.Organization)(nil), errors.New("some error")).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "some error",
@@ -202,7 +202,7 @@ func TestGetAllOrganizationsHandler(t *testing.T) {
 			name:   "success",
 			userID: new("user-1"),
 			prepare: func(f *organizationHandlerFixture) {
-				f.service.On("GetAllOrganizations", mock.Anything, "user-1").Return([]orgtypes.Organization{{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc"}}, nil).Once()
+				f.service.On("GetAllOrganizationsByOwner", mock.Anything, "user-1").Return([]orgtypes.Organization{{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc"}}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
@@ -224,7 +224,7 @@ func TestGetAllOrganizationsHandler(t *testing.T) {
 				tt.prepare(fixture)
 			}
 
-			handler := &GetAllOrganizationsHandler{OrgService: fixture.service}
+			handler := &GetAllOrganizationsByOwnerHandler{UseCases: newOrgUseCases(fixture.service)}
 			req, w, reqCtx := fixture.newRequest(t, http.MethodGet, "/organizations", nil, tt.userID, "")
 			if tt.name == "missing_user" {
 				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
@@ -318,7 +318,7 @@ func TestGetOrganizationByIDHandler(t *testing.T) {
 				tt.prepare(fixture)
 			}
 
-			handler := &GetOrganizationByIDHandler{OrgService: fixture.service}
+			handler := &GetOrganizationByIDHandler{UseCases: newOrgUseCases(fixture.service)}
 			req, w, reqCtx := fixture.newRequest(t, http.MethodGet, "/organizations/test-id", nil, tt.userID, tt.organizationID)
 			if tt.name == "missing_user" {
 				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
@@ -467,7 +467,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 				tt.prepare(fixture)
 			}
 
-			handler := &UpdateOrganizationHandler{OrgService: fixture.service}
+			handler := &UpdateOrganizationHandler{UseCases: newOrgUseCases(fixture.service)}
 			req, w, reqCtx := fixture.newRequest(t, http.MethodPatch, "/organizations/test-id", tt.body, tt.userID, tt.organizationID)
 			if tt.name == "missing_user" {
 				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
@@ -542,7 +542,7 @@ func TestDeleteOrganizationHandler(t *testing.T) {
 				tt.prepare(fixture)
 			}
 
-			handler := &DeleteOrganizationHandler{OrgService: fixture.service}
+			handler := &DeleteOrganizationHandler{UseCases: newOrgUseCases(fixture.service)}
 			req, w, reqCtx := fixture.newRequest(t, http.MethodDelete, "/organizations/test-id", nil, tt.userID, tt.organizationID)
 			if tt.name == "missing_user" {
 				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})

@@ -10,7 +10,6 @@ import (
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/api-key/constants"
 	"github.com/Authula/authula/plugins/api-key/repositories"
 	"github.com/Authula/authula/plugins/api-key/types"
 	rootservices "github.com/Authula/authula/services"
@@ -23,7 +22,6 @@ type apiKeyService struct {
 	accessControlService rootservices.AccessControlService
 	rateLimiterService   rootservices.RateLimiterService
 	organizationService  rootservices.OrganizationService
-	authorizer           rootservices.Authorizer
 	apiKeyRepo           repositories.ApiKeyRepository
 }
 
@@ -39,7 +37,6 @@ func NewApiKeyService(
 	accessControlService rootservices.AccessControlService,
 	rateLimiterService rootservices.RateLimiterService,
 	organizationService rootservices.OrganizationService,
-	authorizer rootservices.Authorizer,
 	apiKeyRepo repositories.ApiKeyRepository,
 ) ApiKeyService {
 	return &apiKeyService{
@@ -52,13 +49,12 @@ func NewApiKeyService(
 		accessControlService: accessControlService,
 		rateLimiterService:   rateLimiterService,
 		organizationService:  organizationService,
-		authorizer:           authorizer,
 		apiKeyRepo:           apiKeyRepo,
 	}
 }
 
 func (s *apiKeyService) Create(ctx context.Context, actor *models.Actor, req types.CreateApiKeyRequest) (*types.CreateApiKeyResponse, error) {
-	if err := s.authorizeCreate(ctx, actor, req); err != nil {
+	if err := s.authorizeCreate(actor, req); err != nil {
 		return nil, err
 	}
 
@@ -173,7 +169,7 @@ func (s *apiKeyService) Create(ctx context.Context, actor *models.Actor, req typ
 	}, nil
 }
 
-func (s *apiKeyService) authorizeCreate(ctx context.Context, actor *models.Actor, req types.CreateApiKeyRequest) error {
+func (s *apiKeyService) authorizeCreate(actor *models.Actor, req types.CreateApiKeyRequest) error {
 	switch req.OwnerType {
 	case types.OwnerTypeUser:
 		if req.OwnerID != "" && req.OwnerID != actor.ID {
@@ -188,9 +184,6 @@ func (s *apiKeyService) authorizeCreate(ctx context.Context, actor *models.Actor
 		}
 		if s.organizationService == nil {
 			return fmt.Errorf("%w: organization service is not available", internalerrors.ErrUnprocessableEntity)
-		}
-		if err := s.authorizer.AuthorizeScope(ctx, actor, constants.OrgApiKeyCreate); err != nil {
-			return err
 		}
 		if err := s.validatePermissionsSubset(actor.Scopes, req.Permissions); err != nil {
 			return err
@@ -212,10 +205,6 @@ func (s *apiKeyService) GetByID(ctx context.Context, actor *models.Actor, id str
 	case types.OwnerTypeUser:
 		if apiKey.OwnerID != actor.ID {
 			return nil, fmt.Errorf("%w: you do not have access to this API key", internalerrors.ErrForbidden)
-		}
-	case types.OwnerTypeOrganization:
-		if err := s.authorizer.AuthorizeScope(ctx, actor, constants.OrgApiKeyRead); err != nil {
-			return nil, err
 		}
 	}
 
@@ -242,10 +231,6 @@ func (s *apiKeyService) GetAll(ctx context.Context, actor *models.Actor, req typ
 		req.OwnerID = &ownerID
 		ownerType := types.OwnerTypeUser
 		req.OwnerType = &ownerType
-	case *req.OwnerType == types.OwnerTypeOrganization:
-		if err := s.authorizer.AuthorizeScope(ctx, actor, constants.OrgApiKeyList); err != nil {
-			return nil, err
-		}
 	}
 
 	items, total, err := s.apiKeyRepo.GetAll(ctx, req.OwnerType, req.OwnerID, page, limit)
@@ -284,9 +269,6 @@ func (s *apiKeyService) Update(ctx context.Context, actor *models.Actor, id stri
 			}
 		}
 	case types.OwnerTypeOrganization:
-		if err := s.authorizer.AuthorizeScope(ctx, actor, constants.OrgApiKeyUpdate); err != nil {
-			return nil, err
-		}
 		if len(req.Permissions) > 0 {
 			if err := s.validatePermissionsSubset(actor.Scopes, req.Permissions); err != nil {
 				return nil, err
@@ -348,10 +330,6 @@ func (s *apiKeyService) Delete(ctx context.Context, actor *models.Actor, id stri
 		if apiKey.OwnerID != actor.ID {
 			return fmt.Errorf("%w: you do not have access to this API key", internalerrors.ErrForbidden)
 		}
-	case types.OwnerTypeOrganization:
-		if err := s.authorizer.AuthorizeScope(ctx, actor, constants.OrgApiKeyDelete); err != nil {
-			return err
-		}
 	}
 
 	if s.rateLimiterService != nil && apiKey.RateLimitEnabled {
@@ -371,10 +349,6 @@ func (s *apiKeyService) DeleteAllByOwner(ctx context.Context, actor *models.Acto
 	case types.OwnerTypeUser:
 		if ownerID != actor.ID {
 			return fmt.Errorf("%w: you cannot delete API keys for another user", internalerrors.ErrForbidden)
-		}
-	case types.OwnerTypeOrganization:
-		if err := s.authorizer.AuthorizeScope(ctx, actor, constants.OrgApiKeyDelete); err != nil {
-			return err
 		}
 	}
 	return s.apiKeyRepo.DeleteAllByOwner(ctx, ownerType, ownerID)

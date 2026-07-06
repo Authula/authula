@@ -23,7 +23,6 @@ type apiKeyServiceFixture struct {
 	mockTokenService         *roottests.MockTokenService
 	mockOrgService           *internaltests.MockOrganizationService
 	mockAccessControlService *apiKeyTests.MockAccessControlService
-	mockAuthorizer           *internaltests.MockAuthorizer
 	mockRateLimiterService   *roottests.MockRateLimitService
 	mockApiKeyService        *apiKeyService
 	mockApiKeyRepo           *apiKeyTests.MockApiKeyRepository
@@ -35,11 +34,10 @@ func newApiKeyServiceFixture(pluginConfig types.ApiKeyPluginConfig) *apiKeyServi
 	mockTokenService := &roottests.MockTokenService{}
 	mockRateLimiterService := &roottests.MockRateLimitService{}
 	mockAccessControlService := &apiKeyTests.MockAccessControlService{}
-	mockAuthorizer := &internaltests.MockAuthorizer{}
 
 	mockApiKeyRepo := &apiKeyTests.MockApiKeyRepository{}
-	service := NewApiKeyService(pluginConfig, mockUserService, mockTokenService, mockAccessControlService, mockRateLimiterService, mockOrgService, mockAuthorizer, mockApiKeyRepo).(*apiKeyService)
-	return &apiKeyServiceFixture{mockApiKeyService: service, mockApiKeyRepo: mockApiKeyRepo, mockUserService: mockUserService, mockTokenService: mockTokenService, mockOrgService: mockOrgService, mockAccessControlService: mockAccessControlService, mockAuthorizer: mockAuthorizer, mockRateLimiterService: mockRateLimiterService}
+	service := NewApiKeyService(pluginConfig, mockUserService, mockTokenService, mockAccessControlService, mockRateLimiterService, mockOrgService, mockApiKeyRepo).(*apiKeyService)
+	return &apiKeyServiceFixture{mockApiKeyService: service, mockApiKeyRepo: mockApiKeyRepo, mockUserService: mockUserService, mockTokenService: mockTokenService, mockOrgService: mockOrgService, mockAccessControlService: mockAccessControlService, mockRateLimiterService: mockRateLimiterService}
 }
 
 func userActor(id string) *models.Actor {
@@ -115,23 +113,10 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			},
 		},
 		{
-			name:   "org_create_requires_permission",
-			actor:  userActor(userID),
-			config: types.ApiKeyPluginConfig{AllowOrgKeys: true},
-			req:    types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID},
-			setup: func(f *apiKeyServiceFixture) {
-				f.mockAuthorizer.On("AuthorizeScope", mock.Anything, mock.Anything, "org:api-key:create").Return(internalerrors.ErrForbidden).Once()
-			},
-			wantErr: internalerrors.ErrForbidden,
-		},
-		{
-			name:   "org_create_privilege_escalation_rejected",
-			actor:  &models.Actor{ID: userID, Type: models.ActorUser, Scopes: []string{"org:api-key:create"}},
-			config: types.ApiKeyPluginConfig{AllowOrgKeys: true},
-			req:    types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID, Permissions: []string{"admin"}},
-			setup: func(f *apiKeyServiceFixture) {
-				f.mockAuthorizer.On("AuthorizeScope", mock.Anything, mock.Anything, "org:api-key:create").Return(nil).Once()
-			},
+			name:    "org_create_privilege_escalation_rejected",
+			actor:   &models.Actor{ID: userID, Type: models.ActorUser, Scopes: []string{"org:api-key:create"}},
+			config:  types.ApiKeyPluginConfig{AllowOrgKeys: true},
+			req:     types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID, Permissions: []string{"admin"}},
 			wantErr: internalerrors.ErrForbidden,
 		},
 		{
@@ -141,7 +126,6 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			req:    types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID, Permissions: []string{"read"}},
 			setup: func(f *apiKeyServiceFixture) {
 				f.mockAccessControlService.On("ValidatePermissionKeys", mock.Anything, []string{"read"}).Return(nil).Once()
-				f.mockAuthorizer.On("AuthorizeScope", mock.Anything, mock.Anything, "org:api-key:create").Return(nil).Once()
 				f.mockOrgService.On("ExistsByID", mock.Anything, orgID).Return(true, nil).Once()
 				f.mockTokenService.On("Generate").Return(rawApiKey, nil).Once()
 				f.mockTokenService.On("Hash", rawApiKey).Return("hashed-key").Once()
@@ -174,7 +158,6 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			config: types.ApiKeyPluginConfig{AllowOrgKeys: true},
 			req:    types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID},
 			setup: func(f *apiKeyServiceFixture) {
-				f.mockAuthorizer.On("AuthorizeScope", mock.Anything, mock.Anything, "org:api-key:create").Return(nil).Once()
 				f.mockOrgService.On("ExistsByID", mock.Anything, orgID).Return(false, nil).Once()
 			},
 			wantErr: internalerrors.ErrNotFound,
@@ -229,7 +212,6 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			fixture.mockTokenService.AssertExpectations(t)
 			fixture.mockOrgService.AssertExpectations(t)
 			fixture.mockAccessControlService.AssertExpectations(t)
-			fixture.mockAuthorizer.AssertExpectations(t)
 			fixture.mockRateLimiterService.AssertExpectations(t)
 			fixture.mockApiKeyRepo.AssertExpectations(t)
 		})
@@ -316,63 +298,10 @@ func TestApiKeyServiceGetAll(t *testing.T) {
 	}
 }
 
-func TestApiKeyServiceGetAllOrgKeys(t *testing.T) {
-	t.Parallel()
-
-	orgID := "org-1"
-	orgType := types.OwnerTypeOrganization
-
-	tests := []struct {
-		name    string
-		actor   *models.Actor
-		req     types.GetApiKeysRequest
-		setup   func(*apiKeyServiceFixture)
-		wantErr error
-	}{
-		{
-			name:  "org_list_requires_permission",
-			actor: userActor("user-1"),
-			req:   types.GetApiKeysRequest{OwnerType: &orgType, OwnerID: &orgID},
-			setup: func(f *apiKeyServiceFixture) {
-				f.mockAuthorizer.On("AuthorizeScope", mock.Anything, mock.Anything, "org:api-key:list").Return(internalerrors.ErrForbidden).Once()
-			},
-			wantErr: internalerrors.ErrForbidden,
-		},
-		{
-			name:  "org_list_allowed",
-			actor: &models.Actor{ID: "user-1", Type: models.ActorUser, Scopes: []string{"org:api-key:list"}},
-			req:   types.GetApiKeysRequest{OwnerType: &orgType, OwnerID: &orgID},
-			setup: func(f *apiKeyServiceFixture) {
-				f.mockAuthorizer.On("AuthorizeScope", mock.Anything, mock.Anything, "org:api-key:list").Return(nil).Once()
-				f.mockApiKeyRepo.On("GetAll", mock.Anything, &orgType, &orgID, 1, 10).Return([]*types.ApiKey{{ID: "api-key-1"}}, 1, nil).Once()
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			fixture := newApiKeyServiceFixture(types.ApiKeyPluginConfig{})
-			tc.setup(fixture)
-
-			_, err := fixture.mockApiKeyService.GetAll(context.Background(), tc.actor, tc.req)
-			if tc.wantErr == nil {
-				require.NoError(t, err)
-			} else {
-				require.Error(t, err)
-				assert.ErrorContains(t, err, tc.wantErr.Error())
-			}
-			fixture.mockAuthorizer.AssertExpectations(t)
-			fixture.mockApiKeyRepo.AssertExpectations(t)
-		})
-	}
-}
-
 func TestApiKeyServiceGetByID(t *testing.T) {
 	t.Parallel()
 
 	userID := "user-1"
-	orgID := "org-1"
 
 	tests := []struct {
 		name    string
@@ -411,23 +340,6 @@ func TestApiKeyServiceGetByID(t *testing.T) {
 				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID}, nil).Once()
 			},
 		},
-		{
-			name:  "org_key_requires_read_permission",
-			actor: userActor(userID),
-			setup: func(f *apiKeyServiceFixture) {
-				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-2").Return(&types.ApiKey{ID: "api-key-2", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID}, nil).Once()
-				f.mockAuthorizer.On("AuthorizeScope", mock.Anything, mock.Anything, "org:api-key:read").Return(internalerrors.ErrForbidden).Once()
-			},
-			wantErr: internalerrors.ErrForbidden,
-		},
-		{
-			name:  "org_key_read_allowed",
-			actor: &models.Actor{ID: userID, Type: models.ActorUser, Scopes: []string{"org:api-key:read"}},
-			setup: func(f *apiKeyServiceFixture) {
-				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-2").Return(&types.ApiKey{ID: "api-key-2", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID}, nil).Once()
-				f.mockAuthorizer.On("AuthorizeScope", mock.Anything, mock.Anything, "org:api-key:read").Return(nil).Once()
-			},
-		},
 	}
 
 	for _, tc := range tests {
@@ -436,11 +348,7 @@ func TestApiKeyServiceGetByID(t *testing.T) {
 			fixture := newApiKeyServiceFixture(types.ApiKeyPluginConfig{})
 			tc.setup(fixture)
 
-			keyID := "api-key-1"
-			if tc.name == "org_key_requires_read_permission" || tc.name == "org_key_read_allowed" {
-				keyID = "api-key-2"
-			}
-			resp, err := fixture.mockApiKeyService.GetByID(context.Background(), tc.actor, keyID)
+			resp, err := fixture.mockApiKeyService.GetByID(context.Background(), tc.actor, "api-key-1")
 			if tc.wantErr == nil {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
@@ -513,13 +421,15 @@ func TestApiKeyServiceUpdate(t *testing.T) {
 			wantErr: internalerrors.ErrNotFound,
 		},
 		{
-			name:  "org_update_requires_permission",
-			actor: userActor(userID),
+			name:  "org_update_allowed",
+			actor: &models.Actor{ID: userID, Type: models.ActorUser, Scopes: []string{"org:api-key:update", "read", "write"}},
 			setup: func(f *apiKeyServiceFixture) {
-				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID}, nil).Once()
-				f.mockAuthorizer.On("AuthorizeScope", mock.Anything, mock.Anything, "org:api-key:update").Return(internalerrors.ErrForbidden).Once()
+				f.mockAccessControlService.On("ValidatePermissionKeys", mock.Anything, permissions).Return(nil).Once()
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", Name: "old", Enabled: true, OwnerType: types.OwnerTypeOrganization, OwnerID: orgID}, nil).Once()
+				f.mockApiKeyRepo.On("Update", mock.Anything, mock.MatchedBy(func(apiKey *types.ApiKey) bool {
+					return apiKey != nil && apiKey.ID == "api-key-1" && apiKey.Name == name && !apiKey.Enabled && apiKey.RateLimitEnabled && len(apiKey.Permissions) == len(permissions) && apiKey.Metadata != nil && len(apiKey.Metadata) == len(metadata)
+				})).Return(&types.ApiKey{ID: "api-key-1", Name: name}, nil).Once()
 			},
-			wantErr: internalerrors.ErrForbidden,
 		},
 	}
 
@@ -560,7 +470,6 @@ func TestApiKeyServiceDelete(t *testing.T) {
 	t.Parallel()
 
 	userID := "user-1"
-	orgID := "org-1"
 
 	tests := []struct {
 		name    string
@@ -591,15 +500,6 @@ func TestApiKeyServiceDelete(t *testing.T) {
 				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID}, nil).Once()
 				f.mockApiKeyRepo.On("Delete", mock.Anything, "api-key-1").Return(nil).Once()
 			},
-		},
-		{
-			name:  "org_delete_requires_permission",
-			actor: userActor(userID),
-			setup: func(f *apiKeyServiceFixture) {
-				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID}, nil).Once()
-				f.mockAuthorizer.On("AuthorizeScope", mock.Anything, mock.Anything, "org:api-key:delete").Return(internalerrors.ErrForbidden).Once()
-			},
-			wantErr: internalerrors.ErrForbidden,
 		},
 	}
 

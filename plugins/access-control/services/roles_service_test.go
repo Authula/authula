@@ -23,7 +23,7 @@ func TestRolesServiceGetRoleByID(t *testing.T) {
 	rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "admin"}, nil).Once()
 	rolePermissionsRepo.On("GetRolePermissions", mock.Anything, "role-1").Return([]types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "users.read"}}, nil).Once()
 
-	service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo, &internaltests.NoopAuthorizer{})
+	service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
 	details, err := service.GetRoleByID(context.Background(), internaltests.TestActor(), "role-1")
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -79,7 +79,7 @@ func TestRolesServiceGetRoleByName(t *testing.T) {
 				tc.setup(rolesRepo, userRolesRepo)
 			}
 
-			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo, &internaltests.NoopAuthorizer{})
+			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			role, err := service.GetRoleByName(context.Background(), internaltests.TestActor(), tc.roleName)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
@@ -162,7 +162,7 @@ func TestRolesServiceRoleWeightOperations(t *testing.T) {
 				tc.setup(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			}
 
-			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo, &internaltests.NoopAuthorizer{})
+			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			role, err := tc.run(context.Background(), service)
 			if err != nil {
 				t.Fatalf("expected nil err, got %v", err)
@@ -215,7 +215,7 @@ func TestRolesServiceDeleteRole(t *testing.T) {
 				tc.setup(rolesRepo, userRolesRepo)
 			}
 
-			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo, &internaltests.NoopAuthorizer{})
+			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
 			err := service.DeleteRole(context.Background(), internaltests.TestActor(), "role-1")
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)

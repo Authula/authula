@@ -157,5 +157,5 @@ func TestCheckUserPermissionsHandler(t *testing.T) {
 }
 
 func newUserPermissionsUseCase(repo *accesscontroltests.MockUserPermissionsRepository) *usecases.UserPermissionsUseCase {
-	return usecases.NewUserPermissionsUseCase(services.NewUserPermissionsService(repo, &internaltests.NoopAuthorizer{}))
+	return usecases.NewUserPermissionsUseCase(services.NewUserPermissionsService(repo), &internaltests.NoopAuthorizer{})
 }
