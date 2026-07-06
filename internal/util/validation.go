@@ -5,22 +5,26 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/go-playground/validator/v10"
 
 	"github.com/Authula/authula/models"
 )
 
-var Validate *validator.Validate
+var (
+	validateOnce sync.Once
+	Validate     *validator.Validate
+)
 
 func InitValidator() {
-	Validate = validator.New()
+	validateOnce.Do(func() {
+		Validate = validator.New()
+	})
 }
 
 func ValidateStruct(s any) error {
-	if Validate == nil {
-		InitValidator()
-	}
+	InitValidator()
 	return Validate.Struct(s)
 }
 
