@@ -17,7 +17,7 @@ import (
 
 func newUsersServiceFixture() (*adminservices.UsersService, *internaltests.MockUserRepository) {
 	repo := &internaltests.MockUserRepository{}
-	return adminservices.NewUsersService(repo, &internaltests.NoopAuthorizer{}), repo
+	return adminservices.NewUsersService(repo), repo
 }
 
 func TestUsersService_Create(t *testing.T) {

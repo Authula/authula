@@ -6,12 +6,12 @@ import (
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/api-key/services"
 	"github.com/Authula/authula/plugins/api-key/types"
+	"github.com/Authula/authula/plugins/api-key/usecases"
 )
 
 type CreateApiKeyHandler struct {
-	Service services.ApiKeyService
+	UseCases *usecases.UseCases
 }
 
 func (h *CreateApiKeyHandler) Handle() http.HandlerFunc {
@@ -31,7 +31,7 @@ func (h *CreateApiKeyHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		result, err := h.Service.Create(ctx, reqCtx.Actor, req)
+		result, err := h.UseCases.Create(ctx, reqCtx.Actor, req)
 		if err != nil {
 			internalerrors.HandleError(err, reqCtx)
 			return

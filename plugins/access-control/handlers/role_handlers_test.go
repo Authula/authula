@@ -627,7 +627,7 @@ func TestDeleteRoleHandler(t *testing.T) {
 }
 
 func newRolesUseCase(rolesRepo *accesscontroltests.MockRolesRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) *usecases.RolesUseCase {
-	return usecases.NewRolesUseCase(services.NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo, &internaltests.NoopAuthorizer{}))
+	return usecases.NewRolesUseCase(services.NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo), &internaltests.NoopAuthorizer{})
 }
 
 func assertRolesEqual(t *testing.T, got []types.Role, want []types.Role) {

@@ -123,7 +123,7 @@ func TestImpersonationService_StartImpersonation_noSessionServices(t *testing.T)
 	impRepo := &admintests.MockImpersonationRepository{}
 	sessRepo := &admintests.MockSessionStateRepository{}
 	// Use constructor to create service with nil session/token services
-	svc := adminservices.NewImpersonationService(impRepo, sessRepo, nil, nil, time.Minute, time.Minute, &internaltests.NoopAuthorizer{})
+	svc := adminservices.NewImpersonationService(impRepo, sessRepo, nil, nil, time.Minute, time.Minute)
 	ctx := context.Background()
 
 	impRepo.On("UserExists", mock.Anything, "actor").Return(true, nil).Once()

@@ -82,7 +82,7 @@ func TestPermissionsServiceCreatePermission(t *testing.T) {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &internaltests.NoopAuthorizer{})
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
 			permission, err := service.CreatePermission(context.Background(), internaltests.TestActor(), tc.req)
 			if tc.wantErr == nil {
 				if err != nil {
@@ -137,7 +137,7 @@ func TestPermissionsServiceGetAllPermissions(t *testing.T) {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &internaltests.NoopAuthorizer{})
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
 			permissions, err := service.GetAllPermissions(context.Background(), internaltests.TestActor())
 			if tc.wantErr == nil {
 				if err != nil {
@@ -199,7 +199,7 @@ func TestPermissionsServiceGetPermissionByID(t *testing.T) {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &internaltests.NoopAuthorizer{})
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
 			permission, err := service.GetPermissionByID(context.Background(), internaltests.TestActor(), tc.id)
 			if tc.wantErr == nil {
 				if err != nil {
@@ -299,7 +299,7 @@ func TestPermissionsServiceUpdatePermission(t *testing.T) {
 				tc.setup(permissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &internaltests.NoopAuthorizer{})
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
 			permission, err := service.UpdatePermission(context.Background(), internaltests.TestActor(), tc.id, tc.req)
 			if tc.wantErr == nil {
 				if err != nil {
@@ -387,7 +387,7 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 				tc.setup(permissionsRepo, rolePermissionsRepo)
 			}
 
-			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo, &internaltests.NoopAuthorizer{})
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
 			err := service.DeletePermission(context.Background(), internaltests.TestActor(), tc.id)
 			if tc.wantErr == nil {
 				if err != nil {

@@ -8,7 +8,6 @@ import (
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
-	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/repositories"
 	"github.com/Authula/authula/plugins/admin/types"
 	rootservices "github.com/Authula/authula/services"
@@ -21,7 +20,6 @@ type ImpersonationService struct {
 	tokenService      rootservices.TokenService
 	sessionExpiresIn  time.Duration
 	maxExpiresIn      time.Duration
-	authorizer        rootservices.Authorizer
 }
 
 func NewImpersonationService(
@@ -31,7 +29,6 @@ func NewImpersonationService(
 	tokenService rootservices.TokenService,
 	sessionExpiresIn time.Duration,
 	maxExpiresIn time.Duration,
-	authorizer rootservices.Authorizer,
 ) *ImpersonationService {
 	if maxExpiresIn <= 0 {
 		maxExpiresIn = 15 * time.Minute
@@ -47,21 +44,14 @@ func NewImpersonationService(
 		tokenService:      tokenService,
 		sessionExpiresIn:  sessionExpiresIn,
 		maxExpiresIn:      maxExpiresIn,
-		authorizer:        authorizer,
 	}
 }
 
 func (s *ImpersonationService) GetAllImpersonations(ctx context.Context, actor *models.Actor) ([]types.Impersonation, error) {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, adminconstants.ImpersonationsListPermission); err != nil {
-		return nil, err
-	}
 	return s.impersonationRepo.GetAllImpersonations(ctx)
 }
 
 func (s *ImpersonationService) GetImpersonationByID(ctx context.Context, actor *models.Actor, impersonationID string) (*types.Impersonation, error) {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, adminconstants.ImpersonationsReadPermission); err != nil {
-		return nil, err
-	}
 	impersonationID = strings.TrimSpace(impersonationID)
 	if impersonationID == "" {
 		return nil, internalerrors.ErrBadRequest
@@ -90,9 +80,6 @@ func (s *ImpersonationService) StartImpersonation(
 	originalCookieValue string,
 	originalCookieMaxAge int,
 ) (*types.StartImpersonationResult, error) {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, adminconstants.ImpersonationsStartPermission); err != nil {
-		return nil, err
-	}
 	actorUserID = strings.TrimSpace(actorUserID)
 	targetUserID := strings.TrimSpace(req.TargetUserID)
 	reason := strings.TrimSpace(req.Reason)
@@ -231,9 +218,6 @@ func (s *ImpersonationService) ValidateImpersonationCookie(ctx context.Context, 
 }
 
 func (s *ImpersonationService) StopImpersonation(ctx context.Context, actor *models.Actor, actorUserID string, request types.StopImpersonationRequest) error {
-	if err := s.authorizer.AuthorizeScope(ctx, actor, adminconstants.ImpersonationsStopPermission); err != nil {
-		return err
-	}
 	actorUserID = strings.TrimSpace(actorUserID)
 	if actorUserID == "" {
 		return internalerrors.ErrBadRequest

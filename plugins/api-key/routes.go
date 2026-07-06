@@ -9,12 +9,12 @@ import (
 )
 
 func Routes(api *API) []models.Route {
-	createApiKeyHandler := &handlers.CreateApiKeyHandler{Service: api.service}
-	getAllApiKeysHandler := &handlers.GetAllApiKeysHandler{Service: api.service}
-	getApiKeyHandler := &handlers.GetApiKeyHandler{Service: api.service}
-	updateApiKeyHandler := &handlers.UpdateApiKeyHandler{Service: api.service}
-	deleteApiKeyHandler := &handlers.DeleteApiKeyHandler{Service: api.service}
-	verifyApiKeyHandler := &handlers.VerifyApiKeyHandler{Service: api.service}
+	createApiKeyHandler := &handlers.CreateApiKeyHandler{UseCases: api.useCases}
+	getAllApiKeysHandler := &handlers.GetAllApiKeysHandler{UseCases: api.useCases}
+	getApiKeyHandler := &handlers.GetApiKeyHandler{UseCases: api.useCases}
+	updateApiKeyHandler := &handlers.UpdateApiKeyHandler{UseCases: api.useCases}
+	deleteApiKeyHandler := &handlers.DeleteApiKeyHandler{UseCases: api.useCases}
+	verifyApiKeyHandler := &handlers.VerifyApiKeyHandler{UseCases: api.useCases}
 
 	return []models.Route{
 		{

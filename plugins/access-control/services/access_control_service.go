@@ -22,7 +22,7 @@ func NewAccessControlService(rolesService *RolesService, userRolesService *UserR
 }
 
 func (s *AccessControlService) RoleExists(ctx context.Context, roleName string) (bool, error) {
-	role, err := s.rolesService.getRoleByNameInternal(ctx, roleName)
+	role, err := s.rolesService.GetRoleByName(ctx, nil, roleName)
 	if err != nil {
 		return false, err
 	}
@@ -31,7 +31,7 @@ func (s *AccessControlService) RoleExists(ctx context.Context, roleName string) 
 }
 
 func (s *AccessControlService) ValidateRoleAssignment(ctx context.Context, roleName string, assignerUserID *string) (bool, error) {
-	role, err := s.rolesService.getRoleByNameInternal(ctx, roleName)
+	role, err := s.rolesService.GetRoleByName(ctx, nil, roleName)
 	if err != nil {
 		return false, err
 	}
@@ -43,7 +43,7 @@ func (s *AccessControlService) ValidateRoleAssignment(ctx context.Context, roleN
 		return false, nil
 	}
 
-	assignerRoles, err := s.userRolesService.getUserRolesInternal(ctx, *assignerUserID)
+	assignerRoles, err := s.userRolesService.GetUserRoles(ctx, nil, *assignerUserID)
 	if err != nil {
 		return false, err
 	}
@@ -74,12 +74,12 @@ func (s *AccessControlService) ValidatePermissionKeys(ctx context.Context, permi
 }
 
 func (s *AccessControlService) AssignRoleToUserIfMissing(ctx context.Context, userID string, roleName string, assignedByUserID *string) error {
-	role, err := s.rolesService.getRoleByNameInternal(ctx, roleName)
+	role, err := s.rolesService.GetRoleByName(ctx, nil, roleName)
 	if err != nil {
 		return err
 	}
 
-	userRoles, err := s.userRolesService.getUserRolesInternal(ctx, userID)
+	userRoles, err := s.userRolesService.GetUserRoles(ctx, nil, userID)
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func (s *AccessControlService) AssignRoleToUserIfMissing(ctx context.Context, us
 		}
 	}
 
-	return s.userRolesService.assignRoleToUserInternal(ctx, userID, role.ID, assignedByUserID)
+	return s.userRolesService.AssignRoleToUser(ctx, nil, userID, types.AssignUserRoleRequest{RoleID: role.ID}, assignedByUserID)
 }
 
 func (s *AccessControlService) EnsurePermissions(ctx context.Context, permissions []rootservices.PermissionDefinition) error {

@@ -13,6 +13,7 @@ import (
 	"github.com/Authula/authula/models"
 	apiKeyTests "github.com/Authula/authula/plugins/api-key/tests"
 	"github.com/Authula/authula/plugins/api-key/types"
+	"github.com/Authula/authula/plugins/api-key/usecases"
 )
 
 func TestVerifyApiKeyHandler(t *testing.T) {
@@ -75,7 +76,7 @@ func TestVerifyApiKeyHandler(t *testing.T) {
 				tt.prepare(service)
 			}
 
-			handler := &VerifyApiKeyHandler{Service: service}
+			handler := &VerifyApiKeyHandler{UseCases: usecases.NewUseCases(service, &internaltests.NoopAuthorizer{})}
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/api-keys/verify", tt.body, nil)
 			handler.Handle().ServeHTTP(w, req)
 

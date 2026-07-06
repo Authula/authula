@@ -54,7 +54,7 @@ func TestUserPermissionsServiceGetUserPermissions(t *testing.T) {
 				tc.setupMock(repo)
 			}
 
-			service := NewUserPermissionsService(repo, &internaltests.NoopAuthorizer{})
+			service := NewUserPermissionsService(repo)
 			permissions, err := service.GetUserPermissions(context.Background(), internaltests.TestActor(), tc.userID)
 			if tc.expectedErr != nil {
 				if err != tc.expectedErr {
@@ -119,7 +119,7 @@ func TestUserPermissionsServiceHasPermissions(t *testing.T) {
 				tc.setupMock(repo)
 			}
 
-			service := NewUserPermissionsService(repo, &internaltests.NoopAuthorizer{})
+			service := NewUserPermissionsService(repo)
 			hasPermissions, err := service.HasPermissions(context.Background(), internaltests.TestActor(), tc.userID, tc.permissionKeys)
 			if tc.expectedErr != nil {
 				if err != tc.expectedErr {

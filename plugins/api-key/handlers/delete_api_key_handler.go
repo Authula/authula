@@ -5,12 +5,12 @@ import (
 
 	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/api-key/services"
 	"github.com/Authula/authula/plugins/api-key/types"
+	"github.com/Authula/authula/plugins/api-key/usecases"
 )
 
 type DeleteApiKeyHandler struct {
-	Service services.ApiKeyService
+	UseCases *usecases.UseCases
 }
 
 func (h *DeleteApiKeyHandler) Handle() http.HandlerFunc {
@@ -25,7 +25,7 @@ func (h *DeleteApiKeyHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		if err := h.Service.Delete(ctx, reqCtx.Actor, id); err != nil {
+		if err := h.UseCases.Delete(ctx, reqCtx.Actor, id); err != nil {
 			internalerrors.HandleError(err, reqCtx)
 			return
 		}

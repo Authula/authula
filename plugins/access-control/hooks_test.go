@@ -30,16 +30,16 @@ func (a *noopAuthorizer) AuthorizeOrganizationAccess(_ context.Context, _ *authm
 
 func newAccessControlHookTestPlugin(logger authmodels.Logger, rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) *AccessControlPlugin {
 	authorizer := &noopAuthorizer{}
-	rolesService := services.NewRolesService(rolesRepo, nil, userRolesRepo, authorizer)
-	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo, authorizer)
+	rolesService := services.NewRolesService(rolesRepo, nil, userRolesRepo)
+	userRolesService := services.NewUserRolesService(userRolesRepo, rolesRepo)
 	accessControlService := services.NewAccessControlService(rolesService, userRolesService, nil)
-	rolePermissionsService := services.NewRolePermissionsService(nil, nil, nil, authorizer)
+	rolePermissionsService := services.NewRolePermissionsService(nil, nil, nil)
 	useCases := usecases.NewAccessControlUseCases(
-		usecases.NewRolesUseCase(rolesService),
-		usecases.NewPermissionsUseCase(nil),
-		usecases.NewRolePermissionsUseCase(rolePermissionsService),
-		usecases.NewUserRolesUseCase(userRolesService),
-		usecases.NewUserPermissionsUseCase(nil),
+		usecases.NewRolesUseCase(rolesService, authorizer),
+		usecases.NewPermissionsUseCase(nil, authorizer),
+		usecases.NewRolePermissionsUseCase(rolePermissionsService, authorizer),
+		usecases.NewUserRolesUseCase(userRolesService, authorizer),
+		usecases.NewUserPermissionsUseCase(nil, authorizer),
 	)
 
 	return &AccessControlPlugin{
@@ -154,6 +154,8 @@ func TestAccessControlPluginAssignRoleFromContextHook(t *testing.T) {
 			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
 				rolesRepo.On("GetRoleByName", mock.Anything, "Editor").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 10}, nil).Once()
 				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 10}, nil).Once()
+				userRolesRepo.On("GetUserRoles", mock.Anything, "assigner-1").Return([]types.UserRoleInfo{{RoleID: "role-admin", RoleName: "admin", RoleWeight: 50}}, nil).Once()
 				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", mock.MatchedBy(func(userID *string) bool {
 					return userID != nil && *userID == "assigner-1"
 				}), (*time.Time)(nil)).Return(nil).Once()
@@ -172,6 +174,7 @@ func TestAccessControlPluginAssignRoleFromContextHook(t *testing.T) {
 			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
 				rolesRepo.On("GetRoleByName", mock.Anything, "Editor").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 10}, nil).Once()
 				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 10}, nil).Once()
 				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), (*time.Time)(nil)).Return(errors.New("assign failed")).Once()
 			},
 		},
