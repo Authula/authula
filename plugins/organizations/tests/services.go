@@ -29,7 +29,7 @@ func (m *MockOrganizationService) CreateOrganization(ctx context.Context, actor 
 	return args.Get(0).(*types.Organization), args.Error(1)
 }
 
-func (m *MockOrganizationService) GetAllOrganizations(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
+func (m *MockOrganizationService) GetAllOrganizationsByOwner(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
 	args := m.Called(ctx, actorID(actor))
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

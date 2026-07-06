@@ -94,7 +94,7 @@ func TestAddOrganizationTeamMemberHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationTeamMemberHandlerCases(t, http.MethodPost, "/organizations/org-1/teams/team-1/members", func(fixture *organizationTeamMemberHandlerFixture) http.HandlerFunc {
-		return (&AddOrganizationTeamMemberHandler{OrgTeamMemberService: fixture.service}).Handle()
+		return (&AddOrganizationTeamMemberHandler{UseCases: newTeamMemberUseCases(fixture.service)}).Handle()
 	}, []organizationTeamMemberHandlerCase{
 		{
 			name:            "missing_user",
@@ -149,7 +149,7 @@ func TestGetAllOrganizationTeamMembersHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationTeamMemberHandlerCases(t, http.MethodGet, "/organizations/org-1/teams/team-1/members", func(fixture *organizationTeamMemberHandlerFixture) http.HandlerFunc {
-		return (&GetAllOrganizationTeamMembersHandler{OrgTeamMemberService: fixture.service}).Handle()
+		return (&GetAllOrganizationTeamMembersHandler{UseCases: newTeamMemberUseCases(fixture.service)}).Handle()
 	}, []organizationTeamMemberHandlerCase{
 		{
 			name:            "missing_user",
@@ -191,7 +191,7 @@ func TestGetOrganizationTeamMemberHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationTeamMemberHandlerCases(t, http.MethodGet, "/organizations/org-1/teams/team-1/members/mem-1", func(fixture *organizationTeamMemberHandlerFixture) http.HandlerFunc {
-		return (&GetOrganizationTeamMemberHandler{OrgTeamMemberService: fixture.service}).Handle()
+		return (&GetOrganizationTeamMemberHandler{UseCases: newTeamMemberUseCases(fixture.service)}).Handle()
 	}, []organizationTeamMemberHandlerCase{
 		{
 			name:            "missing_user",
@@ -235,7 +235,7 @@ func TestDeleteOrganizationTeamMemberHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationTeamMemberHandlerCases(t, http.MethodDelete, "/organizations/org-1/teams/team-1/members/mem-1", func(fixture *organizationTeamMemberHandlerFixture) http.HandlerFunc {
-		return (&DeleteOrganizationTeamMemberHandler{OrgTeamMemberService: fixture.service}).Handle()
+		return (&DeleteOrganizationTeamMemberHandler{UseCases: newTeamMemberUseCases(fixture.service)}).Handle()
 	}, []organizationTeamMemberHandlerCase{
 		{
 			name:            "missing_user",

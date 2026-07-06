@@ -6,12 +6,12 @@ import (
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
-	orgservices "github.com/Authula/authula/plugins/organizations/services"
 	"github.com/Authula/authula/plugins/organizations/types"
+	orgusecases "github.com/Authula/authula/plugins/organizations/usecases"
 )
 
 type CreateOrganizationHandler struct {
-	OrgService orgservices.OrganizationService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *CreateOrganizationHandler) Handle() http.HandlerFunc {
@@ -32,7 +32,7 @@ func (h *CreateOrganizationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		organization, err := h.OrgService.CreateOrganization(ctx, actor, request)
+		organization, err := h.UseCases.CreateOrganization(ctx, actor, request)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -48,16 +48,16 @@ func (h *CreateOrganizationHandler) Handle() http.HandlerFunc {
 	}
 }
 
-type GetAllOrganizationsHandler struct {
-	OrgService orgservices.OrganizationService
+type GetAllOrganizationsByOwnerHandler struct {
+	UseCases *orgusecases.UseCases
 }
 
-func (h *GetAllOrganizationsHandler) Handle() http.HandlerFunc {
+func (h *GetAllOrganizationsByOwnerHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 		actor := reqCtx.Actor
-		organizations, err := h.OrgService.GetAllOrganizations(ctx, actor)
+		organizations, err := h.UseCases.GetAllOrganizationsByOwner(ctx, actor)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -68,7 +68,7 @@ func (h *GetAllOrganizationsHandler) Handle() http.HandlerFunc {
 }
 
 type GetOrganizationByIDHandler struct {
-	OrgService orgservices.OrganizationService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *GetOrganizationByIDHandler) Handle() http.HandlerFunc {
@@ -78,7 +78,7 @@ func (h *GetOrganizationByIDHandler) Handle() http.HandlerFunc {
 		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
-		organization, err := h.OrgService.GetOrganizationByID(ctx, actor, organizationID)
+		organization, err := h.UseCases.GetOrganizationByID(ctx, actor, organizationID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -89,7 +89,7 @@ func (h *GetOrganizationByIDHandler) Handle() http.HandlerFunc {
 }
 
 type UpdateOrganizationHandler struct {
-	OrgService orgservices.OrganizationService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *UpdateOrganizationHandler) Handle() http.HandlerFunc {
@@ -112,7 +112,7 @@ func (h *UpdateOrganizationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		organization, err := h.OrgService.UpdateOrganization(ctx, actor, organizationID, request)
+		organization, err := h.UseCases.UpdateOrganization(ctx, actor, organizationID, request)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -123,7 +123,7 @@ func (h *UpdateOrganizationHandler) Handle() http.HandlerFunc {
 }
 
 type DeleteOrganizationHandler struct {
-	OrgService orgservices.OrganizationService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *DeleteOrganizationHandler) Handle() http.HandlerFunc {
@@ -133,7 +133,7 @@ func (h *DeleteOrganizationHandler) Handle() http.HandlerFunc {
 		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
-		if err := h.OrgService.DeleteOrganization(ctx, actor, organizationID); err != nil {
+		if err := h.UseCases.DeleteOrganization(ctx, actor, organizationID); err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
 		}

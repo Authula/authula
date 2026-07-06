@@ -28,8 +28,8 @@ func (a *API) CreateOrganization(ctx context.Context, actor *models.Actor, reque
 	return a.useCases.CreateOrganization(ctx, actor, request)
 }
 
-func (a *API) GetAllOrganizations(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
-	return a.useCases.GetAllOrganizations(ctx, actor)
+func (a *API) GetAllOrganizationsByOwner(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
+	return a.useCases.GetAllOrganizationsByOwner(ctx, actor)
 }
 
 func (a *API) GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {

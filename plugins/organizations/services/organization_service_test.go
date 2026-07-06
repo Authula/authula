@@ -156,7 +156,7 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 	}
 }
 
-func TestOrganizationService_GetAllOrganizations(t *testing.T) {
+func TestOrganizationService_GetAllOrganizationsByOwner(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -195,7 +195,7 @@ func TestOrganizationService_GetAllOrganizations(t *testing.T) {
 
 			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
 			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, nil, nil)
-			organizations, err := svc.GetAllOrganizations(context.Background(), orgtests.Actor(tt.actorUserID))
+			organizations, err := svc.GetAllOrganizationsByOwner(context.Background(), orgtests.Actor(tt.actorUserID))
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)

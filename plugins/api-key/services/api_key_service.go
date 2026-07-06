@@ -54,7 +54,7 @@ func NewApiKeyService(
 }
 
 func (s *apiKeyService) Create(ctx context.Context, actor *models.Actor, req types.CreateApiKeyRequest) (*types.CreateApiKeyResponse, error) {
-	if err := s.authorizeCreate(ctx, actor, req); err != nil {
+	if err := s.authorizeCreate(actor, req); err != nil {
 		return nil, err
 	}
 
@@ -169,7 +169,7 @@ func (s *apiKeyService) Create(ctx context.Context, actor *models.Actor, req typ
 	}, nil
 }
 
-func (s *apiKeyService) authorizeCreate(ctx context.Context, actor *models.Actor, req types.CreateApiKeyRequest) error {
+func (s *apiKeyService) authorizeCreate(actor *models.Actor, req types.CreateApiKeyRequest) error {
 	switch req.OwnerType {
 	case types.OwnerTypeUser:
 		if req.OwnerID != "" && req.OwnerID != actor.ID {

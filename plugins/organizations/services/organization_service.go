@@ -188,7 +188,7 @@ func (s *organizationService) ensureOrganizationLimit(ctx context.Context, actor
 	return nil
 }
 
-func (s *organizationService) GetAllOrganizations(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
+func (s *organizationService) GetAllOrganizationsByOwner(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
 	if actor == nil || actor.ID == "" {
 		return nil, internalerrors.ErrUnauthorized
 	}

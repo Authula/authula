@@ -6,12 +6,12 @@ import (
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
-	orgservices "github.com/Authula/authula/plugins/organizations/services"
 	"github.com/Authula/authula/plugins/organizations/types"
+	orgusecases "github.com/Authula/authula/plugins/organizations/usecases"
 )
 
 type AddOrganizationMemberHandler struct {
-	OrgMemberService orgservices.OrganizationMemberService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *AddOrganizationMemberHandler) Handle() http.HandlerFunc {
@@ -34,7 +34,7 @@ func (h *AddOrganizationMemberHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		member, err := h.OrgMemberService.AddMember(ctx, actor, organizationID, request)
+		member, err := h.UseCases.AddMember(ctx, actor, organizationID, request)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -51,7 +51,7 @@ func (h *AddOrganizationMemberHandler) Handle() http.HandlerFunc {
 }
 
 type GetAllOrganizationMembersHandler struct {
-	OrgMemberService orgservices.OrganizationMemberService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *GetAllOrganizationMembersHandler) Handle() http.HandlerFunc {
@@ -63,7 +63,7 @@ func (h *GetAllOrganizationMembersHandler) Handle() http.HandlerFunc {
 		organizationID := r.PathValue("organization_id")
 		page := util.GetQueryInt(r, "page", 1)
 		limit := util.GetQueryInt(r, "limit", 10)
-		members, err := h.OrgMemberService.GetAllMembers(ctx, actor, organizationID, page, limit)
+		members, err := h.UseCases.GetAllMembers(ctx, actor, organizationID, page, limit)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -74,7 +74,7 @@ func (h *GetAllOrganizationMembersHandler) Handle() http.HandlerFunc {
 }
 
 type GetOrganizationMemberHandler struct {
-	OrgMemberService orgservices.OrganizationMemberService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *GetOrganizationMemberHandler) Handle() http.HandlerFunc {
@@ -85,7 +85,7 @@ func (h *GetOrganizationMemberHandler) Handle() http.HandlerFunc {
 
 		organizationID := r.PathValue("organization_id")
 		memberID := r.PathValue("member_id")
-		member, err := h.OrgMemberService.GetMember(ctx, actor, organizationID, memberID)
+		member, err := h.UseCases.GetMember(ctx, actor, organizationID, memberID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -96,7 +96,7 @@ func (h *GetOrganizationMemberHandler) Handle() http.HandlerFunc {
 }
 
 type UpdateOrganizationMemberHandler struct {
-	OrgMemberService orgservices.OrganizationMemberService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *UpdateOrganizationMemberHandler) Handle() http.HandlerFunc {
@@ -120,7 +120,7 @@ func (h *UpdateOrganizationMemberHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		member, err := h.OrgMemberService.UpdateMember(ctx, actor, organizationID, memberID, request)
+		member, err := h.UseCases.UpdateMember(ctx, actor, organizationID, memberID, request)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -137,7 +137,7 @@ func (h *UpdateOrganizationMemberHandler) Handle() http.HandlerFunc {
 }
 
 type DeleteOrganizationMemberHandler struct {
-	OrgMemberService orgservices.OrganizationMemberService
+	UseCases *orgusecases.UseCases
 }
 
 func (h *DeleteOrganizationMemberHandler) Handle() http.HandlerFunc {
@@ -149,7 +149,7 @@ func (h *DeleteOrganizationMemberHandler) Handle() http.HandlerFunc {
 
 		organizationID := r.PathValue("organization_id")
 		memberID := r.PathValue("member_id")
-		if err := h.OrgMemberService.RemoveMember(ctx, actor, organizationID, memberID); err != nil {
+		if err := h.UseCases.RemoveMember(ctx, actor, organizationID, memberID); err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
 		}

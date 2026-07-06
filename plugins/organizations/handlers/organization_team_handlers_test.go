@@ -90,7 +90,7 @@ func TestCreateOrganizationTeamHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationTeamHandlerCases(t, http.MethodPost, "/organizations/org-1/teams", func(fixture *organizationTeamHandlerFixture) http.HandlerFunc {
-		return (&CreateOrganizationTeamHandler{OrgTeamService: fixture.service}).Handle()
+		return (&CreateOrganizationTeamHandler{UseCases: newTeamUseCases(fixture.service)}).Handle()
 	}, []organizationTeamHandlerCase{
 		{
 			name:            "missing_user",
@@ -141,7 +141,7 @@ func TestGetAllOrganizationTeamsHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationTeamHandlerCases(t, http.MethodGet, "/organizations/org-1/teams", func(fixture *organizationTeamHandlerFixture) http.HandlerFunc {
-		return (&GetAllOrganizationTeamsHandler{OrgTeamService: fixture.service}).Handle()
+		return (&GetAllOrganizationTeamsHandler{UseCases: newTeamUseCases(fixture.service)}).Handle()
 	}, []organizationTeamHandlerCase{
 		{
 			name:            "missing_user",
@@ -180,7 +180,7 @@ func TestGetOrganizationTeamHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationTeamHandlerCases(t, http.MethodGet, "/organizations/org-1/teams/team-1", func(fixture *organizationTeamHandlerFixture) http.HandlerFunc {
-		return (&GetOrganizationTeamHandler{OrgTeamService: fixture.service}).Handle()
+		return (&GetOrganizationTeamHandler{UseCases: newTeamUseCases(fixture.service)}).Handle()
 	}, []organizationTeamHandlerCase{
 		{
 			name:            "missing_user",
@@ -221,7 +221,7 @@ func TestUpdateOrganizationTeamHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationTeamHandlerCases(t, http.MethodPatch, "/organizations/org-1/teams/team-1", func(fixture *organizationTeamHandlerFixture) http.HandlerFunc {
-		return (&UpdateOrganizationTeamHandler{OrgTeamService: fixture.service}).Handle()
+		return (&UpdateOrganizationTeamHandler{UseCases: newTeamUseCases(fixture.service)}).Handle()
 	}, []organizationTeamHandlerCase{
 		{
 			name:            "missing_user",
@@ -274,7 +274,7 @@ func TestDeleteOrganizationTeamHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationTeamHandlerCases(t, http.MethodDelete, "/organizations/org-1/teams/team-1", func(fixture *organizationTeamHandlerFixture) http.HandlerFunc {
-		return (&DeleteOrganizationTeamHandler{OrgTeamService: fixture.service}).Handle()
+		return (&DeleteOrganizationTeamHandler{UseCases: newTeamUseCases(fixture.service)}).Handle()
 	}, []organizationTeamHandlerCase{
 		{
 			name:            "missing_user",

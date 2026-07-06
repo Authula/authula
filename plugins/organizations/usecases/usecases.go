@@ -40,17 +40,11 @@ func NewUseCases(
 // ------------- OrganizationService -------------
 
 func (u *UseCases) CreateOrganization(ctx context.Context, actor *models.Actor, request types.CreateOrganizationRequest) (*types.Organization, error) {
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsCreatePermission); err != nil {
-		return nil, err
-	}
 	return u.orgService.CreateOrganization(ctx, actor, request)
 }
 
-func (u *UseCases) GetAllOrganizations(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsListPermission); err != nil {
-		return nil, err
-	}
-	return u.orgService.GetAllOrganizations(ctx, actor)
+func (u *UseCases) GetAllOrganizationsByOwner(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
+	return u.orgService.GetAllOrganizationsByOwner(ctx, actor)
 }
 
 func (u *UseCases) GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {
