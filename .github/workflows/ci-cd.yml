@@ -21,7 +21,6 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - name: Install C dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential
@@ -40,7 +39,6 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - name: Install C dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential
@@ -59,7 +57,6 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - name: Install golangci-lint
         run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
@@ -96,7 +93,6 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - name: Install C dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential
