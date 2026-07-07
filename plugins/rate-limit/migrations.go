@@ -5,6 +5,6 @@ import (
 	"github.com/Authula/authula/plugins/rate-limit/migrationset"
 )
 
-func ratelimitMigrationsForProvider(provider string) []migrations.Migration {
-	return migrationset.ForProvider(provider)
+func ratelimitMigrations() []migrations.Migration {
+	return migrationset.Migrations()
 }

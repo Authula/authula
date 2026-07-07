@@ -21,11 +21,10 @@ func InitLogger(config *models.Config) models.Logger {
 	return internalbootstrap.InitLogger(internalbootstrap.LoggerOptions{Level: config.Logger.Level})
 }
 
-// InitDatabase creates a Bun DB connection based on provider
+// InitDatabase creates a Bun DB connection
 func InitDatabase(config *models.Config, logger models.Logger, logLevel string) (bun.IDB, error) {
 	return internalbootstrap.InitDatabase(
 		internalbootstrap.DatabaseOptions{
-			Provider:        config.Database.Provider,
 			URL:             config.Database.URL,
 			MaxOpenConns:    config.Database.MaxOpenConns,
 			MaxIdleConns:    config.Database.MaxIdleConns,

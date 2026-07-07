@@ -13,7 +13,7 @@ import (
 func TestDatabaseProviderRuleLifecycle(t *testing.T) {
 	t.Parallel()
 
-	db := tests.NewSQLiteIntegrationDB(t)
+	db := tests.NewIntegrationTestDB(t)
 	provider, err := NewDatabaseProviderWithConfig(db, types.DatabaseStorageConfig{})
 	require.NoError(t, err)
 

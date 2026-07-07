@@ -114,8 +114,8 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 	return nil
 }
 
-func (p *OrganizationsPlugin) Migrations(provider string) []migrations.Migration {
-	return organizationsMigrationsForProvider(provider)
+func (p *OrganizationsPlugin) Migrations() []migrations.Migration {
+	return organizationsMigrations()
 }
 
 func (p *OrganizationsPlugin) DependsOn() []string {

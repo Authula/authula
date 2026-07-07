@@ -4,18 +4,13 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/mysqldialect"
 	"github.com/uptrace/bun/dialect/pgdialect"
-	"github.com/uptrace/bun/dialect/sqlitedialect"
 	"github.com/uptrace/bun/extra/bundebug"
 
 	"github.com/Authula/authula/env"
@@ -23,7 +18,6 @@ import (
 )
 
 type DatabaseOptions struct {
-	Provider        string
 	URL             string
 	MaxOpenConns    int
 	MaxIdleConns    int
@@ -31,10 +25,6 @@ type DatabaseOptions struct {
 }
 
 func InitDatabase(opts DatabaseOptions, logger models.Logger, logLevel string) (bun.IDB, error) {
-	if opts.Provider == "" {
-		return nil, fmt.Errorf("database provider must be specified")
-	}
-
 	databaseURL := os.Getenv(env.EnvDatabaseURL)
 	if databaseURL == "" {
 		if opts.URL == "" {
@@ -43,54 +33,12 @@ func InitDatabase(opts DatabaseOptions, logger models.Logger, logLevel string) (
 		databaseURL = opts.URL
 	}
 
-	var (
-		sqlDB *sql.DB
-		db    *bun.DB
-		err   error
-	)
-
-	switch opts.Provider {
-	case "sqlite":
-		isMemory := databaseURL == ":memory:"
-
-		if !isMemory {
-			if !filepath.IsAbs(databaseURL) {
-				cwd, _ := os.Getwd()
-				databaseURL = filepath.Join(cwd, databaseURL)
-			}
-
-			dbDir := filepath.Dir(databaseURL)
-			if err := os.MkdirAll(dbDir, 0755); err != nil {
-				return nil, fmt.Errorf("failed to create database directory: %w", err)
-			}
-		}
-
-		sqlDB, err = sql.Open("sqlite3", databaseURL)
-		if err != nil {
-			return nil, err
-		}
-
-		db = bun.NewDB(sqlDB, sqlitedialect.New())
-
-	case "postgres":
-		sqlDB, err = sql.Open("postgres", databaseURL)
-		if err != nil {
-			return nil, err
-		}
-
-		db = bun.NewDB(sqlDB, pgdialect.New())
-
-	case "mysql":
-		sqlDB, err = sql.Open("mysql", databaseURL)
-		if err != nil {
-			return nil, err
-		}
-
-		db = bun.NewDB(sqlDB, mysqldialect.New())
-
-	default:
-		return nil, fmt.Errorf("unsupported database provider: %s", opts.Provider)
+	sqlDB, err := sql.Open("postgres", databaseURL)
+	if err != nil {
+		return nil, err
 	}
+
+	db := bun.NewDB(sqlDB, pgdialect.New())
 
 	configurePool(sqlDB, opts)
 	enableDebugging(db, logLevel)

@@ -2,8 +2,9 @@ package repositories
 
 import (
 	"context"
-	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 
 	plugintests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
@@ -11,6 +12,9 @@ import (
 
 func TestBunPermissionsRepositoryCreatePermission(t *testing.T) {
 	t.Parallel()
+
+	p1 := uuid.New().String()
+	p2 := uuid.New().String()
 
 	tests := []struct {
 		name            string
@@ -22,14 +26,14 @@ func TestBunPermissionsRepositoryCreatePermission(t *testing.T) {
 	}{
 		{
 			name:            "success",
-			permission:      &types.Permission{ID: "p1", Key: "users.read", Description: new("Read users"), IsSystem: false},
-			wantID:          "p1",
+			permission:      &types.Permission{ID: p1, Key: "users.read", Description: new("Read users"), IsSystem: false},
+			wantID:          p1,
 			wantKey:         "users.read",
 			wantDescription: new("Read users"),
 		},
 		{
 			name:       "duplicate key returns conflict",
-			permission: &types.Permission{ID: "p2", Key: "users.read", Description: new("Duplicate"), IsSystem: false},
+			permission: &types.Permission{ID: p2, Key: "users.read", Description: new("Duplicate"), IsSystem: false},
 		},
 	}
 
@@ -37,12 +41,14 @@ func TestBunPermissionsRepositoryCreatePermission(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			user1ID := uuid.New().String()
+			user2ID := uuid.New().String()
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			repo := NewBunPermissionsRepository(db)
 			ctx := context.Background()
 
 			if tc.name == "duplicate key returns conflict" {
-				if err := repo.CreatePermission(ctx, &types.Permission{ID: "p1", Key: "users.read", Description: new("Read users"), IsSystem: false}); err != nil {
+				if err := repo.CreatePermission(ctx, &types.Permission{ID: p1, Key: "users.read", Description: new("Read users"), IsSystem: false}); err != nil {
 					t.Fatalf("failed to seed permission: %v", err)
 				}
 			}
@@ -51,9 +57,6 @@ func TestBunPermissionsRepositoryCreatePermission(t *testing.T) {
 			if tc.name == "duplicate key returns conflict" {
 				if err == nil {
 					t.Fatal("expected error, got nil")
-				}
-				if !strings.Contains(err.Error(), "UNIQUE constraint failed: access_control_permissions.key") {
-					t.Fatalf("expected raw unique constraint error, got %v", err)
 				}
 				return
 			}
@@ -91,14 +94,18 @@ func TestBunPermissionsRepositoryCreatePermission(t *testing.T) {
 func TestBunPermissionsRepositoryGetAllPermissions(t *testing.T) {
 	t.Parallel()
 
-	db := plugintests.SetupRepoDB(t)
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	p1 := uuid.New().String()
+	p2 := uuid.New().String()
+	db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 	repo := NewBunPermissionsRepository(db)
 	ctx := context.Background()
 
-	if err := repo.CreatePermission(ctx, &types.Permission{ID: "p2", Key: "users.write"}); err != nil {
+	if err := repo.CreatePermission(ctx, &types.Permission{ID: p2, Key: "users.write"}); err != nil {
 		t.Fatalf("failed to seed permission p2: %v", err)
 	}
-	if err := repo.CreatePermission(ctx, &types.Permission{ID: "p1", Key: "users.read"}); err != nil {
+	if err := repo.CreatePermission(ctx, &types.Permission{ID: p1, Key: "users.read"}); err != nil {
 		t.Fatalf("failed to seed permission p1: %v", err)
 	}
 
@@ -109,13 +116,15 @@ func TestBunPermissionsRepositoryGetAllPermissions(t *testing.T) {
 	if len(permissions) != 2 {
 		t.Fatalf("expected 2 permissions, got %d", len(permissions))
 	}
-	if permissions[0].ID != "p2" || permissions[1].ID != "p1" {
+	if permissions[0].ID != p2 || permissions[1].ID != p1 {
 		t.Fatalf("expected permissions ordered by creation time, got %#v", permissions)
 	}
 }
 
 func TestBunPermissionsRepositoryGetPermissionByID(t *testing.T) {
 	t.Parallel()
+
+	p1 := uuid.New().String()
 
 	tests := []struct {
 		name           string
@@ -125,13 +134,13 @@ func TestBunPermissionsRepositoryGetPermissionByID(t *testing.T) {
 	}{
 		{
 			name:         "not found",
-			permissionID: "missing",
+			permissionID: "00000000-0000-0000-0000-000000000000",
 			wantNil:      true,
 		},
 		{
 			name:           "success",
-			permissionID:   "p1",
-			seedPermission: &types.Permission{ID: "p1", Key: "users.read", Description: new("Read users"), IsSystem: false},
+			permissionID:   p1,
+			seedPermission: &types.Permission{ID: p1, Key: "users.read", Description: new("Read users"), IsSystem: false},
 		},
 	}
 
@@ -139,7 +148,9 @@ func TestBunPermissionsRepositoryGetPermissionByID(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			user1ID := uuid.New().String()
+			user2ID := uuid.New().String()
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			repo := NewBunPermissionsRepository(db)
 			ctx := context.Background()
 
@@ -169,6 +180,8 @@ func TestBunPermissionsRepositoryGetPermissionByID(t *testing.T) {
 func TestBunPermissionsRepositoryUpdatePermission(t *testing.T) {
 	t.Parallel()
 
+	p1 := uuid.New().String()
+
 	tests := []struct {
 		name           string
 		seedPermission *types.Permission
@@ -178,14 +191,14 @@ func TestBunPermissionsRepositoryUpdatePermission(t *testing.T) {
 	}{
 		{
 			name:         "missing permission",
-			permissionID: "missing",
+			permissionID: "00000000-0000-0000-0000-000000000000",
 			description:  new("updated"),
 			wantUpdated:  false,
 		},
 		{
 			name:           "success",
-			seedPermission: &types.Permission{ID: "p1", Key: "users.read", Description: new("Read users"), IsSystem: false},
-			permissionID:   "p1",
+			seedPermission: &types.Permission{ID: p1, Key: "users.read", Description: new("Read users"), IsSystem: false},
+			permissionID:   p1,
 			description:    new("updated"),
 			wantUpdated:    true,
 		},
@@ -195,7 +208,9 @@ func TestBunPermissionsRepositoryUpdatePermission(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			user1ID := uuid.New().String()
+			user2ID := uuid.New().String()
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			repo := NewBunPermissionsRepository(db)
 			ctx := context.Background()
 
@@ -229,6 +244,8 @@ func TestBunPermissionsRepositoryUpdatePermission(t *testing.T) {
 func TestBunPermissionsRepositoryDeletePermission(t *testing.T) {
 	t.Parallel()
 
+	p1 := uuid.New().String()
+
 	tests := []struct {
 		name           string
 		seedPermission *types.Permission
@@ -237,13 +254,13 @@ func TestBunPermissionsRepositoryDeletePermission(t *testing.T) {
 	}{
 		{
 			name:         "missing permission",
-			permissionID: "missing",
+			permissionID: "00000000-0000-0000-0000-000000000000",
 			wantDeleted:  false,
 		},
 		{
 			name:           "success",
-			seedPermission: &types.Permission{ID: "p1", Key: "users.read", Description: new("Read users"), IsSystem: false},
-			permissionID:   "p1",
+			seedPermission: &types.Permission{ID: p1, Key: "users.read", Description: new("Read users"), IsSystem: false},
+			permissionID:   p1,
 			wantDeleted:    true,
 		},
 	}
@@ -252,7 +269,9 @@ func TestBunPermissionsRepositoryDeletePermission(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			user1ID := uuid.New().String()
+			user2ID := uuid.New().String()
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			repo := NewBunPermissionsRepository(db)
 			ctx := context.Background()
 

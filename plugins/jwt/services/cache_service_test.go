@@ -32,16 +32,20 @@ type cacheTestFixture struct {
 
 func newCacheTestFixture(t *testing.T) *cacheTestFixture {
 	t.Helper()
-	db := internaltests.NewSQLiteIntegrationDB(t)
-
+	db := internaltests.NewIntegrationTestDB(t)
 	migrator, err := migrations.NewMigrator(db, &internaltests.MockLogger{})
 	require.NoError(t, err)
-	err = migrator.Migrate(context.Background(), []migrations.MigrationSet{
-		{
-			PluginID:   models.PluginJWT.String(),
-			Migrations: migrationset.JWTMigrationsForProvider("sqlite"),
-		},
-	})
+
+	coreSet, err := migrations.CoreMigrationSet()
+	require.NoError(t, err)
+
+	jwtSet := migrations.MigrationSet{
+		PluginID:   models.PluginJWT.String(),
+		DependsOn:  []string{migrations.CorePluginID},
+		Migrations: migrationset.Migrations(),
+	}
+
+	err = migrator.Migrate(context.Background(), []migrations.MigrationSet{coreSet, jwtSet})
 	require.NoError(t, err)
 
 	return &cacheTestFixture{

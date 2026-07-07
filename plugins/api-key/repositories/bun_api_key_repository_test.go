@@ -2,31 +2,19 @@ package repositories
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
-	"strings"
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/sqlitedialect"
 
+	"github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/plugins/api-key/types"
 )
 
 func newTestApiKeyDB(t *testing.T) *bun.DB {
 	t.Helper()
 
-	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
-	sqlDB, err := sql.Open("sqlite3", dsn)
-	if err != nil {
-		t.Fatalf("failed to open sqlite db: %v", err)
-	}
-	sqlDB.SetMaxOpenConns(1)
-
-	db := bun.NewDB(sqlDB, sqlitedialect.New())
-	t.Cleanup(func() { _ = db.Close() })
+	db := tests.NewIntegrationTestDB(t)
 
 	ctx := context.Background()
 	if _, err := db.NewCreateTable().Model((*types.ApiKey)(nil)).IfNotExists().Exec(ctx); err != nil {

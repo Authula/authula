@@ -2,28 +2,18 @@ package repositories
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/sqlitedialect"
 
+	"github.com/Authula/authula/internal/testdb"
 	"github.com/Authula/authula/models"
 )
 
-// Helper function to create an in-memory SQLite database for testing
 func newTestSessionDB(t *testing.T) bun.IDB {
-	sqldb, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to create test database: %v", err)
-	}
-
-	db := bun.NewDB(sqldb, sqlitedialect.New())
-
-	// Create the Session table
+	db := testdb.NewIntegrationTestDB(t)
 	ctx := context.Background()
 	if _, err := db.NewCreateTable().Model(&models.Session{}).Exec(ctx); err != nil {
 		t.Fatalf("failed to create Session table: %v", err)

@@ -10,8 +10,6 @@ RUN apt update && apt install -y \
   curl wget git zip unzip less zsh jq lsof ripgrep
 
 ENV HOME="/root"
-# Required for some cgo operations such as using certain database drivers like SQLite
-ENV CGO_ENABLED=1
 
 # --------------------------------------
 # Git

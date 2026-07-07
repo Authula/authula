@@ -21,16 +21,20 @@ import (
 
 func setupKeyServiceTest(t *testing.T) (KeyService, repositories.JWKSRepository) {
 	t.Helper()
-	db := internaltests.NewSQLiteIntegrationDB(t)
-
+	db := internaltests.NewIntegrationTestDB(t)
 	migrator, err := migrations.NewMigrator(db, &internaltests.MockLogger{})
 	require.NoError(t, err)
-	err = migrator.Migrate(context.Background(), []migrations.MigrationSet{
-		{
-			PluginID:   models.PluginJWT.String(),
-			Migrations: migrationset.JWTMigrationsForProvider("sqlite"),
-		},
-	})
+
+	coreSet, err := migrations.CoreMigrationSet()
+	require.NoError(t, err)
+
+	jwtSet := migrations.MigrationSet{
+		PluginID:   models.PluginJWT.String(),
+		DependsOn:  []string{migrations.CorePluginID},
+		Migrations: migrationset.Migrations(),
+	}
+
+	err = migrator.Migrate(context.Background(), []migrations.MigrationSet{coreSet, jwtSet})
 	require.NoError(t, err)
 
 	repo := repositories.NewBunJWKSRepository(db)
@@ -58,7 +62,7 @@ func TestKeyService_GenerateKeysIfMissing(t *testing.T) {
 			name: "keys exist",
 			setup: func(ctx context.Context, repo repositories.JWKSRepository) {
 				err := repo.StoreJWKSKey(ctx, &types.JWKS{
-					ID:         "pre-seeded-key",
+					ID:         "00000000-0000-0000-0000-000000000001",
 					PublicKey:  "pre-seeded-public-key",
 					PrivateKey: "pre-seeded-private-key",
 				})
@@ -90,7 +94,7 @@ func TestKeyService_GenerateKeysIfMissing(t *testing.T) {
 				assert.Contains(t, keys[0].PrivateKey, "BEGIN PRIVATE KEY")
 			} else {
 				require.Len(t, keys, 1)
-				require.Equal(t, "pre-seeded-key", keys[0].ID)
+				require.Equal(t, "00000000-0000-0000-0000-000000000001", keys[0].ID)
 			}
 		})
 	}
@@ -114,20 +118,20 @@ func TestKeyService_GetActiveKey(t *testing.T) {
 			name: "single key",
 			setup: func(ctx context.Context, repo repositories.JWKSRepository) {
 				err := repo.StoreJWKSKey(ctx, &types.JWKS{
-					ID:         "single-key",
+					ID:         "00000000-0000-0000-0000-000000000001",
 					PublicKey:  "public-key-1",
 					PrivateKey: "private-key-1",
 					CreatedAt:  time.Now(),
 				})
 				require.NoError(t, err)
 			},
-			wantID: "single-key",
+			wantID: "00000000-0000-0000-0000-000000000001",
 		},
 		{
 			name: "returns most recent key",
 			setup: func(ctx context.Context, repo repositories.JWKSRepository) {
 				err := repo.StoreJWKSKey(ctx, &types.JWKS{
-					ID:         "old-key",
+					ID:         "00000000-0000-0000-0000-000000000002",
 					PublicKey:  "public-key-old",
 					PrivateKey: "private-key-old",
 					CreatedAt:  time.Now().Add(-1 * time.Hour),
@@ -135,14 +139,14 @@ func TestKeyService_GetActiveKey(t *testing.T) {
 				require.NoError(t, err)
 
 				err = repo.StoreJWKSKey(ctx, &types.JWKS{
-					ID:         "new-key",
+					ID:         "00000000-0000-0000-0000-000000000003",
 					PublicKey:  "public-key-new",
 					PrivateKey: "private-key-new",
 					CreatedAt:  time.Now(),
 				})
 				require.NoError(t, err)
 			},
-			wantID: "new-key",
+			wantID: "00000000-0000-0000-0000-000000000003",
 		},
 	}
 
@@ -186,7 +190,7 @@ func TestKeyService_RotateKeysIfNeeded(t *testing.T) {
 			name: "rotation due",
 			setup: func(ctx context.Context, repo repositories.JWKSRepository) {
 				err := repo.StoreJWKSKey(ctx, &types.JWKS{
-					ID:         "old-key",
+					ID:         "00000000-0000-0000-0000-000000000002",
 					PublicKey:  "old-public-key",
 					PrivateKey: "old-private-key",
 					CreatedAt:  time.Now().Add(-25 * time.Hour),
@@ -199,7 +203,7 @@ func TestKeyService_RotateKeysIfNeeded(t *testing.T) {
 			name: "not due",
 			setup: func(ctx context.Context, repo repositories.JWKSRepository) {
 				err := repo.StoreJWKSKey(ctx, &types.JWKS{
-					ID:         "recent-key",
+					ID:         "00000000-0000-0000-0000-000000000004",
 					PublicKey:  "recent-public-key",
 					PrivateKey: "recent-private-key",
 					CreatedAt:  time.Now().Add(-1 * time.Hour),
@@ -234,7 +238,7 @@ func TestKeyService_RotateKeysIfNeeded(t *testing.T) {
 				if tt.wantRotated {
 					require.Len(t, keys, 2)
 					// Old key should have expires_at set
-					oldKey, err := repo.GetJWKSKeyByID(ctx, "old-key")
+					oldKey, err := repo.GetJWKSKeyByID(ctx, "00000000-0000-0000-0000-000000000002")
 					require.NoError(t, err)
 					require.NotNil(t, oldKey)
 					require.NotNil(t, oldKey.ExpiresAt)

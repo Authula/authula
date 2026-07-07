@@ -15,7 +15,7 @@ import (
 
 func setupSessionRepo(t *testing.T) (*repositories.BunSessionStateRepository, *bun.DB, func()) {
 	t.Helper()
-	db, _ := tests.NewIntegrationTestDBFromEnv(t)
+	db := tests.NewIntegrationTestDB(t)
 
 	ctx := context.Background()
 	if _, err := db.NewCreateTable().Model((*types.AdminSessionState)(nil)).IfNotExists().Exec(ctx); err != nil {

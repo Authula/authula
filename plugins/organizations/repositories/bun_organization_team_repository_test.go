@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 
@@ -15,20 +16,26 @@ import (
 func TestBunOrganizationTeamRepository_Create(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	team1ID := uuid.New().String()
+	team2ID := uuid.New().String()
+
 	tests := []struct {
 		name string
 		team *types.OrganizationTeam
 	}{
 		{
 			name: "keeps provided metadata",
-			team: &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform", Metadata: map[string]any{"tier": "core"}},
+			team: &types.OrganizationTeam{ID: team1ID, OrganizationID: org1ID, Name: "Platform", Slug: "platform", Metadata: map[string]any{"tier": "core"}},
 		},
 		{
 			name: "keeps metadata and description",
 			team: func() *types.OrganizationTeam {
 				description := new(string)
 				*description = "Core"
-				return &types.OrganizationTeam{ID: "team-2", OrganizationID: "org-1", Name: "Core", Slug: "core", Description: description, Metadata: map[string]any{"tier": "core"}}
+				return &types.OrganizationTeam{ID: team2ID, OrganizationID: org1ID, Name: "Core", Slug: "core", Description: description, Metadata: map[string]any{"tier": "core"}}
 			}(),
 		},
 	}
@@ -37,8 +44,8 @@ func TestBunOrganizationTeamRepository_Create(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
-			plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+			plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
 			repo := repositories.NewBunOrganizationTeamRepository(db)
 			created, err := repo.Create(context.Background(), tt.team)
 			require.NoError(t, err)
@@ -52,6 +59,11 @@ func TestBunOrganizationTeamRepository_Create(t *testing.T) {
 func TestBunOrganizationTeamRepository_GetByID(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	team1ID := uuid.New().String()
+
 	tests := []struct {
 		name        string
 		teamID      string
@@ -60,26 +72,26 @@ func TestBunOrganizationTeamRepository_GetByID(t *testing.T) {
 	}{
 		{
 			name:        "found",
-			teamID:      "team-1",
+			teamID:      team1ID,
 			expectFound: true,
 			setup: func(t *testing.T) (repositories.OrganizationTeamRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
 				repo := repositories.NewBunOrganizationTeamRepository(db)
 				ctx := context.Background()
 
-				_, err := repo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
+				_, err := repo.Create(ctx, &types.OrganizationTeam{ID: team1ID, OrganizationID: org1ID, Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
 				return repo, ctx
 			},
 		},
 		{
 			name:   "not found",
-			teamID: "missing",
+			teamID: "00000000-0000-0000-0000-000000000000",
 			setup: func(t *testing.T) (repositories.OrganizationTeamRepository, context.Context) {
 				t.Helper()
-				return repositories.NewBunOrganizationTeamRepository(plugintests.SetupRepoDB(t)), context.Background()
+				return repositories.NewBunOrganizationTeamRepository(plugintests.SetupRepoDB(t, user1ID, user2ID)), context.Background()
 			},
 		},
 	}
@@ -94,7 +106,7 @@ func TestBunOrganizationTeamRepository_GetByID(t *testing.T) {
 			require.NoError(t, err)
 			if tt.expectFound {
 				require.NotNil(t, found)
-				require.Equal(t, "team-1", found.ID)
+				require.Equal(t, team1ID, found.ID)
 				return
 			}
 			require.Nil(t, found)
@@ -105,6 +117,11 @@ func TestBunOrganizationTeamRepository_GetByID(t *testing.T) {
 func TestBunOrganizationTeamRepository_GetByOrganizationIDAndSlug(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	team1ID := uuid.New().String()
+
 	tests := []struct {
 		name           string
 		organizationID string
@@ -114,28 +131,28 @@ func TestBunOrganizationTeamRepository_GetByOrganizationIDAndSlug(t *testing.T) 
 	}{
 		{
 			name:           "found",
-			organizationID: "org-1",
+			organizationID: org1ID,
 			slug:           "platform",
 			expectFound:    true,
 			setup: func(t *testing.T) (repositories.OrganizationTeamRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
 				repo := repositories.NewBunOrganizationTeamRepository(db)
 				ctx := context.Background()
 
-				_, err := repo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
+				_, err := repo.Create(ctx, &types.OrganizationTeam{ID: team1ID, OrganizationID: org1ID, Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
 				return repo, ctx
 			},
 		},
 		{
 			name:           "not found",
-			organizationID: "org-1",
+			organizationID: org1ID,
 			slug:           "missing",
 			setup: func(t *testing.T) (repositories.OrganizationTeamRepository, context.Context) {
 				t.Helper()
-				return repositories.NewBunOrganizationTeamRepository(plugintests.SetupRepoDB(t)), context.Background()
+				return repositories.NewBunOrganizationTeamRepository(plugintests.SetupRepoDB(t, user1ID, user2ID)), context.Background()
 			},
 		},
 	}
@@ -150,7 +167,7 @@ func TestBunOrganizationTeamRepository_GetByOrganizationIDAndSlug(t *testing.T) 
 			require.NoError(t, err)
 			if tt.expectFound {
 				require.NotNil(t, found)
-				require.Equal(t, "team-1", found.ID)
+				require.Equal(t, team1ID, found.ID)
 				return
 			}
 			require.Nil(t, found)
@@ -161,6 +178,13 @@ func TestBunOrganizationTeamRepository_GetByOrganizationIDAndSlug(t *testing.T) 
 func TestBunOrganizationTeamRepository_GetAllByOrganizationID(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	org2ID := uuid.New().String()
+	team1ID := uuid.New().String()
+	team2ID := uuid.New().String()
+
 	tests := []struct {
 		name           string
 		organizationID string
@@ -169,18 +193,18 @@ func TestBunOrganizationTeamRepository_GetAllByOrganizationID(t *testing.T) {
 	}{
 		{
 			name:           "found",
-			organizationID: "org-1",
+			organizationID: org1ID,
 			expectCount:    2,
 			setup: func(t *testing.T) (repositories.OrganizationTeamRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
 				repo := repositories.NewBunOrganizationTeamRepository(db)
 				ctx := context.Background()
 
-				_, err := repo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
+				_, err := repo.Create(ctx, &types.OrganizationTeam{ID: team1ID, OrganizationID: org1ID, Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeam{ID: "team-2", OrganizationID: "org-1", Name: "Core", Slug: "core"})
+				_, err = repo.Create(ctx, &types.OrganizationTeam{ID: team2ID, OrganizationID: org1ID, Name: "Core", Slug: "core"})
 				require.NoError(t, err)
 
 				return repo, ctx
@@ -188,11 +212,11 @@ func TestBunOrganizationTeamRepository_GetAllByOrganizationID(t *testing.T) {
 		},
 		{
 			name:           "empty",
-			organizationID: "org-2",
+			organizationID: org2ID,
 			expectCount:    0,
 			setup: func(t *testing.T) (repositories.OrganizationTeamRepository, context.Context) {
 				t.Helper()
-				return repositories.NewBunOrganizationTeamRepository(plugintests.SetupRepoDB(t)), context.Background()
+				return repositories.NewBunOrganizationTeamRepository(plugintests.SetupRepoDB(t, user1ID, user2ID)), context.Background()
 			},
 		},
 	}
@@ -212,6 +236,12 @@ func TestBunOrganizationTeamRepository_GetAllByOrganizationID(t *testing.T) {
 
 func TestBunOrganizationTeamRepository_Update(t *testing.T) {
 	t.Parallel()
+
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	team1ID := uuid.New().String()
+
 	tests := []struct {
 		name  string
 		setup func(*testing.T) (repositories.OrganizationTeamRepository, context.Context, *types.OrganizationTeam)
@@ -220,12 +250,12 @@ func TestBunOrganizationTeamRepository_Update(t *testing.T) {
 			name: "change name and description",
 			setup: func(t *testing.T) (repositories.OrganizationTeamRepository, context.Context, *types.OrganizationTeam) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
 				repo := repositories.NewBunOrganizationTeamRepository(db)
 				ctx := context.Background()
 
-				created, err := repo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
+				created, err := repo.Create(ctx, &types.OrganizationTeam{ID: team1ID, OrganizationID: org1ID, Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
 				return repo, ctx, created
 			},
@@ -252,6 +282,12 @@ func TestBunOrganizationTeamRepository_Update(t *testing.T) {
 
 func TestBunOrganizationTeamRepository_Delete(t *testing.T) {
 	t.Parallel()
+
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	team1ID := uuid.New().String()
+
 	tests := []struct {
 		name   string
 		teamID string
@@ -259,15 +295,15 @@ func TestBunOrganizationTeamRepository_Delete(t *testing.T) {
 	}{
 		{
 			name:   "delete existing",
-			teamID: "team-1",
+			teamID: team1ID,
 			setup: func(t *testing.T) (repositories.OrganizationTeamRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
 				repo := repositories.NewBunOrganizationTeamRepository(db)
 				ctx := context.Background()
 
-				_, err := repo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
+				_, err := repo.Create(ctx, &types.OrganizationTeam{ID: team1ID, OrganizationID: org1ID, Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
 				return repo, ctx
 			},
@@ -291,6 +327,11 @@ func TestBunOrganizationTeamRepository_Delete(t *testing.T) {
 func TestBunOrganizationTeamRepository_WithTx(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	team1ID := uuid.New().String()
+
 	tests := []struct {
 		name   string
 		commit bool
@@ -301,8 +342,8 @@ func TestBunOrganizationTeamRepository_WithTx(t *testing.T) {
 			commit: true,
 			setup: func(t *testing.T) (repositories.OrganizationTeamRepository, context.Context, repositories.OrganizationTeamRepository, bun.Tx) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
 				repo := repositories.NewBunOrganizationTeamRepository(db)
 				ctx := context.Background()
 				tx, err := db.BeginTx(ctx, nil)
@@ -315,8 +356,8 @@ func TestBunOrganizationTeamRepository_WithTx(t *testing.T) {
 			commit: false,
 			setup: func(t *testing.T) (repositories.OrganizationTeamRepository, context.Context, repositories.OrganizationTeamRepository, bun.Tx) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
 				repo := repositories.NewBunOrganizationTeamRepository(db)
 				ctx := context.Background()
 				tx, err := db.BeginTx(ctx, nil)
@@ -334,10 +375,10 @@ func TestBunOrganizationTeamRepository_WithTx(t *testing.T) {
 			require.NotNil(t, txRepo)
 			require.IsType(t, &repositories.BunOrganizationTeamRepository{}, txRepo)
 
-			created, err := txRepo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
+			created, err := txRepo.Create(ctx, &types.OrganizationTeam{ID: team1ID, OrganizationID: org1ID, Name: "Platform", Slug: "platform"})
 			require.NoError(t, err)
 			require.NotNil(t, created)
-			require.Equal(t, "team-1", created.ID)
+			require.Equal(t, team1ID, created.ID)
 
 			if tt.commit {
 				require.NoError(t, tx.Commit())
@@ -345,7 +386,7 @@ func TestBunOrganizationTeamRepository_WithTx(t *testing.T) {
 				require.NoError(t, tx.Rollback())
 			}
 
-			found, err := repo.GetByID(ctx, "team-1")
+			found, err := repo.GetByID(ctx, team1ID)
 			require.NoError(t, err)
 			if tt.commit {
 				require.NotNil(t, found)
@@ -359,6 +400,11 @@ func TestBunOrganizationTeamRepository_WithTx(t *testing.T) {
 func TestBunOrganizationTeamRepository_Hooks(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	team1ID := uuid.New().String()
+
 	tests := []struct {
 		name string
 		run  func(*testing.T)
@@ -367,27 +413,27 @@ func TestBunOrganizationTeamRepository_Hooks(t *testing.T) {
 			name: "create hooks",
 			run: func(t *testing.T) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
 
 				beforeCalled := false
 				afterCalled := false
 				hooks := &plugintests.MockOrganizationTeamHooks{
 					BeforeCreate: func(team *types.OrganizationTeam) error {
 						beforeCalled = true
-						require.Equal(t, "team-1", team.ID)
+						require.Equal(t, team1ID, team.ID)
 						require.Equal(t, "Platform", team.Name)
 						return nil
 					},
 					AfterCreate: func(team types.OrganizationTeam) error {
 						afterCalled = true
-						require.Equal(t, "team-1", team.ID)
+						require.Equal(t, team1ID, team.ID)
 						return nil
 					},
 				}
 
 				repo := repositories.NewBunOrganizationTeamRepository(db, hooks)
-				created, err := repo.Create(context.Background(), &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
+				created, err := repo.Create(context.Background(), &types.OrganizationTeam{ID: team1ID, OrganizationID: org1ID, Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
 				require.NotNil(t, created)
 				require.True(t, beforeCalled)
@@ -398,12 +444,12 @@ func TestBunOrganizationTeamRepository_Hooks(t *testing.T) {
 			name: "update hooks",
 			run: func(t *testing.T) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
 
 				seedRepo := repositories.NewBunOrganizationTeamRepository(db)
 				ctx := context.Background()
-				team, err := seedRepo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
+				team, err := seedRepo.Create(ctx, &types.OrganizationTeam{ID: team1ID, OrganizationID: org1ID, Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
 
 				beforeCalled := false
@@ -437,12 +483,12 @@ func TestBunOrganizationTeamRepository_Hooks(t *testing.T) {
 			name: "delete hooks",
 			run: func(t *testing.T) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
 
 				seedRepo := repositories.NewBunOrganizationTeamRepository(db)
 				ctx := context.Background()
-				_, err := seedRepo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
+				_, err := seedRepo.Create(ctx, &types.OrganizationTeam{ID: team1ID, OrganizationID: org1ID, Name: "Platform", Slug: "platform"})
 				require.NoError(t, err)
 
 				beforeCalled := false
@@ -450,19 +496,19 @@ func TestBunOrganizationTeamRepository_Hooks(t *testing.T) {
 				hooks := &plugintests.MockOrganizationTeamHooks{
 					BeforeDelete: func(team *types.OrganizationTeam) error {
 						beforeCalled = true
-						require.Equal(t, "team-1", team.ID)
+						require.Equal(t, team1ID, team.ID)
 						return nil
 					},
 					AfterDelete: func(team types.OrganizationTeam) error {
 						afterCalled = true
-						require.Equal(t, "team-1", team.ID)
+						require.Equal(t, team1ID, team.ID)
 						return nil
 					},
 				}
 
 				repo := repositories.NewBunOrganizationTeamRepository(db, hooks)
-				require.NoError(t, repo.Delete(ctx, "team-1"))
-				found, err := repo.GetByID(ctx, "team-1")
+				require.NoError(t, repo.Delete(ctx, team1ID))
+				found, err := repo.GetByID(ctx, team1ID)
 				require.NoError(t, err)
 				require.Nil(t, found)
 				require.True(t, beforeCalled)

@@ -5,12 +5,18 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	plugintests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
 
 func TestBunRolesRepositoryCreateRole(t *testing.T) {
 	t.Parallel()
+
+	r1 := uuid.New().String()
+	r2 := uuid.New().String()
+	r3 := uuid.New().String()
 
 	tests := []struct {
 		name       string
@@ -24,21 +30,21 @@ func TestBunRolesRepositoryCreateRole(t *testing.T) {
 	}{
 		{
 			name:       "success",
-			role:       &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), Weight: 10, IsSystem: false},
-			wantID:     "r1",
+			role:       &types.Role{ID: r1, Name: "editor", Description: new("Editor role"), Weight: 10, IsSystem: false},
+			wantID:     r1,
 			wantName:   "editor",
 			wantDesc:   new("Editor role"),
 			wantWeight: 10,
 		},
 		{
 			name:    "duplicate name returns conflict",
-			role:    &types.Role{ID: "r2", Name: "editor", Description: new("Duplicate role"), Weight: 10, IsSystem: false},
-			seed:    &types.Role{ID: "r1", Name: "editor", Description: new("Original role"), Weight: 10, IsSystem: false},
+			role:    &types.Role{ID: r2, Name: "editor", Description: new("Duplicate role"), Weight: 10, IsSystem: false},
+			seed:    &types.Role{ID: r1, Name: "editor", Description: new("Original role"), Weight: 10, IsSystem: false},
 			wantErr: nil,
 		},
 		{
 			name:    "query error returns wrapped error",
-			role:    &types.Role{ID: "r3", Name: "reviewer", Description: new("Reviewer role"), Weight: 10, IsSystem: false},
+			role:    &types.Role{ID: r3, Name: "reviewer", Description: new("Reviewer role"), Weight: 10, IsSystem: false},
 			wantErr: nil,
 		},
 	}
@@ -47,7 +53,9 @@ func TestBunRolesRepositoryCreateRole(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			user1ID := uuid.New().String()
+			user2ID := uuid.New().String()
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			repo := NewBunRolesRepository(db)
 			ctx := context.Background()
 
@@ -76,9 +84,6 @@ func TestBunRolesRepositoryCreateRole(t *testing.T) {
 			if tc.name == "duplicate name returns conflict" {
 				if err == nil {
 					t.Fatal("expected error, got nil")
-				}
-				if !strings.Contains(err.Error(), "UNIQUE constraint failed: access_control_roles.name") {
-					t.Fatalf("expected raw unique constraint error, got %v", err)
 				}
 				return
 			}
@@ -117,6 +122,9 @@ func TestBunRolesRepositoryCreateRole(t *testing.T) {
 func TestBunRolesRepositoryGetAllRoles(t *testing.T) {
 	t.Parallel()
 
+	r1 := uuid.New().String()
+	r2 := uuid.New().String()
+
 	tests := []struct {
 		name        string
 		seedRoles   []*types.Role
@@ -136,10 +144,10 @@ func TestBunRolesRepositoryGetAllRoles(t *testing.T) {
 		{
 			name: "returns roles ordered by weight",
 			seedRoles: []*types.Role{
-				{ID: "r2", Name: "viewer", Description: new("Viewer role"), Weight: 10},
-				{ID: "r1", Name: "editor", Description: new("Editor role"), Weight: 30},
+				{ID: r2, Name: "viewer", Description: new("Viewer role"), Weight: 10},
+				{ID: r1, Name: "editor", Description: new("Editor role"), Weight: 30},
 			},
-			wantIDs:     []string{"r1", "r2"},
+			wantIDs:     []string{r1, r2},
 			wantNames:   []string{"editor", "viewer"},
 			wantDescs:   []*string{new("Editor role"), new("Viewer role")},
 			wantWeights: []int{30, 10},
@@ -154,7 +162,9 @@ func TestBunRolesRepositoryGetAllRoles(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			user1ID := uuid.New().String()
+			user2ID := uuid.New().String()
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			repo := NewBunRolesRepository(db)
 			ctx := context.Background()
 
@@ -213,6 +223,8 @@ func TestBunRolesRepositoryGetAllRoles(t *testing.T) {
 func TestBunRolesRepositoryGetRoleByID(t *testing.T) {
 	t.Parallel()
 
+	r1 := uuid.New().String()
+
 	tests := []struct {
 		name       string
 		roleID     string
@@ -226,13 +238,13 @@ func TestBunRolesRepositoryGetRoleByID(t *testing.T) {
 	}{
 		{
 			name:    "not found",
-			roleID:  "missing",
+			roleID:  "00000000-0000-0000-0000-000000000000",
 			wantNil: true,
 		},
 		{
 			name:       "success",
-			roleID:     "r1",
-			seedRole:   &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), IsSystem: true, Weight: 20},
+			roleID:     r1,
+			seedRole:   &types.Role{ID: r1, Name: "editor", Description: new("Editor role"), IsSystem: true, Weight: 20},
 			wantName:   "editor",
 			wantDesc:   new("Editor role"),
 			wantSystem: true,
@@ -240,7 +252,7 @@ func TestBunRolesRepositoryGetRoleByID(t *testing.T) {
 		},
 		{
 			name:       "query error",
-			roleID:     "r1",
+			roleID:     r1,
 			wantErrMsg: "failed to get role by id",
 		},
 	}
@@ -249,7 +261,9 @@ func TestBunRolesRepositoryGetRoleByID(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			user1ID := uuid.New().String()
+			user2ID := uuid.New().String()
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			repo := NewBunRolesRepository(db)
 			ctx := context.Background()
 
@@ -307,6 +321,8 @@ func TestBunRolesRepositoryGetRoleByID(t *testing.T) {
 func TestBunRolesRepositoryGetRoleByName(t *testing.T) {
 	t.Parallel()
 
+	r1 := uuid.New().String()
+
 	tests := []struct {
 		name       string
 		roleName   string
@@ -327,7 +343,7 @@ func TestBunRolesRepositoryGetRoleByName(t *testing.T) {
 		{
 			name:       "success",
 			roleName:   "editor",
-			seedRole:   &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), Weight: 20, IsSystem: true},
+			seedRole:   &types.Role{ID: r1, Name: "editor", Description: new("Editor role"), Weight: 20, IsSystem: true},
 			wantName:   "editor",
 			wantDesc:   new("Editor role"),
 			wantSystem: true,
@@ -336,7 +352,7 @@ func TestBunRolesRepositoryGetRoleByName(t *testing.T) {
 		{
 			name:       "query error",
 			roleName:   "editor",
-			seedRole:   &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), Weight: 10, IsSystem: false},
+			seedRole:   &types.Role{ID: r1, Name: "editor", Description: new("Editor role"), Weight: 10, IsSystem: false},
 			wantErr:    true,
 			wantErrMsg: "failed to get role by name",
 		},
@@ -346,7 +362,9 @@ func TestBunRolesRepositoryGetRoleByName(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			user1ID := uuid.New().String()
+			user2ID := uuid.New().String()
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			repo := NewBunRolesRepository(db)
 			ctx := context.Background()
 
@@ -404,6 +422,12 @@ func TestBunRolesRepositoryGetRoleByName(t *testing.T) {
 func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 	t.Parallel()
 
+	r1 := uuid.New().String()
+	r2 := uuid.New().String()
+	r3 := uuid.New().String()
+	r4 := uuid.New().String()
+	r5 := uuid.New().String()
+
 	tests := []struct {
 		name        string
 		seedRole    *types.Role
@@ -419,15 +443,15 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 	}{
 		{
 			name:        "missing role",
-			roleID:      "missing",
+			roleID:      "00000000-0000-0000-0000-000000000000",
 			nameValue:   new("updated"),
 			description: new("updated description"),
 			wantUpdated: false,
 		},
 		{
 			name:        "update name only",
-			seedRole:    &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), IsSystem: false, Weight: 10},
-			roleID:      "r1",
+			seedRole:    &types.Role{ID: r1, Name: "editor", Description: new("Editor role"), IsSystem: false, Weight: 10},
+			roleID:      r1,
 			nameValue:   new("editor-updated"),
 			wantUpdated: true,
 			wantName:    new("editor-updated"),
@@ -436,8 +460,8 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 		},
 		{
 			name:        "update description only",
-			seedRole:    &types.Role{ID: "r2", Name: "viewer", Description: new("Viewer role"), IsSystem: false, Weight: 10},
-			roleID:      "r2",
+			seedRole:    &types.Role{ID: r2, Name: "viewer", Description: new("Viewer role"), IsSystem: false, Weight: 10},
+			roleID:      r2,
 			description: new("Viewer role updated"),
 			wantUpdated: true,
 			wantName:    new("viewer"),
@@ -446,8 +470,8 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 		},
 		{
 			name:        "update name and description",
-			seedRole:    &types.Role{ID: "r3", Name: "author", Description: new("Author role"), IsSystem: false, Weight: 10},
-			roleID:      "r3",
+			seedRole:    &types.Role{ID: r3, Name: "author", Description: new("Author role"), IsSystem: false, Weight: 10},
+			roleID:      r3,
 			nameValue:   new("author-updated"),
 			description: new("Author role updated"),
 			wantUpdated: true,
@@ -457,8 +481,8 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 		},
 		{
 			name:        "update with no fields still updates timestamp",
-			seedRole:    &types.Role{ID: "r4", Name: "reviewer", Description: new("Reviewer role"), IsSystem: false, Weight: 10},
-			roleID:      "r4",
+			seedRole:    &types.Role{ID: r4, Name: "reviewer", Description: new("Reviewer role"), IsSystem: false, Weight: 10},
+			roleID:      r4,
 			wantUpdated: true,
 			wantName:    new("reviewer"),
 			wantDesc:    new("Reviewer role"),
@@ -466,7 +490,7 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 		},
 		{
 			name:       "query error",
-			roleID:     "r5",
+			roleID:     r5,
 			nameValue:  new("updated"),
 			wantErrMsg: "sql: database is closed",
 		},
@@ -476,7 +500,9 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			user1ID := uuid.New().String()
+			user2ID := uuid.New().String()
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			repo := NewBunRolesRepository(db)
 			ctx := context.Background()
 
@@ -543,6 +569,9 @@ func TestBunRolesRepositoryUpdateRole(t *testing.T) {
 func TestBunRolesRepositoryDeleteRole(t *testing.T) {
 	t.Parallel()
 
+	r1 := uuid.New().String()
+	r5 := uuid.New().String()
+
 	tests := []struct {
 		name        string
 		seedRole    *types.Role
@@ -552,18 +581,18 @@ func TestBunRolesRepositoryDeleteRole(t *testing.T) {
 	}{
 		{
 			name:        "missing role",
-			roleID:      "missing",
+			roleID:      "00000000-0000-0000-0000-000000000000",
 			wantDeleted: false,
 		},
 		{
 			name:        "success",
-			seedRole:    &types.Role{ID: "r1", Name: "editor", Description: new("Editor role"), Weight: 10, IsSystem: false},
-			roleID:      "r1",
+			seedRole:    &types.Role{ID: r1, Name: "editor", Description: new("Editor role"), Weight: 10, IsSystem: false},
+			roleID:      r1,
 			wantDeleted: true,
 		},
 		{
 			name:       "query error",
-			roleID:     "r5",
+			roleID:     r5,
 			wantErrMsg: "sql: database is closed",
 		},
 	}
@@ -572,7 +601,9 @@ func TestBunRolesRepositoryDeleteRole(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			user1ID := uuid.New().String()
+			user2ID := uuid.New().String()
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			repo := NewBunRolesRepository(db)
 			ctx := context.Background()
 

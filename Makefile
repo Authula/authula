@@ -3,7 +3,7 @@ APP_NAME=authula
 BINARY_PATH=./tmp/$(APP_NAME)
 MIGRATE_CONFIG?=./config.toml
 MIGRATE_ARGS?=
-MIGRATE_CMD=CGO_ENABLED=1 go run ./cmd/migrate
+MIGRATE_CMD=go run ./cmd/migrate
 
 .PHONY: help build build-exe run dev test clean install setup
 .PHONY: test-coverage
@@ -29,20 +29,20 @@ build-exe: # Build the binary executable
 
 run: # Run the application
 	@rm -f ./tmp/$(APP_NAME)
-	@CGO_ENABLED=1 go run ./cmd/main.go
+	@go run ./cmd/main.go
 
 dev: # Run the application with live reloading using air
 	@rm -f ./tmp/$(APP_NAME)
-	@CGO_ENABLED=1 ./bin/air --build.cmd "go build -o ./tmp/$(APP_NAME) ./cmd/main.go" --build.entrypoint "./tmp/$(APP_NAME)"
+	@./bin/air --build.cmd "go build -o ./tmp/$(APP_NAME) ./cmd/main.go" --build.entrypoint "./tmp/$(APP_NAME)"
 
 # Test commands
 test: # Run all tests
 	@echo "Running tests..."
-	@CGO_ENABLED=1 go test -race -v ./...
+	@go test -race -v -p 1 ./...
 
 test-coverage: # Run tests with coverage report
 	@echo "Running tests with coverage..."
-	@CGO_ENABLED=1 go test -race -v -coverprofile=coverage.out ./...
+	@go test -race -v -coverprofile=coverage.out ./...
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 	@go tool cover -func=coverage.out | grep total | awk '{print "Total coverage: " $$3}'
@@ -96,9 +96,6 @@ check: format vet lint test # Run all checks (format, vet, lint, test)
 quick-check: format vet test # Run quick checks (format, vet, fast tests)
 
 ci: clean install check # CI pipeline (clean, install, check)
-
-# Integration testing
-integration-test: docker-down docker-up docker-test # Run integration tests with Docker
 
 # Migration commands
 migrate-help: # Show migration CLI help

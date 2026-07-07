@@ -2,38 +2,19 @@ package todos_test
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/uptake/go-bun"
-	"github.com/uptake/go-bun/driver/sqliteshim"
+	"github.com/uptrace/bun"
+
+	"github.com/Authula/authula/internal/testdb"
 )
 
 // ================== TEST FIXTURE ==================
 
-// setupTestDB creates an in-memory SQLite database with Bun ORM.
+// setupTestDB creates a test Postgres database using the shared testcontainer.
 func setupTestDB(t *testing.T) bun.IDB {
-	// Open in-memory SQLite
-	sqldb, err := sql.Open(sqliteshim.ShimName, "file::memory:?cache=shared")
-	assert.NoError(t, err)
-
-	// Create Bun database instance
-	db := bun.NewDB(sqldb)
-
-	t.Cleanup(func() {
-		db.Close()
-	})
-
-	// Register models for schema creation
-	db.RegisterModel((*Todo)(nil))
-
-	// Create todos table using Bun schema
-	ctx := context.Background()
-	_, err = db.NewCreateTable().Model((*Todo)(nil)).Exec(ctx)
-	assert.NoError(t, err)
-
-	return db
+	return testdb.NewIntegrationTestDB(t)
 }
 
 // Todo represents the table structure (Bun model).
@@ -82,7 +63,6 @@ func (r *TodoRepository) MarkComplete(ctx context.Context, id string) error {
 }
 
 func randomID() string {
-	// In real code, use UUID library
 	return "abc123"
 }
 
@@ -110,8 +90,11 @@ func TestTodoRepository_Create(t *testing.T) {
 			t.Parallel()
 
 			db := setupTestDB(t)
-			repo := NewTodoRepository(db)
 			ctx := context.Background()
+			_, err := db.NewCreateTable().Model((*Todo)(nil)).Exec(ctx)
+			assert.NoError(t, err)
+
+			repo := NewTodoRepository(db)
 
 			todoID, err := repo.Create(ctx, tt.title)
 
@@ -173,8 +156,11 @@ func TestTodoRepository_MarkComplete(t *testing.T) {
 			t.Parallel()
 
 			db := setupTestDB(t)
-			repo := NewTodoRepository(db)
 			ctx := context.Background()
+			_, err := db.NewCreateTable().Model((*Todo)(nil)).Exec(ctx)
+			assert.NoError(t, err)
+
+			repo := NewTodoRepository(db)
 
 			todoID, err := repo.Create(ctx, tt.title)
 			assert.NoError(t, err)
@@ -189,7 +175,6 @@ func TestTodoRepository_MarkComplete(t *testing.T) {
 	}
 }
 
-// TestTodoRepository_TableDriven shows multiple operations in one test.
 func TestTodoRepository_TableDriven(t *testing.T) {
 	t.Parallel()
 
@@ -211,7 +196,7 @@ func TestTodoRepository_TableDriven(t *testing.T) {
 		{
 			name:    "empty title",
 			title:   "",
-			wantErr: false, // DB allows empty, validation in service layer
+			wantErr: false,
 		},
 	}
 
@@ -220,20 +205,20 @@ func TestTodoRepository_TableDriven(t *testing.T) {
 			t.Parallel()
 
 			db := setupTestDB(t)
-			repo := NewTodoRepository(db)
 			ctx := context.Background()
+			_, err := db.NewCreateTable().Model((*Todo)(nil)).Exec(ctx)
+			assert.NoError(t, err)
 
-			// Act
+			repo := NewTodoRepository(db)
+
 			todoID, err := repo.Create(ctx, tt.title)
 
-			// Assert
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 				assert.NotEmpty(t, todoID)
 
-				// Verify retrieval
 				title, _, err := repo.GetByID(ctx, todoID)
 				assert.NoError(t, err)
 				assert.Equal(t, tt.title, title)

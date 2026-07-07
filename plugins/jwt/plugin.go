@@ -134,8 +134,8 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 	return nil
 }
 
-func (p *JWTPlugin) Migrations(provider string) []migrations.Migration {
-	return JWTMigrationsForProvider(provider)
+func (p *JWTPlugin) Migrations() []migrations.Migration {
+	return JWTMigrations()
 }
 
 func (p *JWTPlugin) DependsOn() []string {

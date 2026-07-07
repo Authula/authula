@@ -2,16 +2,12 @@ package migrations
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/sqlitedialect"
 
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/Authula/authula/internal/testdb"
 )
 
 type testLogger struct {
@@ -26,19 +22,7 @@ func (l testLogger) Error(msg string, args ...any) {}
 func newTestDB(t *testing.T) *bun.DB {
 	t.Helper()
 
-	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
-	sqlDB, err := sql.Open("sqlite3", dsn)
-	assert.NoError(t, err)
-	t.Cleanup(func() {
-		_ = sqlDB.Close()
-	})
-
-	db := bun.NewDB(sqlDB, sqlitedialect.New())
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
-
-	return db
+	return testdb.NewIntegrationTestDB(t)
 }
 
 func TestMigrator_MigrateAndRollback(t *testing.T) {

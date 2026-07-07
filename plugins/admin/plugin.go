@@ -111,8 +111,8 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 	return nil
 }
 
-func (p *AdminPlugin) Migrations(provider string) []migrations.Migration {
-	return adminMigrationsForProvider(provider)
+func (p *AdminPlugin) Migrations() []migrations.Migration {
+	return adminMigrations()
 }
 
 func (p *AdminPlugin) DependsOn() []string {

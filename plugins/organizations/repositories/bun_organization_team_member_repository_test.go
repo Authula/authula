@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 
@@ -15,6 +16,15 @@ import (
 func TestBunOrganizationTeamMemberRepository_Create(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	member1ID := uuid.New().String()
+	member2ID := uuid.New().String()
+	team1ID := uuid.New().String()
+	teamMember1ID := uuid.New().String()
+	teamMember2ID := uuid.New().String()
+
 	tests := []struct {
 		name       string
 		teamMember *types.OrganizationTeamMember
@@ -23,41 +33,41 @@ func TestBunOrganizationTeamMemberRepository_Create(t *testing.T) {
 	}{
 		{
 			name:       "team member",
-			teamMember: &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"},
+			teamMember: &types.OrganizationTeamMember{ID: teamMember1ID, TeamID: team1ID, MemberID: member1ID},
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationMember(t, db, member2ID, org1ID, user2ID, "admin")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
 				return repositories.NewBunOrganizationTeamMemberRepository(db), context.Background()
 			},
 		},
 		{
 			name:       "another team member",
-			teamMember: &types.OrganizationTeamMember{ID: "team-member-2", TeamID: "team-1", MemberID: "member-2"},
+			teamMember: &types.OrganizationTeamMember{ID: teamMember2ID, TeamID: team1ID, MemberID: member2ID},
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationMember(t, db, member2ID, org1ID, user2ID, "admin")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
 				return repositories.NewBunOrganizationTeamMemberRepository(db), context.Background()
 			},
 		},
 		{
 			name:       "duplicate id returns error",
-			teamMember: &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"},
+			teamMember: &types.OrganizationTeamMember{ID: teamMember1ID, TeamID: team1ID, MemberID: member1ID},
 			expectErr:  true,
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationMember(t, db, member2ID, org1ID, user2ID, "admin")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
 				return repositories.NewBunOrganizationTeamMemberRepository(db), context.Background()
 			},
 		},
@@ -94,6 +104,14 @@ func TestBunOrganizationTeamMemberRepository_Create(t *testing.T) {
 func TestBunOrganizationTeamMemberRepository_GetByID(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	member1ID := uuid.New().String()
+	member2ID := uuid.New().String()
+	team1ID := uuid.New().String()
+	teamMember1ID := uuid.New().String()
+
 	tests := []struct {
 		name         string
 		teamMemberID string
@@ -102,28 +120,28 @@ func TestBunOrganizationTeamMemberRepository_GetByID(t *testing.T) {
 	}{
 		{
 			name:         "found",
-			teamMemberID: "team-member-1",
+			teamMemberID: teamMember1ID,
 			expectFound:  true,
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationMember(t, db, member2ID, org1ID, user2ID, "admin")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: teamMember1ID, TeamID: team1ID, MemberID: member1ID})
 				require.NoError(t, err)
 				return repo, ctx
 			},
 		},
 		{
 			name:         "not found",
-			teamMemberID: "missing",
+			teamMemberID: "00000000-0000-0000-0000-000000000000",
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
-				return repositories.NewBunOrganizationTeamMemberRepository(plugintests.SetupRepoDB(t)), context.Background()
+				return repositories.NewBunOrganizationTeamMemberRepository(plugintests.SetupRepoDB(t, user1ID, user2ID)), context.Background()
 			},
 		},
 	}
@@ -138,7 +156,7 @@ func TestBunOrganizationTeamMemberRepository_GetByID(t *testing.T) {
 			require.NoError(t, err)
 			if tt.expectFound {
 				require.NotNil(t, found)
-				require.Equal(t, "team-member-1", found.ID)
+				require.Equal(t, teamMember1ID, found.ID)
 				return
 			}
 			require.Nil(t, found)
@@ -149,6 +167,15 @@ func TestBunOrganizationTeamMemberRepository_GetByID(t *testing.T) {
 func TestBunOrganizationTeamMemberRepository_GetByTeamIDAndMemberID(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	member1ID := uuid.New().String()
+	member2ID := uuid.New().String()
+	team1ID := uuid.New().String()
+	team2ID := uuid.New().String()
+	teamMember1ID := uuid.New().String()
+
 	tests := []struct {
 		name        string
 		teamID      string
@@ -158,58 +185,58 @@ func TestBunOrganizationTeamMemberRepository_GetByTeamIDAndMemberID(t *testing.T
 	}{
 		{
 			name:        "found",
-			teamID:      "team-1",
-			memberID:    "member-1",
+			teamID:      team1ID,
+			memberID:    member1ID,
 			expectFound: true,
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
-				plugintests.SeedOrganizationTeam(t, db, "team-2", "org-1", "Core", "core")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationMember(t, db, member2ID, org1ID, user2ID, "admin")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
+				plugintests.SeedOrganizationTeam(t, db, team2ID, org1ID, "Core", "core")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: teamMember1ID, TeamID: team1ID, MemberID: member1ID})
 				require.NoError(t, err)
 				return repo, ctx
 			},
 		},
 		{
 			name:     "wrong member",
-			teamID:   "team-1",
-			memberID: "member-2",
+			teamID:   team1ID,
+			memberID: member2ID,
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
-				plugintests.SeedOrganizationTeam(t, db, "team-2", "org-1", "Core", "core")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationMember(t, db, member2ID, org1ID, user2ID, "admin")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
+				plugintests.SeedOrganizationTeam(t, db, team2ID, org1ID, "Core", "core")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: teamMember1ID, TeamID: team1ID, MemberID: member1ID})
 				require.NoError(t, err)
 				return repo, ctx
 			},
 		},
 		{
 			name:     "wrong team",
-			teamID:   "team-2",
-			memberID: "member-1",
+			teamID:   team2ID,
+			memberID: member1ID,
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
-				plugintests.SeedOrganizationTeam(t, db, "team-2", "org-1", "Core", "core")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationMember(t, db, member2ID, org1ID, user2ID, "admin")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
+				plugintests.SeedOrganizationTeam(t, db, team2ID, org1ID, "Core", "core")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: teamMember1ID, TeamID: team1ID, MemberID: member1ID})
 				require.NoError(t, err)
 				return repo, ctx
 			},
@@ -226,7 +253,7 @@ func TestBunOrganizationTeamMemberRepository_GetByTeamIDAndMemberID(t *testing.T
 			require.NoError(t, err)
 			if tt.expectFound {
 				require.NotNil(t, found)
-				require.Equal(t, "team-member-1", found.ID)
+				require.Equal(t, teamMember1ID, found.ID)
 				return
 			}
 			require.Nil(t, found)
@@ -236,6 +263,19 @@ func TestBunOrganizationTeamMemberRepository_GetByTeamIDAndMemberID(t *testing.T
 
 func TestBunOrganizationTeamMemberRepository_GetAllByTeamID(t *testing.T) {
 	t.Parallel()
+
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	user3ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	member1ID := uuid.New().String()
+	member2ID := uuid.New().String()
+	member3ID := uuid.New().String()
+	team1ID := uuid.New().String()
+	team2ID := uuid.New().String()
+	teamMember1ID := uuid.New().String()
+	teamMember2ID := uuid.New().String()
+	teamMember3ID := uuid.New().String()
 
 	tests := []struct {
 		name        string
@@ -247,71 +287,71 @@ func TestBunOrganizationTeamMemberRepository_GetAllByTeamID(t *testing.T) {
 	}{
 		{
 			name:        "first page",
-			teamID:      "team-1",
+			teamID:      team1ID,
 			page:        1,
 			limit:       2,
 			expectCount: 2,
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedUser(t, db, "user-3")
-				plugintests.SeedOrganizationMember(t, db, "member-3", "org-1", "user-3", "member")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationMember(t, db, member2ID, org1ID, user2ID, "admin")
+				plugintests.SeedUser(t, db, user3ID)
+				plugintests.SeedOrganizationMember(t, db, member3ID, org1ID, user3ID, "member")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: teamMember1ID, TeamID: team1ID, MemberID: member1ID})
 				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-2", TeamID: "team-1", MemberID: "member-2"})
+				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: teamMember2ID, TeamID: team1ID, MemberID: member2ID})
 				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-3", TeamID: "team-1", MemberID: "member-3"})
+				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: teamMember3ID, TeamID: team1ID, MemberID: member3ID})
 				require.NoError(t, err)
 				return repo, ctx
 			},
 		},
 		{
 			name:        "second page",
-			teamID:      "team-1",
+			teamID:      team1ID,
 			page:        2,
 			limit:       2,
 			expectCount: 1,
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedUser(t, db, "user-3")
-				plugintests.SeedOrganizationMember(t, db, "member-3", "org-1", "user-3", "member")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationMember(t, db, member2ID, org1ID, user2ID, "admin")
+				plugintests.SeedUser(t, db, user3ID)
+				plugintests.SeedOrganizationMember(t, db, member3ID, org1ID, user3ID, "member")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: teamMember1ID, TeamID: team1ID, MemberID: member1ID})
 				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-2", TeamID: "team-1", MemberID: "member-2"})
+				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: teamMember2ID, TeamID: team1ID, MemberID: member2ID})
 				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-3", TeamID: "team-1", MemberID: "member-3"})
+				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: teamMember3ID, TeamID: team1ID, MemberID: member3ID})
 				require.NoError(t, err)
 				return repo, ctx
 			},
 		},
 		{
 			name:        "empty",
-			teamID:      "team-2",
+			teamID:      team2ID,
 			page:        1,
 			limit:       10,
 			expectCount: 0,
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedUser(t, db, "user-3")
-				plugintests.SeedOrganizationMember(t, db, "member-3", "org-1", "user-3", "member")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationMember(t, db, member2ID, org1ID, user2ID, "admin")
+				plugintests.SeedUser(t, db, user3ID)
+				plugintests.SeedOrganizationMember(t, db, member3ID, org1ID, user3ID, "member")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
 				return repositories.NewBunOrganizationTeamMemberRepository(db), context.Background()
 			},
 		},
@@ -327,14 +367,14 @@ func TestBunOrganizationTeamMemberRepository_GetAllByTeamID(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, found, tt.expectCount)
 			for _, teamMember := range found {
-				require.Equal(t, "team-1", teamMember.TeamID)
+				require.Equal(t, team1ID, teamMember.TeamID)
 			}
 			if tt.page == 1 && len(found) > 1 {
-				require.Equal(t, "team-member-3", found[0].ID)
-				require.Equal(t, "team-member-2", found[1].ID)
+				require.Equal(t, teamMember3ID, found[0].ID)
+				require.Equal(t, teamMember2ID, found[1].ID)
 			}
 			if tt.page == 2 && len(found) > 0 {
-				require.Equal(t, "team-member-1", found[0].ID)
+				require.Equal(t, teamMember1ID, found[0].ID)
 			}
 		})
 	}
@@ -342,6 +382,14 @@ func TestBunOrganizationTeamMemberRepository_GetAllByTeamID(t *testing.T) {
 
 func TestBunOrganizationTeamMemberRepository_DeleteByTeamIDAndMemberID(t *testing.T) {
 	t.Parallel()
+
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	member1ID := uuid.New().String()
+	member2ID := uuid.New().String()
+	team1ID := uuid.New().String()
+	teamMember1ID := uuid.New().String()
 
 	tests := []struct {
 		name     string
@@ -351,33 +399,33 @@ func TestBunOrganizationTeamMemberRepository_DeleteByTeamIDAndMemberID(t *testin
 	}{
 		{
 			name:     "delete existing",
-			teamID:   "team-1",
-			memberID: "member-1",
+			teamID:   team1ID,
+			memberID: member1ID,
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationMember(t, db, member2ID, org1ID, user2ID, "admin")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
+				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: teamMember1ID, TeamID: team1ID, MemberID: member1ID})
 				require.NoError(t, err)
 				return repo, ctx
 			},
 		},
 		{
 			name:     "delete missing",
-			teamID:   "team-1",
-			memberID: "missing",
+			teamID:   team1ID,
+			memberID: "00000000-0000-0000-0000-000000000000",
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationMember(t, db, member2ID, org1ID, user2ID, "admin")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
 				return repositories.NewBunOrganizationTeamMemberRepository(db), context.Background()
 			},
 		},
@@ -400,6 +448,13 @@ func TestBunOrganizationTeamMemberRepository_DeleteByTeamIDAndMemberID(t *testin
 func TestBunOrganizationTeamMemberRepository_WithTx(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	member1ID := uuid.New().String()
+	team1ID := uuid.New().String()
+	teamMember1ID := uuid.New().String()
+
 	tests := []struct {
 		name   string
 		commit bool
@@ -410,10 +465,10 @@ func TestBunOrganizationTeamMemberRepository_WithTx(t *testing.T) {
 			commit: true,
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context, repositories.OrganizationTeamMemberRepository, bun.Tx) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
 
@@ -430,10 +485,10 @@ func TestBunOrganizationTeamMemberRepository_WithTx(t *testing.T) {
 			commit: false,
 			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context, repositories.OrganizationTeamMemberRepository, bun.Tx) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
 
@@ -452,10 +507,10 @@ func TestBunOrganizationTeamMemberRepository_WithTx(t *testing.T) {
 			t.Parallel()
 
 			repo, ctx, txRepo, tx := tt.setup(t)
-			created, err := txRepo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
+			created, err := txRepo.Create(ctx, &types.OrganizationTeamMember{ID: teamMember1ID, TeamID: team1ID, MemberID: member1ID})
 			require.NoError(t, err)
 			require.NotNil(t, created)
-			require.Equal(t, "team-member-1", created.ID)
+			require.Equal(t, teamMember1ID, created.ID)
 
 			if tt.commit {
 				require.NoError(t, tx.Commit())
@@ -463,11 +518,11 @@ func TestBunOrganizationTeamMemberRepository_WithTx(t *testing.T) {
 				require.NoError(t, tx.Rollback())
 			}
 
-			found, err := repo.GetByID(ctx, "team-member-1")
+			found, err := repo.GetByID(ctx, teamMember1ID)
 			require.NoError(t, err)
 			if tt.commit {
 				require.NotNil(t, found)
-				require.Equal(t, "team-member-1", found.ID)
+				require.Equal(t, teamMember1ID, found.ID)
 			} else {
 				require.Nil(t, found)
 			}
@@ -478,6 +533,13 @@ func TestBunOrganizationTeamMemberRepository_WithTx(t *testing.T) {
 func TestBunOrganizationTeamMemberRepository_Hooks(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	org1ID := uuid.New().String()
+	member1ID := uuid.New().String()
+	team1ID := uuid.New().String()
+	teamMember1ID := uuid.New().String()
+
 	tests := []struct {
 		name string
 		run  func(*testing.T)
@@ -486,28 +548,28 @@ func TestBunOrganizationTeamMemberRepository_Hooks(t *testing.T) {
 			name: "create hooks",
 			run: func(t *testing.T) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
 
 				beforeCalled := false
 				afterCalled := false
 				hooks := &plugintests.MockOrganizationTeamMemberHooks{
 					BeforeCreate: func(teamMember *types.OrganizationTeamMember) error {
 						beforeCalled = true
-						require.Equal(t, "team-member-1", teamMember.ID)
+						require.Equal(t, teamMember1ID, teamMember.ID)
 						return nil
 					},
 					AfterCreate: func(teamMember types.OrganizationTeamMember) error {
 						afterCalled = true
-						require.Equal(t, "team-member-1", teamMember.ID)
+						require.Equal(t, teamMember1ID, teamMember.ID)
 						return nil
 					},
 				}
 
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db, hooks)
-				created, err := repo.Create(context.Background(), &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
+				created, err := repo.Create(context.Background(), &types.OrganizationTeamMember{ID: teamMember1ID, TeamID: team1ID, MemberID: member1ID})
 				require.NoError(t, err)
 				require.NotNil(t, created)
 				require.True(t, beforeCalled)
@@ -518,14 +580,14 @@ func TestBunOrganizationTeamMemberRepository_Hooks(t *testing.T) {
 			name: "delete hooks",
 			run: func(t *testing.T) {
 				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+				db := plugintests.SetupRepoDB(t, user1ID, user2ID)
+				plugintests.SeedOrganization(t, db, org1ID, user1ID, "Acme Inc", "acme-inc")
+				plugintests.SeedOrganizationMember(t, db, member1ID, org1ID, user1ID, "member")
+				plugintests.SeedOrganizationTeam(t, db, team1ID, org1ID, "Platform", "platform")
 
 				seedRepo := repositories.NewBunOrganizationTeamMemberRepository(db)
 				ctx := context.Background()
-				_, err := seedRepo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
+				_, err := seedRepo.Create(ctx, &types.OrganizationTeamMember{ID: teamMember1ID, TeamID: team1ID, MemberID: member1ID})
 				require.NoError(t, err)
 
 				beforeCalled := false
@@ -533,19 +595,19 @@ func TestBunOrganizationTeamMemberRepository_Hooks(t *testing.T) {
 				hooks := &plugintests.MockOrganizationTeamMemberHooks{
 					BeforeDelete: func(teamMember *types.OrganizationTeamMember) error {
 						beforeCalled = true
-						require.Equal(t, "team-member-1", teamMember.ID)
+						require.Equal(t, teamMember1ID, teamMember.ID)
 						return nil
 					},
 					AfterDelete: func(teamMember types.OrganizationTeamMember) error {
 						afterCalled = true
-						require.Equal(t, "team-member-1", teamMember.ID)
+						require.Equal(t, teamMember1ID, teamMember.ID)
 						return nil
 					},
 				}
 
 				repo := repositories.NewBunOrganizationTeamMemberRepository(db, hooks)
-				require.NoError(t, repo.DeleteByTeamIDAndMemberID(ctx, "team-1", "member-1"))
-				found, err := repo.GetByTeamIDAndMemberID(ctx, "team-1", "member-1")
+				require.NoError(t, repo.DeleteByTeamIDAndMemberID(ctx, team1ID, member1ID))
+				found, err := repo.GetByTeamIDAndMemberID(ctx, team1ID, member1ID)
 				require.NoError(t, err)
 				require.Nil(t, found)
 				require.True(t, beforeCalled)

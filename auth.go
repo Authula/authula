@@ -68,7 +68,7 @@ func New(authConfig *AuthConfig) *Auth {
 
 	migrationManager := migrationmanager.NewManager(migrator)
 
-	if err := migrationManager.RunCore(context.Background(), authConfig.Config.Database.Provider); err != nil {
+	if err := migrationManager.RunCore(context.Background()); err != nil {
 		panic(fmt.Errorf("failed to run core migrations: %w", err))
 	}
 
@@ -160,14 +160,14 @@ func (auth *Auth) RunCoreMigrations(ctx context.Context) error {
 	if auth.migrationManager == nil {
 		return fmt.Errorf("migrator not initialized")
 	}
-	return auth.migrationManager.RunCore(ctx, auth.config.Database.Provider)
+	return auth.migrationManager.RunCore(ctx)
 }
 
 func (auth *Auth) DropCoreMigrations(ctx context.Context) error {
 	if auth.migrationManager == nil {
 		return fmt.Errorf("migrator not initialized")
 	}
-	return auth.migrationManager.DropCore(ctx, auth.config.Database.Provider)
+	return auth.migrationManager.DropCore(ctx)
 }
 
 // registerMiddleware registers all middleware from hooks and plugins

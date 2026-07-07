@@ -4,7 +4,6 @@ import (
 	"context"
 	"reflect"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/mock"
 	"github.com/uptrace/bun"
 

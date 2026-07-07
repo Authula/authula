@@ -110,7 +110,6 @@ func (r *PluginRegistry) RunMigrations(ctx context.Context) error {
 		return fmt.Errorf("config provider returned nil config")
 	}
 
-	dbProvider := cfg.Database.Provider
 	selector := func(plugin models.Plugin) bool {
 		pluginID := plugin.Metadata().ID
 		if !util.IsPluginEnabled(cfg, pluginID) {
@@ -120,7 +119,7 @@ func (r *PluginRegistry) RunMigrations(ctx context.Context) error {
 		return true
 	}
 
-	return r.migrationManager.RunPlugins(ctx, dbProvider, r.plugins, selector)
+	return r.migrationManager.RunPlugins(ctx, r.plugins, selector)
 }
 
 // DropMigrations rolls back migrations for all registered plugins regardless of enablement state.
@@ -134,7 +133,7 @@ func (r *PluginRegistry) DropMigrations(ctx context.Context) error {
 		return fmt.Errorf("config provider returned nil config")
 	}
 
-	return r.migrationManager.DropPlugins(ctx, cfg.Database.Provider, r.plugins, nil)
+	return r.migrationManager.DropPlugins(ctx, r.plugins, nil)
 }
 
 func (r *PluginRegistry) Plugins() []models.Plugin {

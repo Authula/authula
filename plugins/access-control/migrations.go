@@ -5,6 +5,6 @@ import (
 	"github.com/Authula/authula/plugins/access-control/migrationset"
 )
 
-func accessControlMigrationsForProvider(provider string) []migrations.Migration {
-	return migrationset.ForProvider(provider)
+func accessControlMigrations() []migrations.Migration {
+	return migrationset.Migrations()
 }

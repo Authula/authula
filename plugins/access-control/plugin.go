@@ -82,8 +82,8 @@ func (p *AccessControlPlugin) Init(ctx *models.PluginContext) error {
 	return nil
 }
 
-func (p *AccessControlPlugin) Migrations(provider string) []migrations.Migration {
-	return accessControlMigrationsForProvider(provider)
+func (p *AccessControlPlugin) Migrations() []migrations.Migration {
+	return accessControlMigrations()
 }
 
 func (p *AccessControlPlugin) DependsOn() []string {

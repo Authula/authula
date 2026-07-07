@@ -26,7 +26,7 @@ description: Write unit tests in Go following Red-Green-Refactor TDD principles.
 
 **Handlers**: Create handler struct with UseCase/Service field; return `http.HandlerFunc` from `Handler()` method; test via httptest
 **Services**: Mock repositories; test business logic and error handling
-**Repositories**: Test against real SQLite database (Bun ORM); use test fixtures to set up schema
+**Repositories**: Test against real Postgres database (Bun ORM via shared testcontainer); use `NewIntegrationTestDB(t)` helper
 **Integration tests**: Use fixtures; test plugin routes end-to-end
 
 ## Pattern
@@ -43,7 +43,7 @@ See [examples/](examples/) for Todos testing patterns:
 
 - `test_helpers.go` - MockTodoUseCase and MockTodoService interfaces
 - `handler_test.go` - Handler struct with UseCase, Handler() method, httptest patterns
-- `repository_test.go` - Real SQLite database tests with test fixtures, CRUD operations
+- `repository_test.go` - Real Postgres database tests with test fixtures, CRUD operations
 - `todo_service_test.go` - Service tests with mocked repositories and table-driven tests
 - `plugin_integration_test.go` - End-to-end route testing with fixtures
 

@@ -136,8 +136,8 @@ func (p *TOTPPlugin) Hooks() []models.Hook {
 	return p.buildHooks()
 }
 
-func (p *TOTPPlugin) Migrations(provider string) []migrations.Migration {
-	return totpMigrationsForProvider(provider)
+func (p *TOTPPlugin) Migrations() []migrations.Migration {
+	return totpMigrations()
 }
 
 func (p *TOTPPlugin) DependsOn() []string {

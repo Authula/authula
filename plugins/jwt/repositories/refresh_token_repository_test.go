@@ -11,21 +11,48 @@ import (
 
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/migrations"
+	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/migrationset"
 	"github.com/Authula/authula/plugins/jwt/types"
 )
 
+func seedSession(t *testing.T, ctx context.Context, db bun.IDB, sessionID string) {
+	t.Helper()
+
+	user := &models.User{
+		ID:    sessionID,
+		Name:  "test-" + sessionID,
+		Email: sessionID + "@test.com",
+	}
+	_, err := db.NewInsert().Model(user).Exec(ctx)
+	require.NoError(t, err)
+
+	sess := &models.Session{
+		ID:        sessionID,
+		UserID:    sessionID,
+		Token:     "token-" + sessionID,
+		ExpiresAt: time.Now().UTC().Add(time.Hour),
+	}
+	_, err = db.NewInsert().Model(sess).Exec(ctx)
+	require.NoError(t, err)
+}
+
 func setupRefreshTokenRepo(t *testing.T) (*bun.DB, *refreshTokenRepositoryImpl) {
 	t.Helper()
-	db := internaltests.NewSQLiteIntegrationDB(t)
+	db := internaltests.NewIntegrationTestDB(t)
 	migrator, err := migrations.NewMigrator(db, &internaltests.MockLogger{})
 	require.NoError(t, err)
-	err = migrator.Migrate(context.Background(), []migrations.MigrationSet{
-		{
-			PluginID:   "jwt",
-			Migrations: migrationset.JWTMigrationsForProvider("sqlite"),
-		},
-	})
+
+	coreSet, err := migrations.CoreMigrationSet()
+	require.NoError(t, err)
+
+	jwtSet := migrations.MigrationSet{
+		PluginID:   models.PluginJWT.String(),
+		DependsOn:  []string{migrations.CorePluginID},
+		Migrations: migrationset.Migrations(),
+	}
+
+	err = migrator.Migrate(context.Background(), []migrations.MigrationSet{coreSet, jwtSet})
 	require.NoError(t, err)
 	return db, &refreshTokenRepositoryImpl{db: db}
 }
@@ -59,6 +86,8 @@ func TestRefreshTokenRepository_Store(t *testing.T) {
 
 			record := tt.record()
 			now := time.Now().Truncate(time.Millisecond)
+
+			seedSession(t, ctx, repo.db, record.SessionID)
 
 			err := repo.StoreRefreshToken(ctx, record)
 			require.NoError(t, err)
@@ -106,9 +135,11 @@ func TestRefreshTokenRepository_GetRefreshToken(t *testing.T) {
 			ctx := context.Background()
 
 			if !tt.wantNil {
+				sessionID := uuid.New().String()
+				seedSession(t, ctx, repo.db, sessionID)
 				err := repo.StoreRefreshToken(ctx, &types.RefreshToken{
 					ID:        uuid.New().String(),
-					SessionID: uuid.New().String(),
+					SessionID: sessionID,
 					TokenHash: tt.tokenHash,
 					ExpiresAt: time.Now().Add(time.Hour),
 				})
@@ -152,6 +183,8 @@ func TestRefreshTokenRepository_RevokeRefreshToken(t *testing.T) {
 
 			_, repo := setupRefreshTokenRepo(t)
 			ctx := context.Background()
+
+			seedSession(t, ctx, repo.db, tt.record.SessionID)
 
 			err := repo.StoreRefreshToken(ctx, tt.record)
 			require.NoError(t, err)
@@ -209,6 +242,9 @@ func TestRefreshTokenRepository_RevokeAllSessionTokens(t *testing.T) {
 				ExpiresAt: time.Now().Add(time.Hour),
 			}
 
+			seedSession(t, ctx, repo.db, tt.targetSession)
+			seedSession(t, ctx, repo.db, tt.otherSession)
+
 			require.NoError(t, repo.StoreRefreshToken(ctx, token1))
 			require.NoError(t, repo.StoreRefreshToken(ctx, token2))
 			require.NoError(t, repo.StoreRefreshToken(ctx, token3))
@@ -260,6 +296,8 @@ func TestRefreshTokenRepository_SetLastReuseAttempt(t *testing.T) {
 			_, repo := setupRefreshTokenRepo(t)
 			ctx := context.Background()
 
+			seedSession(t, ctx, repo.db, tt.record.SessionID)
+
 			err := repo.StoreRefreshToken(ctx, tt.record)
 			require.NoError(t, err)
 
@@ -305,6 +343,9 @@ func TestRefreshTokenRepository_CleanupExpiredTokens(t *testing.T) {
 
 			_, repo := setupRefreshTokenRepo(t)
 			ctx := context.Background()
+
+			seedSession(t, ctx, repo.db, tt.expiredRecord.SessionID)
+			seedSession(t, ctx, repo.db, tt.validRecord.SessionID)
 
 			require.NoError(t, repo.StoreRefreshToken(ctx, tt.expiredRecord))
 			require.NoError(t, repo.StoreRefreshToken(ctx, tt.validRecord))

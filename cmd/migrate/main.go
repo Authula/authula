@@ -78,7 +78,7 @@ func runCore(action string) error {
 	switch action {
 	case "up":
 		runtime.logger.Info("running core migrations")
-		return runtime.manager.RunCore(ctx, runtime.config.Database.Provider)
+		return runtime.manager.RunCore(ctx)
 	case "down":
 		applied, err := runtime.manager.Migrator().ListApplied(ctx, "")
 		if err != nil {
@@ -91,7 +91,7 @@ func runCore(action string) error {
 		}
 
 		runtime.logger.Info("rolling back core migrations")
-		return runtime.manager.DropCore(ctx, runtime.config.Database.Provider)
+		return runtime.manager.DropCore(ctx)
 	default:
 		return fmt.Errorf("unknown core action: %s", action)
 	}
@@ -152,10 +152,10 @@ func runPlugins(action, only, except string, includeDisabled bool) error {
 		}
 
 		runtime.logger.Debug("running plugin migrations")
-		return runtime.manager.RunPlugins(ctx, runtime.config.Database.Provider, runtime.plugins, selector)
+		return runtime.manager.RunPlugins(ctx, runtime.plugins, selector)
 	case "down":
 		runtime.logger.Debug("rolling back plugin migrations")
-		return runtime.manager.DropPlugins(ctx, runtime.config.Database.Provider, runtime.plugins, selector)
+		return runtime.manager.DropPlugins(ctx, runtime.plugins, selector)
 	default:
 		return fmt.Errorf("unknown plugins action: %s", action)
 	}

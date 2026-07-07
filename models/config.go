@@ -35,7 +35,6 @@ type Config struct {
 }
 
 type DatabaseConfig struct {
-	Provider        string        `json:"provider" toml:"provider"`
 	URL             string        `json:"url" toml:"url"`
 	MaxOpenConns    int           `json:"max_open_conns" toml:"max_open_conns"`
 	MaxIdleConns    int           `json:"max_idle_conns" toml:"max_idle_conns"`
@@ -86,7 +85,6 @@ type EventBusConfig struct {
 	ContextTimeout        time.Duration           `json:"context_timeout" toml:"context_timeout"`
 	Provider              events.EventBusProvider `json:"provider" toml:"provider"`
 	GoChannel             *GoChannelConfig        `json:"go_channel" toml:"go_channel"`
-	SQLite                *SQLiteConfig           `json:"sqlite" toml:"sqlite"`
 	PostgreSQL            *PostgreSQLConfig       `json:"postgres" toml:"postgres"`
 	Redis                 *RedisConfig            `json:"redis" toml:"redis"`
 	Kafka                 *KafkaConfig            `json:"kafka" toml:"kafka"`
@@ -96,10 +94,6 @@ type EventBusConfig struct {
 
 type GoChannelConfig struct {
 	BufferSize int `json:"buffer_size" toml:"buffer_size"`
-}
-
-type SQLiteConfig struct {
-	DBPath string `json:"db_path" toml:"db_path"`
 }
 
 type PostgreSQLConfig struct {

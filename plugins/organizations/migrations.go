@@ -5,6 +5,6 @@ import (
 	"github.com/Authula/authula/plugins/organizations/migrationset"
 )
 
-func organizationsMigrationsForProvider(provider string) []migrations.Migration {
-	return migrationset.ForProvider(provider)
+func organizationsMigrations() []migrations.Migration {
+	return migrationset.Migrations()
 }

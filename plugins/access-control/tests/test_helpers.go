@@ -2,14 +2,11 @@ package tests
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/mock"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/sqlitedialect"
 
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/migrations"
@@ -185,18 +182,10 @@ func (m *MockUserPermissionsRepository) HasPermissions(ctx context.Context, user
 	return args.Bool(0), args.Error(1)
 }
 
-func SetupRepoDB(t *testing.T) *bun.DB {
+func SetupRepoDB(t *testing.T, user1ID, user2ID string) *bun.DB {
 	t.Helper()
 
-	sqldb, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open sqlite: %v", err)
-	}
-
-	db := bun.NewDB(sqldb, sqlitedialect.New())
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
+	db := internaltests.NewIntegrationTestDB(t)
 
 	ctx := context.Background()
 
@@ -205,7 +194,7 @@ func SetupRepoDB(t *testing.T) *bun.DB {
 		t.Fatalf("failed to create migrator: %v", err)
 	}
 
-	coreSet, err := migrations.CoreMigrationSet("sqlite")
+	coreSet, err := migrations.CoreMigrationSet()
 	if err != nil {
 		t.Fatalf("failed to build core migration set: %v", err)
 	}
@@ -213,17 +202,17 @@ func SetupRepoDB(t *testing.T) *bun.DB {
 	accessControlSet := migrations.MigrationSet{
 		PluginID:   models.PluginAccessControl.String(),
 		DependsOn:  []string{migrations.CorePluginID},
-		Migrations: accesscontrolmigrations.ForProvider("sqlite"),
+		Migrations: accesscontrolmigrations.Migrations(),
 	}
 
 	if err := migrator.Migrate(ctx, []migrations.MigrationSet{coreSet, accessControlSet}); err != nil {
 		t.Fatalf("failed to run migrations: %v", err)
 	}
 
-	if _, err := db.ExecContext(ctx, `INSERT INTO users (id, name, email, email_verified, metadata) VALUES ('u1', 'User One', 'u1@example.com', 1, '{}')`); err != nil {
+	if _, err := db.ExecContext(ctx, `INSERT INTO users (id, name, email, email_verified, metadata) VALUES (?, ?, ?, true, '{}')`, user1ID, "User One", "u1@example.com"); err != nil {
 		t.Fatalf("failed to seed user u1: %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `INSERT INTO users (id, name, email, email_verified, metadata) VALUES ('u2', 'User Two', 'u2@example.com', 1, '{}')`); err != nil {
+	if _, err := db.ExecContext(ctx, `INSERT INTO users (id, name, email, email_verified, metadata) VALUES (?, ?, ?, true, '{}')`, user2ID, "User Two", "u2@example.com"); err != nil {
 		t.Fatalf("failed to seed user u2: %v", err)
 	}
 

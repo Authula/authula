@@ -2,25 +2,17 @@ package repositories_test
 
 import (
 	"context"
-	"database/sql"
 	"testing"
+	"time"
 
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/sqlitedialect"
-
+	"github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/plugins/admin/repositories"
-	"github.com/Authula/authula/plugins/admin/tests"
 	"github.com/Authula/authula/plugins/admin/types"
 )
 
 func setupRepo(t *testing.T) (*repositories.BunUserStateRepository, func()) {
 	t.Helper()
-	sqldb, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open sqlite: %v", err)
-	}
-	db := bun.NewDB(sqldb, sqlitedialect.New())
+	db := tests.NewIntegrationTestDB(t)
 
 	ctx := context.Background()
 	if _, err := db.NewCreateTable().Model((*types.AdminUserState)(nil)).IfNotExists().Exec(ctx); err != nil {
@@ -29,11 +21,7 @@ func setupRepo(t *testing.T) (*repositories.BunUserStateRepository, func()) {
 
 	repo := repositories.NewBunUserStateRepository(db)
 
-	cleanup := func() {
-		db.Close()
-		sqldb.Close()
-	}
-	return repo, cleanup
+	return repo, func() {}
 }
 
 func TestBunUserStateRepository_GetByUserID_NotFound(t *testing.T) {
@@ -55,12 +43,13 @@ func TestBunUserStateRepository_UpsertAndRetrieve(t *testing.T) {
 	defer cleanup()
 
 	ctx := context.Background()
+	now := time.Now().UTC()
 	state := &types.AdminUserState{
 		UserID:         "u1",
 		Banned:         true,
-		BannedAt:       tests.PtrTime(t, 0),
-		BannedReason:   tests.PtrString(t, "reason"),
-		BannedByUserID: tests.PtrString(t, "actor"),
+		BannedAt:       &now,
+		BannedReason:   tests.PtrString("reason"),
+		BannedByUserID: tests.PtrString("actor"),
 	}
 
 	if err := repo.Upsert(ctx, state); err != nil {

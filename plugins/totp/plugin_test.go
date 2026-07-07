@@ -2,18 +2,16 @@ package totp
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/sqlitedialect"
 
 	"github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/migrations"
@@ -76,20 +74,15 @@ func buildTestPlugin(t *testing.T) (*TOTPPlugin, *tests.MockUserService, *tests.
 func newHookTestDB(t *testing.T) *bun.DB {
 	t.Helper()
 
-	sqlDB, err := sql.Open("sqlite3", ":memory:")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = sqlDB.Close() })
-
-	db := bun.NewDB(sqlDB, sqlitedialect.New())
-	t.Cleanup(func() { _ = db.Close() })
+	db := tests.NewIntegrationTestDB(t)
 
 	ctx := context.Background()
 	migrator, err := migrations.NewMigrator(db, &tests.MockLogger{})
 	require.NoError(t, err)
 
-	coreSet, err := migrations.CoreMigrationSet("sqlite")
+	coreSet, err := migrations.CoreMigrationSet()
 	require.NoError(t, err)
-	totpSet := MigrationSet("sqlite")
+	totpSet := MigrationSet()
 
 	err = migrator.Migrate(ctx, []migrations.MigrationSet{coreSet, totpSet})
 	require.NoError(t, err)
@@ -108,6 +101,9 @@ func findPendingCookieValue(w *httptest.ResponseRecorder) (string, bool) {
 }
 
 func TestInterceptHook(t *testing.T) {
+	userID1 := uuid.New().String()
+	userID2 := uuid.New().String()
+
 	cases := []struct {
 		name    string
 		arrange func(t *testing.T, plugin *TOTPPlugin, db *bun.DB, totpRepo *repository.TOTPRepository, tokenSvc *tests.MockTokenService, verifSvc *tests.MockVerificationService)
@@ -119,18 +115,18 @@ func TestInterceptHook(t *testing.T) {
 				t.Helper()
 
 				ctx := context.Background()
-				_, err := db.ExecContext(ctx, `INSERT INTO users (id, name, email) VALUES (?, ?, ?)`, "user-1", "User One", "user1@example.com")
+				_, err := db.ExecContext(ctx, `INSERT INTO users (id, name, email) VALUES (?, ?, ?)`, userID1, "User One", "user1@example.com")
 				require.NoError(t, err)
-				_, err = db.ExecContext(ctx, `INSERT INTO users (id, name, email) VALUES (?, ?, ?)`, "user-2", "User Two", "user2@example.com")
+				_, err = db.ExecContext(ctx, `INSERT INTO users (id, name, email) VALUES (?, ?, ?)`, userID2, "User Two", "user2@example.com")
 				require.NoError(t, err)
 
 				plugin.totpRepo = totpRepo
 
-				_, err = totpRepo.Create(ctx, "user-1", "enc-secret", "[]")
+				_, err = totpRepo.Create(ctx, userID1, "enc-secret", "[]")
 				require.NoError(t, err)
-				require.NoError(t, totpRepo.SetEnabled(ctx, "user-1", true))
+				require.NoError(t, totpRepo.SetEnabled(ctx, userID1, true))
 
-				_, err = totpRepo.CreateTrustedDevice(ctx, "user-2", "hash-trusted", "ua", time.Now().UTC().Add(24*time.Hour))
+				_, err = totpRepo.CreateTrustedDevice(ctx, userID2, "hash-trusted", "ua", time.Now().UTC().Add(24*time.Hour))
 				require.NoError(t, err)
 
 				tokenSvc.On("Hash", "trusted-cookie-token").Return("hash-trusted").Once()
@@ -139,10 +135,10 @@ func TestInterceptHook(t *testing.T) {
 				verifSvc.On(
 					"Create",
 					mock.Anything,
-					"user-1",
+					userID1,
 					"hash-pending",
 					models.TypeTOTPPendingAuth,
-					"user-1",
+					userID1,
 					plugin.pluginConfig.PendingTokenExpiry,
 				).Return(&models.Verification{ID: "verif-1"}, nil).Once()
 			},
@@ -164,16 +160,16 @@ func TestInterceptHook(t *testing.T) {
 				t.Helper()
 
 				ctx := context.Background()
-				_, err := db.ExecContext(ctx, `INSERT INTO users (id, name, email) VALUES (?, ?, ?)`, "user-1", "User One", "user1@example.com")
+				_, err := db.ExecContext(ctx, `INSERT INTO users (id, name, email) VALUES (?, ?, ?)`, userID1, "User One", "user1@example.com")
 				require.NoError(t, err)
 
 				plugin.totpRepo = totpRepo
 
-				_, err = totpRepo.Create(ctx, "user-1", "enc-secret", "[]")
+				_, err = totpRepo.Create(ctx, userID1, "enc-secret", "[]")
 				require.NoError(t, err)
-				require.NoError(t, totpRepo.SetEnabled(ctx, "user-1", true))
+				require.NoError(t, totpRepo.SetEnabled(ctx, userID1, true))
 
-				_, err = totpRepo.CreateTrustedDevice(ctx, "user-1", "hash-trusted", "ua", time.Now().UTC().Add(24*time.Hour))
+				_, err = totpRepo.CreateTrustedDevice(ctx, userID1, "hash-trusted", "ua", time.Now().UTC().Add(24*time.Hour))
 				require.NoError(t, err)
 
 				tokenSvc.On("Hash", "trusted-cookie-token").Return("hash-trusted").Once()
@@ -202,7 +198,7 @@ func TestInterceptHook(t *testing.T) {
 			req.AddCookie(&http.Cookie{Name: constants.CookieTOTPTrusted, Value: "trusted-cookie-token"})
 			w := httptest.NewRecorder()
 
-			userID := "user-1"
+			userID := userID1
 			reqCtx := &models.RequestContext{
 				Request:        req,
 				ResponseWriter: w,

@@ -3,7 +3,7 @@
 # -------------------
 FROM golang:1.26.4-alpine AS builder
 
-RUN apk add --no-cache git ca-certificates build-base
+RUN apk add --no-cache git ca-certificates
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ RUN go mod download
 
 COPY . ./
 
-RUN CGO_ENABLED=1 GOOS=linux go build \
+RUN GOOS=linux go build \
     -ldflags="-s -w" \
     -o server ./cmd/main.go
 

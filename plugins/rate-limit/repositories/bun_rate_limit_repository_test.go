@@ -46,7 +46,7 @@ func TestBunRateLimitRepository_GetByKey(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			db := tests.NewSQLiteIntegrationDB(t)
+			db := tests.NewIntegrationTestDB(t)
 			repo := NewRateLimitRepository(db)
 			require.NoError(t, db.ResetModel(ctx, (*types.RateLimit)(nil)))
 			defer func() { require.NoError(t, db.Close()) }()
@@ -107,7 +107,7 @@ func TestBunRateLimitRepository_UpdateOrCreate(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			db := tests.NewSQLiteIntegrationDB(t)
+			db := tests.NewIntegrationTestDB(t)
 			repo := NewRateLimitRepository(db)
 			require.NoError(t, db.ResetModel(ctx, (*types.RateLimit)(nil)))
 			defer func() { require.NoError(t, db.Close()) }()
@@ -169,7 +169,7 @@ func TestBunRateLimitRepository_CleanupExpired(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			db := tests.NewSQLiteIntegrationDB(t)
+			db := tests.NewIntegrationTestDB(t)
 			repo := NewRateLimitRepository(db)
 			require.NoError(t, db.ResetModel(ctx, (*types.RateLimit)(nil)))
 			defer func() { require.NoError(t, db.Close()) }()
@@ -213,7 +213,7 @@ func TestBunRateLimitRepository_SetRule(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			db := tests.NewSQLiteIntegrationDB(t)
+			db := tests.NewIntegrationTestDB(t)
 			repo := NewRateLimitRepository(db)
 			require.NoError(t, db.ResetModel(ctx, (*types.RateLimitRuleRecord)(nil)))
 			defer func() { require.NoError(t, db.Close()) }()
@@ -253,7 +253,7 @@ func TestBunRateLimitRepository_GetRule(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			db := tests.NewSQLiteIntegrationDB(t)
+			db := tests.NewIntegrationTestDB(t)
 			repo := NewRateLimitRepository(db)
 			require.NoError(t, db.ResetModel(ctx, (*types.RateLimitRuleRecord)(nil)))
 			defer func() { require.NoError(t, db.Close()) }()
@@ -309,7 +309,7 @@ func TestBunRateLimitRepository_DeleteRule(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			db := tests.NewSQLiteIntegrationDB(t)
+			db := tests.NewIntegrationTestDB(t)
 			repo := NewRateLimitRepository(db)
 			require.NoError(t, db.ResetModel(ctx, (*types.RateLimitRuleRecord)(nil)))
 			defer func() { require.NoError(t, db.Close()) }()

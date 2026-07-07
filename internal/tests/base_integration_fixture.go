@@ -22,7 +22,6 @@ type BaseTestFixture struct {
 	T                   *testing.T
 	DB                  *bun.DB
 	Config              *models.Config
-	Provider            string
 	ServiceRegistry     models.ServiceRegistry
 	UserService         coreservices.UserService
 	AccountService      coreservices.AccountService
@@ -35,12 +34,11 @@ type BaseTestFixture struct {
 func NewBaseTestFixture(t *testing.T, options ...config.ConfigOption) *BaseTestFixture {
 	t.Helper()
 
-	db, provider := NewIntegrationTestDBFromEnv(t)
+	db := NewIntegrationTestDB(t)
 
 	defaultOptions := []config.ConfigOption{
 		config.WithBasePath("/auth"),
 		config.WithSecret("integration-test-secret"),
-		config.WithDatabase(models.DatabaseConfig{Provider: provider}),
 		config.WithEventBus(models.EventBusConfig{Provider: events.ProviderGoChannel}),
 	}
 
@@ -69,7 +67,6 @@ func NewBaseTestFixture(t *testing.T, options ...config.ConfigOption) *BaseTestF
 		T:                   t,
 		DB:                  db,
 		Config:              cfg,
-		Provider:            provider,
 		ServiceRegistry:     serviceRegistry,
 		UserService:         userService,
 		AccountService:      accountService,

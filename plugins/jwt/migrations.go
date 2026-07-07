@@ -5,6 +5,6 @@ import (
 	"github.com/Authula/authula/plugins/jwt/migrationset"
 )
 
-func JWTMigrationsForProvider(provider string) []migrations.Migration {
-	return migrationset.JWTMigrationsForProvider(provider)
+func JWTMigrations() []migrations.Migration {
+	return migrationset.Migrations()
 }

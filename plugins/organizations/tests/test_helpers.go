@@ -2,14 +2,11 @@ package tests
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/sqlitedialect"
 
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/migrations"
@@ -21,35 +18,29 @@ func Actor(userID string) *models.Actor {
 	return &models.Actor{ID: userID, Type: models.ActorUser}
 }
 
-func SetupRepoDB(t *testing.T) *bun.DB {
+func SetupRepoDB(t *testing.T, user1ID, user2ID string) *bun.DB {
 	t.Helper()
 
-	sqlDB, err := sql.Open("sqlite3", ":memory:")
-	require.NoError(t, err)
-	sqlDB.SetMaxOpenConns(1)
-	t.Cleanup(func() { _ = sqlDB.Close() })
-
-	db := bun.NewDB(sqlDB, sqlitedialect.New())
-	t.Cleanup(func() { _ = db.Close() })
+	db := internaltests.NewIntegrationTestDB(t)
 
 	ctx := context.Background()
 	migrator, err := migrations.NewMigrator(db, &internaltests.MockLogger{})
 	require.NoError(t, err)
 
-	coreSet, err := migrations.CoreMigrationSet("sqlite")
+	coreSet, err := migrations.CoreMigrationSet()
 	require.NoError(t, err)
 
 	orgSet := migrations.MigrationSet{
 		PluginID:   models.PluginOrganizations.String(),
 		DependsOn:  []string{migrations.CorePluginID},
-		Migrations: orgpluginmigrations.ForProvider("sqlite"),
+		Migrations: orgpluginmigrations.Migrations(),
 	}
 
 	err = migrator.Migrate(ctx, []migrations.MigrationSet{coreSet, orgSet})
 	require.NoError(t, err)
 
-	SeedUser(t, db, "user-1")
-	SeedUser(t, db, "user-2")
+	SeedUser(t, db, user1ID)
+	SeedUser(t, db, user2ID)
 
 	return db
 }

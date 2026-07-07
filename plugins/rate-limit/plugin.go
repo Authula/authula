@@ -73,11 +73,11 @@ func (p *RateLimitPlugin) trySecondaryStorage() types.RateLimitProvider {
 	return provider
 }
 
-func (p *RateLimitPlugin) Migrations(provider string) []migrations.Migration {
+func (p *RateLimitPlugin) Migrations() []migrations.Migration {
 	if p.pluginConfig.Provider != types.RateLimitProviderDatabase {
 		return nil
 	}
-	return ratelimitMigrationsForProvider(provider)
+	return ratelimitMigrations()
 }
 
 func (p *RateLimitPlugin) DependsOn() []string {

@@ -15,7 +15,7 @@ import (
 
 func setupImpersonationRepo(t *testing.T) (*repositories.BunImpersonationRepository, *bun.DB, func()) {
 	t.Helper()
-	db, _ := tests.NewIntegrationTestDBFromEnv(t)
+	db := tests.NewIntegrationTestDB(t)
 
 	ctx := context.Background()
 	if _, err := db.NewCreateTable().Model((*types.Impersonation)(nil)).IfNotExists().Exec(ctx); err != nil {

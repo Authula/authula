@@ -113,8 +113,8 @@ func (p *ApiKeyPlugin) Init(ctx *models.PluginContext) error {
 	return nil
 }
 
-func (p *ApiKeyPlugin) Migrations(provider string) []migrations.Migration {
-	return apiKeyMigrationsForProvider(provider)
+func (p *ApiKeyPlugin) Migrations() []migrations.Migration {
+	return apiKeyMigrations()
 }
 
 func (p *ApiKeyPlugin) DependsOn() []string {

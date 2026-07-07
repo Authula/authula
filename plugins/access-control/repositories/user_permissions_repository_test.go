@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
+
 	plugintests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -13,6 +15,13 @@ func TestBunUserPermissionsRepositoryGetUserPermissions(t *testing.T) {
 
 	description := new(string)
 	*description = "Read users"
+
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	role1ID := uuid.New().String()
+	role2ID := uuid.New().String()
+	perm1ID := uuid.New().String()
+	perm2ID := uuid.New().String()
 
 	tests := []struct {
 		name      string
@@ -24,39 +33,39 @@ func TestBunUserPermissionsRepositoryGetUserPermissions(t *testing.T) {
 	}{
 		{
 			name:      "empty result",
-			userID:    "missing-user",
+			userID:    "00000000-0000-0000-0000-000000000000",
 			wantEmpty: true,
 		},
 		{
 			name:   "aggregates permissions across roles and ignores expired roles",
-			userID: "u1",
+			userID: user1ID,
 			seed: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: role1ID, Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-2", Name: "viewer", Weight: 10}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: role2ID, Name: "viewer", Weight: 10}); err != nil {
 					panic(err)
 				}
-				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read", Description: description}); err != nil {
+				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: perm1ID, Key: "users.read", Description: description}); err != nil {
 					panic(err)
 				}
-				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-2", Key: "users.write"}); err != nil {
+				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: perm2ID, Key: "users.write"}); err != nil {
 					panic(err)
 				}
-				grantedBy := "u2"
-				if err := rolePermissionsRepo.AddRolePermission(ctx, "role-1", "perm-1", &grantedBy); err != nil {
+				grantedBy := user2ID
+				if err := rolePermissionsRepo.AddRolePermission(ctx, role1ID, perm1ID, &grantedBy); err != nil {
 					panic(err)
 				}
-				if err := rolePermissionsRepo.AddRolePermission(ctx, "role-2", "perm-1", nil); err != nil {
+				if err := rolePermissionsRepo.AddRolePermission(ctx, role2ID, perm1ID, nil); err != nil {
 					panic(err)
 				}
-				if err := rolePermissionsRepo.AddRolePermission(ctx, "role-2", "perm-2", &grantedBy); err != nil {
+				if err := rolePermissionsRepo.AddRolePermission(ctx, role2ID, perm2ID, &grantedBy); err != nil {
 					panic(err)
 				}
-				if err := userRolesRepo.AssignUserRole(ctx, "u1", "role-1", &grantedBy, nil); err != nil {
+				if err := userRolesRepo.AssignUserRole(ctx, user1ID, role1ID, &grantedBy, nil); err != nil {
 					panic(err)
 				}
-				if err := userRolesRepo.AssignUserRole(ctx, "u1", "role-2", nil, nil); err != nil {
+				if err := userRolesRepo.AssignUserRole(ctx, user1ID, role2ID, nil, nil); err != nil {
 					panic(err)
 				}
 			},
@@ -69,7 +78,7 @@ func TestBunUserPermissionsRepositoryGetUserPermissions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			rolesRepo := NewBunRolesRepository(db)
 			permissionsRepo := NewBunPermissionsRepository(db)
 			rolePermissionsRepo := NewBunRolePermissionsRepository(db)
@@ -118,6 +127,9 @@ func TestBunUserPermissionsRepositoryGetUserPermissions(t *testing.T) {
 func TestBunUserPermissionsRepositoryHasPermissions(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+
 	tests := []struct {
 		name           string
 		seed           func(*BunRolesRepository, *BunPermissionsRepository, *BunRolePermissionsRepository, *BunUserRolesRepository, context.Context)
@@ -127,25 +139,27 @@ func TestBunUserPermissionsRepositoryHasPermissions(t *testing.T) {
 	}{
 		{
 			name:           "empty permission list returns true",
-			userID:         "u1",
+			userID:         user1ID,
 			permissionKeys: []string{},
 			wantHasPerms:   true,
 		},
 		{
 			name:           "missing permission returns false",
-			userID:         "u1",
+			userID:         user1ID,
 			permissionKeys: []string{"users.read", "users.delete"},
 			seed: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
+				roleID := uuid.New().String()
+				permID := uuid.New().String()
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: roleID, Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
-				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read"}); err != nil {
+				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: permID, Key: "users.read"}); err != nil {
 					panic(err)
 				}
-				if err := rolePermissionsRepo.AddRolePermission(ctx, "role-1", "perm-1", nil); err != nil {
+				if err := rolePermissionsRepo.AddRolePermission(ctx, roleID, permID, nil); err != nil {
 					panic(err)
 				}
-				if err := userRolesRepo.AssignUserRole(ctx, "u1", "role-1", nil, nil); err != nil {
+				if err := userRolesRepo.AssignUserRole(ctx, user1ID, roleID, nil, nil); err != nil {
 					panic(err)
 				}
 			},
@@ -153,20 +167,22 @@ func TestBunUserPermissionsRepositoryHasPermissions(t *testing.T) {
 		},
 		{
 			name:           "success",
-			userID:         "u1",
+			userID:         user1ID,
 			permissionKeys: []string{"users.read"},
 			seed: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
+				roleID := uuid.New().String()
+				permID := uuid.New().String()
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: roleID, Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
-				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read"}); err != nil {
+				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: permID, Key: "users.read"}); err != nil {
 					panic(err)
 				}
-				grantedBy := "u2"
-				if err := rolePermissionsRepo.AddRolePermission(ctx, "role-1", "perm-1", &grantedBy); err != nil {
+				grantedBy := user2ID
+				if err := rolePermissionsRepo.AddRolePermission(ctx, roleID, permID, &grantedBy); err != nil {
 					panic(err)
 				}
-				if err := userRolesRepo.AssignUserRole(ctx, "u1", "role-1", nil, nil); err != nil {
+				if err := userRolesRepo.AssignUserRole(ctx, user1ID, roleID, nil, nil); err != nil {
 					panic(err)
 				}
 			},
@@ -178,7 +194,7 @@ func TestBunUserPermissionsRepositoryHasPermissions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			rolesRepo := NewBunRolesRepository(db)
 			permissionsRepo := NewBunPermissionsRepository(db)
 			rolePermissionsRepo := NewBunRolePermissionsRepository(db)

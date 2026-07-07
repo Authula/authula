@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,11 +15,9 @@ import (
 	"github.com/ThreeDotsLabs/watermill-nats/v2/pkg/nats"
 	"github.com/ThreeDotsLabs/watermill-redisstream/pkg/redisstream"
 	watermillSQL "github.com/ThreeDotsLabs/watermill-sql/v3/pkg/sql"
-	"github.com/ThreeDotsLabs/watermill-sqlite/wmsqlitezombiezen"
 	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
-	"zombiezen.com/go/sqlite/sqlitex"
 
 	"github.com/Authula/authula/env"
 	"github.com/Authula/authula/events"
@@ -48,8 +45,6 @@ func InitWatermillProvider(config *models.EventBusConfig, logger watermill.Logge
 		return initNATS(logger, config.NATS)
 	case events.ProviderPostgres:
 		return initPostgres(logger, config.PostgreSQL)
-	case events.ProviderSQLite:
-		return initSQLite(logger, config.SQLite)
 	default:
 		return nil, fmt.Errorf("unsupported event bus provider: %s", config.Provider)
 	}
@@ -72,61 +67,6 @@ func initGoChannel(logger watermill.LoggerAdapter, config *models.GoChannelConfi
 	)
 
 	return NewWatermillPubSub(pubSub, pubSub), nil
-}
-
-// initSQLite initializes a SQLite provider using the ZombieZen driver
-func initSQLite(logger watermill.LoggerAdapter, config *models.SQLiteConfig) (models.PubSub, error) {
-	dbPath := "events.db"
-	if config != nil && config.DBPath != "" {
-		dbPath = config.DBPath
-	}
-
-	// Create directory if it doesn't exist
-	dir := filepath.Dir(dbPath)
-	if dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return nil, fmt.Errorf("failed to create directory for sqlite database: %w", err)
-		}
-	}
-
-	// NewSubscriber expects a connection DSN string
-	subscriber, err := wmsqlitezombiezen.NewSubscriber(
-		dbPath,
-		wmsqlitezombiezen.SubscriberOptions{
-			InitializeSchema: true,
-			Logger:           logger,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create sqlite subscriber: %w", err)
-	}
-
-	// For the publisher, we need to get a connection from the pool
-	// Create a pool to get a connection for the publisher
-	pool, err := sqlitex.NewPool("file:"+dbPath, sqlitex.PoolOptions{
-		PoolSize: 5,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create sqlite connection pool: %w", err)
-	}
-
-	conn, err := pool.Take(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sqlite connection from pool: %w", err)
-	}
-
-	publisher, err := wmsqlitezombiezen.NewPublisher(
-		conn,
-		wmsqlitezombiezen.PublisherOptions{
-			Logger: logger,
-		},
-	)
-	if err != nil {
-		pool.Put(conn)
-		return nil, fmt.Errorf("failed to create sqlite publisher: %w", err)
-	}
-
-	return NewWatermillPubSub(publisher, subscriber), nil
 }
 
 // initPostgres initializes a Postgres SQL provider

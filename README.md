@@ -55,7 +55,7 @@ Authula comes with a variety of plugins that provide essential authentication fe
 - Email & Password: Email-based flows for registration, login, email verification, password reset & email change.
 - OAuth providers
 - TOTP: Authenticator app support, backup codes, trusted devices for two-factor authentication
-- Multiple database backends (SQLite, PostgreSQL, MySQL)
+- PostgreSQL database (primary)
 - Secondary storage (In-memory, DB, Redis)
 - Rate limiting
 - CSRF protection

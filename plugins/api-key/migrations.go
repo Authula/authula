@@ -5,6 +5,6 @@ import (
 	"github.com/Authula/authula/plugins/api-key/migrationset"
 )
 
-func apiKeyMigrationsForProvider(provider string) []migrations.Migration {
-	return migrationset.ForProvider(provider)
+func apiKeyMigrations() []migrations.Migration {
+	return migrationset.Migrations()
 }

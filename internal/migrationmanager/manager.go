@@ -30,13 +30,13 @@ func (m *Manager) Migrator() *migrationsmodule.Migrator {
 	return m.migrator
 }
 
-// RunCore executes the core migrations for the configured provider.
-func (m *Manager) RunCore(ctx context.Context, provider string) error {
+// RunCore executes the core migrations.
+func (m *Manager) RunCore(ctx context.Context) error {
 	if err := m.requireMigrator(); err != nil {
 		return err
 	}
 
-	set, err := migrationsmodule.CoreMigrationSet(provider)
+	set, err := migrationsmodule.CoreMigrationSet()
 	if err != nil {
 		return err
 	}
@@ -45,12 +45,12 @@ func (m *Manager) RunCore(ctx context.Context, provider string) error {
 }
 
 // DropCore rolls back all core migrations.
-func (m *Manager) DropCore(ctx context.Context, provider string) error {
+func (m *Manager) DropCore(ctx context.Context) error {
 	if err := m.requireMigrator(); err != nil {
 		return err
 	}
 
-	set, err := migrationsmodule.CoreMigrationSet(provider)
+	set, err := migrationsmodule.CoreMigrationSet()
 	if err != nil {
 		return err
 	}
@@ -59,12 +59,12 @@ func (m *Manager) DropCore(ctx context.Context, provider string) error {
 }
 
 // RunPlugins executes migrations for all selected plugins.
-func (m *Manager) RunPlugins(ctx context.Context, provider string, plugins []models.Plugin, selector PluginSelector) error {
+func (m *Manager) RunPlugins(ctx context.Context, plugins []models.Plugin, selector PluginSelector) error {
 	if err := m.requireMigrator(); err != nil {
 		return err
 	}
 
-	sets := m.PlanPlugins(provider, plugins, selector)
+	sets := m.PlanPlugins(plugins, selector)
 	if len(sets) == 0 {
 		return nil
 	}
@@ -73,12 +73,12 @@ func (m *Manager) RunPlugins(ctx context.Context, provider string, plugins []mod
 }
 
 // DropPlugins rolls back migrations for all selected plugins.
-func (m *Manager) DropPlugins(ctx context.Context, provider string, plugins []models.Plugin, selector PluginSelector) error {
+func (m *Manager) DropPlugins(ctx context.Context, plugins []models.Plugin, selector PluginSelector) error {
 	if err := m.requireMigrator(); err != nil {
 		return err
 	}
 
-	sets := m.PlanPlugins(provider, plugins, selector)
+	sets := m.PlanPlugins(plugins, selector)
 	if len(sets) == 0 {
 		return nil
 	}
@@ -87,7 +87,7 @@ func (m *Manager) DropPlugins(ctx context.Context, provider string, plugins []mo
 }
 
 // PlanPlugins builds migration sets for plugins matching the selector.
-func (m *Manager) PlanPlugins(provider string, plugins []models.Plugin, selector PluginSelector) []migrationsmodule.MigrationSet {
+func (m *Manager) PlanPlugins(plugins []models.Plugin, selector PluginSelector) []migrationsmodule.MigrationSet {
 	if len(plugins) == 0 {
 		return nil
 	}
@@ -103,7 +103,7 @@ func (m *Manager) PlanPlugins(provider string, plugins []models.Plugin, selector
 			continue
 		}
 
-		migrations := migratable.Migrations(provider)
+		migrations := migratable.Migrations()
 		if len(migrations) == 0 {
 			continue
 		}

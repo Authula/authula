@@ -2,25 +2,19 @@ package secondarystorage
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strconv"
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/sqlitedialect"
+
+	"github.com/Authula/authula/internal/tests"
 )
 
-// Helper function to create an in-memory SQLite database for testing
+// Helper function to create a test database
 func newTestDB(t *testing.T) bun.IDB {
-	sqldb, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to create test database: %v", err)
-	}
-
-	db := bun.NewDB(sqldb, sqlitedialect.New())
+	db := tests.NewIntegrationTestDB(t)
 
 	// Create the KeyValueStore table
 	ctx := context.Background()
@@ -402,18 +396,7 @@ func TestDatabaseStorage_MultipleKeys(t *testing.T) {
 }
 
 func TestDatabaseStorage_ConcurrentReads(t *testing.T) {
-	// Use file-based SQLite for concurrent tests as :memory: doesn't handle concurrency well
-	sqldb, err := sql.Open("sqlite3", "file::memory:?cache=shared")
-	if err != nil {
-		t.Fatalf("failed to create test database: %v", err)
-	}
-
-	db := bun.NewDB(sqldb, sqlitedialect.New())
-
-	ctx := context.Background()
-	if _, err := db.NewCreateTable().Model(&KeyValueStore{}).Exec(ctx); err != nil {
-		t.Fatalf("failed to create KeyValueStore table: %v", err)
-	}
+	db := newTestDB(t)
 
 	storage := newTestDatabaseStorage(t, db)
 	defer func() {
@@ -422,7 +405,7 @@ func TestDatabaseStorage_ConcurrentReads(t *testing.T) {
 		}
 	}()
 
-	ctx = context.Background()
+	ctx := context.Background()
 	key := "concurrent_key"
 	value := "concurrent_value"
 
@@ -687,20 +670,9 @@ func TestDatabaseStorage_DifferentValueTypes(t *testing.T) {
 }
 
 func TestDatabaseStorage_PersistenceAcrossInstances(t *testing.T) {
-	// Create a persistent DB (not in-memory)
-	sqldb, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to create test database: %v", err)
-	}
-
-	db := bun.NewDB(sqldb, sqlitedialect.New())
+	db := newTestDB(t)
 
 	ctx := context.Background()
-	if _, err := db.NewCreateTable().Model(&KeyValueStore{}).Exec(ctx); err != nil {
-		t.Fatalf("failed to create KeyValueStore table: %v", err)
-	}
-
-	ctx = context.Background()
 
 	// Create first storage instance and set values
 	storage1 := newTestDatabaseStorage(t, db)

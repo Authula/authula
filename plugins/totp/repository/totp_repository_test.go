@@ -2,14 +2,12 @@ package repository_test
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/sqlitedialect"
 
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/migrations"
@@ -21,20 +19,15 @@ import (
 func newTestTOTPDB(t *testing.T) *bun.DB {
 	t.Helper()
 
-	sqlDB, err := sql.Open("sqlite3", ":memory:")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = sqlDB.Close() })
-
-	db := bun.NewDB(sqlDB, sqlitedialect.New())
-	t.Cleanup(func() { _ = db.Close() })
+	db := internaltests.NewIntegrationTestDB(t)
 
 	ctx := context.Background()
 	migrator, err := migrations.NewMigrator(db, &internaltests.MockLogger{})
 	require.NoError(t, err)
 
-	coreSet, err := migrations.CoreMigrationSet("sqlite")
+	coreSet, err := migrations.CoreMigrationSet()
 	require.NoError(t, err)
-	totpSet := totpplugin.MigrationSet("sqlite")
+	totpSet := totpplugin.MigrationSet()
 
 	err = migrator.Migrate(ctx, []migrations.MigrationSet{coreSet, totpSet})
 	require.NoError(t, err)
@@ -87,20 +80,21 @@ func TestWithTx(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-with-tx-1")
-				createTestTOTPRecord(t, ctx, repo, "user-with-tx-1")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTOTPRecord(t, ctx, repo, userID)
 
 				tx, err := db.BeginTx(ctx, nil)
 				require.NoError(t, err)
 
 				txRepo := repo.WithTx(tx)
-				err = txRepo.UpdateBackupCodes(ctx, "user-with-tx-1", `["h2"]`)
+				err = txRepo.UpdateBackupCodes(ctx, userID, `["h2"]`)
 				require.NoError(t, err)
 
 				err = tx.Commit()
 				require.NoError(t, err)
 
-				record, err := repo.GetByUserID(ctx, "user-with-tx-1")
+				record, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 				require.Equal(t, `["h2"]`, record.BackupCodes)
 			},
@@ -112,20 +106,21 @@ func TestWithTx(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-with-tx-2")
-				createTestTOTPRecord(t, ctx, repo, "user-with-tx-2")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTOTPRecord(t, ctx, repo, userID)
 
 				tx, err := db.BeginTx(ctx, nil)
 				require.NoError(t, err)
 
 				txRepo := repo.WithTx(tx)
-				err = txRepo.UpdateBackupCodes(ctx, "user-with-tx-2", `["rolled-back"]`)
+				err = txRepo.UpdateBackupCodes(ctx, userID, `["rolled-back"]`)
 				require.NoError(t, err)
 
 				err = tx.Rollback()
 				require.NoError(t, err)
 
-				record, err := repo.GetByUserID(ctx, "user-with-tx-2")
+				record, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 				require.Equal(t, `["h1","h2"]`, record.BackupCodes)
 			},
@@ -144,14 +139,15 @@ func TestGetByUserID(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-get-1")
-				created := createTestTOTPRecord(t, ctx, repo, "user-get-1")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				created := createTestTOTPRecord(t, ctx, repo, userID)
 
-				record, err := repo.GetByUserID(ctx, "user-get-1")
+				record, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 				require.NotNil(t, record)
 				require.Equal(t, created.ID, record.ID)
-				require.Equal(t, "user-get-1", record.UserID)
+				require.Equal(t, userID, record.UserID)
 				require.Equal(t, "encrypted-secret", record.Secret)
 				require.Equal(t, `["h1","h2"]`, record.BackupCodes)
 			},
@@ -163,7 +159,7 @@ func TestGetByUserID(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				record, err := repo.GetByUserID(ctx, "missing-user")
+				record, err := repo.GetByUserID(ctx, "00000000-0000-0000-0000-000000000000")
 				require.NoError(t, err)
 				require.Nil(t, record)
 			},
@@ -182,13 +178,14 @@ func TestCreate(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-create-1")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
 
-				record, err := repo.Create(ctx, "user-create-1", "secret-value", `["a","b"]`)
+				record, err := repo.Create(ctx, userID, "secret-value", `["a","b"]`)
 				require.NoError(t, err)
 				require.NotNil(t, record)
 				require.NotEmpty(t, record.ID)
-				require.Equal(t, "user-create-1", record.UserID)
+				require.Equal(t, userID, record.UserID)
 				require.Equal(t, "secret-value", record.Secret)
 				require.Equal(t, `["a","b"]`, record.BackupCodes)
 				require.False(t, record.CreatedAt.IsZero())
@@ -202,12 +199,13 @@ func TestCreate(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-create-2")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
 
-				_, err := repo.Create(ctx, "user-create-2", "secret-value", `["a","b"]`)
+				_, err := repo.Create(ctx, userID, "secret-value", `["a","b"]`)
 				require.NoError(t, err)
 
-				record, err := repo.GetByUserID(ctx, "user-create-2")
+				record, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 				require.NotNil(t, record)
 				require.Equal(t, "secret-value", record.Secret)
@@ -228,13 +226,14 @@ func TestUpdateBackupCodes(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-update-1")
-				createTestTOTPRecord(t, ctx, repo, "user-update-1")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTOTPRecord(t, ctx, repo, userID)
 
-				err := repo.UpdateBackupCodes(ctx, "user-update-1", `["h2"]`)
+				err := repo.UpdateBackupCodes(ctx, userID, `["h2"]`)
 				require.NoError(t, err)
 
-				record, err := repo.GetByUserID(ctx, "user-update-1")
+				record, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 				require.Equal(t, `["h2"]`, record.BackupCodes)
 			},
@@ -246,17 +245,18 @@ func TestUpdateBackupCodes(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-update-2")
-				createTestTOTPRecord(t, ctx, repo, "user-update-2")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTOTPRecord(t, ctx, repo, userID)
 
-				before, err := repo.GetByUserID(ctx, "user-update-2")
+				before, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 
 				time.Sleep(5 * time.Millisecond)
-				err = repo.UpdateBackupCodes(ctx, "user-update-2", `["changed"]`)
+				err = repo.UpdateBackupCodes(ctx, userID, `["changed"]`)
 				require.NoError(t, err)
 
-				after, err := repo.GetByUserID(ctx, "user-update-2")
+				after, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 				require.True(t, after.UpdatedAt.After(before.UpdatedAt) || after.UpdatedAt.Equal(before.UpdatedAt))
 			},
@@ -268,13 +268,14 @@ func TestUpdateBackupCodes(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-update-3")
-				createTestTOTPRecord(t, ctx, repo, "user-update-3")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTOTPRecord(t, ctx, repo, userID)
 
-				err := repo.UpdateBackupCodes(ctx, "user-update-3", `["only-one"]`)
+				err := repo.UpdateBackupCodes(ctx, userID, `["only-one"]`)
 				require.NoError(t, err)
 
-				record, err := repo.GetByUserID(ctx, "user-update-3")
+				record, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 				require.Equal(t, `["only-one"]`, record.BackupCodes)
 				require.NotEqual(t, `["h1","h2"]`, record.BackupCodes)
@@ -294,14 +295,15 @@ func TestCompareAndSwapBackupCodes(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-cas-1")
-				createTestTOTPRecord(t, ctx, repo, "user-cas-1")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTOTPRecord(t, ctx, repo, userID)
 
-				updated, err := repo.CompareAndSwapBackupCodes(ctx, "user-cas-1", `["h1","h2"]`, `["h2"]`)
+				updated, err := repo.CompareAndSwapBackupCodes(ctx, userID, `["h1","h2"]`, `["h2"]`)
 				require.NoError(t, err)
 				require.True(t, updated)
 
-				record, err := repo.GetByUserID(ctx, "user-cas-1")
+				record, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 				require.Equal(t, `["h2"]`, record.BackupCodes)
 			},
@@ -313,14 +315,15 @@ func TestCompareAndSwapBackupCodes(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-cas-2")
-				createTestTOTPRecord(t, ctx, repo, "user-cas-2")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTOTPRecord(t, ctx, repo, userID)
 
-				updated, err := repo.CompareAndSwapBackupCodes(ctx, "user-cas-2", `["bad"]`, `[]`)
+				updated, err := repo.CompareAndSwapBackupCodes(ctx, userID, `["bad"]`, `[]`)
 				require.NoError(t, err)
 				require.False(t, updated)
 
-				record, err := repo.GetByUserID(ctx, "user-cas-2")
+				record, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 				require.Equal(t, `["h1","h2"]`, record.BackupCodes)
 			},
@@ -339,13 +342,14 @@ func TestDeleteByUserID(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-delete-1")
-				createTestTOTPRecord(t, ctx, repo, "user-delete-1")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTOTPRecord(t, ctx, repo, userID)
 
-				err := repo.DeleteByUserID(ctx, "user-delete-1")
+				err := repo.DeleteByUserID(ctx, userID)
 				require.NoError(t, err)
 
-				record, err := repo.GetByUserID(ctx, "user-delete-1")
+				record, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 				require.Nil(t, record)
 			},
@@ -357,7 +361,7 @@ func TestDeleteByUserID(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				err := repo.DeleteByUserID(ctx, "missing-user")
+				err := repo.DeleteByUserID(ctx, "00000000-0000-0000-0000-000000000000")
 				require.NoError(t, err)
 			},
 		},
@@ -375,12 +379,13 @@ func TestIsEnabled(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-enabled-1")
-				createTestTOTPRecord(t, ctx, repo, "user-enabled-1")
-				err := repo.SetEnabled(ctx, "user-enabled-1", true)
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTOTPRecord(t, ctx, repo, userID)
+				err := repo.SetEnabled(ctx, userID, true)
 				require.NoError(t, err)
 
-				enabled, err := repo.IsEnabled(ctx, "user-enabled-1")
+				enabled, err := repo.IsEnabled(ctx, userID)
 				require.NoError(t, err)
 				require.True(t, enabled)
 			},
@@ -392,10 +397,11 @@ func TestIsEnabled(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-enabled-2")
-				createTestTOTPRecord(t, ctx, repo, "user-enabled-2")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTOTPRecord(t, ctx, repo, userID)
 
-				enabled, err := repo.IsEnabled(ctx, "user-enabled-2")
+				enabled, err := repo.IsEnabled(ctx, userID)
 				require.NoError(t, err)
 				require.False(t, enabled)
 			},
@@ -407,7 +413,7 @@ func TestIsEnabled(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				enabled, err := repo.IsEnabled(ctx, "missing-user")
+				enabled, err := repo.IsEnabled(ctx, "00000000-0000-0000-0000-000000000000")
 				require.NoError(t, err)
 				require.False(t, enabled)
 			},
@@ -426,13 +432,14 @@ func TestSetEnabled(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-set-enabled-1")
-				createTestTOTPRecord(t, ctx, repo, "user-set-enabled-1")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTOTPRecord(t, ctx, repo, userID)
 
-				err := repo.SetEnabled(ctx, "user-set-enabled-1", true)
+				err := repo.SetEnabled(ctx, userID, true)
 				require.NoError(t, err)
 
-				record, err := repo.GetByUserID(ctx, "user-set-enabled-1")
+				record, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 				require.True(t, record.Enabled)
 			},
@@ -444,17 +451,18 @@ func TestSetEnabled(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-set-enabled-2")
-				createTestTOTPRecord(t, ctx, repo, "user-set-enabled-2")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTOTPRecord(t, ctx, repo, userID)
 
-				before, err := repo.GetByUserID(ctx, "user-set-enabled-2")
+				before, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 
 				time.Sleep(5 * time.Millisecond)
-				err = repo.SetEnabled(ctx, "user-set-enabled-2", true)
+				err = repo.SetEnabled(ctx, userID, true)
 				require.NoError(t, err)
 
-				after, err := repo.GetByUserID(ctx, "user-set-enabled-2")
+				after, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 				require.True(t, after.UpdatedAt.After(before.UpdatedAt) || after.UpdatedAt.Equal(before.UpdatedAt))
 			},
@@ -466,15 +474,16 @@ func TestSetEnabled(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-set-enabled-3")
-				createTestTOTPRecord(t, ctx, repo, "user-set-enabled-3")
-				err := repo.SetEnabled(ctx, "user-set-enabled-3", true)
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTOTPRecord(t, ctx, repo, userID)
+				err := repo.SetEnabled(ctx, userID, true)
 				require.NoError(t, err)
 
-				err = repo.SetEnabled(ctx, "user-set-enabled-3", false)
+				err = repo.SetEnabled(ctx, userID, false)
 				require.NoError(t, err)
 
-				record, err := repo.GetByUserID(ctx, "user-set-enabled-3")
+				record, err := repo.GetByUserID(ctx, userID)
 				require.NoError(t, err)
 				require.False(t, record.Enabled)
 			},
@@ -493,14 +502,15 @@ func TestGetTrustedDeviceByToken(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-device-get-1")
-				created := createTestTrustedDevice(t, ctx, repo, "user-device-get-1", "token-1", "ua-1")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				created := createTestTrustedDevice(t, ctx, repo, userID, "token-1", "ua-1")
 
 				device, err := repo.GetTrustedDeviceByToken(ctx, "token-1")
 				require.NoError(t, err)
 				require.NotNil(t, device)
 				require.Equal(t, created.ID, device.ID)
-				require.Equal(t, "user-device-get-1", device.UserID)
+				require.Equal(t, userID, device.UserID)
 				require.Equal(t, "token-1", device.Token)
 				require.Equal(t, "ua-1", device.UserAgent)
 			},
@@ -531,14 +541,15 @@ func TestCreateTrustedDevice(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-device-create-1")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
 				expiresAt := time.Now().UTC().Add(48 * time.Hour)
 
-				device, err := repo.CreateTrustedDevice(ctx, "user-device-create-1", "token-create-1", "ua-create", expiresAt)
+				device, err := repo.CreateTrustedDevice(ctx, userID, "token-create-1", "ua-create", expiresAt)
 				require.NoError(t, err)
 				require.NotNil(t, device)
 				require.NotEmpty(t, device.ID)
-				require.Equal(t, "user-device-create-1", device.UserID)
+				require.Equal(t, userID, device.UserID)
 				require.Equal(t, "token-create-1", device.Token)
 				require.Equal(t, "ua-create", device.UserAgent)
 				require.WithinDuration(t, expiresAt, device.ExpiresAt, time.Second)
@@ -551,16 +562,17 @@ func TestCreateTrustedDevice(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-device-create-2")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
 				expiresAt := time.Now().UTC().Add(24 * time.Hour)
 
-				_, err := repo.CreateTrustedDevice(ctx, "user-device-create-2", "token-create-2", "ua-create", expiresAt)
+				_, err := repo.CreateTrustedDevice(ctx, userID, "token-create-2", "ua-create", expiresAt)
 				require.NoError(t, err)
 
 				device, err := repo.GetTrustedDeviceByToken(ctx, "token-create-2")
 				require.NoError(t, err)
 				require.NotNil(t, device)
-				require.Equal(t, "user-device-create-2", device.UserID)
+				require.Equal(t, userID, device.UserID)
 			},
 		},
 	}
@@ -577,8 +589,9 @@ func TestRefreshTrustedDevice(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-refresh-1")
-				createTestTrustedDevice(t, ctx, repo, "user-refresh-1", "token-refresh-1", "ua")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTrustedDevice(t, ctx, repo, userID, "token-refresh-1", "ua")
 
 				newExpiry := time.Now().UTC().Add(72 * time.Hour)
 				err := repo.RefreshTrustedDevice(ctx, "token-refresh-1", newExpiry)
@@ -597,9 +610,10 @@ func TestRefreshTrustedDevice(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-refresh-2")
-				createTestTrustedDevice(t, ctx, repo, "user-refresh-2", "token-refresh-2a", "ua-a")
-				original := createTestTrustedDevice(t, ctx, repo, "user-refresh-2", "token-refresh-2b", "ua-b")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTrustedDevice(t, ctx, repo, userID, "token-refresh-2a", "ua-a")
+				original := createTestTrustedDevice(t, ctx, repo, userID, "token-refresh-2b", "ua-b")
 
 				newExpiry := time.Now().UTC().Add(96 * time.Hour)
 				err := repo.RefreshTrustedDevice(ctx, "token-refresh-2a", newExpiry)
@@ -625,11 +639,12 @@ func TestDeleteTrustedDevicesByUserID(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-device-delete-1")
-				createTestTrustedDevice(t, ctx, repo, "user-device-delete-1", "token-del-1", "ua")
-				createTestTrustedDevice(t, ctx, repo, "user-device-delete-1", "token-del-2", "ua")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
+				createTestTrustedDevice(t, ctx, repo, userID, "token-del-1", "ua")
+				createTestTrustedDevice(t, ctx, repo, userID, "token-del-2", "ua")
 
-				err := repo.DeleteTrustedDevicesByUserID(ctx, "user-device-delete-1")
+				err := repo.DeleteTrustedDevicesByUserID(ctx, userID)
 				require.NoError(t, err)
 
 				dev1, err := repo.GetTrustedDeviceByToken(ctx, "token-del-1")
@@ -648,12 +663,14 @@ func TestDeleteTrustedDevicesByUserID(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-device-delete-2a")
-				createTestUser(t, ctx, db, "user-device-delete-2b")
-				createTestTrustedDevice(t, ctx, repo, "user-device-delete-2a", "token-del-3", "ua")
-				createTestTrustedDevice(t, ctx, repo, "user-device-delete-2b", "token-del-4", "ua")
+				userID1 := uuid.New().String()
+				userID2 := uuid.New().String()
+				createTestUser(t, ctx, db, userID1)
+				createTestUser(t, ctx, db, userID2)
+				createTestTrustedDevice(t, ctx, repo, userID1, "token-del-3", "ua")
+				createTestTrustedDevice(t, ctx, repo, userID2, "token-del-4", "ua")
 
-				err := repo.DeleteTrustedDevicesByUserID(ctx, "user-device-delete-2a")
+				err := repo.DeleteTrustedDevicesByUserID(ctx, userID1)
 				require.NoError(t, err)
 
 				removed, err := repo.GetTrustedDeviceByToken(ctx, "token-del-3")
@@ -672,7 +689,7 @@ func TestDeleteTrustedDevicesByUserID(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				err := repo.DeleteTrustedDevicesByUserID(ctx, "missing-user")
+				err := repo.DeleteTrustedDevicesByUserID(ctx, "00000000-0000-0000-0000-000000000000")
 				require.NoError(t, err)
 			},
 		},
@@ -690,11 +707,12 @@ func TestDeleteExpiredTrustedDevices(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-expired-1")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
 
-				_, err := repo.CreateTrustedDevice(ctx, "user-expired-1", "token-expired", "ua", time.Now().UTC().Add(-2*time.Hour))
+				_, err := repo.CreateTrustedDevice(ctx, userID, "token-expired", "ua", time.Now().UTC().Add(-2*time.Hour))
 				require.NoError(t, err)
-				_, err = repo.CreateTrustedDevice(ctx, "user-expired-1", "token-valid", "ua", time.Now().UTC().Add(2*time.Hour))
+				_, err = repo.CreateTrustedDevice(ctx, userID, "token-valid", "ua", time.Now().UTC().Add(2*time.Hour))
 				require.NoError(t, err)
 
 				err = repo.DeleteExpiredTrustedDevices(ctx)
@@ -712,9 +730,10 @@ func TestDeleteExpiredTrustedDevices(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-expired-2")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
 
-				_, err := repo.CreateTrustedDevice(ctx, "user-expired-2", "token-valid-2", "ua", time.Now().UTC().Add(3*time.Hour))
+				_, err := repo.CreateTrustedDevice(ctx, userID, "token-valid-2", "ua", time.Now().UTC().Add(3*time.Hour))
 				require.NoError(t, err)
 
 				err = repo.DeleteExpiredTrustedDevices(ctx)
@@ -732,9 +751,10 @@ func TestDeleteExpiredTrustedDevices(t *testing.T) {
 				repo := repository.NewTOTPRepository(db)
 				ctx := context.Background()
 
-				createTestUser(t, ctx, db, "user-expired-3")
+				userID := uuid.New().String()
+				createTestUser(t, ctx, db, userID)
 
-				_, err := repo.CreateTrustedDevice(ctx, "user-expired-3", "token-boundary", "ua", time.Now().UTC().Add(1*time.Second))
+				_, err := repo.CreateTrustedDevice(ctx, userID, "token-boundary", "ua", time.Now().UTC().Add(1*time.Second))
 				require.NoError(t, err)
 
 				err = repo.DeleteExpiredTrustedDevices(ctx)

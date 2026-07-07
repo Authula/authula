@@ -153,11 +153,11 @@ func (p *SecondaryStoragePlugin) initRedisProvider(ctx *models.PluginContext) (m
 	})
 }
 
-func (p *SecondaryStoragePlugin) Migrations(provider string) []migrations.Migration {
+func (p *SecondaryStoragePlugin) Migrations() []migrations.Migration {
 	if p.config.Provider != SecondaryStorageProviderDatabase {
 		return nil
 	}
-	return secondaryStorageMigrationsForProvider(provider)
+	return secondaryStorageMigrations()
 }
 
 func (p *SecondaryStoragePlugin) DependsOn() []string {

@@ -59,7 +59,7 @@ type Plugin interface {
 
 // PluginWithMigrations is an optional interface for plugins that have database migrations
 type PluginWithMigrations interface {
-	Migrations(provider string) []migrations.Migration
+	Migrations() []migrations.Migration
 	DependsOn() []string
 }
 

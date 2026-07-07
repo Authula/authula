@@ -11,21 +11,27 @@ import (
 
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/migrations"
+	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/migrationset"
 	"github.com/Authula/authula/plugins/jwt/types"
 )
 
 func setupJWKSRepo(t *testing.T) (*bun.DB, *bunJWKSRepository) {
 	t.Helper()
-	db := internaltests.NewSQLiteIntegrationDB(t)
+	db := internaltests.NewIntegrationTestDB(t)
 	migrator, err := migrations.NewMigrator(db, &internaltests.MockLogger{})
 	require.NoError(t, err)
-	err = migrator.Migrate(context.Background(), []migrations.MigrationSet{
-		{
-			PluginID:   "jwt",
-			Migrations: migrationset.JWTMigrationsForProvider("sqlite"),
-		},
-	})
+
+	coreSet, err := migrations.CoreMigrationSet()
+	require.NoError(t, err)
+
+	jwtSet := migrations.MigrationSet{
+		PluginID:   models.PluginJWT.String(),
+		DependsOn:  []string{migrations.CorePluginID},
+		Migrations: migrationset.Migrations(),
+	}
+
+	err = migrator.Migrate(context.Background(), []migrations.MigrationSet{coreSet, jwtSet})
 	require.NoError(t, err)
 	return db, &bunJWKSRepository{db: db}
 }
@@ -78,7 +84,7 @@ func TestBunJWKSRepository(t *testing.T) {
 		{
 			name: "GetJWKSKeyByID_not_found",
 			run: func(t *testing.T, repo *bunJWKSRepository, ctx context.Context) {
-				found, err := repo.GetJWKSKeyByID(ctx, "non-existent-id")
+				found, err := repo.GetJWKSKeyByID(ctx, "00000000-0000-0000-0000-000000000000")
 				require.NoError(t, err)
 				require.Nil(t, found)
 			},

@@ -133,9 +133,6 @@ func WithSecret(secret string) ConfigOption {
 
 func WithDatabase(config models.DatabaseConfig) ConfigOption {
 	return func(c *models.Config) {
-		if config.Provider != "" {
-			c.Database.Provider = config.Provider
-		}
 		if envValue := os.Getenv(env.EnvDatabaseURL); envValue != "" {
 			c.Database.URL = envValue
 		} else if config.URL != "" {
@@ -248,9 +245,6 @@ func WithEventBus(config models.EventBusConfig) ConfigOption {
 		if config.GoChannel != nil {
 			c.EventBus.GoChannel = config.GoChannel
 		}
-		if config.SQLite != nil {
-			c.EventBus.SQLite = config.SQLite
-		}
 		if config.PostgreSQL != nil {
 			c.EventBus.PostgreSQL = config.PostgreSQL
 		}
@@ -305,11 +299,6 @@ func validateEventBusConfig(config *models.EventBusConfig) error {
 	case "gochannel":
 		if config.GoChannel == nil {
 			return fmt.Errorf("gochannel provider selected but gochannel config is missing")
-		}
-
-	case "sqlite":
-		if config.SQLite == nil {
-			return fmt.Errorf("sqlite provider selected but sqlite config is missing")
 		}
 
 	case "postgres":

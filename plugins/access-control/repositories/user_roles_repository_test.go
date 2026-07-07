@@ -3,9 +3,10 @@ package repositories
 import (
 	"context"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 
 	plugintests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
@@ -17,7 +18,11 @@ func TestBunUserRolesRepositoryGetUserRoles(t *testing.T) {
 	now := time.Now().UTC()
 	futureExpiry := time.Unix(now.Add(24*time.Hour).Unix(), 0).UTC()
 	roleDescription := new("Editor role")
-	assignedBy := new("u2")
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	assignedBy := &user2ID
+	r1 := uuid.New().String()
+	r2 := uuid.New().String()
 
 	tests := []struct {
 		name      string
@@ -27,29 +32,29 @@ func TestBunUserRolesRepositoryGetUserRoles(t *testing.T) {
 	}{
 		{
 			name:      "empty result",
-			userID:    "missing-user",
+			userID:    "00000000-0000-0000-0000-000000000000",
 			wantRoles: []types.UserRoleInfo{},
 		},
 		{
 			name:   "returns assigned roles ordered by role name",
-			userID: "u1",
+			userID: user1ID,
 			seed: func(rolesRepo *BunRolesRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r2", Name: "viewer", Weight: 10}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: r2, Name: "viewer", Weight: 10}); err != nil {
 					panic(err)
 				}
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor", Description: roleDescription, Weight: 30}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: r1, Name: "editor", Description: roleDescription, Weight: 30}); err != nil {
 					panic(err)
 				}
-				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r1", assignedBy, &futureExpiry); err != nil {
+				if err := userRolesRepo.AssignUserRole(ctx, user1ID, r1, assignedBy, &futureExpiry); err != nil {
 					panic(err)
 				}
-				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r2", nil, nil); err != nil {
+				if err := userRolesRepo.AssignUserRole(ctx, user1ID, r2, nil, nil); err != nil {
 					panic(err)
 				}
 			},
 			wantRoles: []types.UserRoleInfo{
 				{
-					RoleID:           "r1",
+					RoleID:           r1,
 					RoleName:         "editor",
 					RoleDescription:  roleDescription,
 					RoleWeight:       30,
@@ -57,7 +62,7 @@ func TestBunUserRolesRepositoryGetUserRoles(t *testing.T) {
 					ExpiresAt:        &futureExpiry,
 				},
 				{
-					RoleID:           "r2",
+					RoleID:           r2,
 					RoleName:         "viewer",
 					RoleDescription:  nil,
 					RoleWeight:       10,
@@ -72,7 +77,7 @@ func TestBunUserRolesRepositoryGetUserRoles(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			rolesRepo := NewBunRolesRepository(db)
 			userRolesRepo := NewBunUserRolesRepository(db)
 			ctx := context.Background()
@@ -112,6 +117,11 @@ func TestBunUserRolesRepositoryGetUserRoles(t *testing.T) {
 func TestBunUserRolesRepositoryReplaceUserRoles(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	r1 := uuid.New().String()
+	r2 := uuid.New().String()
+
 	tests := []struct {
 		name        string
 		seed        func(*BunRolesRepository, *BunUserRolesRepository, context.Context)
@@ -121,24 +131,24 @@ func TestBunUserRolesRepositoryReplaceUserRoles(t *testing.T) {
 	}{
 		{
 			name:    "replaces all roles",
-			userID:  "u1",
-			roleIDs: []string{"r2", "r1"},
+			userID:  user1ID,
+			roleIDs: []string{r2, r1},
 			seed: func(rolesRepo *BunRolesRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor", Weight: 10}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: r1, Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r2", Name: "viewer", Weight: 20}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: r2, Name: "viewer", Weight: 20}); err != nil {
 					panic(err)
 				}
-				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r1", nil, nil); err != nil {
+				if err := userRolesRepo.AssignUserRole(ctx, user1ID, r1, nil, nil); err != nil {
 					panic(err)
 				}
 			},
-			wantRoleIDs: []string{"r2", "r1"},
+			wantRoleIDs: []string{r2, r1},
 		},
 		{
 			name:        "empty list clears roles",
-			userID:      "u1",
+			userID:      user1ID,
 			roleIDs:     []string{},
 			wantRoleIDs: []string{},
 		},
@@ -148,7 +158,7 @@ func TestBunUserRolesRepositoryReplaceUserRoles(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			rolesRepo := NewBunRolesRepository(db)
 			userRolesRepo := NewBunUserRolesRepository(db)
 			ctx := context.Background()
@@ -185,6 +195,9 @@ func TestBunUserRolesRepositoryAssignUserRole(t *testing.T) {
 
 	now := time.Now().UTC()
 	futureExpiry := time.Unix(now.Add(24*time.Hour).Unix(), 0).UTC()
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	r1 := uuid.New().String()
 
 	tests := []struct {
 		name      string
@@ -196,24 +209,24 @@ func TestBunUserRolesRepositoryAssignUserRole(t *testing.T) {
 	}{
 		{
 			name:      "success",
-			userID:    "u1",
-			roleID:    "r1",
+			userID:    user1ID,
+			roleID:    r1,
 			expiresAt: &futureExpiry,
 			seed: func(rolesRepo *BunRolesRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor", Weight: 10}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: r1, Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
 			},
 		},
 		{
 			name:   "duplicate assignment returns conflict",
-			userID: "u1",
-			roleID: "r1",
+			userID: user1ID,
+			roleID: r1,
 			seed: func(rolesRepo *BunRolesRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor", Weight: 10}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: r1, Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
-				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r1", nil, nil); err != nil {
+				if err := userRolesRepo.AssignUserRole(ctx, user1ID, r1, nil, nil); err != nil {
 					panic(err)
 				}
 			},
@@ -224,7 +237,7 @@ func TestBunUserRolesRepositoryAssignUserRole(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			rolesRepo := NewBunRolesRepository(db)
 			userRolesRepo := NewBunUserRolesRepository(db)
 			ctx := context.Background()
@@ -237,9 +250,6 @@ func TestBunUserRolesRepositoryAssignUserRole(t *testing.T) {
 			if tc.name == "duplicate assignment returns conflict" {
 				if err == nil {
 					t.Fatal("expected error, got nil")
-				}
-				if !strings.Contains(err.Error(), "UNIQUE constraint failed: access_control_user_roles.user_id, access_control_user_roles.role_id") {
-					t.Fatalf("expected raw unique constraint error, got %v", err)
 				}
 				return
 			}
@@ -274,6 +284,10 @@ func TestBunUserRolesRepositoryAssignUserRole(t *testing.T) {
 func TestBunUserRolesRepositoryRemoveUserRole(t *testing.T) {
 	t.Parallel()
 
+	user1ID := uuid.New().String()
+	user2ID := uuid.New().String()
+	r1 := uuid.New().String()
+
 	tests := []struct {
 		name      string
 		seed      func(*BunRolesRepository, *BunUserRolesRepository, context.Context)
@@ -283,13 +297,13 @@ func TestBunUserRolesRepositoryRemoveUserRole(t *testing.T) {
 	}{
 		{
 			name:   "success",
-			userID: "u1",
-			roleID: "r1",
+			userID: user1ID,
+			roleID: r1,
 			seed: func(rolesRepo *BunRolesRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
-				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "r1", Name: "editor", Weight: 10}); err != nil {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: r1, Name: "editor", Weight: 10}); err != nil {
 					panic(err)
 				}
-				if err := userRolesRepo.AssignUserRole(ctx, "u1", "r1", nil, nil); err != nil {
+				if err := userRolesRepo.AssignUserRole(ctx, user1ID, r1, nil, nil); err != nil {
 					panic(err)
 				}
 			},
@@ -301,7 +315,7 @@ func TestBunUserRolesRepositoryRemoveUserRole(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := plugintests.SetupRepoDB(t)
+			db := plugintests.SetupRepoDB(t, user1ID, user2ID)
 			rolesRepo := NewBunRolesRepository(db)
 			userRolesRepo := NewBunUserRolesRepository(db)
 			ctx := context.Background()
