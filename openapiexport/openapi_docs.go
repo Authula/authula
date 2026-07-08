@@ -3,11 +3,12 @@ package openapiexport
 import (
 	"errors"
 
+	internalopenapi "github.com/Authula/authula/internal/openapi"
+	"github.com/Authula/authula/openapi"
+
 	accesscontrolopenapi "github.com/Authula/authula/plugins/access-control/openapi"
 	adminopenapi "github.com/Authula/authula/plugins/admin/openapi"
 	apikeyopenapi "github.com/Authula/authula/plugins/api-key/openapi"
-
-	"github.com/Authula/authula/openapi"
 	emailpasswordopenapi "github.com/Authula/authula/plugins/email-password/openapi"
 	jwtopenapi "github.com/Authula/authula/plugins/jwt/openapi"
 	magiclinkopenapi "github.com/Authula/authula/plugins/magic-link/openapi"
@@ -19,6 +20,7 @@ import (
 func RegisterAllOpenAPIDocs(svc openapi.OpenAPIService, basePath string, extra ...OpenAPIDocFunc) error {
 	var errs []error
 
+	errs = append(errs, internalopenapi.RegisterOpenAPIDocs(svc, basePath))
 	errs = append(errs, emailpasswordopenapi.RegisterOpenAPIDocs(svc, basePath))
 	errs = append(errs, oauth2openapi.RegisterOpenAPIDocs(svc, basePath))
 	errs = append(errs, magiclinkopenapi.RegisterOpenAPIDocs(svc, basePath))

@@ -2255,6 +2255,28 @@
         }
       }
     },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Core"
+        ],
+        "summary": "Get current user",
+        "description": "Retrieves the authenticated user's profile and current session.",
+        "operationId": "getMe",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetMeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/oauth2/authorize/{provider}": {
       "get": {
         "tags": [
@@ -3370,6 +3392,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DeleteOrganizationTeamMemberResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sign-out": {
+      "post": {
+        "tags": [
+          "Core"
+        ],
+        "summary": "Sign out",
+        "description": "Signs out the authenticated user. Optionally sign out a specific session or all sessions.",
+        "operationId": "signOut",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignOutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignOutResponse"
                 }
               }
             }
@@ -4708,6 +4761,21 @@
         ],
         "type": "object"
       },
+      "GetMeResponse": {
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "user",
+          "session"
+        ],
+        "type": "object"
+      },
       "GetSessionStateResponse": {
         "properties": {
           "state": {
@@ -5505,6 +5573,34 @@
         "required": [
           "user",
           "session"
+        ],
+        "type": "object"
+      },
+      "SignOutRequest": {
+        "properties": {
+          "session_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sign_out_all": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "SignOutResponse": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
         ],
         "type": "object"
       },
