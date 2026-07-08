@@ -8,12 +8,33 @@ import (
 	"github.com/Authula/authula/plugins/admin/constants"
 )
 
+type AdminUserID struct {
+	UserID string `path:"user_id" json:"user_id" required:"true" nullable:"false"`
+}
+
+type AdminAccountID struct {
+	ID string `path:"id" json:"id" required:"true" nullable:"false"`
+}
+
+type AdminSessionID struct {
+	SessionID string `path:"session_id" json:"session_id" required:"true" nullable:"false"`
+}
+
+type AdminImpersonationID struct {
+	ImpersonationID string `path:"impersonation_id" json:"impersonation_id" required:"true" nullable:"false"`
+}
+
+type ListUsersQuery struct {
+	Cursor *string `query:"cursor" json:"cursor,omitempty" nullable:"true"`
+	Limit  *int    `query:"limit" json:"limit,omitempty" nullable:"true"`
+}
+
 type CreateUserRequest struct {
-	Name          string         `json:"name" validate:"required"`
-	Email         string         `json:"email" validate:"required,email"`
-	EmailVerified *bool          `json:"email_verified,omitempty"`
-	Image         *string        `json:"image,omitempty"`
-	Metadata      map[string]any `json:"metadata,omitempty"`
+	Name          string         `json:"name" required:"true" nullable:"false" validate:"required"`
+	Email         string         `json:"email" required:"true" nullable:"false" validate:"required,email"`
+	EmailVerified *bool          `json:"email_verified,omitempty" nullable:"true"`
+	Image         *string        `json:"image,omitempty" nullable:"true"`
+	Metadata      map[string]any `json:"metadata,omitempty" nullable:"true"`
 }
 
 func (req *CreateUserRequest) Validate() error {
@@ -21,19 +42,19 @@ func (req *CreateUserRequest) Validate() error {
 }
 
 type CreateUserResponse struct {
-	User *models.User `json:"user"`
+	User *models.User `json:"user" required:"true" nullable:"false"`
 }
 
 type GetUserByIDResponse struct {
-	User *models.User `json:"user"`
+	User *models.User `json:"user" required:"true" nullable:"false"`
 }
 
 type UpdateUserRequest struct {
-	Name          *string        `json:"name,omitempty" validate:"omitempty"`
-	Email         *string        `json:"email,omitempty" validate:"omitempty,email"`
-	EmailVerified *bool          `json:"email_verified,omitempty"`
-	Image         *string        `json:"image,omitempty"`
-	Metadata      map[string]any `json:"metadata,omitempty"`
+	Name          *string        `json:"name,omitempty" nullable:"true" validate:"omitempty"`
+	Email         *string        `json:"email,omitempty" nullable:"true" validate:"omitempty,email"`
+	EmailVerified *bool          `json:"email_verified,omitempty" nullable:"true"`
+	Image         *string        `json:"image,omitempty" nullable:"true"`
+	Metadata      map[string]any `json:"metadata,omitempty" nullable:"true"`
 }
 
 func (req *UpdateUserRequest) Validate() error {
@@ -51,28 +72,28 @@ func (req *UpdateUserRequest) Validate() error {
 }
 
 type UpdateUserResponse struct {
-	User *models.User `json:"user"`
+	User *models.User `json:"user" required:"true" nullable:"false"`
 }
 
 type DeleteUserResponse struct {
-	Message string `json:"message"`
+	Message string `json:"message" required:"true" nullable:"false"`
 }
 
 type UsersPage struct {
-	Users      []models.User `json:"users"`
-	NextCursor *string       `json:"next_cursor,omitempty"`
+	Users      []models.User `json:"users" required:"true" nullable:"false"`
+	NextCursor *string       `json:"next_cursor,omitempty" nullable:"true"`
 }
 
 type CreateAccountRequest struct {
-	ProviderID            string     `json:"provider_id" validate:"required"`
-	AccountID             string     `json:"account_id" validate:"required"`
-	AccessToken           *string    `json:"access_token,omitempty"`
-	RefreshToken          *string    `json:"refresh_token,omitempty"`
-	IDToken               *string    `json:"id_token,omitempty"`
-	AccessTokenExpiresAt  *time.Time `json:"access_token_expires_at,omitempty"`
-	RefreshTokenExpiresAt *time.Time `json:"refresh_token_expires_at,omitempty"`
-	Scope                 *string    `json:"scope,omitempty"`
-	Password              *string    `json:"password,omitempty"`
+	ProviderID            string     `json:"provider_id" required:"true" nullable:"false" validate:"required"`
+	AccountID             string     `json:"account_id" required:"true" nullable:"false" validate:"required"`
+	AccessToken           *string    `json:"access_token,omitempty" nullable:"true"`
+	RefreshToken          *string    `json:"refresh_token,omitempty" nullable:"true"`
+	IDToken               *string    `json:"id_token,omitempty" nullable:"true"`
+	AccessTokenExpiresAt  *time.Time `json:"access_token_expires_at,omitempty" nullable:"true"`
+	RefreshTokenExpiresAt *time.Time `json:"refresh_token_expires_at,omitempty" nullable:"true"`
+	Scope                 *string    `json:"scope,omitempty" nullable:"true"`
+	Password              *string    `json:"password,omitempty" nullable:"true"`
 }
 
 func (req *CreateAccountRequest) Validate() error {
@@ -90,23 +111,23 @@ func (req *CreateAccountRequest) Validate() error {
 }
 
 type CreateAccountResponse struct {
-	Account *models.Account `json:"account"`
+	Account *models.Account `json:"account" required:"true" nullable:"false"`
 }
 
 type GetAccountByIDResponse struct {
-	Account *models.Account `json:"account"`
+	Account *models.Account `json:"account" required:"true" nullable:"false"`
 }
 
 type UpdateAccountRequest struct {
-	ProviderID            *string    `json:"provider_id,omitempty"`
-	AccountID             *string    `json:"account_id,omitempty"`
-	AccessToken           *string    `json:"access_token,omitempty"`
-	RefreshToken          *string    `json:"refresh_token,omitempty"`
-	IDToken               *string    `json:"id_token,omitempty"`
-	AccessTokenExpiresAt  *time.Time `json:"access_token_expires_at,omitempty"`
-	RefreshTokenExpiresAt *time.Time `json:"refresh_token_expires_at,omitempty"`
-	Scope                 *string    `json:"scope,omitempty"`
-	Password              *string    `json:"password,omitempty"`
+	ProviderID            *string    `json:"provider_id,omitempty" nullable:"true"`
+	AccountID             *string    `json:"account_id,omitempty" nullable:"true"`
+	AccessToken           *string    `json:"access_token,omitempty" nullable:"true"`
+	RefreshToken          *string    `json:"refresh_token,omitempty" nullable:"true"`
+	IDToken               *string    `json:"id_token,omitempty" nullable:"true"`
+	AccessTokenExpiresAt  *time.Time `json:"access_token_expires_at,omitempty" nullable:"true"`
+	RefreshTokenExpiresAt *time.Time `json:"refresh_token_expires_at,omitempty" nullable:"true"`
+	Scope                 *string    `json:"scope,omitempty" nullable:"true"`
+	Password              *string    `json:"password,omitempty" nullable:"true"`
 }
 
 func (req *UpdateAccountRequest) Validate() error {
@@ -126,29 +147,29 @@ func (req *UpdateAccountRequest) Validate() error {
 }
 
 type UpdateAccountResponse struct {
-	Account *models.Account `json:"account"`
+	Account *models.Account `json:"account" required:"true" nullable:"false"`
 }
 
 type DeleteAccountResponse struct {
-	Message string `json:"message"`
+	Message string `json:"message" required:"true" nullable:"false"`
 }
 
 type UserAccountsResponse struct {
-	Accounts []models.Account `json:"accounts"`
+	Accounts []models.Account `json:"accounts" required:"true" nullable:"false"`
 }
 
 type GetUserStateResponse struct {
-	State *AdminUserState `json:"state"`
+	State *AdminUserState `json:"state" required:"true" nullable:"false"`
 }
 
 type UpsertUserStateResponse struct {
-	State *AdminUserState `json:"state"`
+	State *AdminUserState `json:"state" required:"true" nullable:"false"`
 }
 
 type CreateUserStateRequest struct {
-	Banned       bool       `json:"banned" validate:"required"`
-	BannedUntil  *time.Time `json:"banned_until,omitempty"`
-	BannedReason *string    `json:"banned_reason,omitempty"`
+	Banned       bool       `json:"banned" required:"true" nullable:"false" validate:"required"`
+	BannedUntil  *time.Time `json:"banned_until,omitempty" nullable:"true"`
+	BannedReason *string    `json:"banned_reason,omitempty" nullable:"true"`
 }
 
 func (req *CreateUserStateRequest) Validate() error {
@@ -164,9 +185,9 @@ func (req *CreateUserStateRequest) Validate() error {
 }
 
 type UpsertUserStateRequest struct {
-	Banned       bool       `json:"banned" validate:"required"`
-	BannedUntil  *time.Time `json:"banned_until,omitempty"`
-	BannedReason *string    `json:"banned_reason,omitempty"`
+	Banned       bool       `json:"banned" required:"true" nullable:"false" validate:"required"`
+	BannedUntil  *time.Time `json:"banned_until,omitempty" nullable:"true"`
+	BannedReason *string    `json:"banned_reason,omitempty" nullable:"true"`
 }
 
 func (req *UpsertUserStateRequest) Validate() error {
@@ -182,12 +203,12 @@ func (req *UpsertUserStateRequest) Validate() error {
 }
 
 type DeleteUserStateResponse struct {
-	Message string `json:"message"`
+	Message string `json:"message" required:"true" nullable:"false"`
 }
 
 type BanUserRequest struct {
-	BannedUntil *time.Time `json:"banned_until,omitempty"`
-	Reason      *string    `json:"reason,omitempty"`
+	BannedUntil *time.Time `json:"banned_until,omitempty" nullable:"true"`
+	Reason      *string    `json:"reason,omitempty" nullable:"true"`
 }
 
 func (req *BanUserRequest) Validate() error {
@@ -203,23 +224,23 @@ func (req *BanUserRequest) Validate() error {
 }
 
 type BanUserResponse struct {
-	State *AdminUserState `json:"state"`
+	State *AdminUserState `json:"state" required:"true" nullable:"false"`
 }
 
 type UnbanUserResponse struct {
-	State *AdminUserState `json:"state"`
+	State *AdminUserState `json:"state" required:"true" nullable:"false"`
 }
 
 type GetSessionStateResponse struct {
-	State *AdminSessionState `json:"state"`
+	State *AdminSessionState `json:"state" required:"true" nullable:"false"`
 }
 
 type CreateSessionStateRequest struct {
-	Revoke                 bool       `json:"revoke" validate:"required"`
-	RevokedReason          *string    `json:"revoked_reason,omitempty"`
-	ImpersonatorUserID     *string    `json:"impersonator_user_id,omitempty"`
-	ImpersonationReason    *string    `json:"impersonation_reason,omitempty"`
-	ImpersonationExpiresAt *time.Time `json:"impersonation_expires_at,omitempty"`
+	Revoke                 bool       `json:"revoke" required:"true" nullable:"false" validate:"required"`
+	RevokedReason          *string    `json:"revoked_reason,omitempty" nullable:"true"`
+	ImpersonatorUserID     *string    `json:"impersonator_user_id,omitempty" nullable:"true"`
+	ImpersonationReason    *string    `json:"impersonation_reason,omitempty" nullable:"true"`
+	ImpersonationExpiresAt *time.Time `json:"impersonation_expires_at,omitempty" nullable:"true"`
 }
 
 func (req *CreateSessionStateRequest) Validate() error {
@@ -235,11 +256,11 @@ func (req *CreateSessionStateRequest) Validate() error {
 }
 
 type UpsertSessionStateRequest struct {
-	Revoke                 bool       `json:"revoke" validate:"required"`
-	RevokedReason          *string    `json:"revoked_reason,omitempty"`
-	ImpersonatorUserID     *string    `json:"impersonator_user_id,omitempty"`
-	ImpersonationReason    *string    `json:"impersonation_reason,omitempty"`
-	ImpersonationExpiresAt *time.Time `json:"impersonation_expires_at,omitempty"`
+	Revoke                 bool       `json:"revoke" required:"true" nullable:"false" validate:"required"`
+	RevokedReason          *string    `json:"revoked_reason,omitempty" nullable:"true"`
+	ImpersonatorUserID     *string    `json:"impersonator_user_id,omitempty" nullable:"true"`
+	ImpersonationReason    *string    `json:"impersonation_reason,omitempty" nullable:"true"`
+	ImpersonationExpiresAt *time.Time `json:"impersonation_expires_at,omitempty" nullable:"true"`
 }
 
 func (req *UpsertSessionStateRequest) Validate() error {
@@ -255,29 +276,29 @@ func (req *UpsertSessionStateRequest) Validate() error {
 }
 
 type UpsertSessionStateResponse struct {
-	State *AdminSessionState `json:"state"`
+	State *AdminSessionState `json:"state" required:"true" nullable:"false"`
 }
 
 type DeleteSessionStateResponse struct {
-	Message string `json:"message"`
+	Message string `json:"message" required:"true" nullable:"false"`
 }
 
 type RevokeSessionRequest struct {
-	Reason *string `json:"reason,omitempty"`
+	Reason *string `json:"reason,omitempty" nullable:"true"`
 }
 
 type RevokeSessionResponse struct {
-	State *AdminSessionState `json:"state"`
+	State *AdminSessionState `json:"state" required:"true" nullable:"false"`
 }
 
 type GetImpersonationByIDResponse struct {
-	Impersonation *Impersonation `json:"impersonation"`
+	Impersonation *Impersonation `json:"impersonation" required:"true" nullable:"false"`
 }
 
 type StartImpersonationRequest struct {
-	TargetUserID     string `json:"target_user_id" validate:"required"`
-	Reason           string `json:"reason" validate:"required"`
-	ExpiresInSeconds *int   `json:"expires_in_seconds,omitempty"`
+	TargetUserID     string `json:"target_user_id" required:"true" nullable:"false" validate:"required"`
+	Reason           string `json:"reason" required:"true" nullable:"false" validate:"required"`
+	ExpiresInSeconds *int   `json:"expires_in_seconds,omitempty" nullable:"true"`
 }
 
 func (req *StartImpersonationRequest) Validate() error {
@@ -296,7 +317,7 @@ type StartImpersonationResult struct {
 }
 
 type StartImpersonationResponse struct {
-	Impersonation *Impersonation `json:"impersonation"`
+	Impersonation *Impersonation `json:"impersonation" required:"true" nullable:"false"`
 }
 
 type StopImpersonationRequest struct {
@@ -308,5 +329,5 @@ type StopImpersonationResult struct {
 }
 
 type StopImpersonationResponse struct {
-	Message string `json:"message"`
+	Message string `json:"message" required:"true" nullable:"false"`
 }

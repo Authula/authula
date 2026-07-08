@@ -766,6 +766,979 @@
         }
       }
     },
+    "/api/auth/admin/accounts/{id}": {
+      "get": {
+        "tags": [
+          "Admin Accounts"
+        ],
+        "summary": "Get account by ID",
+        "description": "Retrieves an account by its ID.",
+        "operationId": "getAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAccountByIDResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin Accounts"
+        ],
+        "summary": "Delete account",
+        "description": "Deletes an account.",
+        "operationId": "deleteAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Admin Accounts"
+        ],
+        "summary": "Update account",
+        "description": "Updates an account's attributes.",
+        "operationId": "updateAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/impersonations": {
+      "get": {
+        "tags": [
+          "Admin Impersonation"
+        ],
+        "summary": "List impersonations",
+        "description": "Lists all impersonations.",
+        "operationId": "listImpersonations",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Impersonation"
+                  },
+                  "type": [
+                    "null",
+                    "array"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin Impersonation"
+        ],
+        "summary": "Start impersonation",
+        "description": "Starts an impersonation session as a target user.",
+        "operationId": "startImpersonation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartImpersonationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartImpersonationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/impersonations/{impersonation_id}": {
+      "get": {
+        "tags": [
+          "Admin Impersonation"
+        ],
+        "summary": "Get impersonation by ID",
+        "description": "Retrieves an impersonation by its ID.",
+        "operationId": "getImpersonation",
+        "parameters": [
+          {
+            "name": "impersonation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetImpersonationByIDResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/impersonations/{impersonation_id}/stop": {
+      "post": {
+        "tags": [
+          "Admin Impersonation"
+        ],
+        "summary": "Stop impersonation",
+        "description": "Stops an impersonation session and restores the original session.",
+        "operationId": "stopImpersonation",
+        "parameters": [
+          {
+            "name": "impersonation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminImpersonationID"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopImpersonationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/sessions/states/revoked": {
+      "get": {
+        "tags": [
+          "Admin Session State"
+        ],
+        "summary": "List revoked session states",
+        "description": "Lists all revoked session states.",
+        "operationId": "listRevokedSessionStates",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminSessionState"
+                  },
+                  "type": [
+                    "null",
+                    "array"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/sessions/{session_id}/revoke": {
+      "post": {
+        "tags": [
+          "Admin Session State"
+        ],
+        "summary": "Revoke session",
+        "description": "Revokes a session.",
+        "operationId": "revokeSession",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeSessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/sessions/{session_id}/state": {
+      "get": {
+        "tags": [
+          "Admin Session State"
+        ],
+        "summary": "Get session state",
+        "description": "Retrieves the state of a session.",
+        "operationId": "getSessionState",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetSessionStateResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin Session State"
+        ],
+        "summary": "Create session state",
+        "description": "Creates the state for a session.",
+        "operationId": "createSessionState",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionStateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpsertSessionStateResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin Session State"
+        ],
+        "summary": "Delete session state",
+        "description": "Deletes the state of a session.",
+        "operationId": "deleteSessionState",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteSessionStateResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Admin Session State"
+        ],
+        "summary": "Update session state",
+        "description": "Updates the state of a session.",
+        "operationId": "updateSessionState",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertSessionStateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpsertSessionStateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/users": {
+      "get": {
+        "tags": [
+          "Admin Users"
+        ],
+        "summary": "List users",
+        "description": "Lists users with cursor-based pagination.",
+        "operationId": "listUsers",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsersPage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin Users"
+        ],
+        "summary": "Create user",
+        "description": "Creates a new user with the specified attributes.",
+        "operationId": "createUser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/users/states/banned": {
+      "get": {
+        "tags": [
+          "Admin User State"
+        ],
+        "summary": "List banned user states",
+        "description": "Lists all banned user states.",
+        "operationId": "listBannedUserStates",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminUserState"
+                  },
+                  "type": [
+                    "null",
+                    "array"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/users/{user_id}": {
+      "get": {
+        "tags": [
+          "Admin Users"
+        ],
+        "summary": "Get user by ID",
+        "description": "Retrieves a user by their ID.",
+        "operationId": "getUser",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetUserByIDResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin Users"
+        ],
+        "summary": "Delete user",
+        "description": "Deletes a user.",
+        "operationId": "deleteUser",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteUserResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Admin Users"
+        ],
+        "summary": "Update user",
+        "description": "Updates a user's attributes.",
+        "operationId": "updateUser",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/users/{user_id}/accounts": {
+      "get": {
+        "tags": [
+          "Admin Accounts"
+        ],
+        "summary": "List user accounts",
+        "description": "Lists all accounts for a user.",
+        "operationId": "listUserAccounts",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserAccountsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin Accounts"
+        ],
+        "summary": "Create account",
+        "description": "Creates a new account for a user.",
+        "operationId": "createAccount",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/users/{user_id}/ban": {
+      "post": {
+        "tags": [
+          "Admin User State"
+        ],
+        "summary": "Ban user",
+        "description": "Bans a user.",
+        "operationId": "banUser",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BanUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BanUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/users/{user_id}/sessions": {
+      "get": {
+        "tags": [
+          "Admin User State"
+        ],
+        "summary": "List user sessions",
+        "description": "Lists all sessions for a user.",
+        "operationId": "listUserSessions",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminUserSession"
+                  },
+                  "type": [
+                    "null",
+                    "array"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/users/{user_id}/state": {
+      "get": {
+        "tags": [
+          "Admin User State"
+        ],
+        "summary": "Get user state",
+        "description": "Retrieves the state of a user.",
+        "operationId": "getUserState",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetUserStateResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin User State"
+        ],
+        "summary": "Create user state",
+        "description": "Creates the state for a user.",
+        "operationId": "createUserState",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserStateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpsertUserStateResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin User State"
+        ],
+        "summary": "Delete user state",
+        "description": "Deletes the state of a user.",
+        "operationId": "deleteUserState",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteUserStateResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Admin User State"
+        ],
+        "summary": "Update user state",
+        "description": "Updates the state of a user.",
+        "operationId": "updateUserState",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertUserStateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpsertUserStateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/users/{user_id}/unban": {
+      "post": {
+        "tags": [
+          "Admin User State"
+        ],
+        "summary": "Unban user",
+        "description": "Unbans a user.",
+        "operationId": "unbanUser",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUserID"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnbanUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/email-password/change-password": {
       "post": {
         "tags": [
@@ -2420,6 +3393,75 @@
         ],
         "type": "object"
       },
+      "Account": {
+        "properties": {
+          "access_token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "access_token_expires_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "account_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "id_token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "provider_id": {
+            "type": "string"
+          },
+          "refresh_token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refresh_token_expires_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "scope": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "AddOrganizationMemberRequest": {
         "properties": {
           "role": {
@@ -2468,6 +3510,187 @@
         ],
         "type": "object"
       },
+      "AdminAccountID": {
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "AdminImpersonationID": {
+        "properties": {
+          "impersonation_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "impersonation_id"
+        ],
+        "type": "object"
+      },
+      "AdminSessionID": {
+        "properties": {
+          "session_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "type": "object"
+      },
+      "AdminSessionState": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "impersonation_expires_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "impersonation_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "impersonator_session_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "impersonator_user_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "revoked_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "revoked_by_user_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "revoked_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "AdminUserID": {
+        "properties": {
+          "user_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "type": "object"
+      },
+      "AdminUserSession": {
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AdminSessionState"
+              }
+            ]
+          }
+        },
+        "required": [
+          "session"
+        ],
+        "type": "object"
+      },
+      "AdminUserState": {
+        "properties": {
+          "banned": {
+            "type": "boolean"
+          },
+          "banned_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "banned_by_user_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "banned_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "banned_until": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "banned",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
       "AssignUserRoleRequest": {
         "properties": {
           "expires_at": {
@@ -2505,6 +3728,35 @@
         },
         "required": [
           "auth_url"
+        ],
+        "type": "object"
+      },
+      "BanUserRequest": {
+        "properties": {
+          "banned_until": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "BanUserResponse": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/AdminUserState"
+          }
+        },
+        "required": [
+          "state"
         ],
         "type": "object"
       },
@@ -2582,6 +3834,76 @@
         },
         "required": [
           "has_permissions"
+        ],
+        "type": "object"
+      },
+      "CreateAccountRequest": {
+        "properties": {
+          "access_token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "access_token_expires_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "account_id": {
+            "type": "string"
+          },
+          "id_token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "provider_id": {
+            "type": "string"
+          },
+          "refresh_token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refresh_token_expires_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "scope": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "provider_id",
+          "account_id"
+        ],
+        "type": "object"
+      },
+      "CreateAccountResponse": {
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/Account"
+          }
+        },
+        "required": [
+          "account"
         ],
         "type": "object"
       },
@@ -2739,6 +4061,122 @@
         ],
         "type": "object"
       },
+      "CreateSessionStateRequest": {
+        "properties": {
+          "impersonation_expires_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "impersonation_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "impersonator_user_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "revoke": {
+            "type": "boolean"
+          },
+          "revoked_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "revoke"
+        ],
+        "type": "object"
+      },
+      "CreateUserRequest": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "email_verified": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "image": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "metadata": {
+            "additionalProperties": {},
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "email"
+        ],
+        "type": "object"
+      },
+      "CreateUserResponse": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "type": "object"
+      },
+      "CreateUserStateRequest": {
+        "properties": {
+          "banned": {
+            "type": "boolean"
+          },
+          "banned_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "banned_until": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "banned"
+        ],
+        "type": "object"
+      },
+      "DeleteAccountResponse": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
       "DeleteOrganizationMemberResponse": {
         "properties": {
           "message": {
@@ -2805,6 +4243,39 @@
         ],
         "type": "object"
       },
+      "DeleteSessionStateResponse": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "DeleteUserResponse": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "DeleteUserStateResponse": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
       "DisableResponse": {
         "properties": {
           "message": {
@@ -2848,6 +4319,39 @@
         ],
         "type": "object"
       },
+      "GetAccountByIDResponse": {
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/Account"
+          }
+        },
+        "required": [
+          "account"
+        ],
+        "type": "object"
+      },
+      "GetImpersonationByIDResponse": {
+        "properties": {
+          "impersonation": {
+            "$ref": "#/components/schemas/Impersonation"
+          }
+        },
+        "required": [
+          "impersonation"
+        ],
+        "type": "object"
+      },
+      "GetSessionStateResponse": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/AdminSessionState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
       "GetTOTPURIResponse": {
         "properties": {
           "totp_uri": {
@@ -2856,6 +4360,17 @@
         },
         "required": [
           "totp_uri"
+        ],
+        "type": "object"
+      },
+      "GetUserByIDResponse": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "user"
         ],
         "type": "object"
       },
@@ -2870,6 +4385,85 @@
         },
         "required": [
           "permissions"
+        ],
+        "type": "object"
+      },
+      "GetUserStateResponse": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/AdminUserState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
+      "Impersonation": {
+        "properties": {
+          "actor_session_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "actor_user_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "ended_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ended_by_user_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "impersonation_session_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "target_user_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "actor_user_id",
+          "target_user_id",
+          "reason",
+          "started_at",
+          "expires_at",
+          "created_at",
+          "updated_at"
         ],
         "type": "object"
       },
@@ -3427,6 +5021,28 @@
         ],
         "type": "object"
       },
+      "RevokeSessionRequest": {
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "RevokeSessionResponse": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/AdminSessionState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
       "Role": {
         "properties": {
           "created_at": {
@@ -3633,6 +5249,49 @@
         ],
         "type": "object"
       },
+      "StartImpersonationRequest": {
+        "properties": {
+          "expires_in_seconds": {
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "target_user_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_user_id",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "StartImpersonationResponse": {
+        "properties": {
+          "impersonation": {
+            "$ref": "#/components/schemas/Impersonation"
+          }
+        },
+        "required": [
+          "impersonation"
+        ],
+        "type": "object"
+      },
+      "StopImpersonationResponse": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
       "TeamID": {
         "properties": {
           "organization_id": {
@@ -3645,6 +5304,89 @@
         "required": [
           "organization_id",
           "team_id"
+        ],
+        "type": "object"
+      },
+      "UnbanUserResponse": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/AdminUserState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
+      "UpdateAccountRequest": {
+        "properties": {
+          "access_token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "access_token_expires_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "account_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id_token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "provider_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refresh_token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refresh_token_expires_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "scope": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "UpdateAccountResponse": {
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/Account"
+          }
+        },
+        "required": [
+          "account"
         ],
         "type": "object"
       },
@@ -3775,6 +5517,135 @@
         ],
         "type": "object"
       },
+      "UpdateUserRequest": {
+        "properties": {
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "email_verified": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "image": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "metadata": {
+            "additionalProperties": {},
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "UpdateUserResponse": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "type": "object"
+      },
+      "UpsertSessionStateRequest": {
+        "properties": {
+          "impersonation_expires_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "impersonation_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "impersonator_user_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "revoke": {
+            "type": "boolean"
+          },
+          "revoked_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "revoke"
+        ],
+        "type": "object"
+      },
+      "UpsertSessionStateResponse": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/AdminSessionState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
+      "UpsertUserStateRequest": {
+        "properties": {
+          "banned": {
+            "type": "boolean"
+          },
+          "banned_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "banned_until": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "banned"
+        ],
+        "type": "object"
+      },
+      "UpsertUserStateResponse": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/AdminUserState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
       "User": {
         "properties": {
           "created_at": {
@@ -3811,6 +5682,20 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "UserAccountsResponse": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/Account"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "accounts"
+        ],
         "type": "object"
       },
       "UserID": {
@@ -3909,6 +5794,26 @@
           "role_id",
           "role_name",
           "role_weight"
+        ],
+        "type": "object"
+      },
+      "UsersPage": {
+        "properties": {
+          "next_cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/User"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "users"
         ],
         "type": "object"
       },

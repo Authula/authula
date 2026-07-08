@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	accesscontrolopenapi "github.com/Authula/authula/plugins/access-control/openapi"
+	adminopenapi "github.com/Authula/authula/plugins/admin/openapi"
 
 	"github.com/Authula/authula/openapi"
 	emailpasswordopenapi "github.com/Authula/authula/plugins/email-password/openapi"
@@ -24,6 +25,7 @@ func RegisterAllOpenAPIDocs(svc openapi.OpenAPIService, basePath string, extra .
 	errs = append(errs, totpopenapi.RegisterOpenAPIDocs(svc, basePath))
 	errs = append(errs, organizationsopenapi.RegisterOpenAPIDocs(svc, basePath))
 	errs = append(errs, accesscontrolopenapi.RegisterOpenAPIDocs(svc, basePath))
+	errs = append(errs, adminopenapi.RegisterOpenAPIDocs(svc, basePath))
 
 	for _, fn := range extra {
 		errs = append(errs, fn(svc, basePath))
