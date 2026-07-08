@@ -7,7 +7,7 @@
   },
   "servers": [{ "url": "http://localhost:8080" }],
   "paths": {
-    "/api/auth/change-password": {
+    "/api/auth/email-password/change-password": {
       "post": {
         "tags": ["Email Password Plugin"],
         "summary": "Change password",
@@ -34,7 +34,7 @@
         }
       }
     },
-    "/api/auth/request-email-change": {
+    "/api/auth/email-password/request-email-change": {
       "post": {
         "tags": ["Email Password Plugin"],
         "summary": "Request email change",
@@ -61,7 +61,7 @@
         }
       }
     },
-    "/api/auth/request-password-reset": {
+    "/api/auth/email-password/request-password-reset": {
       "post": {
         "tags": ["Email Password Plugin"],
         "summary": "Request password reset",
@@ -90,7 +90,7 @@
         }
       }
     },
-    "/api/auth/send-email-verification": {
+    "/api/auth/email-password/send-email-verification": {
       "post": {
         "tags": ["Email Password Plugin"],
         "summary": "Send email verification",
@@ -119,7 +119,7 @@
         }
       }
     },
-    "/api/auth/sign-in": {
+    "/api/auth/email-password/sign-in": {
       "post": {
         "tags": ["Email Password Plugin"],
         "summary": "Sign in",
@@ -144,7 +144,7 @@
         }
       }
     },
-    "/api/auth/sign-up": {
+    "/api/auth/email-password/sign-up": {
       "post": {
         "tags": ["Email Password Plugin"],
         "summary": "Register new user",
@@ -169,7 +169,7 @@
         }
       }
     },
-    "/api/auth/verify-email": {
+    "/api/auth/email-password/verify-email": {
       "get": {
         "tags": ["Email Password Plugin"],
         "summary": "Verify email",
@@ -188,10 +188,93 @@
           }
         }
       }
+    },
+    "/api/auth/oauth2/authorize/{provider}": {
+      "get": {
+        "tags": ["OAuth2 Plugin"],
+        "summary": "Authorize with OAuth2 provider",
+        "description": "Initiates the OAuth2 authorization flow with the specified provider. Returns the provider's authorization URL to redirect the user to.",
+        "operationId": "authorize",
+        "parameters": [
+          {
+            "name": "redirect_to",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthorizeResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/oauth2/callback/{provider}": {
+      "get": {
+        "tags": ["OAuth2 Plugin"],
+        "summary": "OAuth2 callback",
+        "description": "Handles the OAuth2 callback from the provider. Exchanges the authorization code for tokens, creates or links a user account, and returns the authenticated user and session.",
+        "operationId": "callback",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          { "name": "error", "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CallbackResponse" }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AuthorizeResponse": {
+        "properties": { "auth_url": { "type": "string" } },
+        "required": ["auth_url"],
+        "type": "object"
+      },
+      "CallbackResponse": {
+        "properties": {
+          "session": { "$ref": "#/components/schemas/Session" },
+          "user": { "$ref": "#/components/schemas/User" }
+        },
+        "required": ["user", "session"],
+        "type": "object"
+      },
       "ChangeEmailResponse": {
         "properties": { "message": { "type": "string" } },
         "required": ["message"],

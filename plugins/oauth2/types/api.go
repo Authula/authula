@@ -8,8 +8,8 @@ import (
 
 // AuthorizeRequest represents an authorization request
 type AuthorizeRequest struct {
-	ProviderID string `json:"provider" required:"true" nullable:"false"`
-	RedirectTo string `json:"redirect_to,omitempty" nullable:"true"`
+	ProviderID string `path:"provider" json:"provider" required:"true" nullable:"false"`
+	RedirectTo string `query:"redirect_to" json:"redirect_to,omitempty" nullable:"true"`
 }
 
 // AuthorizeResponse represents an authorization response
@@ -19,10 +19,10 @@ type AuthorizeResponse struct {
 
 // CallbackRequest represents an OAuth2 callback request
 type CallbackRequest struct {
-	ProviderID string `json:"provider" required:"true" nullable:"false"`
-	Code       string `json:"code" required:"true" nullable:"false"`
-	State      string `json:"state" required:"true" nullable:"false"`
-	Error      string `json:"error,omitempty" nullable:"true"`
+	ProviderID string `path:"provider" json:"provider" required:"true" nullable:"false"`
+	Code       string `query:"code" json:"code" required:"true" nullable:"false"`
+	State      string `query:"state" json:"state" required:"true" nullable:"false"`
+	Error      string `query:"error" json:"error,omitempty" nullable:"true"`
 }
 
 // CallbackResult represents the result of OAuth2 callback

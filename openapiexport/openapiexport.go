@@ -8,7 +8,7 @@ import (
 	"github.com/Authula/authula/openapi"
 )
 
-type OpenAPIDocFunc func(svc openapi.OpenAPIService, basePath string)
+type OpenAPIDocFunc func(svc openapi.OpenAPIService, basePath string) error
 
 func ExportSpecToFile(outputPath, format string, extraDocs []OpenAPIDocFunc) error {
 	return ExportSpecToFileWithVersion(outputPath, format, "3.1.0", extraDocs)
@@ -58,6 +58,8 @@ func GenerateService(title, apiVersion, description, serverURL, basePath string,
 	if err != nil {
 		return nil, err
 	}
-	RegisterAllOpenAPIDocs(service, basePath, extraDocs...)
+	if err := RegisterAllOpenAPIDocs(service, basePath, extraDocs...); err != nil {
+		return nil, fmt.Errorf("registering OpenAPI docs: %w", err)
+	}
 	return service, nil
 }
