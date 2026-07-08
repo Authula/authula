@@ -396,6 +396,134 @@
           }
         }
       }
+    },
+    "/api/auth/totp/disable": {
+      "post": {
+        "tags": ["TOTP Plugin"],
+        "summary": "Disable TOTP",
+        "description": "Disables TOTP two-factor authentication for the authenticated user.",
+        "operationId": "disableTotp",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DisableResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp/enable": {
+      "post": {
+        "tags": ["TOTP Plugin"],
+        "summary": "Enable TOTP",
+        "description": "Enables TOTP two-factor authentication for the authenticated user. Returns the TOTP URI and backup codes.",
+        "operationId": "enableTotp",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EnableResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp/generate-backup-codes": {
+      "post": {
+        "tags": ["TOTP Plugin"],
+        "summary": "Generate backup codes",
+        "description": "Generates a new set of backup codes for the authenticated user. Previous backup codes are invalidated.",
+        "operationId": "generateTotpBackupCodes",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateBackupCodesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp/get-uri": {
+      "get": {
+        "tags": ["TOTP Plugin"],
+        "summary": "Get TOTP URI",
+        "description": "Returns the current TOTP URI for the authenticated user's authenticator app configuration.",
+        "operationId": "getTotpURI",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GetTOTPURIResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp/verify": {
+      "post": {
+        "tags": ["TOTP Plugin"],
+        "summary": "Verify TOTP code",
+        "description": "Verifies a TOTP code from the authenticator app and completes authentication. Requires a pending TOTP cookie set during sign-in.",
+        "operationId": "verifyTotp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/VerifyTOTPRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VerifyTOTPResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp/verify-backup-code": {
+      "post": {
+        "tags": ["TOTP Plugin"],
+        "summary": "Verify backup code",
+        "description": "Verifies a backup code as an alternative to TOTP verification. Completes authentication if the code is valid.",
+        "operationId": "verifyTotpBackupCode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyBackupCodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyBackupCodeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -429,6 +557,31 @@
       "ChangePasswordResponse": {
         "properties": { "message": { "type": "string" } },
         "required": ["message"],
+        "type": "object"
+      },
+      "DisableResponse": {
+        "properties": { "message": { "type": "string" } },
+        "required": ["message"],
+        "type": "object"
+      },
+      "EnableResponse": {
+        "properties": {
+          "backup_codes": { "items": { "type": "string" }, "type": "array" },
+          "totp_uri": { "type": "string" }
+        },
+        "required": ["totp_uri", "backup_codes"],
+        "type": "object"
+      },
+      "GenerateBackupCodesResponse": {
+        "properties": {
+          "backup_codes": { "items": { "type": "string" }, "type": "array" }
+        },
+        "required": ["backup_codes"],
+        "type": "object"
+      },
+      "GetTOTPURIResponse": {
+        "properties": { "totp_uri": { "type": "string" } },
+        "required": ["totp_uri"],
         "type": "object"
       },
       "JWK": {
@@ -580,6 +733,38 @@
           "name": { "type": "string" },
           "updated_at": { "format": "date-time", "type": "string" }
         },
+        "type": "object"
+      },
+      "VerifyBackupCodeRequest": {
+        "properties": {
+          "code": { "type": "string" },
+          "trust_device": { "type": "boolean" }
+        },
+        "required": ["code"],
+        "type": "object"
+      },
+      "VerifyBackupCodeResponse": {
+        "properties": {
+          "session": { "$ref": "#/components/schemas/Session" },
+          "user": { "$ref": "#/components/schemas/User" }
+        },
+        "required": ["user", "session"],
+        "type": "object"
+      },
+      "VerifyTOTPRequest": {
+        "properties": {
+          "code": { "type": "string" },
+          "trust_device": { "type": "boolean" }
+        },
+        "required": ["code"],
+        "type": "object"
+      },
+      "VerifyTOTPResponse": {
+        "properties": {
+          "session": { "$ref": "#/components/schemas/Session" },
+          "user": { "$ref": "#/components/schemas/User" }
+        },
+        "required": ["user", "session"],
         "type": "object"
       },
       "WellKnownJWKSResponse": {

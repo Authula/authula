@@ -54,9 +54,13 @@ func ParseSameSite(s string) http.SameSite {
 
 // Request payloads
 
+type DisableResponse struct {
+	Message string `json:"message" required:"true" nullable:"false"`
+}
+
 type VerifyTOTPRequest struct {
-	Code        string `json:"code"`
-	TrustDevice bool   `json:"trust_device,omitempty"`
+	Code        string `json:"code" required:"true" nullable:"false"`
+	TrustDevice bool   `json:"trust_device,omitempty" nullable:"false"`
 }
 
 func (v *VerifyTOTPRequest) Validate() error {
@@ -67,8 +71,8 @@ func (v *VerifyTOTPRequest) Validate() error {
 }
 
 type VerifyBackupCodeRequest struct {
-	Code        string `json:"code"`
-	TrustDevice bool   `json:"trust_device,omitempty"`
+	Code        string `json:"code" required:"true" nullable:"false"`
+	TrustDevice bool   `json:"trust_device,omitempty" nullable:"false"`
 }
 
 func (v *VerifyBackupCodeRequest) Validate() error {
@@ -80,34 +84,34 @@ func (v *VerifyBackupCodeRequest) Validate() error {
 
 // Response payloads
 type EnableResponse struct {
-	TotpURI     string   `json:"totp_uri"`
-	BackupCodes []string `json:"backup_codes"`
+	TotpURI     string   `json:"totp_uri" required:"true" nullable:"false"`
+	BackupCodes []string `json:"backup_codes" required:"true" nullable:"false"`
 }
 
 type GetTOTPURIResponse struct {
-	TotpURI string `json:"totp_uri"`
+	TotpURI string `json:"totp_uri" required:"true" nullable:"false"`
 }
 
 type VerifyTOTPResponse struct {
-	User    *models.User    `json:"user"`
-	Session *models.Session `json:"session"`
+	User    *models.User    `json:"user" required:"true" nullable:"false"`
+	Session *models.Session `json:"session" required:"true" nullable:"false"`
 }
 
 type VerifyBackupCodeResponse struct {
-	User    *models.User    `json:"user"`
-	Session *models.Session `json:"session"`
+	User    *models.User    `json:"user" required:"true" nullable:"false"`
+	Session *models.Session `json:"session" required:"true" nullable:"false"`
 }
 
 type GenerateBackupCodesResponse struct {
-	BackupCodes []string `json:"backup_codes"`
+	BackupCodes []string `json:"backup_codes" required:"true" nullable:"false"`
 }
 
 type ViewBackupCodesResponse struct {
-	RemainingCount int `json:"remaining_count"`
+	RemainingCount int `json:"remaining_count" required:"true" nullable:"false"`
 }
 
 type TOTPRedirectResponse struct {
-	TOTPRedirect bool `json:"totp_redirect"`
+	TOTPRedirect bool `json:"totp_redirect" required:"true" nullable:"false"`
 }
 
 // Internal result types
