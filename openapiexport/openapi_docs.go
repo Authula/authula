@@ -3,6 +3,8 @@ package openapiexport
 import (
 	"errors"
 
+	accesscontrolopenapi "github.com/Authula/authula/plugins/access-control/openapi"
+
 	"github.com/Authula/authula/openapi"
 	emailpasswordopenapi "github.com/Authula/authula/plugins/email-password/openapi"
 	jwtopenapi "github.com/Authula/authula/plugins/jwt/openapi"
@@ -21,6 +23,7 @@ func RegisterAllOpenAPIDocs(svc openapi.OpenAPIService, basePath string, extra .
 	errs = append(errs, jwtopenapi.RegisterOpenAPIDocs(svc, basePath))
 	errs = append(errs, totpopenapi.RegisterOpenAPIDocs(svc, basePath))
 	errs = append(errs, organizationsopenapi.RegisterOpenAPIDocs(svc, basePath))
+	errs = append(errs, accesscontrolopenapi.RegisterOpenAPIDocs(svc, basePath))
 
 	for _, fn := range extra {
 		errs = append(errs, fn(svc, basePath))

@@ -134,6 +134,9 @@ $ make openapi-export ARGS="--output ./openapi.json --format json --openapi-vers
 
 # Export YAML
 $ make openapi-export ARGS="--format yaml"
+
+# Make sure to format the openapi.json file using jq to keep it consistent with how we prettify the file to prevent merge conflicts too. Run the following command:
+$ jq "." openapi.json > temp.json && mv temp.json openapi.json
 ```
 
 ---
