@@ -4,11 +4,13 @@ BINARY_PATH=./tmp/$(APP_NAME)
 MIGRATE_CONFIG?=./config.toml
 MIGRATE_ARGS?=
 MIGRATE_CMD=CGO_ENABLED=1 go run ./cmd/migrate
+OPENAPI_EXPORT_BINARY=./tmp/openapi-export
 
 .PHONY: help build build-exe run dev test clean install setup
 .PHONY: test-coverage
 .PHONY: lint format vet deps-update all check quick-check ci
 .PHONY: migrate-core-up migrate-core-down migrate-plugins-up migrate-plugins-down migrate-status
+.PHONY: openapi-export
 
 # Help command
 help: # Display this help screen
@@ -34,6 +36,11 @@ run: # Run the application
 dev: # Run the application with live reloading using air
 	@rm -f ./tmp/$(APP_NAME)
 	@CGO_ENABLED=1 ./bin/air --build.cmd "go build -o ./tmp/$(APP_NAME) ./cmd/main.go" --build.entrypoint "./tmp/$(APP_NAME)"
+
+openapi-export:
+	@echo "Exporting OpenAPI spec..."
+	@go run ./cmd/openapi/ $(ARGS)
+	@echo "Done!"
 
 # Test commands
 test: # Run all tests

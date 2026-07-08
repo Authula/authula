@@ -10,27 +10,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/joho/godotenv"
-
 	authula "github.com/Authula/authula"
 	"github.com/Authula/authula/cmd/shared/configloader"
-	authulaenv "github.com/Authula/authula/env"
+	"github.com/Authula/authula/env"
 	"github.com/Authula/authula/internal/bootstrap"
-	authulamodels "github.com/Authula/authula/models"
+	"github.com/Authula/authula/models"
 )
-
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
-}
 
 // Run Authula with plugins built from config file
 // This demonstrates the unified architecture where both library and standalone modes
 // use identical runtime behavior - they only differ in how plugins are instantiated
 func main() {
-	_ = godotenv.Load(".env")
+	env.LoadEnvConfig()
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -59,8 +50,8 @@ func main() {
 }
 
 // runServer starts the HTTP server and handles restarts
-func runServer(logger authulamodels.Logger, auth *authula.Auth, restartChan chan struct{}, shutdownChan chan os.Signal) {
-	port := getEnv(authulaenv.EnvPort, "8080")
+func runServer(logger models.Logger, auth *authula.Auth, restartChan chan struct{}, shutdownChan chan os.Signal) {
+	port := env.GetEnv(env.EnvPort, "8080")
 
 	// Create HTTP server with graceful shutdown support
 	server := &http.Server{
@@ -116,8 +107,8 @@ func runServer(logger authulamodels.Logger, auth *authula.Auth, restartChan chan
 }
 
 // loadConfig loads configuration with proper precedence:
-func loadConfig() *authulamodels.Config {
-	configPath := getEnv(authulaenv.EnvConfigPath, "config.toml")
+func loadConfig() *models.Config {
+	configPath := env.GetEnv(env.EnvConfigPath, "config.toml")
 
 	config, exists, err := configloader.Load(configPath)
 	if err != nil {
