@@ -2161,7 +2161,7 @@
         ],
         "summary": "Exchange magic link token for session",
         "description": "Exchanges a verified magic link token for an authenticated user session.",
-        "operationId": "exchange",
+        "operationId": "exchangeMagicLink",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2192,7 +2192,7 @@
         ],
         "summary": "Sign in with magic link",
         "description": "Sends a magic link to the given email address if an account exists. Optionally creates a new account if sign-up is enabled.",
-        "operationId": "signIn",
+        "operationId": "signInWithMagicLink",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2223,7 +2223,7 @@
         ],
         "summary": "Verify magic link token",
         "description": "Verifies a magic link token. If a callback_url is provided and trusted, redirects the user with an exchange token appended. Otherwise returns the exchange token in the JSON response.",
-        "operationId": "verify",
+        "operationId": "verifyMagicLink",
         "parameters": [
           {
             "name": "token",
@@ -3639,6 +3639,14 @@
             "type": "string"
           }
         },
+        "required": [
+          "id",
+          "user_id",
+          "account_id",
+          "provider_id",
+          "created_at",
+          "updated_at"
+        ],
         "type": "object"
       },
       "AddOrganizationMemberRequest": {
@@ -5454,6 +5462,14 @@
             "type": "string"
           }
         },
+        "required": [
+          "id",
+          "user_id",
+          "token",
+          "expires_at",
+          "created_at",
+          "updated_at"
+        ],
         "type": "object"
       },
       "SignInRequest": {
@@ -6032,6 +6048,14 @@
             "type": "string"
           }
         },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "email_verified",
+          "created_at",
+          "updated_at"
+        ],
         "type": "object"
       },
       "UserAccountsResponse": {
