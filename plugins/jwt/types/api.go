@@ -38,7 +38,7 @@ type TokenPair struct {
 }
 
 type RefreshTokenRequest struct {
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token" required:"true" nullable:"false"`
 }
 
 func (r *RefreshTokenRequest) Validate() error {
@@ -49,6 +49,21 @@ func (r *RefreshTokenRequest) Validate() error {
 }
 
 type RefreshTokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	AccessToken  string `json:"access_token" required:"true" nullable:"false"`
+	RefreshToken string `json:"refresh_token" required:"true" nullable:"false"`
+}
+
+type JWK struct {
+	Kty string `json:"kty" required:"true" nullable:"false"`
+	Crv string `json:"crv,omitempty" nullable:"false"`
+	Kid string `json:"kid,omitempty" nullable:"false"`
+	X   string `json:"x,omitempty" nullable:"false"`
+	Alg string `json:"alg,omitempty" nullable:"false"`
+	Use string `json:"use,omitempty" nullable:"false"`
+	N   string `json:"n,omitempty" nullable:"false"`
+	E   string `json:"e,omitempty" nullable:"false"`
+}
+
+type WellKnownJWKSResponse struct {
+	Keys []JWK `json:"keys" required:"true" nullable:"false"`
 }

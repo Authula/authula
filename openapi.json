@@ -7,6 +7,26 @@
   },
   "servers": [{ "url": "http://localhost:8080" }],
   "paths": {
+    "/api/auth/.well-known/jwks.json": {
+      "get": {
+        "tags": ["JWT Plugin"],
+        "summary": "Get JWKS",
+        "description": "Returns the JSON Web Key Set (JWKS) containing the public keys used to verify JWT signatures.",
+        "operationId": "getJWKS",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WellKnownJWKSResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/email-password/change-password": {
       "post": {
         "tags": ["Email Password Plugin"],
@@ -349,6 +369,33 @@
           }
         }
       }
+    },
+    "/api/auth/token/refresh": {
+      "post": {
+        "tags": ["JWT Plugin"],
+        "summary": "Refresh JWT token",
+        "description": "Exchanges a valid refresh token for a new access token and refresh token pair.",
+        "operationId": "refreshToken",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RefreshTokenRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshTokenResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -384,6 +431,20 @@
         "required": ["message"],
         "type": "object"
       },
+      "JWK": {
+        "properties": {
+          "alg": { "type": "string" },
+          "crv": { "type": "string" },
+          "e": { "type": "string" },
+          "kid": { "type": "string" },
+          "kty": { "type": "string" },
+          "n": { "type": "string" },
+          "use": { "type": "string" },
+          "x": { "type": "string" }
+        },
+        "required": ["kty"],
+        "type": "object"
+      },
       "MagicLinkExchangeRequest": {
         "properties": { "token": { "type": "string" } },
         "required": ["token"],
@@ -417,6 +478,19 @@
           "token": { "type": "string" }
         },
         "required": ["message"],
+        "type": "object"
+      },
+      "RefreshTokenRequest": {
+        "properties": { "refresh_token": { "type": "string" } },
+        "required": ["refresh_token"],
+        "type": "object"
+      },
+      "RefreshTokenResponse": {
+        "properties": {
+          "access_token": { "type": "string" },
+          "refresh_token": { "type": "string" }
+        },
+        "required": ["access_token", "refresh_token"],
         "type": "object"
       },
       "RequestEmailChangeRequest": {
@@ -506,6 +580,16 @@
           "name": { "type": "string" },
           "updated_at": { "format": "date-time", "type": "string" }
         },
+        "type": "object"
+      },
+      "WellKnownJWKSResponse": {
+        "properties": {
+          "keys": {
+            "items": { "$ref": "#/components/schemas/JWK" },
+            "type": "array"
+          }
+        },
+        "required": ["keys"],
         "type": "object"
       }
     }
