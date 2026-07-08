@@ -370,6 +370,857 @@
         }
       }
     },
+    "/api/auth/organizations": {
+      "get": {
+        "tags": ["Organizations"],
+        "summary": "List organizations",
+        "description": "Lists all organizations owned by the authenticated user.",
+        "operationId": "listOrganizations",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": { "$ref": "#/components/schemas/Organization" },
+                  "type": ["null", "array"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Organizations"],
+        "summary": "Create organization",
+        "description": "Creates a new organization with the authenticated user as the owner.",
+        "operationId": "createOrganization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrganizationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Organization" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/organizations/{organization_id}": {
+      "get": {
+        "tags": ["Organizations"],
+        "summary": "Get organization",
+        "description": "Retrieves an organization by its ID.",
+        "operationId": "getOrganization",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Organization" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Organizations"],
+        "summary": "Delete organization",
+        "description": "Deletes an organization.",
+        "operationId": "deleteOrganization",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteOrganizationResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Organizations"],
+        "summary": "Update organization",
+        "description": "Updates an existing organization.",
+        "operationId": "updateOrganization",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Organization" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/organizations/{organization_id}/invitations": {
+      "get": {
+        "tags": ["Invitations"],
+        "summary": "List invitations",
+        "description": "Lists all invitations for an organization.",
+        "operationId": "listOrganizationInvitations",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrganizationInvitation"
+                  },
+                  "type": ["null", "array"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Invitations"],
+        "summary": "Create invitation",
+        "description": "Creates an invitation for a user to join an organization.",
+        "operationId": "createOrganizationInvitation",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrganizationInvitationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationInvitation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/organizations/{organization_id}/invitations/{invitation_id}": {
+      "get": {
+        "tags": ["Invitations"],
+        "summary": "Get invitation",
+        "description": "Retrieves a single invitation by its ID.",
+        "operationId": "getOrganizationInvitation",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationInvitation"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Invitations"],
+        "summary": "Revoke invitation",
+        "description": "Revokes a pending invitation.",
+        "operationId": "revokeOrganizationInvitation",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InvitationID" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationInvitation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/organizations/{organization_id}/invitations/{invitation_id}/accept": {
+      "post": {
+        "tags": ["Invitations"],
+        "summary": "Accept invitation",
+        "description": "Accepts an invitation to join an organization. Optionally redirects if a redirect_url is provided.",
+        "operationId": "acceptOrganizationInvitation",
+        "parameters": [
+          {
+            "name": "redirect_url",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptOrganizationInvitationQuery"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationInvitation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/organizations/{organization_id}/invitations/{invitation_id}/reject": {
+      "post": {
+        "tags": ["Invitations"],
+        "summary": "Reject invitation",
+        "description": "Rejects an invitation to join an organization.",
+        "operationId": "rejectOrganizationInvitation",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InvitationID" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationInvitation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/organizations/{organization_id}/members": {
+      "get": {
+        "tags": ["Members"],
+        "summary": "List members",
+        "description": "Lists all members of an organization with pagination.",
+        "operationId": "listOrganizationMembers",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrganizationMember"
+                  },
+                  "type": ["null", "array"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Members"],
+        "summary": "Add member",
+        "description": "Adds a user as a member of an organization with the specified role.",
+        "operationId": "addOrganizationMember",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddOrganizationMemberRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrganizationMember" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/organizations/{organization_id}/members/{member_id}": {
+      "get": {
+        "tags": ["Members"],
+        "summary": "Get member",
+        "description": "Retrieves a single organization member by ID.",
+        "operationId": "getOrganizationMember",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrganizationMember" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Members"],
+        "summary": "Delete member",
+        "description": "Removes a member from an organization.",
+        "operationId": "deleteOrganizationMember",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteOrganizationMemberResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Members"],
+        "summary": "Update member",
+        "description": "Updates the role of an organization member.",
+        "operationId": "updateOrganizationMember",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationMemberRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrganizationMember" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/organizations/{organization_id}/teams": {
+      "get": {
+        "tags": ["Teams"],
+        "summary": "List teams",
+        "description": "Lists all teams within an organization.",
+        "operationId": "listOrganizationTeams",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": { "$ref": "#/components/schemas/OrganizationTeam" },
+                  "type": ["null", "array"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Teams"],
+        "summary": "Create team",
+        "description": "Creates a new team within an organization.",
+        "operationId": "createOrganizationTeam",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrganizationTeamRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrganizationTeam" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/organizations/{organization_id}/teams/{team_id}": {
+      "get": {
+        "tags": ["Teams"],
+        "summary": "Get team",
+        "description": "Retrieves a single team by its ID.",
+        "operationId": "getOrganizationTeam",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrganizationTeam" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Teams"],
+        "summary": "Delete team",
+        "description": "Deletes a team.",
+        "operationId": "deleteOrganizationTeam",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteOrganizationTeamResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Teams"],
+        "summary": "Update team",
+        "description": "Updates an existing team.",
+        "operationId": "updateOrganizationTeam",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationTeamRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrganizationTeam" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/organizations/{organization_id}/teams/{team_id}/members": {
+      "get": {
+        "tags": ["Team Members"],
+        "summary": "List team members",
+        "description": "Lists all members of a team with pagination.",
+        "operationId": "listOrganizationTeamMembers",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrganizationTeamMember"
+                  },
+                  "type": ["null", "array"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Team Members"],
+        "summary": "Add team member",
+        "description": "Adds a member to a team.",
+        "operationId": "addOrganizationTeamMember",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddOrganizationTeamMemberRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationTeamMember"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/organizations/{organization_id}/teams/{team_id}/members/{member_id}": {
+      "get": {
+        "tags": ["Team Members"],
+        "summary": "Get team member",
+        "description": "Retrieves a single team member by ID.",
+        "operationId": "getOrganizationTeamMember",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationTeamMember"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Team Members"],
+        "summary": "Delete team member",
+        "description": "Removes a member from a team.",
+        "operationId": "deleteOrganizationTeamMember",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteOrganizationTeamMemberResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/token/refresh": {
       "post": {
         "tags": ["JWT Plugin"],
@@ -528,6 +1379,28 @@
   },
   "components": {
     "schemas": {
+      "AcceptOrganizationInvitationQuery": {
+        "properties": {
+          "invitation_id": { "type": "string" },
+          "organization_id": { "type": "string" },
+          "redirect_url": { "type": ["string", "null"] }
+        },
+        "required": ["organization_id", "invitation_id"],
+        "type": "object"
+      },
+      "AddOrganizationMemberRequest": {
+        "properties": {
+          "role": { "type": "string" },
+          "user_id": { "type": "string" }
+        },
+        "required": ["user_id", "role"],
+        "type": "object"
+      },
+      "AddOrganizationTeamMemberRequest": {
+        "properties": { "member_id": { "type": "string" } },
+        "required": ["member_id"],
+        "type": "object"
+      },
       "AuthorizeResponse": {
         "properties": { "auth_url": { "type": "string" } },
         "required": ["auth_url"],
@@ -559,6 +1432,62 @@
         "required": ["message"],
         "type": "object"
       },
+      "CreateOrganizationInvitationRequest": {
+        "properties": {
+          "email": { "type": "string" },
+          "redirect_url": { "type": ["string", "null"] },
+          "role": { "type": "string" }
+        },
+        "required": ["email", "role"],
+        "type": "object"
+      },
+      "CreateOrganizationRequest": {
+        "properties": {
+          "logo": { "type": ["null", "string"] },
+          "metadata": {
+            "additionalProperties": {},
+            "type": ["object", "null"]
+          },
+          "name": { "type": "string" },
+          "role": { "type": "string" },
+          "slug": { "type": ["null", "string"] }
+        },
+        "required": ["name", "role"],
+        "type": "object"
+      },
+      "CreateOrganizationTeamRequest": {
+        "properties": {
+          "description": { "type": ["null", "string"] },
+          "metadata": {
+            "additionalProperties": {},
+            "type": ["object", "null"]
+          },
+          "name": { "type": "string" },
+          "slug": { "type": ["null", "string"] }
+        },
+        "required": ["name"],
+        "type": "object"
+      },
+      "DeleteOrganizationMemberResponse": {
+        "properties": { "message": { "type": "string" } },
+        "required": ["message"],
+        "type": "object"
+      },
+      "DeleteOrganizationResponse": {
+        "properties": { "message": { "type": "string" } },
+        "required": ["message"],
+        "type": "object"
+      },
+      "DeleteOrganizationTeamMemberResponse": {
+        "properties": { "message": { "type": "string" } },
+        "required": ["message"],
+        "type": "object"
+      },
+      "DeleteOrganizationTeamResponse": {
+        "properties": { "message": { "type": "string" } },
+        "required": ["message"],
+        "type": "object"
+      },
       "DisableResponse": {
         "properties": { "message": { "type": "string" } },
         "required": ["message"],
@@ -582,6 +1511,14 @@
       "GetTOTPURIResponse": {
         "properties": { "totp_uri": { "type": "string" } },
         "required": ["totp_uri"],
+        "type": "object"
+      },
+      "InvitationID": {
+        "properties": {
+          "invitation_id": { "type": "string" },
+          "organization_id": { "type": "string" }
+        },
+        "required": ["organization_id", "invitation_id"],
         "type": "object"
       },
       "JWK": {
@@ -631,6 +1568,126 @@
           "token": { "type": "string" }
         },
         "required": ["message"],
+        "type": "object"
+      },
+      "MemberID": {
+        "properties": {
+          "member_id": { "type": "string" },
+          "organization_id": { "type": "string" }
+        },
+        "required": ["organization_id", "member_id"],
+        "type": "object"
+      },
+      "Organization": {
+        "properties": {
+          "created_at": { "format": "date-time", "type": "string" },
+          "id": { "type": "string" },
+          "logo": { "type": ["null", "string"] },
+          "metadata": {
+            "additionalProperties": {},
+            "type": ["object", "null"]
+          },
+          "name": { "type": "string" },
+          "owner_id": { "type": "string" },
+          "slug": { "type": "string" },
+          "updated_at": { "format": "date-time", "type": "string" }
+        },
+        "required": [
+          "id",
+          "owner_id",
+          "name",
+          "slug",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "OrganizationID": {
+        "properties": { "organization_id": { "type": "string" } },
+        "required": ["organization_id"],
+        "type": "object"
+      },
+      "OrganizationInvitation": {
+        "properties": {
+          "created_at": { "format": "date-time", "type": "string" },
+          "email": { "type": "string" },
+          "expires_at": { "format": "date-time", "type": "string" },
+          "id": { "type": "string" },
+          "inviter_id": { "type": "string" },
+          "organization_id": { "type": "string" },
+          "role": { "type": "string" },
+          "status": {
+            "$ref": "#/components/schemas/OrganizationInvitationStatus"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "inviter_id",
+          "organization_id",
+          "role",
+          "status",
+          "expires_at",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "OrganizationInvitationStatus": {
+        "description": "The type of the invitation status",
+        "enum": ["pending", "accepted", "rejected", "revoked", "expired"],
+        "type": "string"
+      },
+      "OrganizationMember": {
+        "properties": {
+          "created_at": { "format": "date-time", "type": "string" },
+          "id": { "type": "string" },
+          "organization_id": { "type": "string" },
+          "role": { "type": "string" },
+          "updated_at": { "format": "date-time", "type": "string" },
+          "user_id": { "type": "string" }
+        },
+        "required": [
+          "id",
+          "organization_id",
+          "user_id",
+          "role",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "OrganizationTeam": {
+        "properties": {
+          "created_at": { "format": "date-time", "type": "string" },
+          "description": { "type": ["null", "string"] },
+          "id": { "type": "string" },
+          "metadata": {
+            "additionalProperties": {},
+            "type": ["object", "null"]
+          },
+          "name": { "type": "string" },
+          "organization_id": { "type": "string" },
+          "slug": { "type": "string" },
+          "updated_at": { "format": "date-time", "type": "string" }
+        },
+        "required": [
+          "id",
+          "organization_id",
+          "name",
+          "slug",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "OrganizationTeamMember": {
+        "properties": {
+          "created_at": { "format": "date-time", "type": "string" },
+          "id": { "type": "string" },
+          "member_id": { "type": "string" },
+          "team_id": { "type": "string" }
+        },
+        "required": ["id", "team_id", "member_id", "created_at"],
         "type": "object"
       },
       "RefreshTokenRequest": {
@@ -717,6 +1774,44 @@
           "user": { "$ref": "#/components/schemas/User" }
         },
         "required": ["user", "session"],
+        "type": "object"
+      },
+      "TeamID": {
+        "properties": {
+          "organization_id": { "type": "string" },
+          "team_id": { "type": "string" }
+        },
+        "required": ["organization_id", "team_id"],
+        "type": "object"
+      },
+      "UpdateOrganizationMemberRequest": {
+        "properties": { "role": { "type": "string" } },
+        "required": ["role"],
+        "type": "object"
+      },
+      "UpdateOrganizationRequest": {
+        "properties": {
+          "logo": { "type": ["null", "string"] },
+          "metadata": {
+            "additionalProperties": {},
+            "type": ["object", "null"]
+          },
+          "name": { "type": ["null", "string"] },
+          "slug": { "type": ["null", "string"] }
+        },
+        "type": "object"
+      },
+      "UpdateOrganizationTeamRequest": {
+        "properties": {
+          "description": { "type": ["null", "string"] },
+          "metadata": {
+            "additionalProperties": {},
+            "type": ["object", "null"]
+          },
+          "name": { "type": "string" },
+          "slug": { "type": ["null", "string"] }
+        },
+        "required": ["name"],
         "type": "object"
       },
       "User": {

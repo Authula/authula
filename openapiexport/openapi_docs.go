@@ -8,6 +8,7 @@ import (
 	jwtopenapi "github.com/Authula/authula/plugins/jwt/openapi"
 	magiclinkopenapi "github.com/Authula/authula/plugins/magic-link/openapi"
 	oauth2openapi "github.com/Authula/authula/plugins/oauth2/openapi"
+	organizationsopenapi "github.com/Authula/authula/plugins/organizations/openapi"
 	totpopenapi "github.com/Authula/authula/plugins/totp/openapi"
 )
 
@@ -19,6 +20,7 @@ func RegisterAllOpenAPIDocs(svc openapi.OpenAPIService, basePath string, extra .
 	errs = append(errs, magiclinkopenapi.RegisterOpenAPIDocs(svc, basePath))
 	errs = append(errs, jwtopenapi.RegisterOpenAPIDocs(svc, basePath))
 	errs = append(errs, totpopenapi.RegisterOpenAPIDocs(svc, basePath))
+	errs = append(errs, organizationsopenapi.RegisterOpenAPIDocs(svc, basePath))
 
 	for _, fn := range extra {
 		errs = append(errs, fn(svc, basePath))

@@ -6,12 +6,56 @@ import (
 	internalerrors "github.com/Authula/authula/internal/errors"
 )
 
+type OrganizationID struct {
+	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
+}
+
+type InvitationID struct {
+	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
+	InvitationID   string `path:"invitation_id" json:"invitation_id" required:"true" nullable:"false"`
+}
+
+type MemberID struct {
+	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
+	MemberID       string `path:"member_id" json:"member_id" required:"true" nullable:"false"`
+}
+
+type TeamID struct {
+	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
+	TeamID         string `path:"team_id" json:"team_id" required:"true" nullable:"false"`
+}
+
+type TeamMemberID struct {
+	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
+	TeamID         string `path:"team_id" json:"team_id" required:"true" nullable:"false"`
+	MemberID       string `path:"member_id" json:"member_id" required:"true" nullable:"false"`
+}
+
+type ListOrganizationMembersRequest struct {
+	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
+	Page           int    `query:"page" json:"page,omitempty" nullable:"false"`
+	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false"`
+}
+
+type ListOrganizationTeamMembersRequest struct {
+	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
+	TeamID         string `path:"team_id" json:"team_id" required:"true" nullable:"false"`
+	Page           int    `query:"page" json:"page,omitempty" nullable:"false"`
+	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false"`
+}
+
+type AcceptOrganizationInvitationQuery struct {
+	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
+	InvitationID   string `path:"invitation_id" json:"invitation_id" required:"true" nullable:"false"`
+	RedirectURL    string `query:"redirect_url" json:"redirect_url,omitempty" nullable:"true"`
+}
+
 type CreateOrganizationRequest struct {
-	Name     string         `json:"name"`
-	Role     string         `json:"role"`
-	Slug     *string        `json:"slug,omitempty"`
-	Logo     *string        `json:"logo,omitempty"`
-	Metadata map[string]any `json:"metadata,omitempty"`
+	Name     string         `json:"name" required:"true" nullable:"false"`
+	Role     string         `json:"role" required:"true" nullable:"false"`
+	Slug     *string        `json:"slug,omitempty" nullable:"true"`
+	Logo     *string        `json:"logo,omitempty" nullable:"true"`
+	Metadata map[string]any `json:"metadata,omitempty" nullable:"true"`
 }
 
 func (r *CreateOrganizationRequest) Validate() error {
@@ -33,10 +77,10 @@ func (r *CreateOrganizationRequest) Validate() error {
 }
 
 type UpdateOrganizationRequest struct {
-	Name     *string        `json:"name,omitempty"`
-	Slug     *string        `json:"slug,omitempty"`
-	Logo     *string        `json:"logo,omitempty"`
-	Metadata map[string]any `json:"metadata,omitempty"`
+	Name     *string        `json:"name,omitempty" nullable:"true"`
+	Slug     *string        `json:"slug,omitempty" nullable:"true"`
+	Logo     *string        `json:"logo,omitempty" nullable:"true"`
+	Metadata map[string]any `json:"metadata,omitempty" nullable:"true"`
 }
 
 func (r *UpdateOrganizationRequest) Validate() error {
@@ -59,9 +103,9 @@ func (r *UpdateOrganizationRequest) Validate() error {
 }
 
 type CreateOrganizationInvitationRequest struct {
-	Email       string `json:"email"`
-	Role        string `json:"role"`
-	RedirectURL string `json:"redirect_url,omitempty"`
+	Email       string `json:"email" required:"true" nullable:"false"`
+	Role        string `json:"role" required:"true" nullable:"false"`
+	RedirectURL string `json:"redirect_url,omitempty" nullable:"true"`
 }
 
 func (r *CreateOrganizationInvitationRequest) Validate() error {
@@ -75,8 +119,8 @@ func (r *CreateOrganizationInvitationRequest) Validate() error {
 }
 
 type AddOrganizationMemberRequest struct {
-	UserID string `json:"user_id"`
-	Role   string `json:"role"`
+	UserID string `json:"user_id" required:"true" nullable:"false"`
+	Role   string `json:"role" required:"true" nullable:"false"`
 }
 
 func (r *AddOrganizationMemberRequest) Validate() error {
@@ -90,7 +134,7 @@ func (r *AddOrganizationMemberRequest) Validate() error {
 }
 
 type UpdateOrganizationMemberRequest struct {
-	Role string `json:"role"`
+	Role string `json:"role" required:"true" nullable:"false"`
 }
 
 func (r *UpdateOrganizationMemberRequest) Validate() error {
@@ -101,10 +145,10 @@ func (r *UpdateOrganizationMemberRequest) Validate() error {
 }
 
 type CreateOrganizationTeamRequest struct {
-	Name        string         `json:"name"`
-	Slug        *string        `json:"slug,omitempty"`
-	Description *string        `json:"description,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
+	Name        string         `json:"name" required:"true" nullable:"false"`
+	Slug        *string        `json:"slug,omitempty" nullable:"true"`
+	Description *string        `json:"description,omitempty" nullable:"true"`
+	Metadata    map[string]any `json:"metadata,omitempty" nullable:"true"`
 }
 
 func (r *CreateOrganizationTeamRequest) Validate() error {
@@ -123,10 +167,10 @@ func (r *CreateOrganizationTeamRequest) Validate() error {
 }
 
 type UpdateOrganizationTeamRequest struct {
-	Name        string         `json:"name"`
-	Slug        *string        `json:"slug,omitempty"`
-	Description *string        `json:"description,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
+	Name        string         `json:"name" required:"true" nullable:"false"`
+	Slug        *string        `json:"slug,omitempty" nullable:"true"`
+	Description *string        `json:"description,omitempty" nullable:"true"`
+	Metadata    map[string]any `json:"metadata,omitempty" nullable:"true"`
 }
 
 func (r *UpdateOrganizationTeamRequest) Validate() error {
@@ -145,7 +189,7 @@ func (r *UpdateOrganizationTeamRequest) Validate() error {
 }
 
 type AddOrganizationTeamMemberRequest struct {
-	MemberID string `json:"member_id"`
+	MemberID string `json:"member_id" required:"true" nullable:"false"`
 }
 
 func (r *AddOrganizationTeamMemberRequest) Validate() error {
@@ -156,7 +200,7 @@ func (r *AddOrganizationTeamMemberRequest) Validate() error {
 }
 
 type AcceptOrganizationInvitationRequest struct {
-	RedirectURL *string `json:"redirect_url,omitempty"`
+	RedirectURL *string `json:"redirect_url,omitempty" nullable:"true"`
 }
 
 func (r *AcceptOrganizationInvitationRequest) Validate() error {
@@ -168,17 +212,17 @@ func (r *AcceptOrganizationInvitationRequest) Validate() error {
 }
 
 type DeleteOrganizationResponse struct {
-	Message string `json:"message"`
+	Message string `json:"message" required:"true" nullable:"false"`
 }
 
 type DeleteOrganizationMemberResponse struct {
-	Message string `json:"message"`
+	Message string `json:"message" required:"true" nullable:"false"`
 }
 
 type DeleteOrganizationTeamResponse struct {
-	Message string `json:"message"`
+	Message string `json:"message" required:"true" nullable:"false"`
 }
 
 type DeleteOrganizationTeamMemberResponse struct {
-	Message string `json:"message"`
+	Message string `json:"message" required:"true" nullable:"false"`
 }
