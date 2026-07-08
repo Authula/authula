@@ -7,50 +7,60 @@ import (
 	"github.com/Authula/authula/models"
 )
 
-type SignInRequest struct {
-	Email       string  `json:"email"`
-	Name        *string `json:"name,omitempty"`
-	CallbackURL *string `json:"callback_url,omitempty"`
+type MagicLinkSignInRequest struct {
+	Email       string  `json:"email" required:"true" nullable:"false"`
+	Name        *string `json:"name,omitempty" nullable:"true"`
+	CallbackURL *string `json:"callback_url,omitempty" nullable:"true"`
 }
 
-func (r *SignInRequest) Validate() error {
+type MagicLinkVerifyRequest struct {
+	Token       string `query:"token" json:"token" required:"true" nullable:"false"`
+	CallbackURL string `query:"callback_url" json:"callback_url,omitempty" nullable:"true"`
+}
+
+func (r *MagicLinkVerifyRequest) Validate() error {
+	r.Token = strings.TrimSpace(r.Token)
+	return nil
+}
+
+func (r *MagicLinkSignInRequest) Validate() error {
 	if strings.TrimSpace(r.Email) == "" {
 		return internalerrors.ErrEmailRequired
 	}
 	return nil
 }
 
-type SignInResult struct {
+type MagicLinkSignInResult struct {
 	Token string
 }
 
-type SignInResponse struct {
-	Message string `json:"message"`
+type MagicLinkSignInResponse struct {
+	Message string `json:"message" required:"true" nullable:"false"`
 }
 
-type VerifyResponse struct {
-	Message string `json:"message"`
-	Token   string `json:"token,omitempty"`
+type MagicLinkVerifyResponse struct {
+	Message string `json:"message" required:"true" nullable:"false"`
+	Token   string `json:"token,omitempty" nullable:"false"`
 }
 
-type ExchangeRequest struct {
-	Token string `json:"token"`
+type MagicLinkExchangeRequest struct {
+	Token string `json:"token" required:"true" nullable:"false"`
 }
 
-func (r *ExchangeRequest) Validate() error {
+func (r *MagicLinkExchangeRequest) Validate() error {
 	if strings.TrimSpace(r.Token) == "" {
 		return internalerrors.ErrTokenRequired
 	}
 	return nil
 }
 
-type ExchangeResult struct {
+type MagicLinkExchangeResult struct {
 	User         *models.User
 	Session      *models.Session
 	SessionToken string
 }
 
-type ExchangeResponse struct {
-	User    *models.User    `json:"user"`
-	Session *models.Session `json:"session"`
+type MagicLinkExchangeResponse struct {
+	User    *models.User    `json:"user" required:"true" nullable:"false"`
+	Session *models.Session `json:"session" required:"true" nullable:"false"`
 }

@@ -16,7 +16,7 @@ func (a *API) SignIn(
 	name *string,
 	email string,
 	callbackURL *string,
-) (*types.SignInResult, error) {
+) (*types.MagicLinkSignInResult, error) {
 	return a.useCases.SignInUseCase.SignIn(ctx, name, email, callbackURL)
 }
 
@@ -34,7 +34,7 @@ func (a *API) Exchange(
 	token string,
 	ipAddress *string,
 	userAgent *string,
-) (*types.ExchangeResult, error) {
+) (*types.MagicLinkExchangeResult, error) {
 	return a.useCases.ExchangeUseCase.Exchange(ctx, token, ipAddress, userAgent)
 }
 

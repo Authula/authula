@@ -66,7 +66,7 @@ func (h *VerifyHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, &types.VerifyResponse{
+		reqCtx.SetJSONResponse(http.StatusOK, &types.MagicLinkVerifyResponse{
 			Message: "magic link successfully verified",
 			Token:   tokenForExchange,
 		})

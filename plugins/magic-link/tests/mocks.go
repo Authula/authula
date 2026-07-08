@@ -25,10 +25,10 @@ type MockExchangeUseCase struct {
 	mock.Mock
 }
 
-func (m *MockExchangeUseCase) Exchange(ctx context.Context, token string, ipAddress *string, userAgent *string) (*types.ExchangeResult, error) {
+func (m *MockExchangeUseCase) Exchange(ctx context.Context, token string, ipAddress *string, userAgent *string) (*types.MagicLinkExchangeResult, error) {
 	args := m.Called(ctx, token, ipAddress, userAgent)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.ExchangeResult), args.Error(1)
+	return args.Get(0).(*types.MagicLinkExchangeResult), args.Error(1)
 }

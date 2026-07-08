@@ -25,7 +25,7 @@ func NewUseCases(
 }
 
 type SignInUseCase interface {
-	SignIn(ctx context.Context, name *string, email string, callbackURL *string) (*types.SignInResult, error)
+	SignIn(ctx context.Context, name *string, email string, callbackURL *string) (*types.MagicLinkSignInResult, error)
 }
 
 type VerifyUseCase interface {
@@ -33,5 +33,5 @@ type VerifyUseCase interface {
 }
 
 type ExchangeUseCase interface {
-	Exchange(ctx context.Context, token string, ipAddress *string, userAgent *string) (*types.ExchangeResult, error)
+	Exchange(ctx context.Context, token string, ipAddress *string, userAgent *string) (*types.MagicLinkExchangeResult, error)
 }

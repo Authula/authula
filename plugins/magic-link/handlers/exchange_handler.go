@@ -26,7 +26,7 @@ func (h *ExchangeHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		var request types.ExchangeRequest
+		var request types.MagicLinkExchangeRequest
 		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
@@ -54,7 +54,7 @@ func (h *ExchangeHandler) Handler() http.HandlerFunc {
 		reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken
 		reqCtx.Values[models.ContextAuthSuccess.String()] = true
 
-		reqCtx.SetJSONResponse(http.StatusOK, &types.ExchangeResponse{
+		reqCtx.SetJSONResponse(http.StatusOK, &types.MagicLinkExchangeResponse{
 			User:    result.User,
 			Session: result.Session,
 		})

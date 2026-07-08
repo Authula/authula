@@ -25,12 +25,12 @@ func TestExchangeHandler(t *testing.T) {
 	}{
 		{
 			name: "success sets session context",
-			body: internaltests.MarshalToJSON(t, types.ExchangeRequest{Token: "token-123"}),
+			body: internaltests.MarshalToJSON(t, types.MagicLinkExchangeRequest{Token: "token-123"}),
 			setup: func(t *testing.T, useCase *plugintests.MockExchangeUseCase) {
 				user := &models.User{ID: "user-123", Email: "user@example.com"}
 				session := &models.Session{ID: "sess-456", UserID: "user-123"}
 				useCase.On("Exchange", mock.Anything, "token-123", mock.Anything, mock.Anything).
-					Return(&types.ExchangeResult{User: user, Session: session, SessionToken: "session-token"}, nil).Once()
+					Return(&types.MagicLinkExchangeResult{User: user, Session: session, SessionToken: "session-token"}, nil).Once()
 			},
 			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
 				if reqCtx.ResponseStatus != http.StatusOK {
@@ -49,7 +49,7 @@ func TestExchangeHandler(t *testing.T) {
 					t.Fatal("expected auth success flag")
 				}
 
-				var resp types.ExchangeResponse
+				var resp types.MagicLinkExchangeResponse
 				if err := json.Unmarshal(reqCtx.ResponseBody, &resp); err != nil {
 					t.Fatalf("expected JSON body, got error: %v", err)
 				}
@@ -77,7 +77,7 @@ func TestExchangeHandler(t *testing.T) {
 		},
 		{
 			name: "use case error",
-			body: internaltests.MarshalToJSON(t, types.ExchangeRequest{Token: "token-123"}),
+			body: internaltests.MarshalToJSON(t, types.MagicLinkExchangeRequest{Token: "token-123"}),
 			setup: func(t *testing.T, useCase *plugintests.MockExchangeUseCase) {
 				useCase.On("Exchange", mock.Anything, "token-123", mock.Anything, mock.Anything).
 					Return(nil, errors.New("exchange failed")).Once()
@@ -88,7 +88,7 @@ func TestExchangeHandler(t *testing.T) {
 		},
 		{
 			name: "passes request metadata to use case",
-			body: internaltests.MarshalToJSON(t, types.ExchangeRequest{Token: "token-123"}),
+			body: internaltests.MarshalToJSON(t, types.MagicLinkExchangeRequest{Token: "token-123"}),
 			setup: func(t *testing.T, useCase *plugintests.MockExchangeUseCase) {
 				user := &models.User{ID: "user-123", Email: "user@example.com"}
 				session := &models.Session{ID: "sess-456", UserID: "user-123"}
@@ -103,7 +103,7 @@ func TestExchangeHandler(t *testing.T) {
 							t.Fatalf("expected user agent metadata, got %v", userAgent)
 						}
 					}).
-					Return(&types.ExchangeResult{User: user, Session: session, SessionToken: "session-token"}, nil).Once()
+					Return(&types.MagicLinkExchangeResult{User: user, Session: session, SessionToken: "session-token"}, nil).Once()
 			},
 			assertResult: func(t *testing.T, reqCtx *models.RequestContext) {
 				if reqCtx.ResponseStatus != http.StatusOK {

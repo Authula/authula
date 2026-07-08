@@ -31,7 +31,7 @@ func (uc *SignInUseCaseImpl) SignIn(
 	name *string,
 	email string,
 	callbackURL *string,
-) (*types.SignInResult, error) {
+) (*types.MagicLinkSignInResult, error) {
 	reqCtx, _ := models.GetRequestContext(ctx)
 
 	email = strings.ToLower(email)
@@ -117,7 +117,7 @@ func (uc *SignInUseCaseImpl) SignIn(
 		}()
 	}
 
-	return &types.SignInResult{
+	return &types.MagicLinkSignInResult{
 		Token: token,
 	}, nil
 }

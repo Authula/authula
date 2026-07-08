@@ -25,7 +25,7 @@ func (uc *ExchangeUseCaseImpl) Exchange(
 	token string,
 	ipAddress *string,
 	userAgent *string,
-) (*types.ExchangeResult, error) {
+) (*types.MagicLinkExchangeResult, error) {
 	hashedToken := uc.TokenService.Hash(token)
 	verification, err := uc.VerificationService.GetByToken(ctx, hashedToken)
 	if err != nil {
@@ -70,7 +70,7 @@ func (uc *ExchangeUseCaseImpl) Exchange(
 		return nil, err
 	}
 
-	return &types.ExchangeResult{
+	return &types.MagicLinkExchangeResult{
 		User:         user,
 		Session:      session,
 		SessionToken: sessionToken,

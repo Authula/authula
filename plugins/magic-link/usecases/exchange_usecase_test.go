@@ -64,7 +64,7 @@ func TestExchangeUseCase(t *testing.T) {
 		ipAddress    *string
 		userAgent    *string
 		setup        func(t *testing.T, h *exchangeUseCaseTestHarness)
-		assertResult func(t *testing.T, result *types.ExchangeResult, err error)
+		assertResult func(t *testing.T, result *types.MagicLinkExchangeResult, err error)
 	}{
 		{
 			name:      "success returns a session and token",
@@ -89,7 +89,7 @@ func TestExchangeUseCase(t *testing.T) {
 					h.sessionSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkExchangeResult, err error) {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
 				assert.Equal(t, "session-123", result.Session.ID)
@@ -109,7 +109,7 @@ func TestExchangeUseCase(t *testing.T) {
 					h.tokenSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkExchangeResult, err error) {
 				assert.EqualError(t, err, "lookup failed")
 				assert.Nil(t, result)
 			},
@@ -126,7 +126,7 @@ func TestExchangeUseCase(t *testing.T) {
 					h.tokenSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkExchangeResult, err error) {
 				assert.EqualError(t, err, "invalid or expired token")
 				assert.Nil(t, result)
 			},
@@ -144,7 +144,7 @@ func TestExchangeUseCase(t *testing.T) {
 					h.tokenSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkExchangeResult, err error) {
 				assert.EqualError(t, err, "invalid or expired token")
 				assert.Nil(t, result)
 			},
@@ -163,7 +163,7 @@ func TestExchangeUseCase(t *testing.T) {
 					h.tokenSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkExchangeResult, err error) {
 				assert.EqualError(t, err, "invalid token type")
 				assert.Nil(t, result)
 			},
@@ -182,7 +182,7 @@ func TestExchangeUseCase(t *testing.T) {
 					h.tokenSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkExchangeResult, err error) {
 				assert.EqualError(t, err, "invalid token type")
 				assert.Nil(t, result)
 			},
@@ -202,7 +202,7 @@ func TestExchangeUseCase(t *testing.T) {
 					h.tokenSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkExchangeResult, err error) {
 				assert.EqualError(t, err, "user lookup failed")
 				assert.Nil(t, result)
 			},
@@ -222,7 +222,7 @@ func TestExchangeUseCase(t *testing.T) {
 					h.tokenSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkExchangeResult, err error) {
 				assert.EqualError(t, err, "user not found")
 				assert.Nil(t, result)
 			},
@@ -243,7 +243,7 @@ func TestExchangeUseCase(t *testing.T) {
 					h.tokenSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkExchangeResult, err error) {
 				assert.EqualError(t, err, "delete failed")
 				assert.Nil(t, result)
 			},
@@ -269,7 +269,7 @@ func TestExchangeUseCase(t *testing.T) {
 					h.sessionSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.ExchangeResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkExchangeResult, err error) {
 				assert.EqualError(t, err, "session failed")
 				assert.Nil(t, result)
 			},

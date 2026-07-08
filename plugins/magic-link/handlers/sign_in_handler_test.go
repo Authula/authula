@@ -24,7 +24,7 @@ func TestSignInHandler(t *testing.T) {
 	}{
 		{
 			name:        "valid request with existing user",
-			requestBody: internaltests.MarshalToJSON(t, types.SignInRequest{Email: "test@example.com"}),
+			requestBody: internaltests.MarshalToJSON(t, types.MagicLinkSignInRequest{Email: "test@example.com"}),
 			setup: func(t *testing.T, reqCtx *models.RequestContext, userService *internaltests.MockUserService, accountService *internaltests.MockAccountService, tokenService *internaltests.MockTokenService, verificationService *internaltests.MockVerificationService) {
 				userService.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{ID: "user-123", Email: "test@example.com"}, nil).Once()
 				tokenService.On("Generate").Return("token-123", nil).Once()
@@ -43,7 +43,7 @@ func TestSignInHandler(t *testing.T) {
 					t.Fatalf("expected status OK, got %d", reqCtx.ResponseStatus)
 				}
 
-				var resp types.SignInResponse
+				var resp types.MagicLinkSignInResponse
 				if err := json.Unmarshal(reqCtx.ResponseBody, &resp); err != nil {
 					t.Fatalf("expected valid JSON response, got error: %v", err)
 				}
@@ -63,7 +63,7 @@ func TestSignInHandler(t *testing.T) {
 		},
 		{
 			name:        "use case error",
-			requestBody: internaltests.MarshalToJSON(t, types.SignInRequest{Email: "test@example.com"}),
+			requestBody: internaltests.MarshalToJSON(t, types.MagicLinkSignInRequest{Email: "test@example.com"}),
 			setup: func(t *testing.T, reqCtx *models.RequestContext, userService *internaltests.MockUserService, accountService *internaltests.MockAccountService, tokenService *internaltests.MockTokenService, verificationService *internaltests.MockVerificationService) {
 				userService.On("GetByEmail", mock.Anything, "test@example.com").Return(nil, errors.New("database error")).Once()
 			},
@@ -84,7 +84,7 @@ func TestSignInHandler(t *testing.T) {
 		},
 		{
 			name:        "already authenticated returns bad request",
-			requestBody: internaltests.MarshalToJSON(t, types.SignInRequest{Email: "test@example.com"}),
+			requestBody: internaltests.MarshalToJSON(t, types.MagicLinkSignInRequest{Email: "test@example.com"}),
 			setup: func(t *testing.T, reqCtx *models.RequestContext, userService *internaltests.MockUserService, accountService *internaltests.MockAccountService, tokenService *internaltests.MockTokenService, verificationService *internaltests.MockVerificationService) {
 				reqCtx.Actor = &models.Actor{ID: "user-123", Type: models.ActorUser}
 			},

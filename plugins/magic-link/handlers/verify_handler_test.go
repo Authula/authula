@@ -52,7 +52,7 @@ func TestVerifyHandler_Handler(t *testing.T) {
 					t.Fatalf("expected status OK, got %d", reqCtx.ResponseStatus)
 				}
 
-				var resp types.VerifyResponse
+				var resp types.MagicLinkVerifyResponse
 				if err := json.Unmarshal(reqCtx.ResponseBody, &resp); err != nil {
 					t.Fatalf("expected JSON body, got error: %v", err)
 				}

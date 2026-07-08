@@ -26,7 +26,7 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		var request types.SignInRequest
+		var request types.MagicLinkSignInRequest
 		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
@@ -45,7 +45,7 @@ func (h *SignInHandler) Handler() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, &types.SignInResponse{
+		reqCtx.SetJSONResponse(http.StatusOK, &types.MagicLinkSignInResponse{
 			Message: "if an account exists for this email, a magic link has been sent.",
 		})
 	}

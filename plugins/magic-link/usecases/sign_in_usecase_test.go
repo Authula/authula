@@ -23,7 +23,7 @@ func TestSignInUseCase(t *testing.T) {
 		inputName    *string
 		email        string
 		setup        func(t *testing.T, uc *SignInUseCaseImpl, userSvc *mockUserService, accountSvc *mockAccountService, tokenSvc *mockTokenService, verificationSvc *mockVerificationService, mailerSvc *mockMailerService)
-		assertResult func(t *testing.T, result *types.SignInResult, err error)
+		assertResult func(t *testing.T, result *types.MagicLinkSignInResult, err error)
 	}{
 		{
 			name:  "existing user returns token",
@@ -45,7 +45,7 @@ func TestSignInUseCase(t *testing.T) {
 					verificationSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.SignInResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkSignInResult, err error) {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
 				assert.Equal(t, "token-123", result.Token)
@@ -77,7 +77,7 @@ func TestSignInUseCase(t *testing.T) {
 					verificationSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.SignInResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkSignInResult, err error) {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
 				assert.Equal(t, "token-123", result.Token)
@@ -95,7 +95,7 @@ func TestSignInUseCase(t *testing.T) {
 					userSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.SignInResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkSignInResult, err error) {
 				assert.Error(t, err)
 				assert.Nil(t, result)
 				assert.Contains(t, err.Error(), "disabled")
@@ -130,7 +130,7 @@ func TestSignInUseCase(t *testing.T) {
 					verificationSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.SignInResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkSignInResult, err error) {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
 			},
@@ -145,7 +145,7 @@ func TestSignInUseCase(t *testing.T) {
 					userSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.SignInResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkSignInResult, err error) {
 				assert.Error(t, err)
 				assert.Nil(t, result)
 				assert.Contains(t, err.Error(), "database error")
@@ -167,7 +167,7 @@ func TestSignInUseCase(t *testing.T) {
 					tokenSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.SignInResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkSignInResult, err error) {
 				assert.Error(t, err)
 				assert.Nil(t, result)
 				assert.Contains(t, err.Error(), "token generation failed")
@@ -193,7 +193,7 @@ func TestSignInUseCase(t *testing.T) {
 					verificationSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.SignInResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkSignInResult, err error) {
 				assert.Error(t, err)
 				assert.Nil(t, result)
 				assert.Contains(t, err.Error(), "verification creation failed")
@@ -229,7 +229,7 @@ func TestSignInUseCase(t *testing.T) {
 					verificationSvc.AssertExpectations(t)
 				})
 			},
-			assertResult: func(t *testing.T, result *types.SignInResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkSignInResult, err error) {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
 			},
@@ -251,7 +251,7 @@ func TestSignInUseCase(t *testing.T) {
 				verificationSvc.On("Create", mock.Anything, "user-1", "hashed-token-123", models.TypeMagicLinkSignInRequest, "test@example.com", uc.PluginConfig.ExpiresIn).
 					Return(&models.Verification{ID: "verif-1"}, nil).Once()
 			},
-			assertResult: func(t *testing.T, result *types.SignInResult, err error) {
+			assertResult: func(t *testing.T, result *types.MagicLinkSignInResult, err error) {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
 				assert.Equal(t, "token-123", result.Token)
