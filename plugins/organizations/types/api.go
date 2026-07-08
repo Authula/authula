@@ -7,46 +7,46 @@ import (
 )
 
 type OrganizationID struct {
-	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
+	OrganizationID string `path:"organization_id"`
 }
 
 type InvitationID struct {
-	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
-	InvitationID   string `path:"invitation_id" json:"invitation_id" required:"true" nullable:"false"`
+	OrganizationID string `path:"organization_id"`
+	InvitationID   string `path:"invitation_id"`
 }
 
 type MemberID struct {
-	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
-	MemberID       string `path:"member_id" json:"member_id" required:"true" nullable:"false"`
+	OrganizationID string `path:"organization_id"`
+	MemberID       string `path:"member_id"`
 }
 
 type TeamID struct {
-	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
-	TeamID         string `path:"team_id" json:"team_id" required:"true" nullable:"false"`
+	OrganizationID string `path:"organization_id"`
+	TeamID         string `path:"team_id"`
 }
 
 type TeamMemberID struct {
-	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
-	TeamID         string `path:"team_id" json:"team_id" required:"true" nullable:"false"`
-	MemberID       string `path:"member_id" json:"member_id" required:"true" nullable:"false"`
+	OrganizationID string `path:"organization_id"`
+	TeamID         string `path:"team_id"`
+	MemberID       string `path:"member_id"`
 }
 
 type ListOrganizationMembersRequest struct {
-	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
+	OrganizationID string `path:"organization_id"`
 	Page           int    `query:"page" json:"page,omitempty" nullable:"false"`
 	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false"`
 }
 
 type ListOrganizationTeamMembersRequest struct {
-	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
-	TeamID         string `path:"team_id" json:"team_id" required:"true" nullable:"false"`
+	OrganizationID string `path:"organization_id"`
+	TeamID         string `path:"team_id"`
 	Page           int    `query:"page" json:"page,omitempty" nullable:"false"`
 	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false"`
 }
 
 type AcceptOrganizationInvitationQuery struct {
-	OrganizationID string `path:"organization_id" json:"organization_id" required:"true" nullable:"false"`
-	InvitationID   string `path:"invitation_id" json:"invitation_id" required:"true" nullable:"false"`
+	OrganizationID string `path:"organization_id"`
+	InvitationID   string `path:"invitation_id"`
 	RedirectURL    string `query:"redirect_url" json:"redirect_url,omitempty" nullable:"true"`
 }
 

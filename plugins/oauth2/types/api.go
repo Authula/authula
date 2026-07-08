@@ -8,7 +8,7 @@ import (
 
 // AuthorizeRequest represents an authorization request
 type AuthorizeRequest struct {
-	ProviderID string `path:"provider" json:"provider" required:"true" nullable:"false"`
+	ProviderID string `path:"provider"`
 	RedirectTo string `query:"redirect_to" json:"redirect_to,omitempty" nullable:"true"`
 }
 
@@ -19,7 +19,7 @@ type AuthorizeResponse struct {
 
 // CallbackRequest represents an OAuth2 callback request
 type CallbackRequest struct {
-	ProviderID string `path:"provider" json:"provider" required:"true" nullable:"false"`
+	ProviderID string `path:"provider"`
 	Code       string `query:"code" json:"code" required:"true" nullable:"false"`
 	State      string `query:"state" json:"state" required:"true" nullable:"false"`
 	Error      string `query:"error" json:"error,omitempty" nullable:"true"`

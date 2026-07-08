@@ -974,15 +974,6 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AdminImpersonationID"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "OK",
@@ -1716,15 +1707,6 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AdminUserID"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "OK",
@@ -2666,15 +2648,6 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InvitationID"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "OK",
@@ -2771,15 +2744,6 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InvitationID"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "OK",
@@ -3599,12 +3563,6 @@
     "schemas": {
       "AcceptOrganizationInvitationQuery": {
         "properties": {
-          "invitation_id": {
-            "type": "string"
-          },
-          "organization_id": {
-            "type": "string"
-          },
           "redirect_url": {
             "type": [
               "string",
@@ -3612,10 +3570,6 @@
             ]
           }
         },
-        "required": [
-          "organization_id",
-          "invitation_id"
-        ],
         "type": "object"
       },
       "Account": {
@@ -3735,39 +3689,6 @@
         ],
         "type": "object"
       },
-      "AdminAccountID": {
-        "properties": {
-          "id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "type": "object"
-      },
-      "AdminImpersonationID": {
-        "properties": {
-          "impersonation_id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "impersonation_id"
-        ],
-        "type": "object"
-      },
-      "AdminSessionID": {
-        "properties": {
-          "session_id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "session_id"
-        ],
-        "type": "object"
-      },
       "AdminSessionState": {
         "properties": {
           "created_at": {
@@ -3830,17 +3751,6 @@
           "session_id",
           "created_at",
           "updated_at"
-        ],
-        "type": "object"
-      },
-      "AdminUserID": {
-        "properties": {
-          "user_id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "user_id"
         ],
         "type": "object"
       },
@@ -4002,17 +3912,6 @@
           "rate_limit_enabled",
           "created_at",
           "updated_at"
-        ],
-        "type": "object"
-      },
-      "ApiKeyID": {
-        "properties": {
-          "id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
         ],
         "type": "object"
       },
@@ -4927,21 +4826,6 @@
         ],
         "type": "object"
       },
-      "InvitationID": {
-        "properties": {
-          "invitation_id": {
-            "type": "string"
-          },
-          "organization_id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "organization_id",
-          "invitation_id"
-        ],
-        "type": "object"
-      },
       "JWK": {
         "properties": {
           "alg": {
@@ -5048,21 +4932,6 @@
         ],
         "type": "object"
       },
-      "MemberID": {
-        "properties": {
-          "member_id": {
-            "type": "string"
-          },
-          "organization_id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "organization_id",
-          "member_id"
-        ],
-        "type": "object"
-      },
       "Organization": {
         "properties": {
           "created_at": {
@@ -5106,17 +4975,6 @@
           "slug",
           "created_at",
           "updated_at"
-        ],
-        "type": "object"
-      },
-      "OrganizationID": {
-        "properties": {
-          "organization_id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "organization_id"
         ],
         "type": "object"
       },
@@ -5338,17 +5196,6 @@
         ],
         "type": "object"
       },
-      "PermissionID": {
-        "properties": {
-          "permission_id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "permission_id"
-        ],
-        "type": "object"
-      },
       "RefreshTokenRequest": {
         "properties": {
           "refresh_token": {
@@ -5560,17 +5407,6 @@
         ],
         "type": "object"
       },
-      "RoleID": {
-        "properties": {
-          "role_id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "role_id"
-        ],
-        "type": "object"
-      },
       "SendEmailVerificationRequest": {
         "properties": {
           "callback_url": {
@@ -5749,21 +5585,6 @@
         },
         "required": [
           "message"
-        ],
-        "type": "object"
-      },
-      "TeamID": {
-        "properties": {
-          "organization_id": {
-            "type": "string"
-          },
-          "team_id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "organization_id",
-          "team_id"
         ],
         "type": "object"
       },
@@ -6224,17 +6045,6 @@
         },
         "required": [
           "accounts"
-        ],
-        "type": "object"
-      },
-      "UserID": {
-        "properties": {
-          "user_id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "user_id"
         ],
         "type": "object"
       },

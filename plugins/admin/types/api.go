@@ -9,19 +9,19 @@ import (
 )
 
 type AdminUserID struct {
-	UserID string `path:"user_id" json:"user_id" required:"true" nullable:"false"`
+	UserID string `path:"user_id"`
 }
 
 type AdminAccountID struct {
-	ID string `path:"id" json:"id" required:"true" nullable:"false"`
+	ID string `path:"id"`
 }
 
 type AdminSessionID struct {
-	SessionID string `path:"session_id" json:"session_id" required:"true" nullable:"false"`
+	SessionID string `path:"session_id"`
 }
 
 type AdminImpersonationID struct {
-	ImpersonationID string `path:"impersonation_id" json:"impersonation_id" required:"true" nullable:"false"`
+	ImpersonationID string `path:"impersonation_id"`
 }
 
 type ListUsersQuery struct {

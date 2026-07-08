@@ -9,29 +9,29 @@ import (
 )
 
 type RoleID struct {
-	RoleID string `path:"role_id" json:"role_id" required:"true" nullable:"false"`
+	RoleID string `path:"role_id"`
 }
 
 type RoleName struct {
-	RoleName string `path:"role_name" json:"role_name" required:"true" nullable:"false"`
+	RoleName string `path:"role_name"`
 }
 
 type PermissionID struct {
-	PermissionID string `path:"permission_id" json:"permission_id" required:"true" nullable:"false"`
+	PermissionID string `path:"permission_id"`
 }
 
 type UserID struct {
-	UserID string `path:"user_id" json:"user_id" required:"true" nullable:"false"`
+	UserID string `path:"user_id"`
 }
 
 type RolePermissionID struct {
-	RoleID       string `path:"role_id" json:"role_id" required:"true" nullable:"false"`
-	PermissionID string `path:"permission_id" json:"permission_id" required:"true" nullable:"false"`
+	RoleID       string `path:"role_id"`
+	PermissionID string `path:"permission_id"`
 }
 
 type UserRoleID struct {
-	UserID string `path:"user_id" json:"user_id" required:"true" nullable:"false"`
-	RoleID string `path:"role_id" json:"role_id" required:"true" nullable:"false"`
+	UserID string `path:"user_id"`
+	RoleID string `path:"role_id"`
 }
 
 type CreateRoleRequest struct {

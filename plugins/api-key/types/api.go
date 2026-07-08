@@ -12,7 +12,7 @@ const (
 )
 
 type ApiKeyID struct {
-	ID string `path:"id" json:"id" required:"true" nullable:"false"`
+	ID string `path:"id"`
 }
 
 type ListApiKeysQuery struct {
