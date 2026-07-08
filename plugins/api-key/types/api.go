@@ -11,18 +11,29 @@ const (
 	OwnerTypeOrganization = "organization"
 )
 
+type ApiKeyID struct {
+	ID string `path:"id" json:"id" required:"true" nullable:"false"`
+}
+
+type ListApiKeysQuery struct {
+	OwnerType *string `query:"owner_type" json:"owner_type,omitempty" nullable:"true"`
+	OwnerID   *string `query:"owner_id" json:"owner_id,omitempty" nullable:"true"`
+	Page      *int    `query:"page" json:"page,omitempty" nullable:"true"`
+	Limit     *int    `query:"limit" json:"limit,omitempty" nullable:"true"`
+}
+
 type CreateApiKeyRequest struct {
-	Name                 string         `json:"name"`
-	OwnerType            string         `json:"owner_type"`
-	OwnerID              string         `json:"owner_id"`
-	Prefix               *string        `json:"prefix,omitempty"`
-	Enabled              *bool          `json:"enabled,omitempty"`
-	ExpiresAt            *time.Time     `json:"expires_at,omitempty"`
-	RateLimitEnabled     *bool          `json:"rate_limit_enabled,omitempty"`
-	RateLimitTimeWindow  *int           `json:"rate_limit_time_window,omitempty"`
-	RateLimitMaxRequests *int           `json:"rate_limit_max_requests,omitempty"`
-	Permissions          []string       `json:"permissions,omitempty"`
-	Metadata             map[string]any `json:"metadata,omitempty"`
+	Name                 string         `json:"name" required:"true" nullable:"false"`
+	OwnerType            string         `json:"owner_type" required:"true" nullable:"false"`
+	OwnerID              string         `json:"owner_id" required:"true" nullable:"false"`
+	Prefix               *string        `json:"prefix,omitempty" nullable:"true"`
+	Enabled              *bool          `json:"enabled,omitempty" nullable:"true"`
+	ExpiresAt            *time.Time     `json:"expires_at,omitempty" nullable:"true"`
+	RateLimitEnabled     *bool          `json:"rate_limit_enabled,omitempty" nullable:"true"`
+	RateLimitTimeWindow  *int           `json:"rate_limit_time_window,omitempty" nullable:"true"`
+	RateLimitMaxRequests *int           `json:"rate_limit_max_requests,omitempty" nullable:"true"`
+	Permissions          []string       `json:"permissions,omitempty" nullable:"true"`
+	Metadata             map[string]any `json:"metadata,omitempty" nullable:"true"`
 }
 
 func (r *CreateApiKeyRequest) Validate() error {
@@ -47,15 +58,15 @@ func (r *CreateApiKeyRequest) Validate() error {
 }
 
 type CreateApiKeyResponse struct {
-	RawApiKey string  `json:"raw_api_key"`
-	ApiKey    *ApiKey `json:"api_key"`
+	RawApiKey string  `json:"raw_api_key" required:"true" nullable:"false"`
+	ApiKey    *ApiKey `json:"api_key" required:"true" nullable:"false"`
 }
 
 type GetAllApiKeysResponse struct {
-	Items []*ApiKey `json:"items"`
-	Total int       `json:"total"`
-	Page  int       `json:"page"`
-	Limit int       `json:"limit"`
+	Items []*ApiKey `json:"items" required:"true" nullable:"false"`
+	Total int       `json:"total" required:"true" nullable:"false"`
+	Page  int       `json:"page" required:"true" nullable:"false"`
+	Limit int       `json:"limit" required:"true" nullable:"false"`
 }
 
 type GetApiKeysRequest struct {
@@ -66,18 +77,18 @@ type GetApiKeysRequest struct {
 }
 
 type GetApiKeyResponse struct {
-	ApiKey *ApiKey `json:"api_key"`
+	ApiKey *ApiKey `json:"api_key" required:"true" nullable:"false"`
 }
 
 type UpdateApiKeyRequest struct {
-	Name                 *string        `json:"name,omitempty"`
-	Enabled              *bool          `json:"enabled,omitempty"`
-	RateLimitEnabled     *bool          `json:"rate_limit_enabled,omitempty"`
-	RateLimitTimeWindow  *int           `json:"rate_limit_time_window,omitempty"`
-	RateLimitMaxRequests *int           `json:"rate_limit_max_requests,omitempty"`
-	ExpiresAt            *time.Time     `json:"expires_at,omitempty"`
-	Permissions          []string       `json:"permissions,omitempty"`
-	Metadata             map[string]any `json:"metadata,omitempty"`
+	Name                 *string        `json:"name,omitempty" nullable:"true"`
+	Enabled              *bool          `json:"enabled,omitempty" nullable:"true"`
+	RateLimitEnabled     *bool          `json:"rate_limit_enabled,omitempty" nullable:"true"`
+	RateLimitTimeWindow  *int           `json:"rate_limit_time_window,omitempty" nullable:"true"`
+	RateLimitMaxRequests *int           `json:"rate_limit_max_requests,omitempty" nullable:"true"`
+	ExpiresAt            *time.Time     `json:"expires_at,omitempty" nullable:"true"`
+	Permissions          []string       `json:"permissions,omitempty" nullable:"true"`
+	Metadata             map[string]any `json:"metadata,omitempty" nullable:"true"`
 }
 
 func (r *UpdateApiKeyRequest) Validate() error {
@@ -108,15 +119,15 @@ type UpdateApiKeyData struct {
 }
 
 type UpdateApiKeyResponse struct {
-	ApiKey *ApiKey `json:"api_key"`
+	ApiKey *ApiKey `json:"api_key" required:"true" nullable:"false"`
 }
 
 type DeleteApiKeyResponse struct {
-	Message string `json:"message"`
+	Message string `json:"message" required:"true" nullable:"false"`
 }
 
 type VerifyApiKeyRequest struct {
-	Key string `json:"key"`
+	Key string `json:"key" required:"true" nullable:"false"`
 }
 
 func (r *VerifyApiKeyRequest) Validate() error {
@@ -132,5 +143,5 @@ type VerifyApiKeyResult struct {
 }
 
 type VerifyApiKeyResponse struct {
-	ApiKey *ApiKey `json:"api_key"`
+	ApiKey *ApiKey `json:"api_key" required:"true" nullable:"false"`
 }

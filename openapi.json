@@ -1739,6 +1739,231 @@
         }
       }
     },
+    "/api/auth/api-keys": {
+      "get": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "List API keys",
+        "description": "Lists API keys with pagination, optionally filtered by owner.",
+        "operationId": "listApiKeys",
+        "parameters": [
+          {
+            "name": "owner_type",
+            "in": "query",
+            "schema": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "schema": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAllApiKeysResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Create API key",
+        "description": "Creates a new API key for the specified owner.",
+        "operationId": "createApiKey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApiKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateApiKeyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/api-keys/verify": {
+      "post": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Verify API key",
+        "description": "Verifies an API key by its raw value and returns the associated key details.",
+        "operationId": "verifyApiKey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyApiKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyApiKeyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/api-keys/{id}": {
+      "get": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Get API key by ID",
+        "description": "Retrieves an API key by its ID.",
+        "operationId": "getApiKey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetApiKeyResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Delete API key",
+        "description": "Deletes an API key.",
+        "operationId": "deleteApiKey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteApiKeyResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Update API key",
+        "description": "Updates an API key's attributes.",
+        "operationId": "updateApiKey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateApiKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateApiKeyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/email-password/change-password": {
       "post": {
         "tags": [
@@ -3691,6 +3916,106 @@
         ],
         "type": "object"
       },
+      "ApiKey": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "key_hash": {
+            "type": "string"
+          },
+          "last": {
+            "type": "string"
+          },
+          "last_requested_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "metadata": {
+            "additionalProperties": {},
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string"
+          },
+          "owner_type": {
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "prefix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "rate_limit_enabled": {
+            "type": "boolean"
+          },
+          "start": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key_hash",
+          "name",
+          "owner_type",
+          "owner_id",
+          "start",
+          "last",
+          "enabled",
+          "rate_limit_enabled",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "ApiKeyID": {
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
       "AssignUserRoleRequest": {
         "properties": {
           "expires_at": {
@@ -3904,6 +4229,93 @@
         },
         "required": [
           "account"
+        ],
+        "type": "object"
+      },
+      "CreateApiKeyRequest": {
+        "properties": {
+          "enabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "metadata": {
+            "additionalProperties": {},
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string"
+          },
+          "owner_type": {
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "prefix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "rate_limit_enabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "rate_limit_max_requests": {
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "rate_limit_time_window": {
+            "type": [
+              "null",
+              "integer"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "owner_type",
+          "owner_id"
+        ],
+        "type": "object"
+      },
+      "CreateApiKeyResponse": {
+        "properties": {
+          "api_key": {
+            "$ref": "#/components/schemas/ApiKey"
+          },
+          "raw_api_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "raw_api_key",
+          "api_key"
         ],
         "type": "object"
       },
@@ -4177,6 +4589,17 @@
         ],
         "type": "object"
       },
+      "DeleteApiKeyResponse": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
       "DeleteOrganizationMemberResponse": {
         "properties": {
           "message": {
@@ -4327,6 +4750,43 @@
         },
         "required": [
           "account"
+        ],
+        "type": "object"
+      },
+      "GetAllApiKeysResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApiKey"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "limit"
+        ],
+        "type": "object"
+      },
+      "GetApiKeyResponse": {
+        "properties": {
+          "api_key": {
+            "$ref": "#/components/schemas/ApiKey"
+          }
+        },
+        "required": [
+          "api_key"
         ],
         "type": "object"
       },
@@ -5390,6 +5850,75 @@
         ],
         "type": "object"
       },
+      "UpdateApiKeyRequest": {
+        "properties": {
+          "enabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "metadata": {
+            "additionalProperties": {},
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "rate_limit_enabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "rate_limit_max_requests": {
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "rate_limit_time_window": {
+            "type": [
+              "null",
+              "integer"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "UpdateApiKeyResponse": {
+        "properties": {
+          "api_key": {
+            "$ref": "#/components/schemas/ApiKey"
+          }
+        },
+        "required": [
+          "api_key"
+        ],
+        "type": "object"
+      },
       "UpdateOrganizationMemberRequest": {
         "properties": {
           "role": {
@@ -5814,6 +6343,28 @@
         },
         "required": [
           "users"
+        ],
+        "type": "object"
+      },
+      "VerifyApiKeyRequest": {
+        "properties": {
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "type": "object"
+      },
+      "VerifyApiKeyResponse": {
+        "properties": {
+          "api_key": {
+            "$ref": "#/components/schemas/ApiKey"
+          }
+        },
+        "required": [
+          "api_key"
         ],
         "type": "object"
       },
