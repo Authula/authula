@@ -8,21 +8,21 @@ import (
 
 // AuthorizeRequest represents an authorization request
 type AuthorizeRequest struct {
-	ProviderID string
-	RedirectTo string
+	ProviderID string `json:"provider" required:"true" nullable:"false"`
+	RedirectTo string `json:"redirect_to,omitempty" nullable:"true"`
 }
 
 // AuthorizeResponse represents an authorization response
 type AuthorizeResponse struct {
-	AuthURL string `json:"auth_url"`
+	AuthURL string `json:"auth_url" required:"true" nullable:"false"`
 }
 
 // CallbackRequest represents an OAuth2 callback request
 type CallbackRequest struct {
-	ProviderID string
-	Code       string
-	State      string
-	Error      string
+	ProviderID string `json:"provider" required:"true" nullable:"false"`
+	Code       string `json:"code" required:"true" nullable:"false"`
+	State      string `json:"state" required:"true" nullable:"false"`
+	Error      string `json:"error,omitempty" nullable:"true"`
 }
 
 // CallbackResult represents the result of OAuth2 callback
@@ -34,8 +34,8 @@ type CallbackResult struct {
 
 // CallbackResponse represents an OAuth2 callback response
 type CallbackResponse struct {
-	User    *models.User    `json:"user"`
-	Session *models.Session `json:"session"`
+	User    *models.User    `json:"user" required:"true" nullable:"false"`
+	Session *models.Session `json:"session" required:"true" nullable:"false"`
 }
 
 // RefreshRequest represents a token refresh request
