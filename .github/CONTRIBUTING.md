@@ -121,6 +121,21 @@ This will automatically select the workspace folder. But if you need to find the
 - Push your branch and open a pull request.
 - Fill out the PR and link related issues.
 
+#### Extras
+
+`OpenAPI Export`:
+
+```bash
+# Export JSON spec (default output: openapi.json)
+$ make openapi-export
+
+# Export with custom options
+$ make openapi-export ARGS="--output ./openapi.json --format json --openapi-version 3.1.0"
+
+# Export YAML
+$ make openapi-export ARGS="--format yaml"
+```
+
 ---
 
 ### AI Agents

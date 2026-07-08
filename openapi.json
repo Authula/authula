@@ -1,0 +1,304 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Authula API",
+    "description": "Authula API - An open-source authentication solution that scales with you.",
+    "version": "0.1.0"
+  },
+  "servers": [{ "url": "http://localhost:8080" }],
+  "paths": {
+    "/api/auth/change-password": {
+      "post": {
+        "tags": ["Email Password Plugin"],
+        "summary": "Change password",
+        "description": "Changes the user's password using a reset token",
+        "operationId": "changePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ChangePasswordRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangePasswordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/request-email-change": {
+      "post": {
+        "tags": ["Email Password Plugin"],
+        "summary": "Request email change",
+        "description": "Requests to change the authenticated user's email address",
+        "operationId": "requestEmailChange",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestEmailChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ChangeEmailResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/request-password-reset": {
+      "post": {
+        "tags": ["Email Password Plugin"],
+        "summary": "Request password reset",
+        "description": "Requests a password reset link to be sent to the user's email",
+        "operationId": "requestPasswordReset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPasswordResetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangePasswordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/send-email-verification": {
+      "post": {
+        "tags": ["Email Password Plugin"],
+        "summary": "Send email verification",
+        "description": "Sends a verification email to the authenticated user",
+        "operationId": "sendEmailVerification",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendEmailVerificationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangePasswordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sign-in": {
+      "post": {
+        "tags": ["Email Password Plugin"],
+        "summary": "Sign in",
+        "description": "Authenticates a user with email and password",
+        "operationId": "signIn",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SignInRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SignInResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sign-up": {
+      "post": {
+        "tags": ["Email Password Plugin"],
+        "summary": "Register new user",
+        "description": "Registers a new user with email and password",
+        "operationId": "signUp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SignUpRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SignUpResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/verify-email": {
+      "get": {
+        "tags": ["Email Password Plugin"],
+        "summary": "Verify email",
+        "description": "Verifies an email address or processes a password reset token using a verification token",
+        "operationId": "verifyEmail",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangePasswordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ChangeEmailResponse": {
+        "properties": { "message": { "type": "string" } },
+        "required": ["message"],
+        "type": "object"
+      },
+      "ChangePasswordRequest": {
+        "properties": {
+          "password": { "type": "string" },
+          "token": { "type": "string" }
+        },
+        "required": ["token", "password"],
+        "type": "object"
+      },
+      "ChangePasswordResponse": {
+        "properties": { "message": { "type": "string" } },
+        "required": ["message"],
+        "type": "object"
+      },
+      "RequestEmailChangeRequest": {
+        "properties": {
+          "callback_url": { "type": ["null", "string"] },
+          "new_email": { "type": "string" }
+        },
+        "required": ["new_email"],
+        "type": "object"
+      },
+      "RequestPasswordResetRequest": {
+        "properties": {
+          "callback_url": { "type": ["null", "string"] },
+          "email": { "type": "string" }
+        },
+        "required": ["email"],
+        "type": "object"
+      },
+      "SendEmailVerificationRequest": {
+        "properties": { "callback_url": { "type": ["null", "string"] } },
+        "type": "object"
+      },
+      "Session": {
+        "properties": {
+          "created_at": { "format": "date-time", "type": "string" },
+          "expires_at": { "format": "date-time", "type": "string" },
+          "id": { "type": "string" },
+          "ip_address": { "type": ["null", "string"] },
+          "token": { "type": "string" },
+          "updated_at": { "format": "date-time", "type": "string" },
+          "user_agent": { "type": ["null", "string"] },
+          "user_id": { "type": "string" }
+        },
+        "type": "object"
+      },
+      "SignInRequest": {
+        "properties": {
+          "callback_url": { "type": ["null", "string"] },
+          "email": { "type": "string" },
+          "password": { "type": "string" }
+        },
+        "required": ["email", "password"],
+        "type": "object"
+      },
+      "SignInResponse": {
+        "properties": {
+          "session": { "$ref": "#/components/schemas/Session" },
+          "user": { "$ref": "#/components/schemas/User" }
+        },
+        "required": ["user", "session"],
+        "type": "object"
+      },
+      "SignUpRequest": {
+        "properties": {
+          "callback_url": { "type": ["null", "string"] },
+          "email": { "type": "string" },
+          "image": { "type": ["null", "string"] },
+          "metadata": {
+            "additionalProperties": {},
+            "type": ["object", "null"]
+          },
+          "name": { "type": "string" },
+          "password": { "type": "string" }
+        },
+        "required": ["name", "email", "password"],
+        "type": "object"
+      },
+      "SignUpResponse": {
+        "properties": {
+          "session": { "$ref": "#/components/schemas/Session" },
+          "user": { "$ref": "#/components/schemas/User" }
+        },
+        "required": ["user", "session"],
+        "type": "object"
+      },
+      "User": {
+        "properties": {
+          "created_at": { "format": "date-time", "type": "string" },
+          "email": { "type": "string" },
+          "email_verified": { "type": "boolean" },
+          "id": { "type": "string" },
+          "image": { "type": ["null", "string"] },
+          "metadata": {
+            "additionalProperties": {},
+            "type": ["object", "null"]
+          },
+          "name": { "type": "string" },
+          "updated_at": { "format": "date-time", "type": "string" }
+        },
+        "type": "object"
+      }
+    }
+  }
+}

@@ -1,5 +1,13 @@
 package env
 
+import (
+	"log"
+	"os"
+	"strings"
+
+	"github.com/joho/godotenv"
+)
+
 const (
 	// OAUTH2 PROVIDERS
 
@@ -38,13 +46,33 @@ const (
 
 	// AUTHULA
 
-	EnvConfigPath  = "AUTHULA_CONFIG_PATH"
-	EnvBaseURL     = "AUTHULA_BASE_URL"
-	EnvSecret      = "AUTHULA_SECRET"
-	EnvDatabaseURL = "AUTHULA_DATABASE_URL"
+	EnvOpenAPISpecVersion = "OPENAPI_SPEC_VERSION"
+	EnvConfigPath         = "AUTHULA_CONFIG_PATH"
+	EnvBaseURL            = "AUTHULA_BASE_URL"
+	EnvSecret             = "AUTHULA_SECRET"
+	EnvDatabaseURL        = "AUTHULA_DATABASE_URL"
 
 	// ENVIRONMENT
 
 	EnvGoEnvironment = "GO_ENV"
 	EnvPort          = "PORT"
 )
+
+func GetEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
+func LoadEnvConfig() {
+	env := os.Getenv("GO_ENV")
+
+	// Only attempt to load .env files in local development.
+	// Production configurations should be explicitly injected into the environment.
+	if env == "" || strings.ToLower(env) == "development" {
+		if err := godotenv.Load(); err != nil {
+			log.Println("Note: No .env file found, relying on system environment variables.")
+		}
+	}
+}

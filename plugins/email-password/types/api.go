@@ -7,12 +7,12 @@ import (
 )
 
 type SignUpRequest struct {
-	Name        string         `json:"name"`
-	Email       string         `json:"email"`
-	Password    string         `json:"password"`
-	Image       *string        `json:"image,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
-	CallbackURL *string        `json:"callback_url,omitempty"`
+	Name        string         `json:"name" required:"true" nullable:"false"`
+	Email       string         `json:"email" required:"true" nullable:"false"`
+	Password    string         `json:"password" required:"true" nullable:"false"`
+	Image       *string        `json:"image,omitempty" nullable:"true"`
+	Metadata    map[string]any `json:"metadata,omitempty" nullable:"true"`
+	CallbackURL *string        `json:"callback_url,omitempty" nullable:"true"`
 }
 
 func (p *SignUpRequest) Validate() error {
@@ -35,14 +35,14 @@ type SignUpResult struct {
 }
 
 type SignUpResponse struct {
-	User    *models.User    `json:"user"`
-	Session *models.Session `json:"session"`
+	User    *models.User    `json:"user" required:"true" nullable:"false"`
+	Session *models.Session `json:"session" required:"true" nullable:"false"`
 }
 
 type SignInRequest struct {
-	Email       string  `json:"email"`
-	Password    string  `json:"password"`
-	CallbackURL *string `json:"callback_url,omitempty"`
+	Email       string  `json:"email" required:"true" nullable:"false"`
+	Password    string  `json:"password" required:"true" nullable:"false"`
+	CallbackURL *string `json:"callback_url,omitempty" nullable:"true"`
 }
 
 func (p *SignInRequest) Validate() error {
@@ -61,13 +61,13 @@ type SignInResult struct {
 }
 
 type SignInResponse struct {
-	User    *models.User    `json:"user"`
-	Session *models.Session `json:"session"`
+	User    *models.User    `json:"user" required:"true" nullable:"false"`
+	Session *models.Session `json:"session" required:"true" nullable:"false"`
 }
 
 type VerifyEmailRequest struct {
-	Token       string  `json:"token"`
-	CallbackURL *string `json:"callback_url,omitempty"`
+	Token       string  `json:"token" required:"true" nullable:"false"`
+	CallbackURL *string `json:"callback_url,omitempty" nullable:"true"`
 }
 
 func (p *VerifyEmailRequest) Validate() error {
@@ -79,7 +79,7 @@ func (p *VerifyEmailRequest) Validate() error {
 }
 
 type SendEmailVerificationRequest struct {
-	CallbackURL *string `json:"callback_url,omitempty"`
+	CallbackURL *string `json:"callback_url,omitempty" nullable:"true"`
 }
 
 func (p *SendEmailVerificationRequest) Validate() error {
@@ -90,8 +90,8 @@ func (p *SendEmailVerificationRequest) Validate() error {
 }
 
 type RequestPasswordResetRequest struct {
-	Email       string  `json:"email"`
-	CallbackURL *string `json:"callback_url,omitempty"`
+	Email       string  `json:"email" required:"true" nullable:"false"`
+	CallbackURL *string `json:"callback_url,omitempty" nullable:"true"`
 }
 
 func (p *RequestPasswordResetRequest) Validate() error {
@@ -103,8 +103,8 @@ func (p *RequestPasswordResetRequest) Validate() error {
 }
 
 type RequestEmailChangeRequest struct {
-	NewEmail    string  `json:"new_email"`
-	CallbackURL *string `json:"callback_url,omitempty"`
+	NewEmail    string  `json:"new_email" required:"true" nullable:"false"`
+	CallbackURL *string `json:"callback_url,omitempty" nullable:"true"`
 }
 
 func (p *RequestEmailChangeRequest) Validate() error {
@@ -116,8 +116,8 @@ func (p *RequestEmailChangeRequest) Validate() error {
 }
 
 type ChangePasswordRequest struct {
-	Token    string `json:"token"`
-	Password string `json:"password"`
+	Token    string `json:"token" required:"true" nullable:"false"`
+	Password string `json:"password" required:"true" nullable:"false"`
 }
 
 func (p *ChangePasswordRequest) Validate() error {
@@ -127,9 +127,9 @@ func (p *ChangePasswordRequest) Validate() error {
 }
 
 type ChangePasswordResponse struct {
-	Message string `json:"message"`
+	Message string `json:"message" required:"true" nullable:"false"`
 }
 
 type ChangeEmailResponse struct {
-	Message string `json:"message"`
+	Message string `json:"message" required:"true" nullable:"false"`
 }
