@@ -8,7 +8,7 @@ import (
 	"github.com/Authula/authula/openapi"
 )
 
-type OpenAPIDocFunc func(svc openapi.OpenAPIService, basePath string) error
+type OpenAPIDocFunc func(svc openapi.OpenAPIService) error
 
 func ExportSpecToFile(outputPath, format string, extraDocs []OpenAPIDocFunc) error {
 	return ExportSpecToFileWithVersion(outputPath, format, "3.1.0", extraDocs)
@@ -25,8 +25,6 @@ func ExportSpecToFileWithVersion(outputPath, format, openAPIVersion string, extr
 		"Authula API",
 		env.GetEnv(env.EnvOpenAPISpecVersion, "0.1.0"),
 		"Authula API - An open-source authentication solution that scales with you.",
-		env.GetEnv(env.EnvBaseURL, "http://localhost:8080"),
-		"/api/auth",
 		extraDocs,
 		openapi.WithOpenAPIVersion(openAPIVersion),
 		openapi.WithShortSchemaNames(),
@@ -53,12 +51,12 @@ func ExportSpecToFileWithVersion(outputPath, format, openAPIVersion string, extr
 	return nil
 }
 
-func GenerateService(title, apiVersion, description, serverURL, basePath string, extraDocs []OpenAPIDocFunc, opts ...openapi.ServiceOption) (openapi.OpenAPIService, error) {
-	service, err := openapi.NewOpenAPIService(title, apiVersion, description, serverURL, opts...)
+func GenerateService(title, apiVersion, description string, extraDocs []OpenAPIDocFunc, opts ...openapi.ServiceOption) (openapi.OpenAPIService, error) {
+	service, err := openapi.NewOpenAPIService(title, apiVersion, description, opts...)
 	if err != nil {
 		return nil, err
 	}
-	if err := RegisterAllOpenAPIDocs(service, basePath, extraDocs...); err != nil {
+	if err := RegisterAllOpenAPIDocs(service, extraDocs...); err != nil {
 		return nil, fmt.Errorf("registering OpenAPI docs: %w", err)
 	}
 	return service, nil

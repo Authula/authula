@@ -51,7 +51,7 @@ func WithShortSchemaNames() ServiceOption {
 	}
 }
 
-func NewOpenAPIService(title, apiVersion, description, serverURL string, opts ...ServiceOption) (OpenAPIService, error) {
+func NewOpenAPIService(title, apiVersion, description string, opts ...ServiceOption) (OpenAPIService, error) {
 	svc := &openapiService{}
 	for _, opt := range opts {
 		opt(svc)
@@ -63,12 +63,12 @@ func NewOpenAPIService(title, apiVersion, description, serverURL string, opts ..
 
 	switch svc.openAPIVersion {
 	case "3.0.0", "3.0.1", "3.0.2", "3.0.3":
-		if err := svc.initV3(title, apiVersion, description, serverURL); err != nil {
+		if err := svc.initV3(title, apiVersion, description); err != nil {
 			return nil, err
 		}
 
 	case "3.1.0":
-		if err := svc.initV31(title, apiVersion, description, serverURL); err != nil {
+		if err := svc.initV31(title, apiVersion, description); err != nil {
 			return nil, err
 		}
 
@@ -79,13 +79,12 @@ func NewOpenAPIService(title, apiVersion, description, serverURL string, opts ..
 	return svc, nil
 }
 
-func (s *openapiService) initV3(title, apiVersion, description, serverURL string) error {
+func (s *openapiService) initV3(title, apiVersion, description string) error {
 	r := openapi3.NewReflector()
 	r.SpecEns().Info.
 		WithTitle(title).
 		WithVersion(apiVersion).
 		WithDescription(description)
-	r.SpecEns().WithServers(openapi3.Server{URL: serverURL})
 	r.Spec.Openapi = s.openAPIVersion
 
 	r.JSONSchemaReflector().DefaultOptions = append(
@@ -114,13 +113,12 @@ func (s *openapiService) initV3(title, apiVersion, description, serverURL string
 	return nil
 }
 
-func (s *openapiService) initV31(title, apiVersion, description, serverURL string) error {
+func (s *openapiService) initV31(title, apiVersion, description string) error {
 	r := openapi31.NewReflector()
 	r.SpecEns().Info.
 		WithTitle(title).
 		WithVersion(apiVersion).
 		WithDescription(description)
-	r.SpecEns().WithServers(openapi31.Server{URL: serverURL})
 	r.Spec.Openapi = s.openAPIVersion
 
 	r.JSONSchemaReflector().DefaultOptions = append(

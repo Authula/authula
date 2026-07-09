@@ -5,13 +5,8 @@
     "description": "Authula API - An open-source authentication solution that scales with you.",
     "version": "0.1.0"
   },
-  "servers": [
-    {
-      "url": "http://localhost:8080"
-    }
-  ],
   "paths": {
-    "/api/auth/.well-known/jwks.json": {
+    "/.well-known/jwks.json": {
       "get": {
         "tags": [
           "JWT Plugin"
@@ -33,7 +28,7 @@
         }
       }
     },
-    "/api/auth/access-control/permissions": {
+    "/access-control/permissions": {
       "get": {
         "tags": [
           "Access Control"
@@ -90,7 +85,7 @@
         }
       }
     },
-    "/api/auth/access-control/permissions/{permission_id}": {
+    "/access-control/permissions/{permission_id}": {
       "get": {
         "tags": [
           "Access Control"
@@ -191,7 +186,7 @@
         }
       }
     },
-    "/api/auth/access-control/roles": {
+    "/access-control/roles": {
       "get": {
         "tags": [
           "Access Control"
@@ -248,7 +243,7 @@
         }
       }
     },
-    "/api/auth/access-control/roles/by-name/{role_name}": {
+    "/access-control/roles/by-name/{role_name}": {
       "get": {
         "tags": [
           "Access Control"
@@ -280,7 +275,7 @@
         }
       }
     },
-    "/api/auth/access-control/roles/{role_id}": {
+    "/access-control/roles/{role_id}": {
       "get": {
         "tags": [
           "Access Control"
@@ -381,7 +376,7 @@
         }
       }
     },
-    "/api/auth/access-control/roles/{role_id}/permissions": {
+    "/access-control/roles/{role_id}/permissions": {
       "get": {
         "tags": [
           "Access Control"
@@ -497,7 +492,7 @@
         }
       }
     },
-    "/api/auth/access-control/roles/{role_id}/permissions/{permission_id}": {
+    "/access-control/roles/{role_id}/permissions/{permission_id}": {
       "delete": {
         "tags": [
           "Access Control"
@@ -537,7 +532,7 @@
         }
       }
     },
-    "/api/auth/access-control/users/{user_id}/permissions": {
+    "/access-control/users/{user_id}/permissions": {
       "get": {
         "tags": [
           "Access Control"
@@ -569,7 +564,7 @@
         }
       }
     },
-    "/api/auth/access-control/users/{user_id}/permissions/check": {
+    "/access-control/users/{user_id}/permissions/check": {
       "post": {
         "tags": [
           "Access Control"
@@ -610,7 +605,7 @@
         }
       }
     },
-    "/api/auth/access-control/users/{user_id}/roles": {
+    "/access-control/users/{user_id}/roles": {
       "get": {
         "tags": [
           "Access Control"
@@ -726,7 +721,7 @@
         }
       }
     },
-    "/api/auth/access-control/users/{user_id}/roles/{role_id}": {
+    "/access-control/users/{user_id}/roles/{role_id}": {
       "delete": {
         "tags": [
           "Access Control"
@@ -766,7 +761,7 @@
         }
       }
     },
-    "/api/auth/admin/accounts/{id}": {
+    "/admin/accounts/{id}": {
       "get": {
         "tags": [
           "Admin Accounts"
@@ -867,7 +862,7 @@
         }
       }
     },
-    "/api/auth/admin/impersonations": {
+    "/admin/impersonations": {
       "get": {
         "tags": [
           "Admin Impersonation"
@@ -924,7 +919,7 @@
         }
       }
     },
-    "/api/auth/admin/impersonations/{impersonation_id}": {
+    "/admin/impersonations/{impersonation_id}": {
       "get": {
         "tags": [
           "Admin Impersonation"
@@ -956,7 +951,7 @@
         }
       }
     },
-    "/api/auth/admin/impersonations/{impersonation_id}/stop": {
+    "/admin/impersonations/{impersonation_id}/stop": {
       "post": {
         "tags": [
           "Admin Impersonation"
@@ -988,7 +983,7 @@
         }
       }
     },
-    "/api/auth/admin/sessions/states/revoked": {
+    "/admin/sessions/states/revoked": {
       "get": {
         "tags": [
           "Admin Session State"
@@ -1016,7 +1011,7 @@
         }
       }
     },
-    "/api/auth/admin/sessions/{session_id}/revoke": {
+    "/admin/sessions/{session_id}/revoke": {
       "post": {
         "tags": [
           "Admin Session State"
@@ -1057,7 +1052,7 @@
         }
       }
     },
-    "/api/auth/admin/sessions/{session_id}/state": {
+    "/admin/sessions/{session_id}/state": {
       "get": {
         "tags": [
           "Admin Session State"
@@ -1197,7 +1192,7 @@
         }
       }
     },
-    "/api/auth/admin/users": {
+    "/admin/users": {
       "get": {
         "tags": [
           "Admin Users"
@@ -1270,7 +1265,7 @@
         }
       }
     },
-    "/api/auth/admin/users/states/banned": {
+    "/admin/users/states/banned": {
       "get": {
         "tags": [
           "Admin User State"
@@ -1298,7 +1293,7 @@
         }
       }
     },
-    "/api/auth/admin/users/{user_id}": {
+    "/admin/users/{user_id}": {
       "get": {
         "tags": [
           "Admin Users"
@@ -1399,7 +1394,7 @@
         }
       }
     },
-    "/api/auth/admin/users/{user_id}/accounts": {
+    "/admin/users/{user_id}/accounts": {
       "get": {
         "tags": [
           "Admin Accounts"
@@ -1470,7 +1465,7 @@
         }
       }
     },
-    "/api/auth/admin/users/{user_id}/ban": {
+    "/admin/users/{user_id}/ban": {
       "post": {
         "tags": [
           "Admin User State"
@@ -1511,7 +1506,7 @@
         }
       }
     },
-    "/api/auth/admin/users/{user_id}/sessions": {
+    "/admin/users/{user_id}/sessions": {
       "get": {
         "tags": [
           "Admin User State"
@@ -1549,7 +1544,7 @@
         }
       }
     },
-    "/api/auth/admin/users/{user_id}/state": {
+    "/admin/users/{user_id}/state": {
       "get": {
         "tags": [
           "Admin User State"
@@ -1689,7 +1684,7 @@
         }
       }
     },
-    "/api/auth/admin/users/{user_id}/unban": {
+    "/admin/users/{user_id}/unban": {
       "post": {
         "tags": [
           "Admin User State"
@@ -1721,7 +1716,7 @@
         }
       }
     },
-    "/api/auth/api-keys": {
+    "/api-keys": {
       "get": {
         "tags": [
           "API Keys"
@@ -1814,7 +1809,7 @@
         }
       }
     },
-    "/api/auth/api-keys/verify": {
+    "/api-keys/verify": {
       "post": {
         "tags": [
           "API Keys"
@@ -1845,7 +1840,7 @@
         }
       }
     },
-    "/api/auth/api-keys/{id}": {
+    "/api-keys/{id}": {
       "get": {
         "tags": [
           "API Keys"
@@ -1946,7 +1941,7 @@
         }
       }
     },
-    "/api/auth/email-password/change-password": {
+    "/email-password/change-password": {
       "post": {
         "tags": [
           "Email Password Plugin"
@@ -1977,7 +1972,7 @@
         }
       }
     },
-    "/api/auth/email-password/request-email-change": {
+    "/email-password/request-email-change": {
       "post": {
         "tags": [
           "Email Password Plugin"
@@ -2008,7 +2003,7 @@
         }
       }
     },
-    "/api/auth/email-password/request-password-reset": {
+    "/email-password/request-password-reset": {
       "post": {
         "tags": [
           "Email Password Plugin"
@@ -2039,7 +2034,7 @@
         }
       }
     },
-    "/api/auth/email-password/send-email-verification": {
+    "/email-password/send-email-verification": {
       "post": {
         "tags": [
           "Email Password Plugin"
@@ -2070,7 +2065,7 @@
         }
       }
     },
-    "/api/auth/email-password/sign-in": {
+    "/email-password/sign-in": {
       "post": {
         "tags": [
           "Email Password Plugin"
@@ -2101,7 +2096,7 @@
         }
       }
     },
-    "/api/auth/email-password/sign-up": {
+    "/email-password/sign-up": {
       "post": {
         "tags": [
           "Email Password Plugin"
@@ -2132,7 +2127,7 @@
         }
       }
     },
-    "/api/auth/email-password/verify-email": {
+    "/email-password/verify-email": {
       "get": {
         "tags": [
           "Email Password Plugin"
@@ -2154,7 +2149,7 @@
         }
       }
     },
-    "/api/auth/magic-link/exchange": {
+    "/magic-link/exchange": {
       "post": {
         "tags": [
           "Magic Link Plugin"
@@ -2185,7 +2180,7 @@
         }
       }
     },
-    "/api/auth/magic-link/sign-in": {
+    "/magic-link/sign-in": {
       "post": {
         "tags": [
           "Magic Link Plugin"
@@ -2216,7 +2211,7 @@
         }
       }
     },
-    "/api/auth/magic-link/verify": {
+    "/magic-link/verify": {
       "get": {
         "tags": [
           "Magic Link Plugin"
@@ -2255,7 +2250,7 @@
         }
       }
     },
-    "/api/auth/me": {
+    "/me": {
       "get": {
         "tags": [
           "Core"
@@ -2277,14 +2272,14 @@
         }
       }
     },
-    "/api/auth/oauth2/authorize/{provider}": {
+    "/oauth2/authorize/{provider}": {
       "get": {
         "tags": [
           "OAuth2 Plugin"
         ],
         "summary": "Authorize with OAuth2 provider",
         "description": "Initiates the OAuth2 authorization flow with the specified provider. Returns the provider's authorization URL to redirect the user to.",
-        "operationId": "authorize",
+        "operationId": "oauthAuthorize",
         "parameters": [
           {
             "name": "redirect_to",
@@ -2316,14 +2311,14 @@
         }
       }
     },
-    "/api/auth/oauth2/callback/{provider}": {
+    "/oauth2/callback/{provider}": {
       "get": {
         "tags": [
           "OAuth2 Plugin"
         ],
         "summary": "OAuth2 callback",
         "description": "Handles the OAuth2 callback from the provider. Exchanges the authorization code for tokens, creates or links a user account, and returns the authenticated user and session.",
-        "operationId": "callback",
+        "operationId": "oauthCallback",
         "parameters": [
           {
             "name": "code",
@@ -2371,7 +2366,7 @@
         }
       }
     },
-    "/api/auth/organizations": {
+    "/organizations": {
       "get": {
         "tags": [
           "Organizations"
@@ -2428,7 +2423,7 @@
         }
       }
     },
-    "/api/auth/organizations/{organization_id}": {
+    "/organizations/{organization_id}": {
       "get": {
         "tags": [
           "Organizations"
@@ -2529,7 +2524,7 @@
         }
       }
     },
-    "/api/auth/organizations/{organization_id}/invitations": {
+    "/organizations/{organization_id}/invitations": {
       "get": {
         "tags": [
           "Invitations"
@@ -2606,7 +2601,7 @@
         }
       }
     },
-    "/api/auth/organizations/{organization_id}/invitations/{invitation_id}": {
+    "/organizations/{organization_id}/invitations/{invitation_id}": {
       "get": {
         "tags": [
           "Invitations"
@@ -2684,7 +2679,7 @@
         }
       }
     },
-    "/api/auth/organizations/{organization_id}/invitations/{invitation_id}/accept": {
+    "/organizations/{organization_id}/invitations/{invitation_id}/accept": {
       "post": {
         "tags": [
           "Invitations"
@@ -2740,7 +2735,7 @@
         }
       }
     },
-    "/api/auth/organizations/{organization_id}/invitations/{invitation_id}/reject": {
+    "/organizations/{organization_id}/invitations/{invitation_id}/reject": {
       "post": {
         "tags": [
           "Invitations"
@@ -2780,7 +2775,7 @@
         }
       }
     },
-    "/api/auth/organizations/{organization_id}/members": {
+    "/organizations/{organization_id}/members": {
       "get": {
         "tags": [
           "Members"
@@ -2871,7 +2866,7 @@
         }
       }
     },
-    "/api/auth/organizations/{organization_id}/members/{member_id}": {
+    "/organizations/{organization_id}/members/{member_id}": {
       "get": {
         "tags": [
           "Members"
@@ -2996,7 +2991,7 @@
         }
       }
     },
-    "/api/auth/organizations/{organization_id}/teams": {
+    "/organizations/{organization_id}/teams": {
       "get": {
         "tags": [
           "Teams"
@@ -3073,7 +3068,7 @@
         }
       }
     },
-    "/api/auth/organizations/{organization_id}/teams/{team_id}": {
+    "/organizations/{organization_id}/teams/{team_id}": {
       "get": {
         "tags": [
           "Teams"
@@ -3198,7 +3193,7 @@
         }
       }
     },
-    "/api/auth/organizations/{organization_id}/teams/{team_id}/members": {
+    "/organizations/{organization_id}/teams/{team_id}/members": {
       "get": {
         "tags": [
           "Team Members"
@@ -3305,7 +3300,7 @@
         }
       }
     },
-    "/api/auth/organizations/{organization_id}/teams/{team_id}/members/{member_id}": {
+    "/organizations/{organization_id}/teams/{team_id}/members/{member_id}": {
       "get": {
         "tags": [
           "Team Members"
@@ -3399,7 +3394,7 @@
         }
       }
     },
-    "/api/auth/sign-out": {
+    "/sign-out": {
       "post": {
         "tags": [
           "Core"
@@ -3430,7 +3425,7 @@
         }
       }
     },
-    "/api/auth/token/refresh": {
+    "/token/refresh": {
       "post": {
         "tags": [
           "JWT Plugin"
@@ -3461,7 +3456,7 @@
         }
       }
     },
-    "/api/auth/totp/disable": {
+    "/totp/disable": {
       "post": {
         "tags": [
           "TOTP Plugin"
@@ -3483,7 +3478,7 @@
         }
       }
     },
-    "/api/auth/totp/enable": {
+    "/totp/enable": {
       "post": {
         "tags": [
           "TOTP Plugin"
@@ -3505,7 +3500,7 @@
         }
       }
     },
-    "/api/auth/totp/generate-backup-codes": {
+    "/totp/generate-backup-codes": {
       "post": {
         "tags": [
           "TOTP Plugin"
@@ -3527,7 +3522,7 @@
         }
       }
     },
-    "/api/auth/totp/get-uri": {
+    "/totp/get-uri": {
       "get": {
         "tags": [
           "TOTP Plugin"
@@ -3549,7 +3544,7 @@
         }
       }
     },
-    "/api/auth/totp/verify": {
+    "/totp/verify": {
       "post": {
         "tags": [
           "TOTP Plugin"
@@ -3580,7 +3575,7 @@
         }
       }
     },
-    "/api/auth/totp/verify-backup-code": {
+    "/totp/verify-backup-code": {
       "post": {
         "tags": [
           "TOTP Plugin"

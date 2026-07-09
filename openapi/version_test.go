@@ -13,7 +13,7 @@ import (
 
 func TestOpenAPIVersion(t *testing.T) {
 	t.Run("defaults to 3.0.3", func(t *testing.T) {
-		svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "", "http://localhost:8080")
+		svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "")
 		require.NoError(t, err)
 
 		spec, err := svc.SpecJSON()
@@ -26,13 +26,12 @@ func TestOpenAPIVersion(t *testing.T) {
 	})
 
 	t.Run("explicit 3.0.3", func(t *testing.T) {
-		svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "", "http://localhost:8080",
-			openapi.WithOpenAPIVersion("3.0.3"))
+		svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "", openapi.WithOpenAPIVersion("3.0.3"))
 		require.NoError(t, err)
 
 		err = svc.AddOperation(
 			http.MethodGet,
-			"/api/v1/test",
+			"/api/test",
 			openapi.WithResponseStatus(http.StatusOK, &struct {
 				Message string `json:"message"`
 			}{}),
@@ -46,11 +45,11 @@ func TestOpenAPIVersion(t *testing.T) {
 		err = json.Unmarshal(spec, &result)
 		require.NoError(t, err)
 		assert.Equal(t, "3.0.3", result["openapi"])
-		assert.Contains(t, result["paths"].(map[string]any), "/api/v1/test")
+		assert.Contains(t, result["paths"].(map[string]any), "/api/test")
 	})
 
 	t.Run("3.1.0 spec version and basic operation", func(t *testing.T) {
-		svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "", "http://localhost:8080",
+		svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "",
 			openapi.WithOpenAPIVersion("3.1.0"),
 			openapi.WithShortSchemaNames())
 		require.NoError(t, err)
@@ -61,7 +60,7 @@ func TestOpenAPIVersion(t *testing.T) {
 
 		err = svc.AddOperation(
 			http.MethodGet,
-			"/api/v1/health",
+			"/api/health",
 			openapi.WithSummary("Health"),
 			openapi.WithResponseStatus(http.StatusOK, &HealthResponse{}),
 		)
@@ -76,7 +75,7 @@ func TestOpenAPIVersion(t *testing.T) {
 		assert.Equal(t, "3.1.0", result["openapi"])
 
 		paths := result["paths"].(map[string]any)
-		assert.Contains(t, paths, "/api/v1/health")
+		assert.Contains(t, paths, "/api/health")
 
 		schemas := result["components"].(map[string]any)["schemas"].(map[string]any)
 		assert.Contains(t, schemas, "HealthResponse", "short names should work with 3.1")

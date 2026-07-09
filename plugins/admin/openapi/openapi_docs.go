@@ -2,19 +2,18 @@ package openapi
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/Authula/authula/openapi"
 	"github.com/Authula/authula/plugins/admin/types"
 )
 
-func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
+func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 	return errors.Join(
 		// Users
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/admin/users", basePath),
+			"/admin/users",
 			openapi.WithOperationID("createUser"),
 			openapi.WithSummary("Create user"),
 			openapi.WithDescription("Creates a new user with the specified attributes."),
@@ -24,7 +23,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/admin/users", basePath),
+			"/admin/users",
 			openapi.WithOperationID("listUsers"),
 			openapi.WithSummary("List users"),
 			openapi.WithDescription("Lists users with cursor-based pagination."),
@@ -34,7 +33,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/admin/users/{user_id}", basePath),
+			"/admin/users/{user_id}",
 			openapi.WithOperationID("getUser"),
 			openapi.WithSummary("Get user by ID"),
 			openapi.WithDescription("Retrieves a user by their ID."),
@@ -44,7 +43,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPatch,
-			fmt.Sprintf("%s/admin/users/{user_id}", basePath),
+			"/admin/users/{user_id}",
 			openapi.WithOperationID("updateUser"),
 			openapi.WithSummary("Update user"),
 			openapi.WithDescription("Updates a user's attributes."),
@@ -55,7 +54,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodDelete,
-			fmt.Sprintf("%s/admin/users/{user_id}", basePath),
+			"/admin/users/{user_id}",
 			openapi.WithOperationID("deleteUser"),
 			openapi.WithSummary("Delete user"),
 			openapi.WithDescription("Deletes a user."),
@@ -67,7 +66,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		// Accounts
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/admin/users/{user_id}/accounts", basePath),
+			"/admin/users/{user_id}/accounts",
 			openapi.WithOperationID("createAccount"),
 			openapi.WithSummary("Create account"),
 			openapi.WithDescription("Creates a new account for a user."),
@@ -78,7 +77,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/admin/users/{user_id}/accounts", basePath),
+			"/admin/users/{user_id}/accounts",
 			openapi.WithOperationID("listUserAccounts"),
 			openapi.WithSummary("List user accounts"),
 			openapi.WithDescription("Lists all accounts for a user."),
@@ -88,7 +87,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/admin/accounts/{id}", basePath),
+			"/admin/accounts/{id}",
 			openapi.WithOperationID("getAccount"),
 			openapi.WithSummary("Get account by ID"),
 			openapi.WithDescription("Retrieves an account by its ID."),
@@ -98,7 +97,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPatch,
-			fmt.Sprintf("%s/admin/accounts/{id}", basePath),
+			"/admin/accounts/{id}",
 			openapi.WithOperationID("updateAccount"),
 			openapi.WithSummary("Update account"),
 			openapi.WithDescription("Updates an account's attributes."),
@@ -109,7 +108,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodDelete,
-			fmt.Sprintf("%s/admin/accounts/{id}", basePath),
+			"/admin/accounts/{id}",
 			openapi.WithOperationID("deleteAccount"),
 			openapi.WithSummary("Delete account"),
 			openapi.WithDescription("Deletes an account."),
@@ -121,7 +120,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		// User state
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/admin/users/{user_id}/state", basePath),
+			"/admin/users/{user_id}/state",
 			openapi.WithOperationID("getUserState"),
 			openapi.WithSummary("Get user state"),
 			openapi.WithDescription("Retrieves the state of a user."),
@@ -131,7 +130,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/admin/users/{user_id}/state", basePath),
+			"/admin/users/{user_id}/state",
 			openapi.WithOperationID("createUserState"),
 			openapi.WithSummary("Create user state"),
 			openapi.WithDescription("Creates the state for a user."),
@@ -142,7 +141,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPatch,
-			fmt.Sprintf("%s/admin/users/{user_id}/state", basePath),
+			"/admin/users/{user_id}/state",
 			openapi.WithOperationID("updateUserState"),
 			openapi.WithSummary("Update user state"),
 			openapi.WithDescription("Updates the state of a user."),
@@ -153,7 +152,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodDelete,
-			fmt.Sprintf("%s/admin/users/{user_id}/state", basePath),
+			"/admin/users/{user_id}/state",
 			openapi.WithOperationID("deleteUserState"),
 			openapi.WithSummary("Delete user state"),
 			openapi.WithDescription("Deletes the state of a user."),
@@ -163,7 +162,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/admin/users/states/banned", basePath),
+			"/admin/users/states/banned",
 			openapi.WithOperationID("listBannedUserStates"),
 			openapi.WithSummary("List banned user states"),
 			openapi.WithDescription("Lists all banned user states."),
@@ -172,7 +171,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/admin/users/{user_id}/ban", basePath),
+			"/admin/users/{user_id}/ban",
 			openapi.WithOperationID("banUser"),
 			openapi.WithSummary("Ban user"),
 			openapi.WithDescription("Bans a user."),
@@ -183,7 +182,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/admin/users/{user_id}/unban", basePath),
+			"/admin/users/{user_id}/unban",
 			openapi.WithOperationID("unbanUser"),
 			openapi.WithSummary("Unban user"),
 			openapi.WithDescription("Unbans a user."),
@@ -193,7 +192,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/admin/users/{user_id}/sessions", basePath),
+			"/admin/users/{user_id}/sessions",
 			openapi.WithOperationID("listUserSessions"),
 			openapi.WithSummary("List user sessions"),
 			openapi.WithDescription("Lists all sessions for a user."),
@@ -205,7 +204,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		// Session state
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/admin/sessions/{session_id}/state", basePath),
+			"/admin/sessions/{session_id}/state",
 			openapi.WithOperationID("getSessionState"),
 			openapi.WithSummary("Get session state"),
 			openapi.WithDescription("Retrieves the state of a session."),
@@ -215,7 +214,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/admin/sessions/{session_id}/state", basePath),
+			"/admin/sessions/{session_id}/state",
 			openapi.WithOperationID("createSessionState"),
 			openapi.WithSummary("Create session state"),
 			openapi.WithDescription("Creates the state for a session."),
@@ -226,7 +225,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPatch,
-			fmt.Sprintf("%s/admin/sessions/{session_id}/state", basePath),
+			"/admin/sessions/{session_id}/state",
 			openapi.WithOperationID("updateSessionState"),
 			openapi.WithSummary("Update session state"),
 			openapi.WithDescription("Updates the state of a session."),
@@ -237,7 +236,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodDelete,
-			fmt.Sprintf("%s/admin/sessions/{session_id}/state", basePath),
+			"/admin/sessions/{session_id}/state",
 			openapi.WithOperationID("deleteSessionState"),
 			openapi.WithSummary("Delete session state"),
 			openapi.WithDescription("Deletes the state of a session."),
@@ -247,7 +246,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/admin/sessions/states/revoked", basePath),
+			"/admin/sessions/states/revoked",
 			openapi.WithOperationID("listRevokedSessionStates"),
 			openapi.WithSummary("List revoked session states"),
 			openapi.WithDescription("Lists all revoked session states."),
@@ -256,7 +255,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/admin/sessions/{session_id}/revoke", basePath),
+			"/admin/sessions/{session_id}/revoke",
 			openapi.WithOperationID("revokeSession"),
 			openapi.WithSummary("Revoke session"),
 			openapi.WithDescription("Revokes a session."),
@@ -269,7 +268,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		// Impersonation
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/admin/impersonations", basePath),
+			"/admin/impersonations",
 			openapi.WithOperationID("listImpersonations"),
 			openapi.WithSummary("List impersonations"),
 			openapi.WithDescription("Lists all impersonations."),
@@ -278,7 +277,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/admin/impersonations/{impersonation_id}", basePath),
+			"/admin/impersonations/{impersonation_id}",
 			openapi.WithOperationID("getImpersonation"),
 			openapi.WithSummary("Get impersonation by ID"),
 			openapi.WithDescription("Retrieves an impersonation by its ID."),
@@ -288,7 +287,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/admin/impersonations", basePath),
+			"/admin/impersonations",
 			openapi.WithOperationID("startImpersonation"),
 			openapi.WithSummary("Start impersonation"),
 			openapi.WithDescription("Starts an impersonation session as a target user."),
@@ -298,7 +297,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/admin/impersonations/{impersonation_id}/stop", basePath),
+			"/admin/impersonations/{impersonation_id}/stop",
 			openapi.WithOperationID("stopImpersonation"),
 			openapi.WithSummary("Stop impersonation"),
 			openapi.WithDescription("Stops an impersonation session and restores the original session."),

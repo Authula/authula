@@ -2,18 +2,17 @@ package openapi
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/Authula/authula/openapi"
 	"github.com/Authula/authula/plugins/api-key/types"
 )
 
-func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
+func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 	return errors.Join(
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/api-keys", basePath),
+			"/api-keys",
 			openapi.WithOperationID("createApiKey"),
 			openapi.WithSummary("Create API key"),
 			openapi.WithDescription("Creates a new API key for the specified owner."),
@@ -23,7 +22,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/api-keys", basePath),
+			"/api-keys",
 			openapi.WithOperationID("listApiKeys"),
 			openapi.WithSummary("List API keys"),
 			openapi.WithDescription("Lists API keys with pagination, optionally filtered by owner."),
@@ -33,7 +32,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/api-keys/{id}", basePath),
+			"/api-keys/{id}",
 			openapi.WithOperationID("getApiKey"),
 			openapi.WithSummary("Get API key by ID"),
 			openapi.WithDescription("Retrieves an API key by its ID."),
@@ -43,7 +42,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPatch,
-			fmt.Sprintf("%s/api-keys/{id}", basePath),
+			"/api-keys/{id}",
 			openapi.WithOperationID("updateApiKey"),
 			openapi.WithSummary("Update API key"),
 			openapi.WithDescription("Updates an API key's attributes."),
@@ -54,7 +53,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodDelete,
-			fmt.Sprintf("%s/api-keys/{id}", basePath),
+			"/api-keys/{id}",
 			openapi.WithOperationID("deleteApiKey"),
 			openapi.WithSummary("Delete API key"),
 			openapi.WithDescription("Deletes an API key."),
@@ -64,7 +63,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/api-keys/verify", basePath),
+			"/api-keys/verify",
 			openapi.WithOperationID("verifyApiKey"),
 			openapi.WithSummary("Verify API key"),
 			openapi.WithDescription("Verifies an API key by its raw value and returns the associated key details."),

@@ -14,7 +14,7 @@ import (
 
 func TestNewOpenAPISpecHandler(t *testing.T) {
 	t.Run("serves valid JSON spec", func(t *testing.T) {
-		svc, err := openapi.NewOpenAPIService("Test API", "1.0.0", "", "http://localhost:8080")
+		svc, err := openapi.NewOpenAPIService("Test API", "1.0.0", "")
 		require.NoError(t, err)
 
 		err = svc.AddOperation(
@@ -42,7 +42,7 @@ func TestNewOpenAPISpecHandler(t *testing.T) {
 	})
 
 	t.Run("returns 500 on empty service", func(t *testing.T) {
-		svc, err := openapi.NewOpenAPIService("Test API", "1.0.0", "", "http://localhost:8080")
+		svc, err := openapi.NewOpenAPIService("Test API", "1.0.0", "")
 		require.NoError(t, err)
 
 		handler := openapi.NewOpenAPISpecHandler(svc)
@@ -55,7 +55,7 @@ func TestNewOpenAPISpecHandler(t *testing.T) {
 }
 
 func TestNewOpenAPISpecYAMLHandler(t *testing.T) {
-	svc, err := openapi.NewOpenAPIService("Test API", "1.0.0", "", "http://localhost:8080")
+	svc, err := openapi.NewOpenAPIService("Test API", "1.0.0", "")
 	require.NoError(t, err)
 
 	err = svc.AddOperation(

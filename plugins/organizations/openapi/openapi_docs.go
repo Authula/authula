@@ -2,19 +2,18 @@ package openapi
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/Authula/authula/openapi"
 	"github.com/Authula/authula/plugins/organizations/types"
 )
 
-func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
+func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 	return errors.Join(
 		// Organizations
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/organizations", basePath),
+			"/organizations",
 			openapi.WithOperationID("createOrganization"),
 			openapi.WithSummary("Create organization"),
 			openapi.WithDescription("Creates a new organization with the authenticated user as the owner."),
@@ -24,7 +23,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/organizations", basePath),
+			"/organizations",
 			openapi.WithOperationID("listOrganizations"),
 			openapi.WithSummary("List organizations"),
 			openapi.WithDescription("Lists all organizations owned by the authenticated user."),
@@ -33,7 +32,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/organizations/{organization_id}", basePath),
+			"/organizations/{organization_id}",
 			openapi.WithOperationID("getOrganization"),
 			openapi.WithSummary("Get organization"),
 			openapi.WithDescription("Retrieves an organization by its ID."),
@@ -43,7 +42,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPatch,
-			fmt.Sprintf("%s/organizations/{organization_id}", basePath),
+			"/organizations/{organization_id}",
 			openapi.WithOperationID("updateOrganization"),
 			openapi.WithSummary("Update organization"),
 			openapi.WithDescription("Updates an existing organization."),
@@ -54,7 +53,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodDelete,
-			fmt.Sprintf("%s/organizations/{organization_id}", basePath),
+			"/organizations/{organization_id}",
 			openapi.WithOperationID("deleteOrganization"),
 			openapi.WithSummary("Delete organization"),
 			openapi.WithDescription("Deletes an organization."),
@@ -66,7 +65,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		// Invitations
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/organizations/{organization_id}/invitations", basePath),
+			"/organizations/{organization_id}/invitations",
 			openapi.WithOperationID("createOrganizationInvitation"),
 			openapi.WithSummary("Create invitation"),
 			openapi.WithDescription("Creates an invitation for a user to join an organization."),
@@ -77,7 +76,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/organizations/{organization_id}/invitations", basePath),
+			"/organizations/{organization_id}/invitations",
 			openapi.WithOperationID("listOrganizationInvitations"),
 			openapi.WithSummary("List invitations"),
 			openapi.WithDescription("Lists all invitations for an organization."),
@@ -87,7 +86,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/organizations/{organization_id}/invitations/{invitation_id}", basePath),
+			"/organizations/{organization_id}/invitations/{invitation_id}",
 			openapi.WithOperationID("getOrganizationInvitation"),
 			openapi.WithSummary("Get invitation"),
 			openapi.WithDescription("Retrieves a single invitation by its ID."),
@@ -97,7 +96,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPatch,
-			fmt.Sprintf("%s/organizations/{organization_id}/invitations/{invitation_id}", basePath),
+			"/organizations/{organization_id}/invitations/{invitation_id}",
 			openapi.WithOperationID("revokeOrganizationInvitation"),
 			openapi.WithSummary("Revoke invitation"),
 			openapi.WithDescription("Revokes a pending invitation."),
@@ -107,7 +106,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/organizations/{organization_id}/invitations/{invitation_id}/accept", basePath),
+			"/organizations/{organization_id}/invitations/{invitation_id}/accept",
 			openapi.WithOperationID("acceptOrganizationInvitation"),
 			openapi.WithSummary("Accept invitation"),
 			openapi.WithDescription("Accepts an invitation to join an organization. Optionally redirects if a redirect_url is provided."),
@@ -117,7 +116,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/organizations/{organization_id}/invitations/{invitation_id}/reject", basePath),
+			"/organizations/{organization_id}/invitations/{invitation_id}/reject",
 			openapi.WithOperationID("rejectOrganizationInvitation"),
 			openapi.WithSummary("Reject invitation"),
 			openapi.WithDescription("Rejects an invitation to join an organization."),
@@ -129,7 +128,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		// Members
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/organizations/{organization_id}/members", basePath),
+			"/organizations/{organization_id}/members",
 			openapi.WithOperationID("addOrganizationMember"),
 			openapi.WithSummary("Add member"),
 			openapi.WithDescription("Adds a user as a member of an organization with the specified role."),
@@ -140,7 +139,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/organizations/{organization_id}/members", basePath),
+			"/organizations/{organization_id}/members",
 			openapi.WithOperationID("listOrganizationMembers"),
 			openapi.WithSummary("List members"),
 			openapi.WithDescription("Lists all members of an organization with pagination."),
@@ -150,7 +149,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/organizations/{organization_id}/members/{member_id}", basePath),
+			"/organizations/{organization_id}/members/{member_id}",
 			openapi.WithOperationID("getOrganizationMember"),
 			openapi.WithSummary("Get member"),
 			openapi.WithDescription("Retrieves a single organization member by ID."),
@@ -160,7 +159,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPatch,
-			fmt.Sprintf("%s/organizations/{organization_id}/members/{member_id}", basePath),
+			"/organizations/{organization_id}/members/{member_id}",
 			openapi.WithOperationID("updateOrganizationMember"),
 			openapi.WithSummary("Update member"),
 			openapi.WithDescription("Updates the role of an organization member."),
@@ -171,7 +170,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodDelete,
-			fmt.Sprintf("%s/organizations/{organization_id}/members/{member_id}", basePath),
+			"/organizations/{organization_id}/members/{member_id}",
 			openapi.WithOperationID("deleteOrganizationMember"),
 			openapi.WithSummary("Delete member"),
 			openapi.WithDescription("Removes a member from an organization."),
@@ -183,7 +182,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		// Teams
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/organizations/{organization_id}/teams", basePath),
+			"/organizations/{organization_id}/teams",
 			openapi.WithOperationID("createOrganizationTeam"),
 			openapi.WithSummary("Create team"),
 			openapi.WithDescription("Creates a new team within an organization."),
@@ -194,7 +193,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/organizations/{organization_id}/teams", basePath),
+			"/organizations/{organization_id}/teams",
 			openapi.WithOperationID("listOrganizationTeams"),
 			openapi.WithSummary("List teams"),
 			openapi.WithDescription("Lists all teams within an organization."),
@@ -204,7 +203,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/organizations/{organization_id}/teams/{team_id}", basePath),
+			"/organizations/{organization_id}/teams/{team_id}",
 			openapi.WithOperationID("getOrganizationTeam"),
 			openapi.WithSummary("Get team"),
 			openapi.WithDescription("Retrieves a single team by its ID."),
@@ -214,7 +213,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPatch,
-			fmt.Sprintf("%s/organizations/{organization_id}/teams/{team_id}", basePath),
+			"/organizations/{organization_id}/teams/{team_id}",
 			openapi.WithOperationID("updateOrganizationTeam"),
 			openapi.WithSummary("Update team"),
 			openapi.WithDescription("Updates an existing team."),
@@ -225,7 +224,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodDelete,
-			fmt.Sprintf("%s/organizations/{organization_id}/teams/{team_id}", basePath),
+			"/organizations/{organization_id}/teams/{team_id}",
 			openapi.WithOperationID("deleteOrganizationTeam"),
 			openapi.WithSummary("Delete team"),
 			openapi.WithDescription("Deletes a team."),
@@ -237,7 +236,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		// Team Members
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/organizations/{organization_id}/teams/{team_id}/members", basePath),
+			"/organizations/{organization_id}/teams/{team_id}/members",
 			openapi.WithOperationID("addOrganizationTeamMember"),
 			openapi.WithSummary("Add team member"),
 			openapi.WithDescription("Adds a member to a team."),
@@ -248,7 +247,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/organizations/{organization_id}/teams/{team_id}/members", basePath),
+			"/organizations/{organization_id}/teams/{team_id}/members",
 			openapi.WithOperationID("listOrganizationTeamMembers"),
 			openapi.WithSummary("List team members"),
 			openapi.WithDescription("Lists all members of a team with pagination."),
@@ -258,7 +257,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/organizations/{organization_id}/teams/{team_id}/members/{member_id}", basePath),
+			"/organizations/{organization_id}/teams/{team_id}/members/{member_id}",
 			openapi.WithOperationID("getOrganizationTeamMember"),
 			openapi.WithSummary("Get team member"),
 			openapi.WithDescription("Retrieves a single team member by ID."),
@@ -268,7 +267,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodDelete,
-			fmt.Sprintf("%s/organizations/{organization_id}/teams/{team_id}/members/{member_id}", basePath),
+			"/organizations/{organization_id}/teams/{team_id}/members/{member_id}",
 			openapi.WithOperationID("deleteOrganizationTeamMember"),
 			openapi.WithSummary("Delete team member"),
 			openapi.WithDescription("Removes a member from a team."),

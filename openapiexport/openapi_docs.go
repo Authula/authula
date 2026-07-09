@@ -17,22 +17,22 @@ import (
 	totpopenapi "github.com/Authula/authula/plugins/totp/openapi"
 )
 
-func RegisterAllOpenAPIDocs(svc openapi.OpenAPIService, basePath string, extra ...OpenAPIDocFunc) error {
+func RegisterAllOpenAPIDocs(svc openapi.OpenAPIService, extra ...OpenAPIDocFunc) error {
 	var errs []error
 
-	errs = append(errs, internalopenapi.RegisterOpenAPIDocs(svc, basePath))
-	errs = append(errs, emailpasswordopenapi.RegisterOpenAPIDocs(svc, basePath))
-	errs = append(errs, oauth2openapi.RegisterOpenAPIDocs(svc, basePath))
-	errs = append(errs, magiclinkopenapi.RegisterOpenAPIDocs(svc, basePath))
-	errs = append(errs, jwtopenapi.RegisterOpenAPIDocs(svc, basePath))
-	errs = append(errs, totpopenapi.RegisterOpenAPIDocs(svc, basePath))
-	errs = append(errs, organizationsopenapi.RegisterOpenAPIDocs(svc, basePath))
-	errs = append(errs, accesscontrolopenapi.RegisterOpenAPIDocs(svc, basePath))
-	errs = append(errs, adminopenapi.RegisterOpenAPIDocs(svc, basePath))
-	errs = append(errs, apikeyopenapi.RegisterOpenAPIDocs(svc, basePath))
+	errs = append(errs, internalopenapi.RegisterOpenAPIDocs(svc))
+	errs = append(errs, emailpasswordopenapi.RegisterOpenAPIDocs(svc))
+	errs = append(errs, oauth2openapi.RegisterOpenAPIDocs(svc))
+	errs = append(errs, magiclinkopenapi.RegisterOpenAPIDocs(svc))
+	errs = append(errs, jwtopenapi.RegisterOpenAPIDocs(svc))
+	errs = append(errs, totpopenapi.RegisterOpenAPIDocs(svc))
+	errs = append(errs, organizationsopenapi.RegisterOpenAPIDocs(svc))
+	errs = append(errs, accesscontrolopenapi.RegisterOpenAPIDocs(svc))
+	errs = append(errs, adminopenapi.RegisterOpenAPIDocs(svc))
+	errs = append(errs, apikeyopenapi.RegisterOpenAPIDocs(svc))
 
 	for _, fn := range extra {
-		errs = append(errs, fn(svc, basePath))
+		errs = append(errs, fn(svc))
 	}
 
 	return errors.Join(errs...)

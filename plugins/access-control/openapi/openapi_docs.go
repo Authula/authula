@@ -2,19 +2,18 @@ package openapi
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/Authula/authula/openapi"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
 
-func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
+func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 	return errors.Join(
 		// Roles
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/access-control/roles", basePath),
+			"/access-control/roles",
 			openapi.WithOperationID("createRole"),
 			openapi.WithSummary("Create role"),
 			openapi.WithDescription("Creates a new role."),
@@ -24,7 +23,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/access-control/roles", basePath),
+			"/access-control/roles",
 			openapi.WithOperationID("listRoles"),
 			openapi.WithSummary("List roles"),
 			openapi.WithDescription("Lists all roles."),
@@ -33,7 +32,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/access-control/roles/by-name/{role_name}", basePath),
+			"/access-control/roles/by-name/{role_name}",
 			openapi.WithOperationID("getRoleByName"),
 			openapi.WithSummary("Get role by name"),
 			openapi.WithDescription("Retrieves a role by its name."),
@@ -43,7 +42,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/access-control/roles/{role_id}", basePath),
+			"/access-control/roles/{role_id}",
 			openapi.WithOperationID("getRole"),
 			openapi.WithSummary("Get role by ID"),
 			openapi.WithDescription("Retrieves a role by its ID, including its permissions."),
@@ -53,7 +52,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPatch,
-			fmt.Sprintf("%s/access-control/roles/{role_id}", basePath),
+			"/access-control/roles/{role_id}",
 			openapi.WithOperationID("updateRole"),
 			openapi.WithSummary("Update role"),
 			openapi.WithDescription("Updates a role's attributes."),
@@ -64,7 +63,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodDelete,
-			fmt.Sprintf("%s/access-control/roles/{role_id}", basePath),
+			"/access-control/roles/{role_id}",
 			openapi.WithOperationID("deleteRole"),
 			openapi.WithSummary("Delete role"),
 			openapi.WithDescription("Deletes a role."),
@@ -76,7 +75,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		// Permissions
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/access-control/permissions", basePath),
+			"/access-control/permissions",
 			openapi.WithOperationID("createPermission"),
 			openapi.WithSummary("Create permission"),
 			openapi.WithDescription("Creates a new permission."),
@@ -86,7 +85,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/access-control/permissions", basePath),
+			"/access-control/permissions",
 			openapi.WithOperationID("listPermissions"),
 			openapi.WithSummary("List permissions"),
 			openapi.WithDescription("Lists all permissions."),
@@ -95,7 +94,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/access-control/permissions/{permission_id}", basePath),
+			"/access-control/permissions/{permission_id}",
 			openapi.WithOperationID("getPermission"),
 			openapi.WithSummary("Get permission by ID"),
 			openapi.WithDescription("Retrieves a permission by its ID."),
@@ -105,7 +104,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPatch,
-			fmt.Sprintf("%s/access-control/permissions/{permission_id}", basePath),
+			"/access-control/permissions/{permission_id}",
 			openapi.WithOperationID("updatePermission"),
 			openapi.WithSummary("Update permission"),
 			openapi.WithDescription("Updates a permission's description."),
@@ -116,7 +115,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodDelete,
-			fmt.Sprintf("%s/access-control/permissions/{permission_id}", basePath),
+			"/access-control/permissions/{permission_id}",
 			openapi.WithOperationID("deletePermission"),
 			openapi.WithSummary("Delete permission"),
 			openapi.WithDescription("Deletes a permission."),
@@ -128,7 +127,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		// Role permissions
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/access-control/roles/{role_id}/permissions", basePath),
+			"/access-control/roles/{role_id}/permissions",
 			openapi.WithOperationID("addRolePermission"),
 			openapi.WithSummary("Assign permission to role"),
 			openapi.WithDescription("Assigns a permission to a role."),
@@ -139,7 +138,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/access-control/roles/{role_id}/permissions", basePath),
+			"/access-control/roles/{role_id}/permissions",
 			openapi.WithOperationID("listRolePermissions"),
 			openapi.WithSummary("List role permissions"),
 			openapi.WithDescription("Lists all permissions assigned to a role."),
@@ -149,7 +148,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPut,
-			fmt.Sprintf("%s/access-control/roles/{role_id}/permissions", basePath),
+			"/access-control/roles/{role_id}/permissions",
 			openapi.WithOperationID("replaceRolePermissions"),
 			openapi.WithSummary("Replace role permissions"),
 			openapi.WithDescription("Replaces all permissions assigned to a role with a new set."),
@@ -160,7 +159,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodDelete,
-			fmt.Sprintf("%s/access-control/roles/{role_id}/permissions/{permission_id}", basePath),
+			"/access-control/roles/{role_id}/permissions/{permission_id}",
 			openapi.WithOperationID("removeRolePermission"),
 			openapi.WithSummary("Remove role permission"),
 			openapi.WithDescription("Removes a permission from a role."),
@@ -172,7 +171,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		// User roles
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/access-control/users/{user_id}/roles", basePath),
+			"/access-control/users/{user_id}/roles",
 			openapi.WithOperationID("listUserRoles"),
 			openapi.WithSummary("List user roles"),
 			openapi.WithDescription("Lists all roles assigned to a user."),
@@ -182,7 +181,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPut,
-			fmt.Sprintf("%s/access-control/users/{user_id}/roles", basePath),
+			"/access-control/users/{user_id}/roles",
 			openapi.WithOperationID("replaceUserRoles"),
 			openapi.WithSummary("Replace user roles"),
 			openapi.WithDescription("Replaces all roles assigned to a user with a new set."),
@@ -193,7 +192,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/access-control/users/{user_id}/roles", basePath),
+			"/access-control/users/{user_id}/roles",
 			openapi.WithOperationID("assignUserRole"),
 			openapi.WithSummary("Assign role to user"),
 			openapi.WithDescription("Assigns a role to a user."),
@@ -204,7 +203,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodDelete,
-			fmt.Sprintf("%s/access-control/users/{user_id}/roles/{role_id}", basePath),
+			"/access-control/users/{user_id}/roles/{role_id}",
 			openapi.WithOperationID("removeUserRole"),
 			openapi.WithSummary("Remove user role"),
 			openapi.WithDescription("Removes a role from a user."),
@@ -216,7 +215,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		// User permissions
 		svc.AddOperation(
 			http.MethodGet,
-			fmt.Sprintf("%s/access-control/users/{user_id}/permissions", basePath),
+			"/access-control/users/{user_id}/permissions",
 			openapi.WithOperationID("getUserPermissions"),
 			openapi.WithSummary("Get user permissions"),
 			openapi.WithDescription("Retrieves all permissions granted to a user through their roles."),
@@ -226,7 +225,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService, basePath string) error {
 		),
 		svc.AddOperation(
 			http.MethodPost,
-			fmt.Sprintf("%s/access-control/users/{user_id}/permissions/check", basePath),
+			"/access-control/users/{user_id}/permissions/check",
 			openapi.WithOperationID("checkUserPermissions"),
 			openapi.WithSummary("Check user permissions"),
 			openapi.WithDescription("Checks whether a user has all the specified permissions."),

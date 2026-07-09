@@ -13,8 +13,7 @@ import (
 
 func TestShortSchemaNames(t *testing.T) {
 	t.Run("schema name is just the struct name without package prefix", func(t *testing.T) {
-		svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "", "http://localhost:8080",
-			openapi.WithShortSchemaNames())
+		svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "", openapi.WithShortSchemaNames())
 		require.NoError(t, err)
 
 		type HealthResponse struct {
@@ -48,7 +47,7 @@ func TestShortSchemaNames(t *testing.T) {
 	})
 
 	t.Run("default (no option) still uses package-prefixed names", func(t *testing.T) {
-		svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "", "http://localhost:8080")
+		svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "")
 		require.NoError(t, err)
 
 		type MyResponse struct {
@@ -77,7 +76,7 @@ func TestShortSchemaNames(t *testing.T) {
 
 func TestRegisterSchema(t *testing.T) {
 	t.Run("registers a type under a custom schema name", func(t *testing.T) {
-		svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "", "http://localhost:8080")
+		svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "")
 		require.NoError(t, err)
 
 		type MyType struct {
