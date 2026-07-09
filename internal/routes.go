@@ -27,7 +27,7 @@ func CoreRoutes(logger models.Logger, userService services.UserService, sessionS
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireActor(models.ActorUser),
 			},
-			Handler: getMeHandler.Handler(),
+			Handler: getMeHandler.Handle(),
 		},
 		{
 			Method: "POST",
@@ -35,7 +35,7 @@ func CoreRoutes(logger models.Logger, userService services.UserService, sessionS
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireActor(models.ActorUser),
 			},
-			Handler: signOutHandler.Handler(),
+			Handler: signOutHandler.Handle(),
 		},
 	}
 }

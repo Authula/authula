@@ -12,7 +12,7 @@ type GetMeHandler struct {
 	UseCase *usecases.GetMeUseCase
 }
 
-func (h *GetMeHandler) Handler() http.HandlerFunc {
+func (h *GetMeHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)

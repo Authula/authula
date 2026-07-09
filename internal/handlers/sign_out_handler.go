@@ -13,7 +13,7 @@ type SignOutHandler struct {
 	UseCase *usecases.SignOutUseCase
 }
 
-func (h *SignOutHandler) Handler() http.HandlerFunc {
+func (h *SignOutHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
