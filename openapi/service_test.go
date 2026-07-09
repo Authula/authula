@@ -46,8 +46,6 @@ func TestNewOpenAPIService(t *testing.T) {
 			assert.Equal(t, tt.title, info["title"])
 			assert.Equal(t, tt.version, info["version"])
 			assert.Equal(t, tt.description, info["description"])
-
-
 		})
 	}
 }
