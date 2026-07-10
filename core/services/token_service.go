@@ -1,7 +1,7 @@
 package services
 
 import (
-	"github.com/Authula/authula/internal/repositories"
+	"github.com/Authula/authula/core/repositories"
 	"github.com/Authula/authula/services"
 )
 

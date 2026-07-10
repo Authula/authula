@@ -9,13 +9,13 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/Authula/authula/config"
+	corerepos "github.com/Authula/authula/core/repositories"
+	coreservices "github.com/Authula/authula/core/services"
 	"github.com/Authula/authula/events"
 	coreplugins "github.com/Authula/authula/internal/plugins"
-	coreinternalrepos "github.com/Authula/authula/internal/repositories"
 	coreinternalsecurity "github.com/Authula/authula/internal/security"
-	coreinternalservices "github.com/Authula/authula/internal/services"
 	"github.com/Authula/authula/models"
-	coreservices "github.com/Authula/authula/services"
+	servicesinterfaces "github.com/Authula/authula/services"
 )
 
 type BaseTestFixture struct {
@@ -24,11 +24,11 @@ type BaseTestFixture struct {
 	Config              *models.Config
 	Provider            string
 	ServiceRegistry     models.ServiceRegistry
-	UserService         coreservices.UserService
-	AccountService      coreservices.AccountService
-	SessionService      coreservices.SessionService
-	VerificationService coreservices.VerificationService
-	TokenService        coreservices.TokenService
+	UserService         servicesinterfaces.UserService
+	AccountService      servicesinterfaces.AccountService
+	SessionService      servicesinterfaces.SessionService
+	VerificationService servicesinterfaces.VerificationService
+	TokenService        servicesinterfaces.TokenService
 	idAliases           map[string]string
 }
 
@@ -47,17 +47,17 @@ func NewBaseTestFixture(t *testing.T, options ...config.ConfigOption) *BaseTestF
 	cfg := config.NewConfig(append(defaultOptions, options...)...)
 
 	serviceRegistry := coreplugins.NewServiceRegistry()
-	userRepo := coreinternalrepos.NewBunUserRepository(db)
-	userService := coreinternalservices.NewUserService(userRepo, nil)
-	tokenRepo := coreinternalrepos.NewCryptoTokenRepository(cfg.Secret)
-	accountRepo := coreinternalrepos.NewBunAccountRepository(db)
-	accountService := coreinternalservices.NewAccountService(cfg, accountRepo, tokenRepo, nil)
-	sessionRepo := coreinternalrepos.NewBunSessionRepository(db)
-	sessionService := coreinternalservices.NewSessionService(sessionRepo, nil, nil)
-	verificationRepo := coreinternalrepos.NewBunVerificationRepository(db)
+	userRepo := corerepos.NewBunUserRepository(db)
+	userService := coreservices.NewUserService(userRepo, nil)
+	tokenRepo := corerepos.NewCryptoTokenRepository(cfg.Secret)
+	accountRepo := corerepos.NewBunAccountRepository(db)
+	accountService := coreservices.NewAccountService(cfg, accountRepo, tokenRepo, nil)
+	sessionRepo := corerepos.NewBunSessionRepository(db)
+	sessionService := coreservices.NewSessionService(sessionRepo, nil, nil)
+	verificationRepo := corerepos.NewBunVerificationRepository(db)
 	tokenSigner := coreinternalsecurity.NewHMACSigner(cfg.Secret)
-	verificationService := coreinternalservices.NewVerificationService(verificationRepo, tokenSigner, nil)
-	tokenService := coreinternalservices.NewTokenService(tokenRepo)
+	verificationService := coreservices.NewVerificationService(verificationRepo, tokenSigner, nil)
+	tokenService := coreservices.NewTokenService(tokenRepo)
 
 	serviceRegistry.Register(models.ServiceUser.String(), userService)
 	serviceRegistry.Register(models.ServiceAccount.String(), accountService)

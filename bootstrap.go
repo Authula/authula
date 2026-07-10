@@ -4,16 +4,16 @@ import (
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/uptrace/bun"
 
+	corerepositories "github.com/Authula/authula/core/repositories"
+	coreservices "github.com/Authula/authula/core/services"
 	"github.com/Authula/authula/events"
 	internalbootstrap "github.com/Authula/authula/internal/bootstrap"
 	internalevents "github.com/Authula/authula/internal/events"
-	internalrepositories "github.com/Authula/authula/internal/repositories"
 	internalsecurity "github.com/Authula/authula/internal/security"
-	internalservices "github.com/Authula/authula/internal/services"
 	internalsystemssession "github.com/Authula/authula/internal/systems/session"
 	internalsystemsverification "github.com/Authula/authula/internal/systems/verification"
 	"github.com/Authula/authula/models"
-	coreservices "github.com/Authula/authula/services"
+	serviceinterfaces "github.com/Authula/authula/services"
 )
 
 // InitLogger initializes the logger based on configuration
@@ -60,21 +60,21 @@ func InitEventBus(config *models.Config) (models.EventBus, error) {
 	return internalevents.NewEventBus(config, logger, pubsub), nil
 }
 
-func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.ServiceRegistry) *coreservices.CoreServices {
+func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.ServiceRegistry) *serviceinterfaces.CoreServices {
 	signer := internalsecurity.NewHMACSigner(config.Secret)
 
-	userRepo := internalrepositories.NewBunUserRepository(db)
-	accountRepo := internalrepositories.NewBunAccountRepository(db)
-	sessionRepo := internalrepositories.NewBunSessionRepository(db)
-	verificationRepo := internalrepositories.NewBunVerificationRepository(db)
-	tokenRepo := internalrepositories.NewCryptoTokenRepository(config.Secret)
+	userRepo := corerepositories.NewBunUserRepository(db)
+	accountRepo := corerepositories.NewBunAccountRepository(db)
+	sessionRepo := corerepositories.NewBunSessionRepository(db)
+	verificationRepo := corerepositories.NewBunVerificationRepository(db)
+	tokenRepo := corerepositories.NewCryptoTokenRepository(config.Secret)
 
-	userService := internalservices.NewUserService(userRepo, config.CoreDatabaseHooks)
-	accountService := internalservices.NewAccountService(config, accountRepo, tokenRepo, config.CoreDatabaseHooks)
-	sessionService := internalservices.NewSessionService(sessionRepo, signer, config.CoreDatabaseHooks)
-	verificationService := internalservices.NewVerificationService(verificationRepo, signer, config.CoreDatabaseHooks)
-	tokenService := internalservices.NewTokenService(tokenRepo)
-	passwordService := internalservices.NewArgon2PasswordService()
+	userService := coreservices.NewUserService(userRepo, config.CoreDatabaseHooks)
+	accountService := coreservices.NewAccountService(config, accountRepo, tokenRepo, config.CoreDatabaseHooks)
+	sessionService := coreservices.NewSessionService(sessionRepo, signer, config.CoreDatabaseHooks)
+	verificationService := coreservices.NewVerificationService(verificationRepo, signer, config.CoreDatabaseHooks)
+	tokenService := coreservices.NewTokenService(tokenRepo)
+	passwordService := coreservices.NewArgon2PasswordService()
 
 	serviceRegistry.Register(models.ServiceUser.String(), userService)
 	serviceRegistry.Register(models.ServiceAccount.String(), accountService)
@@ -83,7 +83,7 @@ func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.
 	serviceRegistry.Register(models.ServiceToken.String(), tokenService)
 	serviceRegistry.Register(models.ServicePassword.String(), passwordService)
 
-	return &coreservices.CoreServices{
+	return &serviceinterfaces.CoreServices{
 		UserService:         userService,
 		AccountService:      accountService,
 		SessionService:      sessionService,
@@ -93,7 +93,7 @@ func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.
 	}
 }
 
-func InitCoreSystems(logger models.Logger, config *models.Config, coreServices *coreservices.CoreServices) []models.CoreSystem {
+func InitCoreSystems(logger models.Logger, config *models.Config, coreServices *serviceinterfaces.CoreServices) []models.CoreSystem {
 	return []models.CoreSystem{
 		internalsystemssession.NewSessionCleanupSystem(
 			logger,

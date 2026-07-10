@@ -4,17 +4,17 @@ import (
 	"context"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	repositories "github.com/Authula/authula/internal/repositories"
+	corerepositories "github.com/Authula/authula/core/repositories"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/types"
 	"github.com/Authula/authula/util"
 )
 
 type UsersService struct {
-	userRepo repositories.UserRepository
+	userRepo corerepositories.UserRepository
 }
 
-func NewUsersService(userRepo repositories.UserRepository) *UsersService {
+func NewUsersService(userRepo corerepositories.UserRepository) *UsersService {
 	return &UsersService{userRepo: userRepo}
 }
 

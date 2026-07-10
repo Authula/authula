@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	coreinternalrepos "github.com/Authula/authula/internal/repositories"
+	corerepos "github.com/Authula/authula/core/repositories"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
 	adminconstants "github.com/Authula/authula/plugins/admin/constants"
@@ -56,8 +56,8 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 	userStateRepo := repositories.NewBunUserStateRepository(ctx.DB)
 	sessionStateRepo := repositories.NewBunSessionStateRepository(ctx.DB)
 
-	coreUserRepo := coreinternalrepos.NewBunUserRepository(ctx.DB)
-	coreAccountRepo := coreinternalrepos.NewBunAccountRepository(ctx.DB)
+	coreUserRepo := corerepos.NewBunUserRepository(ctx.DB)
+	coreAccountRepo := corerepos.NewBunAccountRepository(ctx.DB)
 
 	sessionService, ok := ctx.ServiceRegistry.Get(models.ServiceSession.String()).(rootservices.SessionService)
 	if !ok {

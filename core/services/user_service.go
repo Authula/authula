@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/Authula/authula/internal/repositories"
+	"github.com/Authula/authula/core/repositories"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/services"
 	"github.com/Authula/authula/util"

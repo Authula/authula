@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	corerepositories "github.com/Authula/authula/internal/repositories"
+	corerepositories "github.com/Authula/authula/core/repositories"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/types"
 	rootservices "github.com/Authula/authula/services"
