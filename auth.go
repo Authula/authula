@@ -8,7 +8,7 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/Authula/authula/internal"
+	"github.com/Authula/authula/core"
 	"github.com/Authula/authula/internal/migrationmanager"
 	"github.com/Authula/authula/internal/plugins"
 	"github.com/Authula/authula/migrations"
@@ -37,7 +37,7 @@ type Auth struct {
 	handlerOnce      sync.Once
 	coreServices     *coreservices.CoreServices
 	systems          []models.CoreSystem
-	Api              internal.CoreAPI
+	Api              core.CoreAPI
 }
 
 // New creates a new Auth instance using the provided config and plugins.
@@ -122,7 +122,7 @@ func New(authConfig *AuthConfig) *Auth {
 		panic(fmt.Errorf("failed to initialize plugins: %w", err))
 	}
 
-	api := internal.NewCoreAPI(logger, coreServices.UserService, coreServices.SessionService)
+	api := core.NewCoreAPI(logger, coreServices.UserService, coreServices.SessionService)
 
 	systems := InitCoreSystems(logger, authConfig.Config, coreServices)
 	for _, system := range systems {
@@ -264,7 +264,7 @@ func (auth *Auth) GetActorFromRequest(req *http.Request) (*models.Actor, bool) {
 func (auth *Auth) Handler() http.Handler {
 	auth.handlerOnce.Do(func() {
 		auth.router.RegisterRoutes(
-			internal.CoreRoutes(
+			core.CoreRoutes(
 				auth.logger,
 				auth.coreServices.UserService,
 				auth.coreServices.SessionService,

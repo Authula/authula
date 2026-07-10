@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/Authula/authula/core/types"
 	inttests "github.com/Authula/authula/internal/tests"
-	"github.com/Authula/authula/internal/types"
 	"github.com/Authula/authula/models"
 )
 

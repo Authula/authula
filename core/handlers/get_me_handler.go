@@ -3,8 +3,8 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/Authula/authula/internal/types"
-	"github.com/Authula/authula/internal/usecases"
+	"github.com/Authula/authula/core/types"
+	"github.com/Authula/authula/core/usecases"
 	"github.com/Authula/authula/models"
 )
 

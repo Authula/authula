@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/Authula/authula/internal/types"
+	"github.com/Authula/authula/core/types"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/services"
 )

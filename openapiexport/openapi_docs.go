@@ -3,7 +3,7 @@ package openapiexport
 import (
 	"errors"
 
-	internalopenapi "github.com/Authula/authula/internal/openapi"
+	coreopenapi "github.com/Authula/authula/core/openapi"
 	"github.com/Authula/authula/openapi"
 
 	accesscontrolopenapi "github.com/Authula/authula/plugins/access-control/openapi"
@@ -20,7 +20,7 @@ import (
 func RegisterAllOpenAPIDocs(svc openapi.OpenAPIService, extra ...OpenAPIDocFunc) error {
 	var errs []error
 
-	errs = append(errs, internalopenapi.RegisterOpenAPIDocs(svc))
+	errs = append(errs, coreopenapi.RegisterOpenAPIDocs(svc))
 	errs = append(errs, emailpasswordopenapi.RegisterOpenAPIDocs(svc))
 	errs = append(errs, oauth2openapi.RegisterOpenAPIDocs(svc))
 	errs = append(errs, magiclinkopenapi.RegisterOpenAPIDocs(svc))

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Authula/authula/internal/types"
+	"github.com/Authula/authula/core/types"
 	"github.com/Authula/authula/openapi"
 )
 

@@ -1,9 +1,9 @@
-package internal
+package core
 
 import (
 	"net/http"
 
-	"github.com/Authula/authula/internal/handlers"
+	"github.com/Authula/authula/core/handlers"
 	"github.com/Authula/authula/middleware"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/services"
