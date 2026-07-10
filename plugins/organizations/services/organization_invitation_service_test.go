@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	emailtmpl "github.com/Authula/authula/core/email/template"
 	coreerrors "github.com/Authula/authula/core/errors"
-	emailtmpl "github.com/Authula/authula/internal/email/template"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"

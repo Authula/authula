@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	emailconstants "github.com/Authula/authula/internal/email/constants"
-	emailtmpl "github.com/Authula/authula/internal/email/template"
+	emailconstants "github.com/Authula/authula/core/email/constants"
+	emailtmpl "github.com/Authula/authula/core/email/template"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
 	"github.com/Authula/authula/plugins/email-password/types"

@@ -5,7 +5,7 @@ import (
 
 	"github.com/uptrace/bun"
 
-	emailtmpl "github.com/Authula/authula/internal/email/template"
+	emailtmpl "github.com/Authula/authula/core/email/template"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
 	rootservices "github.com/Authula/authula/services"

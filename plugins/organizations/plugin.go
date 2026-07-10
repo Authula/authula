@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	emailtmpl "github.com/Authula/authula/internal/email/template"
+	emailtmpl "github.com/Authula/authula/core/email/template"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"

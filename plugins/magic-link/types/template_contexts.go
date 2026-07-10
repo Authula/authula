@@ -3,7 +3,7 @@ package types
 import (
 	"time"
 
-	emailtmpl "github.com/Authula/authula/internal/email/template"
+	emailtmpl "github.com/Authula/authula/core/email/template"
 )
 
 type MagicLinkSignInContext struct {

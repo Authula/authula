@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	emailtmpl "github.com/Authula/authula/internal/email/template"
+	emailtmpl "github.com/Authula/authula/core/email/template"
 	inttests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"

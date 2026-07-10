@@ -11,9 +11,9 @@ import (
 
 	"github.com/uptrace/bun"
 
+	emailconstants "github.com/Authula/authula/core/email/constants"
+	emailtmpl "github.com/Authula/authula/core/email/template"
 	coreerrors "github.com/Authula/authula/core/errors"
-	emailconstants "github.com/Authula/authula/internal/email/constants"
-	emailtmpl "github.com/Authula/authula/internal/email/template"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
 	"github.com/Authula/authula/plugins/organizations/repositories"
