@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgtests "github.com/Authula/authula/plugins/organizations/tests"
@@ -195,7 +195,7 @@ func TestGetOrganizationTeamHandler(t *testing.T) {
 			organizationID: "org-1",
 			teamID:         "team-1",
 			prepare: func(fixture *organizationTeamHandlerFixture) {
-				fixture.service.On("GetTeam", mock.Anything, "user-1", "org-1", "team-1").Return((*orgtypes.OrganizationTeam)(nil), internalerrors.ErrNotFound).Once()
+				fixture.service.On("GetTeam", mock.Anything, "user-1", "org-1", "team-1").Return((*orgtypes.OrganizationTeam)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedMessage: "not found",

@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	adminhandlers "github.com/Authula/authula/plugins/admin/handlers"
@@ -29,7 +29,7 @@ func TestGetUserStateHandler(t *testing.T) {
 		{
 			name: "error",
 			setup: func(userStateRepo *admintests.MockUserStateRepository, _ *admintests.MockSessionStateRepository, _ *admintests.MockImpersonationRepository) {
-				userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return((*types.AdminUserState)(nil), internalerrors.ErrBadRequest).Once()
+				userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return((*types.AdminUserState)(nil), coreerrors.ErrBadRequest).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "bad request",
@@ -105,7 +105,7 @@ func TestUpsertUserStateHandler(t *testing.T) {
 			name: "error",
 			setup: func(userStateRepo *admintests.MockUserStateRepository, _ *admintests.MockSessionStateRepository, impRepo *admintests.MockImpersonationRepository) {
 				impRepo.On("UserExists", mock.Anything, "user-1").Return(true, nil).Once()
-				userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(internalerrors.ErrBadRequest).Once()
+				userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(coreerrors.ErrBadRequest).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "bad request",
@@ -178,7 +178,7 @@ func TestDeleteUserStateHandler(t *testing.T) {
 		{
 			name: "error",
 			setup: func(userStateRepo *admintests.MockUserStateRepository) {
-				userStateRepo.On("Delete", mock.Anything, "user-1").Return(internalerrors.ErrNotFound).Once()
+				userStateRepo.On("Delete", mock.Anything, "user-1").Return(coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedMessage: "not found",
@@ -305,7 +305,7 @@ func TestBanUserHandler(t *testing.T) {
 			name: "error",
 			setup: func(userStateRepo *admintests.MockUserStateRepository, _ *admintests.MockSessionStateRepository, impRepo *admintests.MockImpersonationRepository) {
 				impRepo.On("UserExists", mock.Anything, "user-1").Return(true, nil).Once()
-				userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(internalerrors.ErrBadRequest).Once()
+				userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(coreerrors.ErrBadRequest).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "bad request",
@@ -379,7 +379,7 @@ func TestUnbanUserHandler(t *testing.T) {
 			name: "error",
 			setup: func(userStateRepo *admintests.MockUserStateRepository, impRepo *admintests.MockImpersonationRepository) {
 				impRepo.On("UserExists", mock.Anything, "user-1").Return(true, nil).Once()
-				userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(internalerrors.ErrNotFound).Once()
+				userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedMessage: "not found",
@@ -444,7 +444,7 @@ func TestGetSessionStateHandler(t *testing.T) {
 		{
 			name: "error",
 			setup: func(_ *admintests.MockUserStateRepository, sessionStateRepo *admintests.MockSessionStateRepository, _ *admintests.MockImpersonationRepository) {
-				sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return((*types.AdminSessionState)(nil), internalerrors.ErrForbidden).Once()
+				sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return((*types.AdminSessionState)(nil), coreerrors.ErrForbidden).Once()
 			},
 			expectedStatus:  http.StatusForbidden,
 			expectedMessage: "forbidden",
@@ -520,7 +520,7 @@ func TestUpsertSessionStateHandler(t *testing.T) {
 			name: "error",
 			setup: func(_ *admintests.MockUserStateRepository, sessionStateRepo *admintests.MockSessionStateRepository, _ *admintests.MockImpersonationRepository) {
 				sessionStateRepo.On("SessionExists", mock.Anything, "session-1").Return(true, nil).Once()
-				sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(internalerrors.ErrBadRequest).Once()
+				sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(coreerrors.ErrBadRequest).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "bad request",
@@ -592,7 +592,7 @@ func TestDeleteSessionStateHandler(t *testing.T) {
 		{
 			name: "error",
 			setup: func(sessionStateRepo *admintests.MockSessionStateRepository) {
-				sessionStateRepo.On("Delete", mock.Anything, "session-1").Return(internalerrors.ErrNotFound).Once()
+				sessionStateRepo.On("Delete", mock.Anything, "session-1").Return(coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedMessage: "not found",
@@ -710,7 +710,7 @@ func TestGetUserAdminSessionsHandler(t *testing.T) {
 			name: "error",
 			setup: func(sessionStateRepo *admintests.MockSessionStateRepository, impRepo *admintests.MockImpersonationRepository) {
 				impRepo.On("UserExists", mock.Anything, "user-1").Return(true, nil).Once()
-				sessionStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(([]types.AdminUserSession)(nil), internalerrors.ErrNotFound).Once()
+				sessionStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(([]types.AdminUserSession)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedMessage: "not found",
@@ -781,7 +781,7 @@ func TestRevokeSessionHandler(t *testing.T) {
 			name: "use case error",
 			setup: func(_ *admintests.MockUserStateRepository, sessionStateRepo *admintests.MockSessionStateRepository, _ *admintests.MockImpersonationRepository) {
 				sessionStateRepo.On("SessionExists", mock.Anything, "session-1").Return(true, nil).Once()
-				sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(internalerrors.ErrForbidden).Once()
+				sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(coreerrors.ErrForbidden).Once()
 			},
 			expectedStatus:  http.StatusForbidden,
 			expectedMessage: "forbidden",

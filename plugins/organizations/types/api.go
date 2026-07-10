@@ -3,7 +3,7 @@ package types
 import (
 	"strings"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 )
 
 type OrganizationID struct {
@@ -60,10 +60,10 @@ type CreateOrganizationRequest struct {
 
 func (r *CreateOrganizationRequest) Validate() error {
 	if strings.TrimSpace(r.Name) == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	if strings.TrimSpace(r.Role) == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	if r.Slug != nil {
 		value := strings.TrimSpace(*r.Slug)
@@ -87,7 +87,7 @@ func (r *UpdateOrganizationRequest) Validate() error {
 	if r.Name != nil {
 		value := strings.TrimSpace(*r.Name)
 		if value == "" {
-			return internalerrors.ErrUnprocessableEntity
+			return coreerrors.ErrUnprocessableEntity
 		}
 		r.Name = &value
 	}
@@ -110,10 +110,10 @@ type CreateOrganizationInvitationRequest struct {
 
 func (r *CreateOrganizationInvitationRequest) Validate() error {
 	if strings.TrimSpace(r.Email) == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	if strings.TrimSpace(r.Role) == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	return nil
 }
@@ -125,10 +125,10 @@ type AddOrganizationMemberRequest struct {
 
 func (r *AddOrganizationMemberRequest) Validate() error {
 	if strings.TrimSpace(r.UserID) == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	if strings.TrimSpace(r.Role) == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	return nil
 }
@@ -139,7 +139,7 @@ type UpdateOrganizationMemberRequest struct {
 
 func (r *UpdateOrganizationMemberRequest) Validate() error {
 	if strings.TrimSpace(r.Role) == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	return nil
 }
@@ -153,7 +153,7 @@ type CreateOrganizationTeamRequest struct {
 
 func (r *CreateOrganizationTeamRequest) Validate() error {
 	if strings.TrimSpace(r.Name) == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	if r.Slug != nil {
 		value := strings.TrimSpace(*r.Slug)
@@ -175,7 +175,7 @@ type UpdateOrganizationTeamRequest struct {
 
 func (r *UpdateOrganizationTeamRequest) Validate() error {
 	if strings.TrimSpace(r.Name) == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	if r.Slug != nil {
 		value := strings.TrimSpace(*r.Slug)
@@ -194,7 +194,7 @@ type AddOrganizationTeamMemberRequest struct {
 
 func (r *AddOrganizationTeamMemberRequest) Validate() error {
 	if strings.TrimSpace(r.MemberID) == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	return nil
 }

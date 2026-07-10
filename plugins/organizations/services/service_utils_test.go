@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
@@ -42,7 +42,7 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 			name:         "unauthorized when inputs are missing",
 			actorUserID:  "",
 			organization: "org-1",
-			expectErr:    internalerrors.ErrUnauthorized,
+			expectErr:    coreerrors.ErrUnauthorized,
 		},
 		{
 			name:         "not found when organization is missing",
@@ -51,7 +51,7 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return((*types.Organization)(nil), nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:         "forbidden when actor is not owner",
@@ -60,7 +60,7 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:         "propagates repository error",
@@ -136,7 +136,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 			name:         "unauthorized when inputs are missing",
 			actorUserID:  "",
 			organization: "org-1",
-			expectErr:    internalerrors.ErrUnauthorized,
+			expectErr:    coreerrors.ErrUnauthorized,
 		},
 		{
 			name:         "not found when organization is missing",
@@ -145,7 +145,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return((*types.Organization)(nil), nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:         "forbidden when member is missing",
@@ -155,7 +155,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return((*types.OrganizationMember)(nil), nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:         "propagates organization repository error",
@@ -388,7 +388,7 @@ func TestServiceUtils_ensureEmailVerifiedForInvitationAcceptance(t *testing.T) {
 			setup: func(userSvc *internaltests.MockUserService) {
 				userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "user@example.com", EmailVerified: false}, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:                 "returns not found when user is missing",
@@ -397,7 +397,7 @@ func TestServiceUtils_ensureEmailVerifiedForInvitationAcceptance(t *testing.T) {
 			setup: func(userSvc *internaltests.MockUserService) {
 				userSvc.On("GetByID", mock.Anything, "user-1").Return((*models.User)(nil), nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:                 "returns not found when user has no email",
@@ -406,13 +406,13 @@ func TestServiceUtils_ensureEmailVerifiedForInvitationAcceptance(t *testing.T) {
 			setup: func(userSvc *internaltests.MockUserService) {
 				userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", EmailVerified: true}, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:                 "returns not found when user ID is empty",
 			userID:               "",
 			requireEmailVerified: true,
-			expectErr:            internalerrors.ErrNotFound,
+			expectErr:            coreerrors.ErrNotFound,
 		},
 		{
 			name:                 "propagates user service error",

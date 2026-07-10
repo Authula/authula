@@ -3,7 +3,7 @@ package types
 import (
 	"strings"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 )
 
@@ -25,7 +25,7 @@ func (r *MagicLinkVerifyRequest) Validate() error {
 
 func (r *MagicLinkSignInRequest) Validate() error {
 	if strings.TrimSpace(r.Email) == "" {
-		return internalerrors.ErrEmailRequired
+		return coreerrors.ErrEmailRequired
 	}
 	return nil
 }
@@ -49,7 +49,7 @@ type MagicLinkExchangeRequest struct {
 
 func (r *MagicLinkExchangeRequest) Validate() error {
 	if strings.TrimSpace(r.Token) == "" {
-		return internalerrors.ErrTokenRequired
+		return coreerrors.ErrTokenRequired
 	}
 	return nil
 }

@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/repositories"
@@ -31,7 +31,7 @@ func NewOrganizationTeamMemberService(
 func (s *organizationTeamMemberService) AddTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, request types.AddOrganizationTeamMemberRequest) (*types.OrganizationTeamMember, error) {
 	orgMemberID := request.MemberID
 	if orgMemberID == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
@@ -47,7 +47,7 @@ func (s *organizationTeamMemberService) AddTeamMember(ctx context.Context, actor
 		return nil, err
 	}
 	if team == nil || team.OrganizationID != organizationID {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	orgMember, err := s.orgMemberRepo.GetByID(ctx, orgMemberID)
@@ -55,13 +55,13 @@ func (s *organizationTeamMemberService) AddTeamMember(ctx context.Context, actor
 		return nil, err
 	}
 	if orgMember == nil || orgMember.OrganizationID != organizationID {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	if existing, err := s.orgTeamMemberRepo.GetByTeamIDAndMemberID(ctx, teamID, orgMemberID); err != nil {
 		return nil, err
 	} else if existing != nil {
-		return nil, internalerrors.ErrConflict
+		return nil, coreerrors.ErrConflict
 	}
 
 	teamMember := &types.OrganizationTeamMember{
@@ -92,7 +92,7 @@ func (s *organizationTeamMemberService) GetAllTeamMembers(ctx context.Context, a
 		return nil, err
 	}
 	if team == nil || team.OrganizationID != organizationID {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	return s.orgTeamMemberRepo.GetAllByTeamID(ctx, teamID, page, limit)
@@ -112,7 +112,7 @@ func (s *organizationTeamMemberService) GetTeamMember(ctx context.Context, actor
 		return nil, err
 	}
 	if team == nil || team.OrganizationID != organizationID {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	orgMember, err := s.orgMemberRepo.GetByID(ctx, memberID)
@@ -120,7 +120,7 @@ func (s *organizationTeamMemberService) GetTeamMember(ctx context.Context, actor
 		return nil, err
 	}
 	if orgMember == nil || orgMember.OrganizationID != organizationID {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	teamMember, err := s.orgTeamMemberRepo.GetByTeamIDAndMemberID(ctx, teamID, orgMember.ID)
@@ -128,7 +128,7 @@ func (s *organizationTeamMemberService) GetTeamMember(ctx context.Context, actor
 		return nil, err
 	}
 	if teamMember == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	return teamMember, nil
@@ -148,7 +148,7 @@ func (s *organizationTeamMemberService) RemoveTeamMember(ctx context.Context, ac
 		return err
 	}
 	if team == nil || team.OrganizationID != organizationID {
-		return internalerrors.ErrNotFound
+		return coreerrors.ErrNotFound
 	}
 
 	orgMember, err := s.orgMemberRepo.GetByID(ctx, memberID)
@@ -156,7 +156,7 @@ func (s *organizationTeamMemberService) RemoveTeamMember(ctx context.Context, ac
 		return err
 	}
 	if orgMember == nil || orgMember.OrganizationID != organizationID {
-		return internalerrors.ErrNotFound
+		return coreerrors.ErrNotFound
 	}
 
 	teamMember, err := s.orgTeamMemberRepo.GetByTeamIDAndMemberID(ctx, teamID, orgMember.ID)
@@ -164,7 +164,7 @@ func (s *organizationTeamMemberService) RemoveTeamMember(ctx context.Context, ac
 		return err
 	}
 	if teamMember == nil {
-		return internalerrors.ErrNotFound
+		return coreerrors.ErrNotFound
 	}
 
 	if err := s.orgTeamMemberRepo.DeleteByTeamIDAndMemberID(ctx, teamID, orgMember.ID); err != nil {

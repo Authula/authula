@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	admintests "github.com/Authula/authula/plugins/admin/tests"
@@ -38,7 +38,7 @@ func TestImpersonationUseCase_GetImpersonationByID(t *testing.T) {
 
 		useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
 		_, err := useCase.GetImpersonationByID(context.Background(), internaltests.TestActor(), "   ")
-		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
+		assert.ErrorIs(t, err, coreerrors.ErrBadRequest)
 	})
 
 	t.Run("forwards trimmed id", func(t *testing.T) {
@@ -56,9 +56,9 @@ func TestImpersonationUseCase_GetImpersonationByID(t *testing.T) {
 		t.Parallel()
 
 		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		impRepo.On("GetImpersonationByID", mock.Anything, "imp-2").Return((*admintypes.Impersonation)(nil), internalerrors.ErrNotFound).Once()
+		impRepo.On("GetImpersonationByID", mock.Anything, "imp-2").Return((*admintypes.Impersonation)(nil), coreerrors.ErrNotFound).Once()
 		_, err := useCase.GetImpersonationByID(context.Background(), internaltests.TestActor(), "imp-2")
-		assert.ErrorIs(t, err, internalerrors.ErrNotFound)
+		assert.ErrorIs(t, err, coreerrors.ErrNotFound)
 		impRepo.AssertExpectations(t)
 	})
 }
@@ -71,7 +71,7 @@ func TestImpersonationUseCase_StartImpersonation(t *testing.T) {
 
 		useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
 		_, err := useCase.StartImpersonation(context.Background(), internaltests.TestActor(), "", nil, internaltests.PtrString("127.0.0.1"), internaltests.PtrString("user-agent"), admintypes.StartImpersonationRequest{TargetUserID: "t", Reason: "r"}, nil, "", 0)
-		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
+		assert.ErrorIs(t, err, coreerrors.ErrBadRequest)
 	})
 
 	t.Run("happy path returns result", func(t *testing.T) {
@@ -131,9 +131,9 @@ func TestImpersonationUseCase_StopImpersonation(t *testing.T) {
 		t.Parallel()
 
 		useCase, _, sessionStateRepo, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		sessionStateRepo.On("GetBySessionID", mock.Anything, "impersonated-session-1").Return((*admintypes.AdminSessionState)(nil), internalerrors.ErrNotFound).Once()
+		sessionStateRepo.On("GetBySessionID", mock.Anything, "impersonated-session-1").Return((*admintypes.AdminSessionState)(nil), coreerrors.ErrNotFound).Once()
 		_, err := useCase.StopImpersonation(context.Background(), internaltests.TestActor(), "target-1", "impersonated-session-1", "orig-token", admintypes.StopImpersonationRequest{})
-		assert.ErrorIs(t, err, internalerrors.ErrNotFound)
+		assert.ErrorIs(t, err, coreerrors.ErrNotFound)
 		sessionStateRepo.AssertExpectations(t)
 	})
 
@@ -144,7 +144,7 @@ func TestImpersonationUseCase_StopImpersonation(t *testing.T) {
 		sessionStateRepo.On("GetBySessionID", mock.Anything, "impersonated-session-1").Return(&admintypes.AdminSessionState{SessionID: "impersonated-session-1"}, nil).Once()
 
 		_, err := useCase.StopImpersonation(context.Background(), internaltests.TestActor(), "target-1", "impersonated-session-1", "orig-token", admintypes.StopImpersonationRequest{})
-		assert.ErrorIs(t, err, internalerrors.ErrUnauthorized)
+		assert.ErrorIs(t, err, coreerrors.ErrUnauthorized)
 		sessionStateRepo.AssertExpectations(t)
 	})
 
@@ -160,7 +160,7 @@ func TestImpersonationUseCase_StopImpersonation(t *testing.T) {
 		impRepo.On("GetLatestActiveImpersonationByActor", mock.Anything, "actor-1").Return((*admintypes.Impersonation)(nil), nil).Once()
 
 		_, err := useCase.StopImpersonation(context.Background(), internaltests.TestActor(), "target-1", sessionID, "orig-token", admintypes.StopImpersonationRequest{})
-		assert.ErrorIs(t, err, internalerrors.ErrNotFound)
+		assert.ErrorIs(t, err, coreerrors.ErrNotFound)
 		sessionStateRepo.AssertExpectations(t)
 		tokenSvc.AssertExpectations(t)
 		sessionSvc.AssertExpectations(t)
@@ -178,7 +178,7 @@ func TestImpersonationUseCase_StopImpersonation(t *testing.T) {
 		sessionSvc.On("GetByToken", mock.Anything, "hashed-orig").Return(&models.Session{ID: origSessionID, UserID: actorID}, nil).Once()
 
 		_, err := useCase.StopImpersonation(context.Background(), internaltests.TestActor(), "target-1", "impersonated-session-1", "orig-token", admintypes.StopImpersonationRequest{})
-		assert.ErrorIs(t, err, internalerrors.ErrUnauthorized)
+		assert.ErrorIs(t, err, coreerrors.ErrUnauthorized)
 		sessionStateRepo.AssertExpectations(t)
 		tokenSvc.AssertExpectations(t)
 		sessionSvc.AssertExpectations(t)

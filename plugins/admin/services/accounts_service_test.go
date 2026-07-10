@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	admintests "github.com/Authula/authula/plugins/admin/tests"
@@ -50,7 +50,7 @@ func TestAccountsService_Create_UserNotFound(t *testing.T) {
 	userRepo.On("GetByID", mock.Anything, "u1").Return((*models.User)(nil), nil).Once()
 
 	created, err := svc.Create(ctx, internaltests.TestActor(), "u1", request)
-	assert.ErrorIs(t, err, internalerrors.ErrNotFound)
+	assert.ErrorIs(t, err, coreerrors.ErrNotFound)
 	assert.Nil(t, created)
 	userRepo.AssertExpectations(t)
 	accountRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
@@ -68,7 +68,7 @@ func TestAccountsService_Create_Conflict(t *testing.T) {
 	accountRepo.On("GetByProviderAndAccountID", mock.Anything, "email", "acct-1").Return(&models.Account{ID: "acc-existing"}, nil).Once()
 
 	created, err := svc.Create(ctx, internaltests.TestActor(), "u1", request)
-	assert.ErrorIs(t, err, internalerrors.ErrConflict)
+	assert.ErrorIs(t, err, coreerrors.ErrConflict)
 	assert.Nil(t, created)
 	accountRepo.AssertExpectations(t)
 	passwordSvc.AssertNotCalled(t, "Hash", mock.Anything)
@@ -122,7 +122,7 @@ func TestAccountsService_Update_NotFound(t *testing.T) {
 	accountRepo.On("GetByID", mock.Anything, "acc-1").Return((*models.Account)(nil), nil).Once()
 
 	updated, err := svc.Update(ctx, internaltests.TestActor(), "acc-1", admintypes.UpdateAccountRequest{Scope: admintests.PtrString(t, "openid")})
-	assert.ErrorIs(t, err, internalerrors.ErrNotFound)
+	assert.ErrorIs(t, err, coreerrors.ErrNotFound)
 	assert.Nil(t, updated)
 }
 

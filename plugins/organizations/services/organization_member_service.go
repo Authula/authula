@@ -6,7 +6,7 @@ import (
 
 	"github.com/uptrace/bun"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/constants"
@@ -40,12 +40,12 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actor *models
 
 	userID := request.UserID
 	if userID == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	role := request.Role
 	if role == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	user, err := s.userService.GetByID(ctx, userID)
@@ -53,28 +53,28 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actor *models
 		return nil, err
 	}
 	if user == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	if existing, err := s.orgMemberRepo.GetByOrganizationIDAndUserID(ctx, organizationID, userID); err != nil {
 		return nil, err
 	} else if existing != nil {
-		return nil, internalerrors.ErrConflict
+		return nil, coreerrors.ErrConflict
 	}
 
 	actorID := actor.ID
 	validatedRoleAssignment, err := s.accessControlService.ValidateRoleAssignment(ctx, role, &actorID)
 	if err != nil {
-		if err.Error() == internalerrors.ErrForbidden.Error() {
-			return nil, internalerrors.ErrForbidden
+		if err.Error() == coreerrors.ErrForbidden.Error() {
+			return nil, coreerrors.ErrForbidden
 		}
-		if err.Error() == internalerrors.ErrNotFound.Error() {
-			return nil, internalerrors.ErrBadRequest
+		if err.Error() == coreerrors.ErrNotFound.Error() {
+			return nil, coreerrors.ErrBadRequest
 		}
 		return nil, err
 	}
 	if !validatedRoleAssignment {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	var created *types.OrganizationMember
@@ -120,7 +120,7 @@ func (s *organizationMemberService) GetMember(ctx context.Context, actor *models
 	}
 
 	if memberID == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	member, err := s.orgMemberRepo.GetByID(ctx, memberID)
@@ -128,7 +128,7 @@ func (s *organizationMemberService) GetMember(ctx context.Context, actor *models
 		return nil, err
 	}
 	if member == nil || member.OrganizationID != organizationID {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	return member, nil
@@ -145,31 +145,31 @@ func (s *organizationMemberService) UpdateMember(ctx context.Context, actor *mod
 		return nil, err
 	}
 	if member == nil || member.OrganizationID != organizationID {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	role := request.Role
 	if role == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	actorID := actor.ID
 	validatedRoleAssignment, err := s.accessControlService.ValidateRoleAssignment(ctx, role, &actorID)
 	if err != nil {
-		if err.Error() == internalerrors.ErrForbidden.Error() {
-			return nil, internalerrors.ErrForbidden
+		if err.Error() == coreerrors.ErrForbidden.Error() {
+			return nil, coreerrors.ErrForbidden
 		}
-		if err.Error() == internalerrors.ErrNotFound.Error() {
-			return nil, internalerrors.ErrBadRequest
+		if err.Error() == coreerrors.ErrNotFound.Error() {
+			return nil, coreerrors.ErrBadRequest
 		}
 		return nil, err
 	}
 	if !validatedRoleAssignment {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	if actorMember != nil && actorMember.UserID == member.UserID {
-		return nil, internalerrors.ErrForbidden
+		return nil, coreerrors.ErrForbidden
 	}
 
 	member.Role = role
@@ -192,7 +192,7 @@ func (s *organizationMemberService) RemoveMember(ctx context.Context, actor *mod
 		return err
 	}
 	if member == nil || member.OrganizationID != organizationID {
-		return internalerrors.ErrNotFound
+		return coreerrors.ErrNotFound
 	}
 
 	if err := s.orgMemberRepo.Delete(ctx, member.ID); err != nil {

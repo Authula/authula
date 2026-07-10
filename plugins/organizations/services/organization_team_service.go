@@ -6,7 +6,7 @@ import (
 
 	"github.com/uptrace/bun"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/repositories"
@@ -46,7 +46,7 @@ func (s *organizationTeamService) CreateTeam(ctx context.Context, actor *models.
 
 	name := request.Name
 	if name == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	slug := ""
@@ -57,13 +57,13 @@ func (s *organizationTeamService) CreateTeam(ctx context.Context, actor *models.
 		slug = slugify(name)
 	}
 	if slug == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	if existing, err := s.orgTeamRepo.GetByOrganizationIDAndSlug(ctx, organizationID, slug); err != nil {
 		return nil, err
 	} else if existing != nil {
-		return nil, internalerrors.ErrConflict
+		return nil, coreerrors.ErrConflict
 	}
 
 	team := &types.OrganizationTeam{
@@ -146,7 +146,7 @@ func (s *organizationTeamService) GetTeam(ctx context.Context, actor *models.Act
 		return nil, err
 	}
 	if team == nil || team.OrganizationID != organizationID {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	return team, nil
@@ -166,12 +166,12 @@ func (s *organizationTeamService) UpdateTeam(ctx context.Context, actor *models.
 		return nil, err
 	}
 	if team == nil || team.OrganizationID != organizationID {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	name := request.Name
 	if name == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	slug := team.Slug
@@ -182,13 +182,13 @@ func (s *organizationTeamService) UpdateTeam(ctx context.Context, actor *models.
 		slug = slugify(name)
 	}
 	if slug == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	if existing, err := s.orgTeamRepo.GetByOrganizationIDAndSlug(ctx, organizationID, slug); err != nil {
 		return nil, err
 	} else if existing != nil && existing.ID != teamID {
-		return nil, internalerrors.ErrConflict
+		return nil, coreerrors.ErrConflict
 	}
 
 	team.Name = name
@@ -221,7 +221,7 @@ func (s *organizationTeamService) DeleteTeam(ctx context.Context, actor *models.
 		return err
 	}
 	if team == nil || team.OrganizationID != organizationID {
-		return internalerrors.ErrNotFound
+		return coreerrors.ErrNotFound
 	}
 
 	if err := s.orgTeamRepo.Delete(ctx, teamID); err != nil {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
@@ -36,7 +36,7 @@ func (s *AccessControlService) ValidateRoleAssignment(ctx context.Context, roleN
 		return false, err
 	}
 	if role == nil || role.ID == "" {
-		return false, internalerrors.ErrNotFound
+		return false, coreerrors.ErrNotFound
 	}
 
 	if assignerUserID == nil || *assignerUserID == "" {
@@ -50,11 +50,11 @@ func (s *AccessControlService) ValidateRoleAssignment(ctx context.Context, roleN
 
 	highestWeight, activeCount := determineHighestActiveRoleWeight(assignerRoles, time.Now().UTC())
 	if activeCount == 0 {
-		return false, internalerrors.ErrForbidden
+		return false, coreerrors.ErrForbidden
 	}
 
 	if role.Weight > highestWeight {
-		return false, internalerrors.ErrForbidden
+		return false, coreerrors.ErrForbidden
 	}
 
 	return true, nil
@@ -67,7 +67,7 @@ func (s *AccessControlService) ValidatePermissionKeys(ctx context.Context, permi
 			return err
 		}
 		if permission == nil {
-			return internalerrors.ErrNotFound
+			return coreerrors.ErrNotFound
 		}
 	}
 	return nil

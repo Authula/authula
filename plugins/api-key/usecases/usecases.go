@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	apiconstants "github.com/Authula/authula/plugins/api-key/constants"
 	apiservices "github.com/Authula/authula/plugins/api-key/services"
@@ -61,7 +61,7 @@ func (u *UseCases) Update(ctx context.Context, actor *models.Actor, id string, r
 		return nil, err
 	}
 	if apiKey == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 	if apiKey.OwnerType == types.OwnerTypeOrganization {
 		if err := u.authorizer.AuthorizeScope(ctx, actor, apiconstants.OrgApiKeyUpdate); err != nil {

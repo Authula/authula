@@ -3,7 +3,7 @@ package usecases
 import (
 	"context"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/services"
@@ -22,7 +22,7 @@ func NewUserPermissionsUseCase(service *services.UserPermissionsService, authori
 
 func (u *UserPermissionsUseCase) GetSelfUserPermissions(ctx context.Context, actor *models.Actor, userID string) ([]types.UserPermissionInfo, error) {
 	if actor.ID != userID {
-		return nil, internalerrors.ErrForbidden
+		return nil, coreerrors.ErrForbidden
 	}
 	return u.service.GetUserPermissions(ctx, actor, userID)
 }

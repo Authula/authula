@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	adminhandlers "github.com/Authula/authula/plugins/admin/handlers"
@@ -111,7 +111,7 @@ func TestGetAllUsersHandler(t *testing.T) {
 		{
 			name: "use case error",
 			setup: func(repo *internaltests.MockUserRepository) {
-				repo.On("GetAll", mock.Anything, (*string)(nil), 10).Return(([]models.User)(nil), (*string)(nil), internalerrors.ErrForbidden).Once()
+				repo.On("GetAll", mock.Anything, (*string)(nil), 10).Return(([]models.User)(nil), (*string)(nil), coreerrors.ErrForbidden).Once()
 			},
 			path:            "/admin/users",
 			expectedStatus:  http.StatusForbidden,
@@ -184,7 +184,7 @@ func TestGetUserByIDHandler(t *testing.T) {
 			name:       "use case error",
 			pathParams: map[string]string{"user_id": "user-1"},
 			setup: func(repo *internaltests.MockUserRepository) {
-				repo.On("GetByID", mock.Anything, "user-1").Return((*models.User)(nil), internalerrors.ErrUnauthorized).Once()
+				repo.On("GetByID", mock.Anything, "user-1").Return((*models.User)(nil), coreerrors.ErrUnauthorized).Once()
 			},
 			expectedStatus:  http.StatusUnauthorized,
 			expectedMessage: "unauthorized",
@@ -266,7 +266,7 @@ func TestUpdateUserHandler(t *testing.T) {
 			name:       "use case error",
 			pathParams: map[string]string{"user_id": "user-1"},
 			setup: func(repo *internaltests.MockUserRepository) {
-				repo.On("GetByID", mock.Anything, "user-1").Return((*models.User)(nil), internalerrors.ErrBadRequest).Once()
+				repo.On("GetByID", mock.Anything, "user-1").Return((*models.User)(nil), coreerrors.ErrBadRequest).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "bad request",
@@ -339,7 +339,7 @@ func TestDeleteUserHandler(t *testing.T) {
 			pathParams: map[string]string{"user_id": "user-1"},
 			setup: func(repo *internaltests.MockUserRepository) {
 				repo.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1"}, nil).Once()
-				repo.On("Delete", mock.Anything, "user-1").Return(internalerrors.ErrBadRequest).Once()
+				repo.On("Delete", mock.Anything, "user-1").Return(coreerrors.ErrBadRequest).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "bad request",

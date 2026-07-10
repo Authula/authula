@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"
@@ -27,7 +27,7 @@ func NewServiceUtils(orgRepo repositories.OrganizationRepository, orgMemberRepo 
 
 func (s *ServiceUtils) authorizeOwner(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" {
-		return nil, internalerrors.ErrUnauthorized
+		return nil, coreerrors.ErrUnauthorized
 	}
 
 	organization, err := s.orgRepo.GetByID(ctx, organizationID)
@@ -35,13 +35,13 @@ func (s *ServiceUtils) authorizeOwner(ctx context.Context, actor *models.Actor, 
 		return nil, err
 	}
 	if organization == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 	if _, ok := actor.GetClaimString("organization_id"); ok {
 		return organization, nil
 	}
 	if organization.OwnerID != actor.ID {
-		return nil, internalerrors.ErrForbidden
+		return nil, coreerrors.ErrForbidden
 	}
 
 	return organization, nil
@@ -49,7 +49,7 @@ func (s *ServiceUtils) authorizeOwner(ctx context.Context, actor *models.Actor, 
 
 func (s *ServiceUtils) authorizeOrganizationAccess(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, *types.OrganizationMember, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" {
-		return nil, nil, internalerrors.ErrUnauthorized
+		return nil, nil, coreerrors.ErrUnauthorized
 	}
 
 	organization, err := s.orgRepo.GetByID(ctx, organizationID)
@@ -57,7 +57,7 @@ func (s *ServiceUtils) authorizeOrganizationAccess(ctx context.Context, actor *m
 		return nil, nil, err
 	}
 	if organization == nil {
-		return nil, nil, internalerrors.ErrNotFound
+		return nil, nil, coreerrors.ErrNotFound
 	}
 	if _, ok := actor.GetClaimString("organization_id"); ok {
 		return organization, nil, nil
@@ -71,7 +71,7 @@ func (s *ServiceUtils) authorizeOrganizationAccess(ctx context.Context, actor *m
 		return nil, nil, err
 	}
 	if member == nil {
-		return nil, nil, internalerrors.ErrForbidden
+		return nil, nil, coreerrors.ErrForbidden
 	}
 
 	return organization, member, nil
@@ -83,7 +83,7 @@ func (s *ServiceUtils) authorizeTeamAccess(ctx context.Context, actor *models.Ac
 		return err
 	}
 	if team == nil || team.OrganizationID != orgID {
-		return internalerrors.ErrNotFound
+		return coreerrors.ErrNotFound
 	}
 
 	if _, ok := actor.GetClaimString("organization_id"); ok {
@@ -95,7 +95,7 @@ func (s *ServiceUtils) authorizeTeamAccess(ctx context.Context, actor *models.Ac
 		return err
 	}
 	if member == nil {
-		return internalerrors.ErrForbidden
+		return coreerrors.ErrForbidden
 	}
 
 	tm, err := s.orgTeamMemberRepo.GetByTeamIDAndMemberID(ctx, teamID, member.ID)
@@ -103,7 +103,7 @@ func (s *ServiceUtils) authorizeTeamAccess(ctx context.Context, actor *models.Ac
 		return err
 	}
 	if tm == nil {
-		return internalerrors.ErrForbidden
+		return coreerrors.ErrForbidden
 	}
 	return nil
 }

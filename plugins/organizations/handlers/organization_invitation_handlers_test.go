@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
@@ -210,7 +210,7 @@ func TestGetOrganizationInvitationHandler(t *testing.T) {
 			organizationID: "org-1",
 			invitationID:   "inv-1",
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
-				fixture.service.On("GetOrganizationInvitation", mock.Anything, "user-1", "org-1", "inv-1").Return((*orgtypes.OrganizationInvitation)(nil), internalerrors.ErrNotFound).Once()
+				fixture.service.On("GetOrganizationInvitation", mock.Anything, "user-1", "org-1", "inv-1").Return((*orgtypes.OrganizationInvitation)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedMessage: "not found",

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
@@ -83,7 +83,7 @@ func TestCreateOrganizationHandler(t *testing.T) {
 			prepare: func(f *organizationHandlerFixture) {
 				f.service.On("CreateOrganization", mock.Anything, "user-1", mock.MatchedBy(func(request orgtypes.CreateOrganizationRequest) bool {
 					return request.Name == "Acme Inc" && request.Role == "member"
-				})).Return((*orgtypes.Organization)(nil), internalerrors.ErrUnprocessableEntity).Once()
+				})).Return((*orgtypes.Organization)(nil), coreerrors.ErrUnprocessableEntity).Once()
 			},
 			expectedStatus:  http.StatusUnprocessableEntity,
 			expectedMessage: "unprocessable entity",
@@ -260,7 +260,7 @@ func TestGetOrganizationByIDHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(f *organizationHandlerFixture) {
-				f.service.On("GetOrganizationByID", mock.Anything, "user-1", "org-1").Return((*orgtypes.Organization)(nil), internalerrors.ErrNotFound).Once()
+				f.service.On("GetOrganizationByID", mock.Anything, "user-1", "org-1").Return((*orgtypes.Organization)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedMessage: "not found",
@@ -270,7 +270,7 @@ func TestGetOrganizationByIDHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(f *organizationHandlerFixture) {
-				f.service.On("GetOrganizationByID", mock.Anything, "user-1", "org-1").Return((*orgtypes.Organization)(nil), internalerrors.ErrForbidden).Once()
+				f.service.On("GetOrganizationByID", mock.Anything, "user-1", "org-1").Return((*orgtypes.Organization)(nil), coreerrors.ErrForbidden).Once()
 			},
 			expectedStatus:  http.StatusForbidden,
 			expectedMessage: "forbidden",
@@ -374,7 +374,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 			prepare: func(f *organizationHandlerFixture) {
 				f.service.On("UpdateOrganization", mock.Anything, "user-1", "org-1", mock.MatchedBy(func(request orgtypes.UpdateOrganizationRequest) bool {
 					return request.Name != nil && *request.Name == "Acme Platform"
-				})).Return((*orgtypes.Organization)(nil), internalerrors.ErrNotFound).Once()
+				})).Return((*orgtypes.Organization)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedMessage: "not found",
@@ -385,7 +385,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 			organizationID: "org-1",
 			body:           internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{Name: new("Acme Platform")}),
 			prepare: func(f *organizationHandlerFixture) {
-				f.service.On("UpdateOrganization", mock.Anything, "user-1", "org-1", mock.Anything).Return((*orgtypes.Organization)(nil), internalerrors.ErrForbidden).Once()
+				f.service.On("UpdateOrganization", mock.Anything, "user-1", "org-1", mock.Anything).Return((*orgtypes.Organization)(nil), coreerrors.ErrForbidden).Once()
 			},
 			expectedStatus:  http.StatusForbidden,
 			expectedMessage: "forbidden",
@@ -503,7 +503,7 @@ func TestDeleteOrganizationHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(f *organizationHandlerFixture) {
-				f.service.On("DeleteOrganization", mock.Anything, "user-1", "org-1").Return(internalerrors.ErrNotFound).Once()
+				f.service.On("DeleteOrganization", mock.Anything, "user-1", "org-1").Return(coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedMessage: "not found",
@@ -513,7 +513,7 @@ func TestDeleteOrganizationHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(f *organizationHandlerFixture) {
-				f.service.On("DeleteOrganization", mock.Anything, "user-1", "org-1").Return(internalerrors.ErrForbidden).Once()
+				f.service.On("DeleteOrganization", mock.Anything, "user-1", "org-1").Return(coreerrors.ErrForbidden).Once()
 			},
 			expectedStatus:  http.StatusForbidden,
 			expectedMessage: "forbidden",

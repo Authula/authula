@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/services"
@@ -27,7 +27,7 @@ func (u StateUseCase) GetUserState(ctx context.Context, actor *models.Actor, use
 	}
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	return u.service.GetUserState(ctx, actor, userID)
@@ -39,7 +39,7 @@ func (u StateUseCase) UpsertUserState(ctx context.Context, actor *models.Actor, 
 	}
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	return u.service.UpsertUserState(ctx, actor, userID, request, actorUserID)
@@ -51,7 +51,7 @@ func (u StateUseCase) CreateUserState(ctx context.Context, actor *models.Actor, 
 	}
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	return u.service.CreateUserState(ctx, actor, userID, request, actorUserID)
@@ -63,7 +63,7 @@ func (u StateUseCase) UpdateUserState(ctx context.Context, actor *models.Actor, 
 	}
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	return u.service.UpdateUserState(ctx, actor, userID, request, actorUserID)
@@ -75,7 +75,7 @@ func (u StateUseCase) DeleteUserState(ctx context.Context, actor *models.Actor, 
 	}
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return internalerrors.ErrBadRequest
+		return coreerrors.ErrBadRequest
 	}
 
 	return u.service.DeleteUserState(ctx, actor, userID)
@@ -94,7 +94,7 @@ func (u StateUseCase) GetSessionState(ctx context.Context, actor *models.Actor, 
 	}
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	return u.service.GetSessionState(ctx, actor, sessionID)
@@ -106,7 +106,7 @@ func (u StateUseCase) UpsertSessionState(ctx context.Context, actor *models.Acto
 	}
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	return u.service.UpsertSessionState(ctx, actor, sessionID, request, actorUserID)
@@ -118,7 +118,7 @@ func (u StateUseCase) CreateSessionState(ctx context.Context, actor *models.Acto
 	}
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	return u.service.CreateSessionState(ctx, actor, sessionID, request, actorUserID)
@@ -130,7 +130,7 @@ func (u StateUseCase) UpdateSessionState(ctx context.Context, actor *models.Acto
 	}
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	return u.service.UpdateSessionState(ctx, actor, sessionID, request, actorUserID)
@@ -142,7 +142,7 @@ func (u StateUseCase) DeleteSessionState(ctx context.Context, actor *models.Acto
 	}
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return internalerrors.ErrBadRequest
+		return coreerrors.ErrBadRequest
 	}
 
 	return u.service.DeleteSessionState(ctx, actor, sessionID)
@@ -151,7 +151,7 @@ func (u StateUseCase) DeleteSessionState(ctx context.Context, actor *models.Acto
 func (u StateUseCase) GetSelfUserState(ctx context.Context, actor *models.Actor, userID string) (*types.AdminUserState, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	return u.service.GetSelfUserState(ctx, actor, userID)
@@ -160,7 +160,7 @@ func (u StateUseCase) GetSelfUserState(ctx context.Context, actor *models.Actor,
 func (u StateUseCase) GetSelfSessionState(ctx context.Context, sessionID string) (*types.AdminSessionState, error) {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	return u.service.GetSelfSessionState(ctx, sessionID)
@@ -172,7 +172,7 @@ func (u StateUseCase) GetUserAdminSessions(ctx context.Context, actor *models.Ac
 	}
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	return u.service.GetUserAdminSessions(ctx, actor, userID)

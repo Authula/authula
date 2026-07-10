@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
@@ -28,7 +28,7 @@ func TestPermissionsServiceCreatePermission(t *testing.T) {
 		{
 			name:    "blank key",
 			req:     types.CreatePermissionRequest{Key: ""},
-			wantErr: internalerrors.ErrBadRequest,
+			wantErr: coreerrors.ErrBadRequest,
 		},
 		{
 			name: "success",
@@ -168,7 +168,7 @@ func TestPermissionsServiceGetPermissionByID(t *testing.T) {
 		{
 			name:    "blank id",
 			id:      "",
-			wantErr: internalerrors.ErrBadRequest,
+			wantErr: coreerrors.ErrBadRequest,
 		},
 		{
 			name: "not found",
@@ -176,7 +176,7 @@ func TestPermissionsServiceGetPermissionByID(t *testing.T) {
 			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return((*types.Permission)(nil), nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 		{
 			name: "success",
@@ -234,19 +234,19 @@ func TestPermissionsServiceUpdatePermission(t *testing.T) {
 			name:    "blank id",
 			id:      "",
 			req:     types.UpdatePermissionRequest{Description: &updatedDescription},
-			wantErr: internalerrors.ErrUnprocessableEntity,
+			wantErr: coreerrors.ErrUnprocessableEntity,
 		},
 		{
 			name:    "nil description",
 			id:      "perm-1",
 			req:     types.UpdatePermissionRequest{},
-			wantErr: internalerrors.ErrUnprocessableEntity,
+			wantErr: coreerrors.ErrUnprocessableEntity,
 		},
 		{
 			name:    "blank description",
 			id:      "perm-1",
 			req:     types.UpdatePermissionRequest{Description: func() *string { value := ""; return &value }()},
-			wantErr: internalerrors.ErrUnprocessableEntity,
+			wantErr: coreerrors.ErrUnprocessableEntity,
 		},
 		{
 			name: "not found",
@@ -255,7 +255,7 @@ func TestPermissionsServiceUpdatePermission(t *testing.T) {
 			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return((*types.Permission)(nil), nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 		{
 			name: "system permission",
@@ -264,7 +264,7 @@ func TestPermissionsServiceUpdatePermission(t *testing.T) {
 			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read", IsSystem: true}, nil).Once()
 			},
-			wantErr: internalerrors.ErrBadRequest,
+			wantErr: coreerrors.ErrBadRequest,
 		},
 		{
 			name: "update returns false",
@@ -274,7 +274,7 @@ func TestPermissionsServiceUpdatePermission(t *testing.T) {
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
 				permissionsRepo.On("UpdatePermission", mock.Anything, "perm-1", &updatedDescription).Return(false, nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 		{
 			name: "success",
@@ -329,7 +329,7 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 		{
 			name:    "blank id",
 			id:      "",
-			wantErr: internalerrors.ErrBadRequest,
+			wantErr: coreerrors.ErrBadRequest,
 		},
 		{
 			name: "not found",
@@ -337,7 +337,7 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return((*types.Permission)(nil), nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 		{
 			name: "system permission",
@@ -345,7 +345,7 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read", IsSystem: true}, nil).Once()
 			},
-			wantErr: internalerrors.ErrBadRequest,
+			wantErr: coreerrors.ErrBadRequest,
 		},
 		{
 			name: "permission in use",
@@ -354,7 +354,7 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
 				rolePermissionsRepo.On("CountRolesByPermission", mock.Anything, "perm-1").Return(2, nil).Once()
 			},
-			wantErr: internalerrors.ErrConflict,
+			wantErr: coreerrors.ErrConflict,
 		},
 		{
 			name: "delete returns false",
@@ -364,7 +364,7 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 				rolePermissionsRepo.On("CountRolesByPermission", mock.Anything, "perm-1").Return(0, nil).Once()
 				permissionsRepo.On("DeletePermission", mock.Anything, "perm-1").Return(false, nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 		{
 			name: "success",

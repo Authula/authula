@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/access-control/types"
@@ -68,7 +68,7 @@ func (p *AccessControlPlugin) hydrateActorScopes(reqCtx *models.RequestContext) 
 			for _, apiKeyScope := range reqCtx.Actor.Scopes {
 				if !hasScope(activeUserScopes, apiKeyScope) {
 					// Strict Invalidation: The user lost this permission, kill the flight
-					return internalerrors.ErrForbidden
+					return coreerrors.ErrForbidden
 				}
 			}
 		}

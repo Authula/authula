@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
@@ -25,7 +25,7 @@ func TestUserPermissionsServiceGetUserPermissions(t *testing.T) {
 		{
 			name:        "blank user id",
 			userID:      "",
-			expectedErr: internalerrors.ErrUnprocessableEntity,
+			expectedErr: coreerrors.ErrUnprocessableEntity,
 		},
 		{
 			name:   "success",
@@ -39,9 +39,9 @@ func TestUserPermissionsServiceGetUserPermissions(t *testing.T) {
 			name:   "repo error",
 			userID: "u1",
 			setupMock: func(m *accesscontroltests.MockUserPermissionsRepository) {
-				m.On("GetUserPermissions", mock.Anything, "u1").Return(([]types.UserPermissionInfo)(nil), internalerrors.ErrNotFound).Once()
+				m.On("GetUserPermissions", mock.Anything, "u1").Return(([]types.UserPermissionInfo)(nil), coreerrors.ErrNotFound).Once()
 			},
-			expectedErr: internalerrors.ErrNotFound,
+			expectedErr: coreerrors.ErrNotFound,
 		},
 	}
 
@@ -88,7 +88,7 @@ func TestUserPermissionsServiceHasPermissions(t *testing.T) {
 		{
 			name:        "blank user id",
 			userID:      "",
-			expectedErr: internalerrors.ErrUnprocessableEntity,
+			expectedErr: coreerrors.ErrUnprocessableEntity,
 		},
 		{
 			name:           "success",
@@ -104,9 +104,9 @@ func TestUserPermissionsServiceHasPermissions(t *testing.T) {
 			userID:         "u1",
 			permissionKeys: []string{"users.read"},
 			setupMock: func(m *accesscontroltests.MockUserPermissionsRepository) {
-				m.On("HasPermissions", mock.Anything, "u1", []string{"users.read"}).Return(false, internalerrors.ErrForbidden).Once()
+				m.On("HasPermissions", mock.Anything, "u1", []string{"users.read"}).Return(false, coreerrors.ErrForbidden).Once()
 			},
-			expectedErr: internalerrors.ErrForbidden,
+			expectedErr: coreerrors.ErrForbidden,
 		},
 	}
 

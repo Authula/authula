@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/access-control/repositories"
@@ -21,7 +21,7 @@ func NewPermissionsService(permissionsRepo repositories.PermissionsRepository, r
 
 func (s *PermissionsService) CreatePermission(ctx context.Context, actor *models.Actor, req types.CreatePermissionRequest) (*types.Permission, error) {
 	if req.Key == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	var description *string
@@ -49,7 +49,7 @@ func (s *PermissionsService) GetAllPermissions(ctx context.Context, actor *model
 
 func (s *PermissionsService) GetPermissionByID(ctx context.Context, actor *models.Actor, permissionID string) (*types.Permission, error) {
 	if permissionID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	permission, err := s.permissionsRepo.GetPermissionByID(ctx, permissionID)
@@ -57,7 +57,7 @@ func (s *PermissionsService) GetPermissionByID(ctx context.Context, actor *model
 		return nil, err
 	}
 	if permission == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	return permission, nil
@@ -65,7 +65,7 @@ func (s *PermissionsService) GetPermissionByID(ctx context.Context, actor *model
 
 func (s *PermissionsService) GetPermissionByKey(ctx context.Context, actor *models.Actor, permissionKey string) (*types.Permission, error) {
 	if permissionKey == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	permission, err := s.permissionsRepo.GetPermissionByKey(ctx, permissionKey)
@@ -73,7 +73,7 @@ func (s *PermissionsService) GetPermissionByKey(ctx context.Context, actor *mode
 		return nil, err
 	}
 	if permission == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	return permission, nil
@@ -81,15 +81,15 @@ func (s *PermissionsService) GetPermissionByKey(ctx context.Context, actor *mode
 
 func (s *PermissionsService) UpdatePermission(ctx context.Context, actor *models.Actor, permissionID string, req types.UpdatePermissionRequest) (*types.Permission, error) {
 	if permissionID == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 	if req.Description == nil {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	description := *req.Description
 	if description == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	permission, err := s.permissionsRepo.GetPermissionByID(ctx, permissionID)
@@ -97,10 +97,10 @@ func (s *PermissionsService) UpdatePermission(ctx context.Context, actor *models
 		return nil, err
 	}
 	if permission == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 	if permission.IsSystem {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	updated, err := s.permissionsRepo.UpdatePermission(ctx, permissionID, &description)
@@ -108,7 +108,7 @@ func (s *PermissionsService) UpdatePermission(ctx context.Context, actor *models
 		return nil, err
 	}
 	if !updated {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	permission, err = s.permissionsRepo.GetPermissionByID(ctx, permissionID)
@@ -116,7 +116,7 @@ func (s *PermissionsService) UpdatePermission(ctx context.Context, actor *models
 		return nil, err
 	}
 	if permission == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	return permission, nil
@@ -124,7 +124,7 @@ func (s *PermissionsService) UpdatePermission(ctx context.Context, actor *models
 
 func (s *PermissionsService) DeletePermission(ctx context.Context, actor *models.Actor, permissionID string) error {
 	if permissionID == "" {
-		return internalerrors.ErrBadRequest
+		return coreerrors.ErrBadRequest
 	}
 
 	permission, err := s.permissionsRepo.GetPermissionByID(ctx, permissionID)
@@ -132,10 +132,10 @@ func (s *PermissionsService) DeletePermission(ctx context.Context, actor *models
 		return err
 	}
 	if permission == nil {
-		return internalerrors.ErrNotFound
+		return coreerrors.ErrNotFound
 	}
 	if permission.IsSystem {
-		return internalerrors.ErrBadRequest
+		return coreerrors.ErrBadRequest
 	}
 
 	totalCountOfRolesByPermission, err := s.rolePermissionsRepo.CountRolesByPermission(ctx, permissionID)
@@ -143,7 +143,7 @@ func (s *PermissionsService) DeletePermission(ctx context.Context, actor *models
 		return err
 	}
 	if totalCountOfRolesByPermission > 0 {
-		return internalerrors.ErrConflict
+		return coreerrors.ErrConflict
 	}
 
 	deleted, err := s.permissionsRepo.DeletePermission(ctx, permissionID)
@@ -151,7 +151,7 @@ func (s *PermissionsService) DeletePermission(ctx context.Context, actor *models
 		return err
 	}
 	if !deleted {
-		return internalerrors.ErrNotFound
+		return coreerrors.ErrNotFound
 	}
 
 	return nil

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
@@ -21,7 +21,7 @@ func NewUserRolesService(userRolesRepo repositories.UserRolesRepository, rolesRe
 
 func (s *UserRolesService) GetUserRoles(ctx context.Context, actor *models.Actor, userID string) ([]types.UserRoleInfo, error) {
 	if userID == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	return s.userRolesRepo.GetUserRoles(ctx, userID)
@@ -29,7 +29,7 @@ func (s *UserRolesService) GetUserRoles(ctx context.Context, actor *models.Actor
 
 func (s *UserRolesService) ReplaceUserRoles(ctx context.Context, actor *models.Actor, userID string, roleIDs []string, assignedByUserID *string) error {
 	if userID == "" {
-		return internalerrors.ErrBadRequest
+		return coreerrors.ErrBadRequest
 	}
 
 	normalized := make([]string, 0, len(roleIDs))
@@ -48,7 +48,7 @@ func (s *UserRolesService) ReplaceUserRoles(ctx context.Context, actor *models.A
 			return err
 		}
 		if role == nil {
-			return internalerrors.ErrNotFound
+			return coreerrors.ErrNotFound
 		}
 
 		seen[roleID] = struct{}{}
@@ -64,7 +64,7 @@ func (s *UserRolesService) ReplaceUserRoles(ctx context.Context, actor *models.A
 
 		for _, role := range targetRoles {
 			if role.Weight > highestWeight {
-				return internalerrors.ErrForbidden
+				return coreerrors.ErrForbidden
 			}
 		}
 	}
@@ -74,16 +74,16 @@ func (s *UserRolesService) ReplaceUserRoles(ctx context.Context, actor *models.A
 
 func (s *UserRolesService) AssignRoleToUser(ctx context.Context, actor *models.Actor, userID string, req types.AssignUserRoleRequest, assignedByUserID *string) error {
 	if userID == "" {
-		return internalerrors.ErrBadRequest
+		return coreerrors.ErrBadRequest
 	}
 
 	roleID := req.RoleID
 	if roleID == "" {
-		return internalerrors.ErrBadRequest
+		return coreerrors.ErrBadRequest
 	}
 
 	if req.ExpiresAt != nil && req.ExpiresAt.Before(time.Now().UTC()) {
-		return internalerrors.ErrBadRequest
+		return coreerrors.ErrBadRequest
 	}
 
 	role, err := s.rolesRepo.GetRoleByID(ctx, roleID)
@@ -91,7 +91,7 @@ func (s *UserRolesService) AssignRoleToUser(ctx context.Context, actor *models.A
 		return err
 	}
 	if role == nil {
-		return internalerrors.ErrNotFound
+		return coreerrors.ErrNotFound
 	}
 
 	if err := s.ensureRoleAssignable(ctx, role, assignedByUserID); err != nil {
@@ -103,7 +103,7 @@ func (s *UserRolesService) AssignRoleToUser(ctx context.Context, actor *models.A
 
 func (s *UserRolesService) RemoveRoleFromUser(ctx context.Context, actor *models.Actor, userID string, roleID string) error {
 	if userID == "" || roleID == "" {
-		return internalerrors.ErrBadRequest
+		return coreerrors.ErrBadRequest
 	}
 
 	return s.userRolesRepo.RemoveUserRole(ctx, userID, roleID)
@@ -120,7 +120,7 @@ func (s *UserRolesService) ensureRoleAssignable(ctx context.Context, role *types
 	}
 
 	if role.Weight > highestWeight {
-		return internalerrors.ErrForbidden
+		return coreerrors.ErrForbidden
 	}
 
 	return nil

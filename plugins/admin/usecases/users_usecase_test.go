@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	adminconstants "github.com/Authula/authula/plugins/admin/constants"
@@ -23,7 +23,7 @@ func TestUsersUseCase_Create(t *testing.T) {
 
 		useCase, _ := admintests.NewUsersUseCaseFixture()
 		_, err := useCase.Create(context.Background(), internaltests.TestActor(), admintypes.CreateUserRequest{Name: "", Email: "foo@bar.com"})
-		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
+		assert.ErrorIs(t, err, coreerrors.ErrBadRequest)
 	})
 
 	t.Run("bad request when email is empty", func(t *testing.T) {
@@ -31,7 +31,7 @@ func TestUsersUseCase_Create(t *testing.T) {
 
 		useCase, _ := admintests.NewUsersUseCaseFixture()
 		_, err := useCase.Create(context.Background(), internaltests.TestActor(), admintypes.CreateUserRequest{Name: "Name", Email: ""})
-		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
+		assert.ErrorIs(t, err, coreerrors.ErrBadRequest)
 	})
 
 	t.Run("trims input and defaults emailVerified", func(t *testing.T) {
@@ -133,7 +133,7 @@ func TestUsersUseCase_Update(t *testing.T) {
 
 		useCase, _ := admintests.NewUsersUseCaseFixture()
 		_, err := useCase.Update(context.Background(), internaltests.TestActor(), "u1", admintypes.UpdateUserRequest{})
-		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
+		assert.ErrorIs(t, err, coreerrors.ErrBadRequest)
 	})
 
 	t.Run("forwards changes to service", func(t *testing.T) {
@@ -166,7 +166,7 @@ func TestUsersUseCase_Delete(t *testing.T) {
 
 		useCase, _ := admintests.NewUsersUseCaseFixture()
 		err := useCase.Delete(context.Background(), internaltests.TestActor(), "  ")
-		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
+		assert.ErrorIs(t, err, coreerrors.ErrBadRequest)
 	})
 
 	t.Run("forwards to service on success", func(t *testing.T) {

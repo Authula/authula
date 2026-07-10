@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/plugins/access-control/services"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
@@ -46,7 +46,7 @@ func TestCreateRoleHandler(t *testing.T) {
 			setupMock: func(m *accesscontroltests.MockRolesRepository) {
 				m.On("CreateRole", mock.Anything, mock.MatchedBy(func(role *types.Role) bool {
 					return role != nil && role.Name == "Administrator" && role.Description != nil && *role.Description == *description && role.Weight == 25 && role.IsSystem && role.ID != ""
-				})).Return(internalerrors.ErrUnauthorized).Once()
+				})).Return(coreerrors.ErrUnauthorized).Once()
 			},
 			expectedStatus: http.StatusUnauthorized,
 			expectedBody:   map[string]string{"message": "unauthorized"},
@@ -139,7 +139,7 @@ func TestGetAllRolesHandler(t *testing.T) {
 		{
 			name: "service error",
 			setupMock: func(m *accesscontroltests.MockRolesRepository) {
-				m.On("GetAllRoles", mock.Anything).Return(([]types.Role)(nil), internalerrors.ErrForbidden).Once()
+				m.On("GetAllRoles", mock.Anything).Return(([]types.Role)(nil), coreerrors.ErrForbidden).Once()
 			},
 			expectedStatus: http.StatusForbidden,
 			expectedBody:   map[string]string{"message": "forbidden"},
@@ -252,7 +252,7 @@ func TestGetRoleByIDHandler(t *testing.T) {
 			name:   "service error",
 			roleID: "role-404",
 			setupMock: func(m *accesscontroltests.MockRolesRepository, _ *accesscontroltests.MockRolePermissionsRepository) {
-				m.On("GetRoleByID", mock.Anything, "role-404").Return((*types.Role)(nil), internalerrors.ErrNotFound).Once()
+				m.On("GetRoleByID", mock.Anything, "role-404").Return((*types.Role)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedBody:   map[string]string{"message": "not found"},
@@ -362,7 +362,7 @@ func TestGetRoleByNameHandler(t *testing.T) {
 			name:     "service error",
 			roleName: "missing",
 			setupMock: func(m *accesscontroltests.MockRolesRepository) {
-				m.On("GetRoleByName", mock.Anything, "missing").Return((*types.Role)(nil), internalerrors.ErrNotFound).Once()
+				m.On("GetRoleByName", mock.Anything, "missing").Return((*types.Role)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedBody:   map[string]string{"message": "not found"},

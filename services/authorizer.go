@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 )
 
@@ -21,23 +21,23 @@ func NewDefaultAuthorizer() Authorizer {
 
 func (a *DefaultAuthorizer) AuthorizeScope(ctx context.Context, actor *models.Actor, scope string) error {
 	if actor == nil || actor.ID == "" {
-		return internalerrors.ErrUnauthorized
+		return coreerrors.ErrUnauthorized
 	}
 	if !hasPermission(actor.Scopes, scope) {
-		return internalerrors.ErrInsufficientPermissions
+		return coreerrors.ErrInsufficientPermissions
 	}
 	return nil
 }
 
 func (a *DefaultAuthorizer) AuthorizeOrganizationAccess(ctx context.Context, actor *models.Actor, orgID string, scope string) error {
 	if actor == nil || actor.ID == "" {
-		return internalerrors.ErrUnauthorized
+		return coreerrors.ErrUnauthorized
 	}
 	if err := verifyTenant(actor, orgID); err != nil {
 		return err
 	}
 	if !hasPermission(actor.Scopes, scope) {
-		return internalerrors.ErrInsufficientPermissions
+		return coreerrors.ErrInsufficientPermissions
 	}
 	return nil
 }
@@ -51,7 +51,7 @@ func verifyTenant(actor *models.Actor, targetOrgID string) error {
 		return nil
 	}
 	if boundOrg != targetOrgID {
-		return internalerrors.ErrForbidden
+		return coreerrors.ErrForbidden
 	}
 	return nil
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	admintests "github.com/Authula/authula/plugins/admin/tests"
 	admintypes "github.com/Authula/authula/plugins/admin/types"
@@ -21,7 +21,7 @@ func TestStateUseCase_GetUserState(t *testing.T) {
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
 		_, err := useCase.GetUserState(context.Background(), internaltests.TestActor(), "   ")
-		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
+		assert.ErrorIs(t, err, coreerrors.ErrBadRequest)
 	})
 
 	t.Run("forwards trimmed id", func(t *testing.T) {
@@ -43,7 +43,7 @@ func TestStateUseCase_UpsertUserState(t *testing.T) {
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
 		_, err := useCase.UpsertUserState(context.Background(), internaltests.TestActor(), "  ", admintypes.UpsertUserStateRequest{}, nil)
-		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
+		assert.ErrorIs(t, err, coreerrors.ErrBadRequest)
 	})
 
 	t.Run("forwards trimmed id to service", func(t *testing.T) {
@@ -73,7 +73,7 @@ func TestStateUseCase_DeleteUserState(t *testing.T) {
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
 		err := useCase.DeleteUserState(context.Background(), internaltests.TestActor(), "   ")
-		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
+		assert.ErrorIs(t, err, coreerrors.ErrBadRequest)
 	})
 
 	t.Run("forwards trimmed id", func(t *testing.T) {
@@ -106,7 +106,7 @@ func TestStateUseCase_GetSessionState(t *testing.T) {
 		t.Parallel()
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
 		_, err := useCase.GetSessionState(context.Background(), internaltests.TestActor(), "")
-		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
+		assert.ErrorIs(t, err, coreerrors.ErrBadRequest)
 	})
 
 	t.Run("forwards trimmed id", func(t *testing.T) {
@@ -128,7 +128,7 @@ func TestStateUseCase_UpsertSessionState(t *testing.T) {
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
 		_, err := useCase.UpsertSessionState(context.Background(), internaltests.TestActor(), "", admintypes.UpsertSessionStateRequest{}, nil)
-		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
+		assert.ErrorIs(t, err, coreerrors.ErrBadRequest)
 	})
 
 	t.Run("forwards trimmed id", func(t *testing.T) {
@@ -155,7 +155,7 @@ func TestStateUseCase_DeleteSessionState(t *testing.T) {
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
 		err := useCase.DeleteSessionState(context.Background(), internaltests.TestActor(), "   ")
-		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
+		assert.ErrorIs(t, err, coreerrors.ErrBadRequest)
 	})
 
 	t.Run("forwards trimmed id", func(t *testing.T) {
@@ -177,7 +177,7 @@ func TestStateUseCase_GetUserAdminSessions(t *testing.T) {
 
 		useCase, _, _, _ := admintests.NewStateUseCaseFixture()
 		_, err := useCase.GetUserAdminSessions(context.Background(), internaltests.TestActor(), "")
-		assert.ErrorIs(t, err, internalerrors.ErrBadRequest)
+		assert.ErrorIs(t, err, coreerrors.ErrBadRequest)
 	})
 
 	t.Run("forwards trimmed id with repo call", func(t *testing.T) {

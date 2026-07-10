@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	emailtmpl "github.com/Authula/authula/internal/email/template"
-	internalerrors "github.com/Authula/authula/internal/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
@@ -140,7 +140,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			actorUserID:    "",
 			organizationID: "org-1",
 			request:        types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
-			expectErr:      internalerrors.ErrUnauthorized,
+			expectErr:      coreerrors.ErrUnauthorized,
 		},
 		{
 			name:                "invalid role is rejected",
@@ -151,7 +151,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrUnprocessableEntity,
+			expectErr: coreerrors.ErrUnprocessableEntity,
 		},
 		{
 			name:                 "higher role is forbidden",
@@ -163,7 +163,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:                 "access control forbidden is normalized",
@@ -175,7 +175,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:           "forbidden for non owner",
@@ -185,7 +185,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:                "org member can create",
@@ -355,7 +355,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			pluginConfig: func(config *types.OrganizationsPluginConfig, callbackCalled *bool) {
 				config.InvitationsLimit = &threeLimit
 			},
-			expectErr: internalerrors.ErrConflict,
+			expectErr: coreerrors.ErrConflict,
 		},
 		{
 			name:                "invitations limit repository count error is returned",
@@ -781,7 +781,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 			},
 			expectLen: 1,
 		},
-		{name: "unauthorized", actorUserID: "", organizationID: "org-1", expectErr: internalerrors.ErrUnauthorized},
+		{name: "unauthorized", actorUserID: "", organizationID: "org-1", expectErr: coreerrors.ErrUnauthorized},
 		{
 			name:           "organization not found",
 			actorUserID:    "user-1",
@@ -789,7 +789,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(nil, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:           "organization lookup error",
@@ -808,7 +808,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(nil, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:           "repo error",
@@ -912,7 +912,7 @@ func TestOrganizationInvitationService_RevokeOrganizationInvitation(t *testing.T
 					return invitation != nil && invitation.Status == types.OrganizationInvitationStatusExpired
 				})).Return(&types.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Status: types.OrganizationInvitationStatusExpired}, nil).Once()
 			},
-			expectErr: internalerrors.ErrConflict,
+			expectErr: coreerrors.ErrConflict,
 		},
 		{
 			name:           "update error",
@@ -982,7 +982,7 @@ func TestOrganizationInvitationService_AcceptPendingOrganizationInvitationsForEm
 			name:      "bad request invalid email",
 			userID:    "user-2",
 			email:     "not-an-email",
-			expectErr: internalerrors.ErrBadRequest,
+			expectErr: coreerrors.ErrBadRequest,
 		},
 		{
 			name:   "success",
@@ -1008,7 +1008,7 @@ func TestOrganizationInvitationService_AcceptPendingOrganizationInvitationsForEm
 			setup: func(userSvc *internaltests.MockUserService, orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
 				userSvc.On("GetByID", mock.Anything, "user-2").Return(&models.User{ID: "user-2", Email: "user@example.com", EmailVerified: false}, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 	}
 
@@ -1067,7 +1067,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 			actorUserID:  "",
 			organization: "org-1",
 			invitationID: "inv-1",
-			expectErr:    internalerrors.ErrUnauthorized,
+			expectErr:    coreerrors.ErrUnauthorized,
 		},
 		{
 			name:         "success",
@@ -1094,7 +1094,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 				userSvc.On("GetByID", mock.Anything, "user-2").Return(&models.User{ID: "user-2", Email: "other@example.com"}, nil).Once()
 				invRepo.On("GetByID", mock.Anything, "inv-1").Return(&types.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)}, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:         "user lookup error",
@@ -1114,7 +1114,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
 				userSvc.On("GetByID", mock.Anything, "user-2").Return((*models.User)(nil), nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:         "user missing email",
@@ -1124,7 +1124,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
 				userSvc.On("GetByID", mock.Anything, "user-2").Return(&models.User{ID: "user-2", Email: ""}, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:         "invitation lookup error",
@@ -1146,7 +1146,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 				userSvc.On("GetByID", mock.Anything, "user-2").Return(&models.User{ID: "user-2", Email: "user@example.com"}, nil).Once()
 				invRepo.On("GetByID", mock.Anything, "inv-1").Return((*types.OrganizationInvitation)(nil), nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:         "invitation from other organization",
@@ -1157,7 +1157,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 				userSvc.On("GetByID", mock.Anything, "user-2").Return(&models.User{ID: "user-2", Email: "user@example.com"}, nil).Once()
 				invRepo.On("GetByID", mock.Anything, "inv-1").Return(&types.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-2", Email: "user@example.com", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)}, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:         "expired pending conflict",
@@ -1171,7 +1171,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 					return invitation != nil && invitation.Status == types.OrganizationInvitationStatusExpired
 				})).Return(&types.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Status: types.OrganizationInvitationStatusExpired}, nil).Once()
 			},
-			expectErr: internalerrors.ErrConflict,
+			expectErr: coreerrors.ErrConflict,
 		},
 		{
 			name:         "member lookup error",
@@ -1257,7 +1257,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
 				userSvc.On("GetByID", mock.Anything, "user-2").Return(&models.User{ID: "user-2", Email: "user@example.com", EmailVerified: false}, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 	}
 
@@ -1313,7 +1313,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 			actorUserID:  "",
 			organization: "org-1",
 			invitationID: "inv-1",
-			expectErr:    internalerrors.ErrUnauthorized,
+			expectErr:    coreerrors.ErrUnauthorized,
 		},
 		{
 			name:         "success",
@@ -1347,7 +1347,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository) {
 				userSvc.On("GetByID", mock.Anything, "user-2").Return((*models.User)(nil), nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:         "user missing email",
@@ -1357,7 +1357,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 			setup: func(userSvc *internaltests.MockUserService, invRepo *orgtests.MockOrganizationInvitationRepository) {
 				userSvc.On("GetByID", mock.Anything, "user-2").Return(&models.User{ID: "user-2", Email: ""}, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:         "invitation lookup error",
@@ -1379,7 +1379,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 				userSvc.On("GetByID", mock.Anything, "user-2").Return(&models.User{ID: "user-2", Email: "user@example.com"}, nil).Once()
 				invRepo.On("GetByID", mock.Anything, "inv-1").Return((*types.OrganizationInvitation)(nil), nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:         "invitation from other organization",
@@ -1390,7 +1390,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 				userSvc.On("GetByID", mock.Anything, "user-2").Return(&models.User{ID: "user-2", Email: "user@example.com"}, nil).Once()
 				invRepo.On("GetByID", mock.Anything, "inv-1").Return(&types.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-2", Email: "user@example.com", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)}, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:         "expired pending conflict",
@@ -1404,7 +1404,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 					return invitation != nil && invitation.Status == types.OrganizationInvitationStatusExpired
 				})).Return(&types.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Status: types.OrganizationInvitationStatusExpired}, nil).Once()
 			},
-			expectErr: internalerrors.ErrConflict,
+			expectErr: coreerrors.ErrConflict,
 		},
 		{
 			name:         "email mismatch forbidden",
@@ -1415,7 +1415,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 				userSvc.On("GetByID", mock.Anything, "user-2").Return(&models.User{ID: "user-2", Email: "other@example.com"}, nil).Once()
 				invRepo.On("GetByID", mock.Anything, "inv-1").Return(&types.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)}, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:         "update error",

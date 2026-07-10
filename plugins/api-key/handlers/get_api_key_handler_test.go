@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	apiKeyTests "github.com/Authula/authula/plugins/api-key/tests"
@@ -36,7 +36,7 @@ func TestGetApiKeyHandler(t *testing.T) {
 			name: "not_found",
 			path: "/api-keys/api-key-1",
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("GetByID", mock.Anything, mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), internalerrors.ErrNotFound).Once()
+				m.On("GetByID", mock.Anything, mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 		},

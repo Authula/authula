@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/repositories"
 	"github.com/Authula/authula/plugins/admin/types"
@@ -30,7 +30,7 @@ func (s *StateService) CreateUserState(ctx context.Context, actor *models.Actor,
 		return nil, err
 	}
 	if !exists {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	current, err := s.userStateRepo.GetByUserID(ctx, userID)
@@ -38,7 +38,7 @@ func (s *StateService) CreateUserState(ctx context.Context, actor *models.Actor,
 		return nil, err
 	}
 	if current != nil {
-		return nil, internalerrors.ErrConflict
+		return nil, coreerrors.ErrConflict
 	}
 
 	state := buildUserStateFromCreate(userID, request, actorUserID)
@@ -55,7 +55,7 @@ func (s *StateService) UpdateUserState(ctx context.Context, actor *models.Actor,
 		return nil, err
 	}
 	if !exists {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	current, err := s.userStateRepo.GetByUserID(ctx, userID)
@@ -63,7 +63,7 @@ func (s *StateService) UpdateUserState(ctx context.Context, actor *models.Actor,
 		return nil, err
 	}
 	if current == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	state := buildUserState(userID, request, actorUserID)
@@ -80,7 +80,7 @@ func (s *StateService) UpsertUserState(ctx context.Context, actor *models.Actor,
 		return nil, err
 	}
 	if !exists {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	state := buildUserState(userID, request, actorUserID)
@@ -102,7 +102,7 @@ func (s *StateService) GetBannedUserStates(ctx context.Context, actor *models.Ac
 
 func (s *StateService) GetSelfUserState(ctx context.Context, actor *models.Actor, userID string) (*types.AdminUserState, error) {
 	if actor.ID != userID {
-		return nil, internalerrors.ErrForbidden
+		return nil, coreerrors.ErrForbidden
 	}
 	return s.userStateRepo.GetByUserID(ctx, userID)
 }
@@ -121,7 +121,7 @@ func (s *StateService) CreateSessionState(ctx context.Context, actor *models.Act
 		return nil, err
 	}
 	if !exists {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	current, err := s.sessionStateRepo.GetBySessionID(ctx, sessionID)
@@ -129,7 +129,7 @@ func (s *StateService) CreateSessionState(ctx context.Context, actor *models.Act
 		return nil, err
 	}
 	if current != nil {
-		return nil, internalerrors.ErrConflict
+		return nil, coreerrors.ErrConflict
 	}
 
 	state := buildSessionStateFromCreate(sessionID, request, actorUserID)
@@ -146,7 +146,7 @@ func (s *StateService) UpdateSessionState(ctx context.Context, actor *models.Act
 		return nil, err
 	}
 	if !exists {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	current, err := s.sessionStateRepo.GetBySessionID(ctx, sessionID)
@@ -154,7 +154,7 @@ func (s *StateService) UpdateSessionState(ctx context.Context, actor *models.Act
 		return nil, err
 	}
 	if current == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	state := buildSessionState(sessionID, request, actorUserID)
@@ -171,7 +171,7 @@ func (s *StateService) UpsertSessionState(ctx context.Context, actor *models.Act
 		return nil, err
 	}
 	if !exists {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	state := buildSessionState(sessionID, request, actorUserID)
@@ -193,7 +193,7 @@ func (s *StateService) GetUserAdminSessions(ctx context.Context, actor *models.A
 		return nil, err
 	}
 	if !exists {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	return s.sessionStateRepo.GetByUserID(ctx, userID)

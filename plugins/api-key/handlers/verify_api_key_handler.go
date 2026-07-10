@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/api-key/types"
@@ -33,7 +33,7 @@ func (h *VerifyApiKeyHandler) Handle() http.HandlerFunc {
 
 		result, err := h.UseCases.Verify(ctx, req)
 		if err != nil {
-			internalerrors.HandleError(err, reqCtx)
+			coreerrors.HandleError(err, reqCtx)
 			return
 		}
 

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/repositories"
@@ -54,7 +54,7 @@ func (s *ImpersonationService) GetAllImpersonations(ctx context.Context, actor *
 func (s *ImpersonationService) GetImpersonationByID(ctx context.Context, actor *models.Actor, impersonationID string) (*types.Impersonation, error) {
 	impersonationID = strings.TrimSpace(impersonationID)
 	if impersonationID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	row, err := s.impersonationRepo.GetImpersonationByID(ctx, impersonationID)
@@ -62,7 +62,7 @@ func (s *ImpersonationService) GetImpersonationByID(ctx context.Context, actor *
 		return nil, err
 	}
 	if row == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	return row, nil
@@ -85,16 +85,16 @@ func (s *ImpersonationService) StartImpersonation(
 	reason := strings.TrimSpace(req.Reason)
 
 	if actorUserID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 	if targetUserID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 	if actorUserID == targetUserID {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 	if reason == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	actorExists, err := s.impersonationRepo.UserExists(ctx, actorUserID)
@@ -102,7 +102,7 @@ func (s *ImpersonationService) StartImpersonation(
 		return nil, err
 	}
 	if !actorExists {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	targetExists, err := s.impersonationRepo.UserExists(ctx, targetUserID)
@@ -110,7 +110,7 @@ func (s *ImpersonationService) StartImpersonation(
 		return nil, err
 	}
 	if !targetExists {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	now := time.Now().UTC()
@@ -118,11 +118,11 @@ func (s *ImpersonationService) StartImpersonation(
 	maxDuration := s.maxExpiresIn
 	if req.ExpiresInSeconds != nil {
 		if *req.ExpiresInSeconds <= 0 {
-			return nil, internalerrors.ErrBadRequest
+			return nil, coreerrors.ErrBadRequest
 		}
 		requestedDuration := time.Duration(*req.ExpiresInSeconds) * time.Second
 		if requestedDuration > s.maxExpiresIn {
-			return nil, internalerrors.ErrBadRequest
+			return nil, coreerrors.ErrBadRequest
 		}
 		maxDuration = requestedDuration
 		expiresAt = now.Add(requestedDuration)
@@ -212,7 +212,7 @@ func (s *ImpersonationService) ValidateImpersonationCookie(ctx context.Context, 
 	hashedOriginal := s.tokenService.Hash(originalCookieValue)
 	originalSession, err := s.sessionService.GetByToken(ctx, hashedOriginal)
 	if err != nil || originalSession == nil {
-		return nil, internalerrors.ErrForbidden
+		return nil, coreerrors.ErrForbidden
 	}
 	return originalSession, nil
 }
@@ -220,7 +220,7 @@ func (s *ImpersonationService) ValidateImpersonationCookie(ctx context.Context, 
 func (s *ImpersonationService) StopImpersonation(ctx context.Context, actor *models.Actor, actorUserID string, request types.StopImpersonationRequest) error {
 	actorUserID = strings.TrimSpace(actorUserID)
 	if actorUserID == "" {
-		return internalerrors.ErrBadRequest
+		return coreerrors.ErrBadRequest
 	}
 
 	var target *types.Impersonation
@@ -231,7 +231,7 @@ func (s *ImpersonationService) StopImpersonation(ctx context.Context, actor *mod
 			return err
 		}
 		if target == nil {
-			return internalerrors.ErrNotFound
+			return coreerrors.ErrNotFound
 		}
 	} else {
 		target, err = s.impersonationRepo.GetLatestActiveImpersonationByActor(ctx, actorUserID)
@@ -239,12 +239,12 @@ func (s *ImpersonationService) StopImpersonation(ctx context.Context, actor *mod
 			return err
 		}
 		if target == nil {
-			return internalerrors.ErrNotFound
+			return coreerrors.ErrNotFound
 		}
 	}
 
 	if target.ActorUserID != actorUserID {
-		return internalerrors.ErrForbidden
+		return coreerrors.ErrForbidden
 	}
 
 	if target.ImpersonationSessionID != nil && s.sessionStateRepo != nil {

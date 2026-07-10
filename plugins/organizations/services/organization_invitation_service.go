@@ -11,9 +11,9 @@ import (
 
 	"github.com/uptrace/bun"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	emailconstants "github.com/Authula/authula/internal/email/constants"
 	emailtmpl "github.com/Authula/authula/internal/email/template"
-	internalerrors "github.com/Authula/authula/internal/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
@@ -78,7 +78,7 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 	reqCtx, _ := models.GetRequestContext(ctx)
 
 	if actor == nil || actor.ID == "" || organizationID == "" {
-		return nil, internalerrors.ErrUnauthorized
+		return nil, coreerrors.ErrUnauthorized
 	}
 	actorID := actor.ID
 
@@ -89,21 +89,21 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 
 	role := request.Role
 	if role == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	validatedRoleAssignment, err := s.accessControlService.ValidateRoleAssignment(ctx, role, &actorID)
 	if err != nil {
-		if err.Error() == internalerrors.ErrForbidden.Error() {
-			return nil, internalerrors.ErrForbidden
+		if err.Error() == coreerrors.ErrForbidden.Error() {
+			return nil, coreerrors.ErrForbidden
 		}
-		if err.Error() == internalerrors.ErrNotFound.Error() {
-			return nil, internalerrors.ErrUnprocessableEntity
+		if err.Error() == coreerrors.ErrNotFound.Error() {
+			return nil, coreerrors.ErrUnprocessableEntity
 		}
 		return nil, err
 	}
 	if !validatedRoleAssignment {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	var created *types.OrganizationInvitation
@@ -126,13 +126,13 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 				return err
 			}
 			if existing.Status == types.OrganizationInvitationStatusPending {
-				return internalerrors.ErrConflict
+				return coreerrors.ErrConflict
 			}
 		}
 
 		expiresAt := time.Now().UTC().Add(s.pluginConfig.InvitationExpiresIn)
 		if !expiresAt.After(time.Now().UTC()) {
-			return internalerrors.ErrUnprocessableEntity
+			return coreerrors.ErrUnprocessableEntity
 		}
 		invitation := &types.OrganizationInvitation{
 			ID:             util.GenerateUUID(),
@@ -251,7 +251,7 @@ func (s *organizationInvitationService) publishOrganizationInvitationCreatedEven
 
 func (s *organizationInvitationService) GetAllOrganizationInvitations(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationInvitation, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" {
-		return nil, internalerrors.ErrUnauthorized
+		return nil, coreerrors.ErrUnauthorized
 	}
 
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
@@ -268,7 +268,7 @@ func (s *organizationInvitationService) GetAllOrganizationInvitations(ctx contex
 
 func (s *organizationInvitationService) GetOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" || invitationID == "" {
-		return nil, internalerrors.ErrUnauthorized
+		return nil, coreerrors.ErrUnauthorized
 	}
 
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
@@ -280,7 +280,7 @@ func (s *organizationInvitationService) GetOrganizationInvitation(ctx context.Co
 		return nil, err
 	}
 	if invitation == nil || invitation.OrganizationID != organizationID {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	return invitation, nil
@@ -288,7 +288,7 @@ func (s *organizationInvitationService) GetOrganizationInvitation(ctx context.Co
 
 func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" || invitationID == "" {
-		return nil, internalerrors.ErrUnauthorized
+		return nil, coreerrors.ErrUnauthorized
 	}
 
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
@@ -300,13 +300,13 @@ func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context
 		return nil, err
 	}
 	if invitation == nil || invitation.OrganizationID != organizationID {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 	if err := s.expireOrganizationInvitationIfNeeded(ctx, invitation); err != nil {
 		return nil, err
 	}
 	if invitation.Status != types.OrganizationInvitationStatusPending {
-		return nil, internalerrors.ErrConflict
+		return nil, coreerrors.ErrConflict
 	}
 
 	invitation.Status = types.OrganizationInvitationStatusRevoked
@@ -320,7 +320,7 @@ func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context
 }
 func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" || invitationID == "" {
-		return nil, internalerrors.ErrUnauthorized
+		return nil, coreerrors.ErrUnauthorized
 	}
 
 	actorID := actor.ID
@@ -334,16 +334,16 @@ func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context
 		return nil, err
 	}
 	if invitation == nil || invitation.OrganizationID != organizationID {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 	if err := s.expireOrganizationInvitationIfNeeded(ctx, invitation); err != nil {
 		return nil, err
 	}
 	if invitation.Status != types.OrganizationInvitationStatusPending {
-		return nil, internalerrors.ErrConflict
+		return nil, coreerrors.ErrConflict
 	}
 	if !strings.EqualFold(invitation.Email, user.Email) {
-		return nil, internalerrors.ErrForbidden
+		return nil, coreerrors.ErrForbidden
 	}
 
 	accepted, err := s.acceptOrganizationInvitations(ctx, actorID, []types.OrganizationInvitation{*invitation})
@@ -351,7 +351,7 @@ func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context
 		return nil, err
 	}
 	if len(accepted) == 0 {
-		return nil, internalerrors.ErrConflict
+		return nil, coreerrors.ErrConflict
 	}
 
 	return &accepted[0], nil
@@ -359,7 +359,7 @@ func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context
 
 func (s *organizationInvitationService) RejectOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" || invitationID == "" {
-		return nil, internalerrors.ErrUnauthorized
+		return nil, coreerrors.ErrUnauthorized
 	}
 
 	actorID := actor.ID
@@ -368,7 +368,7 @@ func (s *organizationInvitationService) RejectOrganizationInvitation(ctx context
 		return nil, err
 	}
 	if user == nil || user.Email == "" {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	invitation, err := s.orgInvitationRepo.GetByID(ctx, invitationID)
@@ -376,16 +376,16 @@ func (s *organizationInvitationService) RejectOrganizationInvitation(ctx context
 		return nil, err
 	}
 	if invitation == nil || invitation.OrganizationID != organizationID {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 	if err := s.expireOrganizationInvitationIfNeeded(ctx, invitation); err != nil {
 		return nil, err
 	}
 	if invitation.Status != types.OrganizationInvitationStatusPending {
-		return nil, internalerrors.ErrConflict
+		return nil, coreerrors.ErrConflict
 	}
 	if !strings.EqualFold(invitation.Email, user.Email) {
-		return nil, internalerrors.ErrForbidden
+		return nil, coreerrors.ErrForbidden
 	}
 
 	invitation.Status = types.OrganizationInvitationStatusRejected
@@ -401,11 +401,11 @@ func (s *organizationInvitationService) RejectOrganizationInvitation(ctx context
 func (s *organizationInvitationService) AcceptPendingOrganizationInvitationsForEmail(ctx context.Context, userID string, email string) ([]types.OrganizationInvitation, error) {
 	email = strings.ToLower(email)
 	if userID == "" || email == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	if _, err := mail.ParseAddress(email); err != nil {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	if s.pluginConfig.RequireEmailVerifiedOnInvitation {
@@ -438,7 +438,7 @@ func (s *organizationInvitationService) acceptOrganizationInvitations(ctx contex
 				return err
 			}
 			if !roleExists {
-				return internalerrors.ErrUnprocessableEntity
+				return coreerrors.ErrUnprocessableEntity
 			}
 
 			existingMember, err := memberRepo.GetByOrganizationIDAndUserID(ctx, invitation.OrganizationID, userID)
@@ -518,7 +518,7 @@ func ensureOrganizationInvitationsLimit(ctx context.Context, invitationRepo repo
 
 func ensureEmailVerifiedForInvitationAcceptance(ctx context.Context, userService rootservices.UserService, userID string, requireEmailVerified bool) (*models.User, error) {
 	if userID == "" {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	user, err := userService.GetByID(ctx, userID)
@@ -526,10 +526,10 @@ func ensureEmailVerifiedForInvitationAcceptance(ctx context.Context, userService
 		return nil, err
 	}
 	if user == nil || user.Email == "" {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 	if requireEmailVerified && !user.EmailVerified {
-		return nil, internalerrors.ErrForbidden
+		return nil, coreerrors.ErrForbidden
 	}
 
 	return user, nil

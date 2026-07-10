@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -28,7 +28,7 @@ func TestAccessControlServiceRoleExists(t *testing.T) {
 			setup: func(rolesRepo *accesscontroltests.MockRolesRepository) {
 				rolesRepo.On("GetRoleByName", mock.Anything, "missing").Return((*types.Role)(nil), nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 			wantOK:  false,
 		},
 		{
@@ -43,9 +43,9 @@ func TestAccessControlServiceRoleExists(t *testing.T) {
 			name:     "repository error",
 			roleName: "editor",
 			setup: func(rolesRepo *accesscontroltests.MockRolesRepository) {
-				rolesRepo.On("GetRoleByName", mock.Anything, "editor").Return((*types.Role)(nil), internalerrors.ErrForbidden).Once()
+				rolesRepo.On("GetRoleByName", mock.Anything, "editor").Return((*types.Role)(nil), coreerrors.ErrForbidden).Once()
 			},
-			wantErr: internalerrors.ErrForbidden,
+			wantErr: coreerrors.ErrForbidden,
 		},
 	}
 
@@ -106,15 +106,15 @@ func TestAccessControlServiceValidatePermissionKeys(t *testing.T) {
 				permissionsRepo.On("GetPermissionByKey", mock.Anything, "read:users").Return(&types.Permission{ID: "p1", Key: "read:users"}, nil).Once()
 				permissionsRepo.On("GetPermissionByKey", mock.Anything, "missing:key").Return((*types.Permission)(nil), nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:           "repository error propagates",
 			permissionKeys: []string{"read:users"},
 			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
-				permissionsRepo.On("GetPermissionByKey", mock.Anything, "read:users").Return((*types.Permission)(nil), internalerrors.ErrForbidden).Once()
+				permissionsRepo.On("GetPermissionByKey", mock.Anything, "read:users").Return((*types.Permission)(nil), coreerrors.ErrForbidden).Once()
 			},
-			wantErr: internalerrors.ErrForbidden,
+			wantErr: coreerrors.ErrForbidden,
 		},
 	}
 
@@ -161,7 +161,7 @@ func TestAccessControlServiceValidateRoleAssignment(t *testing.T) {
 			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
 				rolesRepo.On("GetRoleByName", mock.Anything, "missing").Return((*types.Role)(nil), nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:     "nil assigner is not allowed",
@@ -180,7 +180,7 @@ func TestAccessControlServiceValidateRoleAssignment(t *testing.T) {
 				rolesRepo.On("GetRoleByName", mock.Anything, "editor").Return(&types.Role{ID: "role-1", Name: "editor", Weight: 10}, nil).Once()
 				userRolesRepo.On("GetUserRoles", mock.Anything, "assigner-user-1").Return([]types.UserRoleInfo{{RoleID: "role-old", RoleName: "old", RoleWeight: 100, ExpiresAt: func() *time.Time { value := time.Now().UTC().Add(-time.Hour); return &value }()}}, nil).Once()
 			},
-			wantErr: internalerrors.ErrForbidden,
+			wantErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:     "expired roles are ignored",
@@ -203,7 +203,7 @@ func TestAccessControlServiceValidateRoleAssignment(t *testing.T) {
 				rolesRepo.On("GetRoleByName", mock.Anything, "admin").Return(&types.Role{ID: "role-2", Name: "admin", Weight: 80}, nil).Once()
 				userRolesRepo.On("GetUserRoles", mock.Anything, "assigner-user-1").Return([]types.UserRoleInfo{{RoleID: "role-member", RoleName: "member", RoleWeight: 10}}, nil).Once()
 			},
-			wantErr: internalerrors.ErrForbidden,
+			wantErr: coreerrors.ErrForbidden,
 		},
 	}
 

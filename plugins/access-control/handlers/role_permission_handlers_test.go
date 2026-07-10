@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/plugins/access-control/services"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
@@ -41,7 +41,7 @@ func TestGetRolePermissionsHandler(t *testing.T) {
 			name:   "use case error",
 			roleID: "role-404",
 			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, _ *accesscontroltests.MockRolePermissionsRepository) {
-				rolesRepo.On("GetRoleByID", mock.Anything, "role-404").Return((*types.Role)(nil), internalerrors.ErrNotFound).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-404").Return((*types.Role)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedBody:   map[string]string{"message": "not found"},
@@ -139,7 +139,7 @@ func TestAddRolePermissionHandler(t *testing.T) {
 			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Administrator"}, nil).Once()
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
-				rolePermissionsRepo.On("AddRolePermission", mock.Anything, "role-1", "perm-1", (*string)(nil)).Return(internalerrors.ErrUnauthorized).Once()
+				rolePermissionsRepo.On("AddRolePermission", mock.Anything, "role-1", "perm-1", (*string)(nil)).Return(coreerrors.ErrUnauthorized).Once()
 			},
 			expectedStatus: http.StatusUnauthorized,
 			expectedBody:   map[string]string{"message": "unauthorized"},
@@ -241,7 +241,7 @@ func TestReplaceRolePermissionsHandler(t *testing.T) {
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Administrator"}, nil).Once()
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-2").Return(&types.Permission{ID: "perm-2", Key: "users.write"}, nil).Once()
-				rolePermissionsRepo.On("ReplaceRolePermissions", mock.Anything, "role-1", []string{"perm-1", "perm-2"}, (*string)(nil)).Return(internalerrors.ErrConflict).Once()
+				rolePermissionsRepo.On("ReplaceRolePermissions", mock.Anything, "role-1", []string{"perm-1", "perm-2"}, (*string)(nil)).Return(coreerrors.ErrConflict).Once()
 			},
 			expectedStatus: http.StatusConflict,
 			expectedBody:   map[string]string{"message": "conflict"},
@@ -333,7 +333,7 @@ func TestRemoveRolePermissionHandler(t *testing.T) {
 			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Administrator"}, nil).Once()
 				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
-				rolePermissionsRepo.On("RemoveRolePermission", mock.Anything, "role-1", "perm-1").Return(internalerrors.ErrNotFound).Once()
+				rolePermissionsRepo.On("RemoveRolePermission", mock.Anything, "role-1", "perm-1").Return(coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedBody:   map[string]string{"message": "not found"},

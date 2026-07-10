@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/plugins/organizations/constants"
 	orgtests "github.com/Authula/authula/plugins/organizations/tests"
@@ -62,25 +62,25 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 			name:        "unauthorized",
 			actorUserID: "",
 			request:     types.CreateOrganizationRequest{Name: "Acme", Role: "member"},
-			expectErr:   internalerrors.ErrUnauthorized,
+			expectErr:   coreerrors.ErrUnauthorized,
 		},
 		{
 			name:        "missing role",
 			actorUserID: "user-1",
 			request:     types.CreateOrganizationRequest{Name: "Acme"},
-			expectErr:   internalerrors.ErrUnprocessableEntity,
+			expectErr:   coreerrors.ErrUnprocessableEntity,
 		},
 		{
 			name:        "bad request",
 			actorUserID: "user-1",
 			request:     types.CreateOrganizationRequest{Name: "", Role: "member"},
-			expectErr:   internalerrors.ErrUnprocessableEntity,
+			expectErr:   coreerrors.ErrUnprocessableEntity,
 		},
 		{
 			name:        "invalid role",
 			actorUserID: "user-1",
 			request:     types.CreateOrganizationRequest{Name: "Acme", Role: "ghost"},
-			expectErr:   internalerrors.ErrUnprocessableEntity,
+			expectErr:   coreerrors.ErrUnprocessableEntity,
 		},
 		{
 			name:           "success",
@@ -169,7 +169,7 @@ func TestOrganizationService_GetAllOrganizationsByOwner(t *testing.T) {
 		{
 			name:        "unauthorized",
 			actorUserID: "",
-			expectErr:   internalerrors.ErrUnauthorized,
+			expectErr:   coreerrors.ErrUnauthorized,
 		},
 		{
 			name:        "success",
@@ -227,7 +227,7 @@ func TestOrganizationService_GetOrganizationByID(t *testing.T) {
 				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(nil, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:           "success for member",
@@ -288,14 +288,14 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 			actorUserID:    "",
 			organizationID: "",
 			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
-			expectErr:      internalerrors.ErrUnauthorized,
+			expectErr:      coreerrors.ErrUnauthorized,
 		},
 		{
 			name:           "unauthorized if no organization ID provided",
 			actorUserID:    "user-1",
 			organizationID: "",
 			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
-			expectErr:      internalerrors.ErrUnauthorized,
+			expectErr:      coreerrors.ErrUnauthorized,
 		},
 		{
 			name:           "forbidden",
@@ -306,7 +306,7 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(nil, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:           "success for member",

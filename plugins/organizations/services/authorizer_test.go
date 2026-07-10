@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	rootservices "github.com/Authula/authula/services"
 )
@@ -30,13 +30,13 @@ func TestAuthorizer_AuthorizeScope(t *testing.T) {
 			name:    "nil actor returns unauthorized",
 			actor:   nil,
 			scope:   "organizations:create",
-			wantErr: internalerrors.ErrUnauthorized,
+			wantErr: coreerrors.ErrUnauthorized,
 		},
 		{
 			name:    "empty ID actor returns unauthorized",
 			actor:   &models.Actor{ID: "", Type: models.ActorUser},
 			scope:   "organizations:create",
-			wantErr: internalerrors.ErrUnauthorized,
+			wantErr: coreerrors.ErrUnauthorized,
 		},
 		{
 			name:  "allows actor with matching scope",
@@ -47,7 +47,7 @@ func TestAuthorizer_AuthorizeScope(t *testing.T) {
 			name:    "denies actor without matching scope",
 			actor:   &models.Actor{ID: "user-1", Type: models.ActorUser},
 			scope:   "organizations:create",
-			wantErr: internalerrors.ErrInsufficientPermissions,
+			wantErr: coreerrors.ErrInsufficientPermissions,
 		},
 		{
 			name:  "allows wildcard scope",
@@ -93,14 +93,14 @@ func TestAuthorizer_AuthorizeOrganizationAccess(t *testing.T) {
 			actor:   nil,
 			orgID:   "org-1",
 			scope:   "organizations:read",
-			wantErr: internalerrors.ErrUnauthorized,
+			wantErr: coreerrors.ErrUnauthorized,
 		},
 		{
 			name:    "empty ID actor returns unauthorized",
 			actor:   &models.Actor{ID: "", Type: models.ActorUser},
 			orgID:   "org-1",
 			scope:   "organizations:read",
-			wantErr: internalerrors.ErrUnauthorized,
+			wantErr: coreerrors.ErrUnauthorized,
 		},
 		{
 			name:  "allows user with matching scope",
@@ -119,14 +119,14 @@ func TestAuthorizer_AuthorizeOrganizationAccess(t *testing.T) {
 			actor:   &models.Actor{ID: "machine-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}, Scopes: []string{"organizations:read"}},
 			orgID:   "org-2",
 			scope:   "organizations:read",
-			wantErr: internalerrors.ErrForbidden,
+			wantErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:    "denies actor without scope",
 			actor:   &models.Actor{ID: "user-1", Type: models.ActorUser},
 			orgID:   "org-1",
 			scope:   "organizations:read",
-			wantErr: internalerrors.ErrInsufficientPermissions,
+			wantErr: coreerrors.ErrInsufficientPermissions,
 		},
 	}
 

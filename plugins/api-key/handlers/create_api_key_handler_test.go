@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	apiKeyTests "github.com/Authula/authula/plugins/api-key/tests"
@@ -42,7 +42,7 @@ func TestCreateApiKeyHandler(t *testing.T) {
 			name: "service_error",
 			body: internaltests.MarshalToJSON(t, validReq),
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
-				m.On("Create", mock.Anything, mock.Anything, validReq).Return((*types.CreateApiKeyResponse)(nil), internalerrors.ErrForbidden).Once()
+				m.On("Create", mock.Anything, mock.Anything, validReq).Return((*types.CreateApiKeyResponse)(nil), coreerrors.ErrForbidden).Once()
 			},
 			expectedStatus: http.StatusForbidden,
 		},

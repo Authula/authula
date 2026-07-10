@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/api-key/repositories"
@@ -63,7 +63,7 @@ func (s *apiKeyService) Create(ctx context.Context, actor *models.Actor, req typ
 	}
 
 	if req.OwnerType != types.OwnerTypeUser && req.OwnerType != types.OwnerTypeOrganization {
-		return nil, fmt.Errorf("%w: owner_type must be 'user' or 'organization'", internalerrors.ErrBadRequest)
+		return nil, fmt.Errorf("%w: owner_type must be 'user' or 'organization'", coreerrors.ErrBadRequest)
 	}
 
 	switch req.OwnerType {
@@ -73,21 +73,21 @@ func (s *apiKeyService) Create(ctx context.Context, actor *models.Actor, req typ
 			return nil, err
 		}
 		if user == nil {
-			return nil, fmt.Errorf("%w: user not found", internalerrors.ErrNotFound)
+			return nil, fmt.Errorf("%w: user not found", coreerrors.ErrNotFound)
 		}
 	case types.OwnerTypeOrganization:
 		if !s.config.allowOrgKeys {
-			return nil, fmt.Errorf("%w: organization-owned keys are not enabled", internalerrors.ErrForbidden)
+			return nil, fmt.Errorf("%w: organization-owned keys are not enabled", coreerrors.ErrForbidden)
 		}
 		if s.organizationService == nil {
-			return nil, fmt.Errorf("%w: organization service is not available", internalerrors.ErrUnprocessableEntity)
+			return nil, fmt.Errorf("%w: organization service is not available", coreerrors.ErrUnprocessableEntity)
 		}
 		exists, err := s.organizationService.ExistsByID(ctx, req.OwnerID)
 		if err != nil {
 			return nil, err
 		}
 		if !exists {
-			return nil, fmt.Errorf("%w: organization not found", internalerrors.ErrNotFound)
+			return nil, fmt.Errorf("%w: organization not found", coreerrors.ErrNotFound)
 		}
 	}
 
@@ -173,17 +173,17 @@ func (s *apiKeyService) authorizeCreate(actor *models.Actor, req types.CreateApi
 	switch req.OwnerType {
 	case types.OwnerTypeUser:
 		if req.OwnerID != "" && req.OwnerID != actor.ID {
-			return fmt.Errorf("%w: cannot create API key for another user", internalerrors.ErrForbidden)
+			return fmt.Errorf("%w: cannot create API key for another user", coreerrors.ErrForbidden)
 		}
 		if err := s.validatePermissionsSubset(actor.Scopes, req.Permissions); err != nil {
 			return err
 		}
 	case types.OwnerTypeOrganization:
 		if !s.config.allowOrgKeys {
-			return fmt.Errorf("%w: organization-owned keys are not enabled", internalerrors.ErrForbidden)
+			return fmt.Errorf("%w: organization-owned keys are not enabled", coreerrors.ErrForbidden)
 		}
 		if s.organizationService == nil {
-			return fmt.Errorf("%w: organization service is not available", internalerrors.ErrUnprocessableEntity)
+			return fmt.Errorf("%w: organization service is not available", coreerrors.ErrUnprocessableEntity)
 		}
 		if err := s.validatePermissionsSubset(actor.Scopes, req.Permissions); err != nil {
 			return err
@@ -198,13 +198,13 @@ func (s *apiKeyService) GetByID(ctx context.Context, actor *models.Actor, id str
 		return nil, err
 	}
 	if apiKey == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	switch apiKey.OwnerType {
 	case types.OwnerTypeUser:
 		if apiKey.OwnerID != actor.ID {
-			return nil, fmt.Errorf("%w: you do not have access to this API key", internalerrors.ErrForbidden)
+			return nil, fmt.Errorf("%w: you do not have access to this API key", coreerrors.ErrForbidden)
 		}
 	}
 
@@ -255,13 +255,13 @@ func (s *apiKeyService) Update(ctx context.Context, actor *models.Actor, id stri
 		return nil, err
 	}
 	if apiKey == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	switch apiKey.OwnerType {
 	case types.OwnerTypeUser:
 		if apiKey.OwnerID != actor.ID {
-			return nil, fmt.Errorf("%w: you do not have access to this API key", internalerrors.ErrForbidden)
+			return nil, fmt.Errorf("%w: you do not have access to this API key", coreerrors.ErrForbidden)
 		}
 		if len(req.Permissions) > 0 {
 			if err := s.validatePermissionsSubset(actor.Scopes, req.Permissions); err != nil {
@@ -322,13 +322,13 @@ func (s *apiKeyService) Delete(ctx context.Context, actor *models.Actor, id stri
 		return err
 	}
 	if apiKey == nil {
-		return internalerrors.ErrNotFound
+		return coreerrors.ErrNotFound
 	}
 
 	switch apiKey.OwnerType {
 	case types.OwnerTypeUser:
 		if apiKey.OwnerID != actor.ID {
-			return fmt.Errorf("%w: you do not have access to this API key", internalerrors.ErrForbidden)
+			return fmt.Errorf("%w: you do not have access to this API key", coreerrors.ErrForbidden)
 		}
 	}
 
@@ -348,7 +348,7 @@ func (s *apiKeyService) DeleteAllByOwner(ctx context.Context, actor *models.Acto
 	switch ownerType {
 	case types.OwnerTypeUser:
 		if ownerID != actor.ID {
-			return fmt.Errorf("%w: you cannot delete API keys for another user", internalerrors.ErrForbidden)
+			return fmt.Errorf("%w: you cannot delete API keys for another user", coreerrors.ErrForbidden)
 		}
 	}
 	return s.apiKeyRepo.DeleteAllByOwner(ctx, ownerType, ownerID)
@@ -374,7 +374,7 @@ func (s *apiKeyService) RecordLastRequest(ctx context.Context, id string, timest
 		return nil, err
 	}
 	if apiKey == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 	apiKey.LastRequestedAt = &timestamp
 	return s.apiKeyRepo.Update(ctx, apiKey)
@@ -390,7 +390,7 @@ func (s *apiKeyService) validatePermissionsSubset(actorScopes []string, keyPermi
 	}
 	for _, perm := range keyPermissions {
 		if !hasPermission(actorScopes, perm) {
-			return fmt.Errorf("%w: permission %q is not within your scopes", internalerrors.ErrForbidden, perm)
+			return fmt.Errorf("%w: permission %q is not within your scopes", coreerrors.ErrForbidden, perm)
 		}
 	}
 	return nil
@@ -414,8 +414,8 @@ func (s *apiKeyService) validatePermissions(ctx context.Context, permissionKeys 
 	}
 
 	if err := s.accessControlService.ValidatePermissionKeys(ctx, permissionKeys); err != nil {
-		if errors.Is(err, internalerrors.ErrNotFound) {
-			return fmt.Errorf("%w: one or more permissions were not found", internalerrors.ErrNotFound)
+		if errors.Is(err, coreerrors.ErrNotFound) {
+			return fmt.Errorf("%w: one or more permissions were not found", coreerrors.ErrNotFound)
 		}
 		return err
 	}

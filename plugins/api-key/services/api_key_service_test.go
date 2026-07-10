@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	roottests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
@@ -74,13 +74,13 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			name:    "invalid_owner_type",
 			actor:   userActor(userID),
 			req:     types.CreateApiKeyRequest{Name: "Key", OwnerType: "invalid", OwnerID: userID},
-			wantErr: internalerrors.ErrBadRequest,
+			wantErr: coreerrors.ErrBadRequest,
 		},
 		{
 			name:    "different_user_id_rejected",
 			actor:   userActor(userID),
 			req:     types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeUser, OwnerID: "other-user"},
-			wantErr: internalerrors.ErrForbidden,
+			wantErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:  "user_not_found",
@@ -89,7 +89,7 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			setup: func(f *apiKeyServiceFixture) {
 				f.mockUserService.On("GetByID", mock.Anything, userID).Return((*models.User)(nil), nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:   "user_success",
@@ -117,7 +117,7 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			actor:   &models.Actor{ID: userID, Type: models.ActorUser, Scopes: []string{"org:api-key:create"}},
 			config:  types.ApiKeyPluginConfig{AllowOrgKeys: true},
 			req:     types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID, Permissions: []string{"admin"}},
-			wantErr: internalerrors.ErrForbidden,
+			wantErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:   "org_create_success",
@@ -142,7 +142,7 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			name:    "organization_disabled",
 			actor:   userActor(userID),
 			req:     types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID},
-			wantErr: internalerrors.ErrForbidden,
+			wantErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:    "organization_service_nil",
@@ -150,7 +150,7 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			config:  types.ApiKeyPluginConfig{AllowOrgKeys: true},
 			req:     types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID},
 			setup:   nil,
-			wantErr: internalerrors.ErrUnprocessableEntity,
+			wantErr: coreerrors.ErrUnprocessableEntity,
 		},
 		{
 			name:   "organization_not_found",
@@ -160,7 +160,7 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			setup: func(f *apiKeyServiceFixture) {
 				f.mockOrgService.On("ExistsByID", mock.Anything, orgID).Return(false, nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:  "generate_error",
@@ -177,9 +177,9 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			actor: &models.Actor{ID: userID, Type: models.ActorUser, Scopes: []string{"missing.permission"}},
 			req:   types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeUser, OwnerID: userID, Permissions: []string{"missing.permission"}},
 			setup: func(f *apiKeyServiceFixture) {
-				f.mockAccessControlService.On("ValidatePermissionKeys", mock.Anything, []string{"missing.permission"}).Return(internalerrors.ErrNotFound).Once()
+				f.mockAccessControlService.On("ValidatePermissionKeys", mock.Anything, []string{"missing.permission"}).Return(coreerrors.ErrNotFound).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 	}
 
@@ -315,7 +315,7 @@ func TestApiKeyServiceGetByID(t *testing.T) {
 			setup: func(f *apiKeyServiceFixture) {
 				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:  "repo_error",
@@ -331,7 +331,7 @@ func TestApiKeyServiceGetByID(t *testing.T) {
 			setup: func(f *apiKeyServiceFixture) {
 				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: "other-user"}, nil).Once()
 			},
-			wantErr: internalerrors.ErrForbidden,
+			wantErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:  "success",
@@ -382,7 +382,7 @@ func TestApiKeyServiceUpdate(t *testing.T) {
 			setup: func(f *apiKeyServiceFixture) {
 				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:  "repo_error_on_lookup",
@@ -398,7 +398,7 @@ func TestApiKeyServiceUpdate(t *testing.T) {
 			setup: func(f *apiKeyServiceFixture) {
 				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: "other-user"}, nil).Once()
 			},
-			wantErr: internalerrors.ErrForbidden,
+			wantErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:  "success_selective_update",
@@ -415,10 +415,10 @@ func TestApiKeyServiceUpdate(t *testing.T) {
 			name:  "permission_validation_failure",
 			actor: userActor(userID),
 			setup: func(f *apiKeyServiceFixture) {
-				f.mockAccessControlService.On("ValidatePermissionKeys", mock.Anything, permissions).Return(internalerrors.ErrNotFound).Once()
+				f.mockAccessControlService.On("ValidatePermissionKeys", mock.Anything, permissions).Return(coreerrors.ErrNotFound).Once()
 				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", Name: "old", Enabled: true, OwnerType: types.OwnerTypeUser, OwnerID: userID}, nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:  "org_update_allowed",
@@ -483,7 +483,7 @@ func TestApiKeyServiceDelete(t *testing.T) {
 			setup: func(f *apiKeyServiceFixture) {
 				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), nil).Once()
 			},
-			wantErr: internalerrors.ErrNotFound,
+			wantErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:  "other_users_key_rejected",
@@ -491,7 +491,7 @@ func TestApiKeyServiceDelete(t *testing.T) {
 			setup: func(f *apiKeyServiceFixture) {
 				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: "other-user"}, nil).Once()
 			},
-			wantErr: internalerrors.ErrForbidden,
+			wantErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:  "success",

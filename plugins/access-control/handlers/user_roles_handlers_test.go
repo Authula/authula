@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/plugins/access-control/services"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
@@ -41,7 +41,7 @@ func TestGetUserRolesHandler(t *testing.T) {
 			name:   "use case error",
 			userID: "user-404",
 			setupMock: func(m *accesscontroltests.MockUserRolesRepository) {
-				m.On("GetUserRoles", mock.Anything, "user-404").Return(([]types.UserRoleInfo)(nil), internalerrors.ErrNotFound).Once()
+				m.On("GetUserRoles", mock.Anything, "user-404").Return(([]types.UserRoleInfo)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedBody:   map[string]string{"message": "not found"},
@@ -240,7 +240,7 @@ func TestAssignUserRoleHandler(t *testing.T) {
 			body:   internaltests.MarshalToJSON(t, types.AssignUserRoleRequest{RoleID: "role-1"}),
 			setupMock: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "Editor", Weight: 20}, nil).Once()
-				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), (*time.Time)(nil)).Return(internalerrors.ErrUnauthorized).Once()
+				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), (*time.Time)(nil)).Return(coreerrors.ErrUnauthorized).Once()
 			},
 			expectedStatus: http.StatusUnauthorized,
 			expectedBody:   map[string]string{"message": "unauthorized"},
@@ -331,7 +331,7 @@ func TestRemoveUserRoleHandler(t *testing.T) {
 			userID: "user-1",
 			roleID: "role-1",
 			setupMock: func(m *accesscontroltests.MockUserRolesRepository) {
-				m.On("RemoveUserRole", mock.Anything, "user-1", "role-1").Return(internalerrors.ErrNotFound).Once()
+				m.On("RemoveUserRole", mock.Anything, "user-1", "role-1").Return(coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedBody:   map[string]string{"message": "not found"},

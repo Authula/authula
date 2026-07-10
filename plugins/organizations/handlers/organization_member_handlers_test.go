@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
@@ -214,7 +214,7 @@ func TestGetOrganizationMemberHandler(t *testing.T) {
 			organizationID: "org-1",
 			memberID:       "mem-1",
 			prepare: func(fixture *organizationMemberHandlerFixture) {
-				fixture.service.On("GetMember", mock.Anything, "user-1", "org-1", "mem-1").Return((*orgtypes.OrganizationMember)(nil), internalerrors.ErrNotFound).Once()
+				fixture.service.On("GetMember", mock.Anything, "user-1", "org-1", "mem-1").Return((*orgtypes.OrganizationMember)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedMessage: "not found",
@@ -267,7 +267,7 @@ func TestUpdateOrganizationMemberHandler(t *testing.T) {
 			memberID:       "mem-1",
 			body:           internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationMemberRequest{Role: "admin"}),
 			prepare: func(fixture *organizationMemberHandlerFixture) {
-				fixture.service.On("UpdateMember", mock.Anything, "user-1", "org-1", "mem-1", mock.Anything).Return((*orgtypes.OrganizationMember)(nil), internalerrors.ErrForbidden).Once()
+				fixture.service.On("UpdateMember", mock.Anything, "user-1", "org-1", "mem-1", mock.Anything).Return((*orgtypes.OrganizationMember)(nil), coreerrors.ErrForbidden).Once()
 			},
 			expectedStatus:  http.StatusForbidden,
 			expectedMessage: "forbidden",

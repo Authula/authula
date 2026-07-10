@@ -3,7 +3,7 @@ package tests
 import (
 	"context"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	rootservices "github.com/Authula/authula/services"
 )
 
@@ -75,7 +75,7 @@ func (s *AccessControlServiceStub) ValidateRoleAssignment(ctx context.Context, r
 	}
 
 	if roleWeight > assignerWeight {
-		return false, internalerrors.ErrForbidden
+		return false, coreerrors.ErrForbidden
 	}
 
 	return true, nil

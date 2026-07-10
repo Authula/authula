@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
@@ -26,7 +26,7 @@ func TestUserRolesServiceAssignRoleToUser(t *testing.T) {
 		{
 			name:    "expired assignment",
 			req:     types.AssignUserRoleRequest{RoleID: "role-1", ExpiresAt: func() *time.Time { t := time.Now().UTC().Add(-time.Hour); return &t }()},
-			wantErr: internalerrors.ErrBadRequest,
+			wantErr: coreerrors.ErrBadRequest,
 		},
 		{
 			name: "success without assigner",
@@ -56,7 +56,7 @@ func TestUserRolesServiceAssignRoleToUser(t *testing.T) {
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "admin", Weight: 80}, nil).Once()
 				userRolesRepo.On("GetUserRoles", mock.Anything, "assigner-1").Return([]types.UserRoleInfo{{RoleID: "role-2", RoleName: "member", RoleWeight: 10}}, nil).Once()
 			},
-			wantErr: internalerrors.ErrForbidden,
+			wantErr: coreerrors.ErrForbidden,
 		},
 	}
 
@@ -110,7 +110,7 @@ func TestUserRolesServiceReplaceUserRoles(t *testing.T) {
 				rolesRepo.On("GetRoleByID", mock.Anything, "role-2").Return(&types.Role{ID: "role-2", Name: "editor", Weight: 10}, nil).Once()
 				userRolesRepo.On("GetUserRoles", mock.Anything, "assigner-1").Return([]types.UserRoleInfo{{RoleID: "role-10", RoleName: "manager", RoleWeight: 15}}, nil).Once()
 			},
-			wantErr: internalerrors.ErrForbidden,
+			wantErr: coreerrors.ErrForbidden,
 		},
 	}
 

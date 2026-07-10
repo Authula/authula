@@ -10,7 +10,7 @@ import (
 
 	"github.com/uptrace/bun"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/constants"
@@ -52,24 +52,24 @@ func NewOrganizationService(
 
 func (s *organizationService) CreateOrganization(ctx context.Context, actor *models.Actor, request types.CreateOrganizationRequest) (*types.Organization, error) {
 	if actor == nil || actor.ID == "" {
-		return nil, internalerrors.ErrUnauthorized
+		return nil, coreerrors.ErrUnauthorized
 	}
 
 	name := request.Name
 	if name == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	role := request.Role
 	if role == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 	roleExists, err := s.accessControlService.RoleExists(ctx, role)
 	if err != nil {
 		return nil, err
 	}
 	if !roleExists {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	slug := ""
@@ -80,7 +80,7 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actor *mod
 		slug = slugify(name)
 	}
 	if slug == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	organization := &types.Organization{
@@ -134,7 +134,7 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actor *mod
 
 func (s *organizationService) ensureOrganizationLimit(ctx context.Context, actor *models.Actor, orgRepo repositories.OrganizationRepository, memberRepo repositories.OrganizationMemberRepository) error {
 	if actor == nil || actor.ID == "" {
-		return internalerrors.ErrUnauthorized
+		return coreerrors.ErrUnauthorized
 	}
 
 	if s.organizationsLimit == nil || *s.organizationsLimit <= 0 {
@@ -190,7 +190,7 @@ func (s *organizationService) ensureOrganizationLimit(ctx context.Context, actor
 
 func (s *organizationService) GetAllOrganizationsByOwner(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
 	if actor == nil || actor.ID == "" {
-		return nil, internalerrors.ErrUnauthorized
+		return nil, coreerrors.ErrUnauthorized
 	}
 
 	ownedOrganizations, err := s.orgRepo.GetAllByOwnerID(ctx, actor.ID)
@@ -258,7 +258,7 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, actor *mod
 
 	name := request.Name
 	if name != nil && *name == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	slug := organization.Slug
@@ -269,7 +269,7 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, actor *mod
 		slug = slugify(*name)
 	}
 	if slug == "" {
-		return nil, internalerrors.ErrUnprocessableEntity
+		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	if name != nil {

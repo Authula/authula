@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	adminhandlers "github.com/Authula/authula/plugins/admin/handlers"
@@ -236,7 +236,7 @@ func TestDeleteAccountHandler(t *testing.T) {
 			name: "error",
 			setup: func(accountRepo *internaltests.MockAccountRepository) {
 				accountRepo.On("GetByID", mock.Anything, "acc-1").Return(&models.Account{ID: "acc-1"}, nil).Once()
-				accountRepo.On("Delete", mock.Anything, "acc-1").Return(internalerrors.ErrBadRequest).Once()
+				accountRepo.On("Delete", mock.Anything, "acc-1").Return(coreerrors.ErrBadRequest).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "bad request",

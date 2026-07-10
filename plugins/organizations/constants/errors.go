@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 )
 
@@ -28,5 +28,5 @@ func HandleError(err error, reqCtx *models.RequestContext) {
 		return
 	}
 
-	internalerrors.HandleError(err, reqCtx)
+	coreerrors.HandleError(err, reqCtx)
 }

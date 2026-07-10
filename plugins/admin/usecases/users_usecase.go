@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/services"
@@ -29,10 +29,10 @@ func (u UsersUseCase) Create(ctx context.Context, actor *models.Actor, request t
 	email := strings.TrimSpace(strings.ToLower(request.Email))
 
 	if name == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 	if email == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	request.Name = name
@@ -84,7 +84,7 @@ func (u UsersUseCase) Update(ctx context.Context, actor *models.Actor, userID st
 		return nil, adminconstants.ErrUserIDRequired
 	}
 	if request.Name == nil && request.Email == nil && request.EmailVerified == nil && request.Image == nil && len(request.Metadata) == 0 {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	return u.service.Update(ctx, actor, userID, request)
@@ -96,7 +96,7 @@ func (u UsersUseCase) Delete(ctx context.Context, actor *models.Actor, userID st
 	}
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return internalerrors.ErrBadRequest
+		return coreerrors.ErrBadRequest
 	}
 
 	return u.service.Delete(ctx, actor, userID)

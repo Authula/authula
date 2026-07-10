@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	apiKeyTests "github.com/Authula/authula/plugins/api-key/tests"
@@ -34,7 +34,7 @@ func TestDeleteApiKeyHandler(t *testing.T) {
 			name: "service_error", path: "/api-keys/api-key-1",
 			prepare: func(m *apiKeyTests.MockApiKeyService) {
 				m.On("GetByID", mock.Anything, mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: "user-1"}, nil).Once()
-				m.On("Delete", mock.Anything, mock.Anything, "api-key-1").Return(internalerrors.ErrNotFound).Once()
+				m.On("Delete", mock.Anything, mock.Anything, "api-key-1").Return(coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus: http.StatusNotFound,
 		},

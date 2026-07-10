@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/services"
@@ -27,7 +27,7 @@ func (u AccountsUseCase) GetByID(ctx context.Context, actor *models.Actor, accou
 	}
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 	return u.service.GetByID(ctx, actor, accountID)
 }
@@ -59,7 +59,7 @@ func (u AccountsUseCase) Create(ctx context.Context, actor *models.Actor, userID
 		return nil, adminconstants.ErrUserIDRequired
 	}
 	if request.ProviderID == "" || request.AccountID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	return u.service.Create(ctx, actor, userID, request)
@@ -71,7 +71,7 @@ func (u AccountsUseCase) Update(ctx context.Context, actor *models.Actor, accoun
 	}
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	if request.ProviderID == nil &&
@@ -83,7 +83,7 @@ func (u AccountsUseCase) Update(ctx context.Context, actor *models.Actor, accoun
 		request.RefreshTokenExpiresAt == nil &&
 		request.Scope == nil &&
 		request.Password == nil {
-		return nil, internalerrors.ErrBadRequest
+		return nil, coreerrors.ErrBadRequest
 	}
 
 	if request.ProviderID != nil {
@@ -108,7 +108,7 @@ func (u AccountsUseCase) Delete(ctx context.Context, actor *models.Actor, accoun
 	}
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
-		return internalerrors.ErrBadRequest
+		return coreerrors.ErrBadRequest
 	}
 	return u.service.Delete(ctx, actor, accountID)
 }

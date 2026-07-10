@@ -3,7 +3,7 @@ package types
 import (
 	"time"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
 )
@@ -43,7 +43,7 @@ type CreateRoleRequest struct {
 
 func (req *CreateRoleRequest) Validate() error {
 	if req.Name == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	return nil
 }
@@ -81,7 +81,7 @@ type CreatePermissionRequest struct {
 
 func (req *CreatePermissionRequest) Validate() error {
 	if req.Key == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	return nil
 }
@@ -108,7 +108,7 @@ type AddRolePermissionRequest struct {
 
 func (req *AddRolePermissionRequest) Validate() error {
 	if req.PermissionID == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	return nil
 }
@@ -123,7 +123,7 @@ type ReplaceRolePermissionsRequest struct {
 
 func (req *ReplaceRolePermissionsRequest) Validate() error {
 	if len(req.PermissionIDs) == 0 {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	return nil
 }
@@ -143,7 +143,7 @@ type AssignUserRoleRequest struct {
 
 func (req *AssignUserRoleRequest) Validate() error {
 	if req.RoleID == "" {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	return nil
 }
@@ -154,7 +154,7 @@ type ReplaceUserRolesRequest struct {
 
 func (req *ReplaceUserRolesRequest) Validate() error {
 	if len(req.RoleIDs) == 0 {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	return nil
 }
@@ -177,7 +177,7 @@ type CheckUserPermissionsRequest struct {
 
 func (req *CheckUserPermissionsRequest) Validate() error {
 	if len(req.PermissionKeys) == 0 {
-		return internalerrors.ErrUnprocessableEntity
+		return coreerrors.ErrUnprocessableEntity
 	}
 	return nil
 }

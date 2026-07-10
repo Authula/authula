@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	corerepositories "github.com/Authula/authula/internal/repositories"
 	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
@@ -36,7 +36,7 @@ func (s *AccountsService) GetByUserID(ctx context.Context, actor *models.Actor, 
 		return nil, err
 	}
 	if user == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	return s.accountRepo.GetAllByUserID(ctx, userID)
@@ -48,7 +48,7 @@ func (s *AccountsService) Create(ctx context.Context, actor *models.Actor, userI
 		return nil, err
 	}
 	if user == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	existing, err := s.accountRepo.GetByProviderAndAccountID(ctx, request.ProviderID, request.AccountID)
@@ -56,7 +56,7 @@ func (s *AccountsService) Create(ctx context.Context, actor *models.Actor, userI
 		return nil, err
 	}
 	if existing != nil {
-		return nil, internalerrors.ErrConflict
+		return nil, coreerrors.ErrConflict
 	}
 
 	password := request.Password
@@ -94,7 +94,7 @@ func (s *AccountsService) Update(ctx context.Context, actor *models.Actor, accou
 		return nil, err
 	}
 	if account == nil {
-		return nil, internalerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
 	if request.ProviderID != nil {
@@ -141,7 +141,7 @@ func (s *AccountsService) Delete(ctx context.Context, actor *models.Actor, accou
 		return err
 	}
 	if account == nil {
-		return internalerrors.ErrNotFound
+		return coreerrors.ErrNotFound
 	}
 
 	return s.accountRepo.Delete(ctx, accountID)

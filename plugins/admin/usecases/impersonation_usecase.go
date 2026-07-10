@@ -3,7 +3,7 @@ package usecases
 import (
 	"context"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/services"
@@ -60,12 +60,12 @@ func (u ImpersonationUseCase) StopImpersonation(ctx context.Context, actor *mode
 	}
 
 	if sessionState == nil || sessionState.ImpersonatorUserID == nil {
-		return nil, internalerrors.ErrUnauthorized
+		return nil, coreerrors.ErrUnauthorized
 	}
 
 	actorUserID := *sessionState.ImpersonatorUserID
 	if actorUserID == "" {
-		return nil, internalerrors.ErrUnauthorized
+		return nil, coreerrors.ErrUnauthorized
 	}
 
 	if originalCookieValue != "" {
@@ -75,19 +75,19 @@ func (u ImpersonationUseCase) StopImpersonation(ctx context.Context, actor *mode
 		}
 
 		if sessionState.ImpersonatorSessionID == nil || *sessionState.ImpersonatorSessionID != originalSession.ID {
-			return nil, internalerrors.ErrUnauthorized
+			return nil, coreerrors.ErrUnauthorized
 		}
 	} else {
 		if actor == nil || actor.Claims == nil {
-			return nil, internalerrors.ErrUnauthorized
+			return nil, coreerrors.ErrUnauthorized
 		}
 		impersonatorID, ok := actor.Claims[adminconstants.ImpersonatorID]
 		if !ok {
-			return nil, internalerrors.ErrUnauthorized
+			return nil, coreerrors.ErrUnauthorized
 		}
 		impersonatorIDStr, ok := impersonatorID.(string)
 		if !ok || impersonatorIDStr == "" || impersonatorIDStr != actorUserID {
-			return nil, internalerrors.ErrUnauthorized
+			return nil, coreerrors.ErrUnauthorized
 		}
 	}
 

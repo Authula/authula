@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	internalerrors "github.com/Authula/authula/internal/errors"
+	coreerrors "github.com/Authula/authula/core/errors"
 	orgtests "github.com/Authula/authula/plugins/organizations/tests"
 	"github.com/Authula/authula/plugins/organizations/types"
 )
@@ -100,7 +100,7 @@ func TestOrganizationTeamService_CreateTeam(t *testing.T) {
 		expectCalled     bool
 		expectTeamMember bool
 	}{
-		{name: "unauthorized", actorUserID: "", organizationID: "org-1", request: types.CreateOrganizationTeamRequest{Name: "Platform"}, expectErr: internalerrors.ErrUnauthorized},
+		{name: "unauthorized", actorUserID: "", organizationID: "org-1", request: types.CreateOrganizationTeamRequest{Name: "Platform"}, expectErr: coreerrors.ErrUnauthorized},
 		{
 			name:           "organization not found",
 			actorUserID:    "user-1",
@@ -109,7 +109,7 @@ func TestOrganizationTeamService_CreateTeam(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository, hooks *orgtests.MockOrganizationTeamHooks, serviceUtils *ServiceUtils) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(nil, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:           "organization lookup error",
@@ -129,7 +129,7 @@ func TestOrganizationTeamService_CreateTeam(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository, hooks *orgtests.MockOrganizationTeamHooks, serviceUtils *ServiceUtils) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:           "bad request empty name",
@@ -139,7 +139,7 @@ func TestOrganizationTeamService_CreateTeam(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository, hooks *orgtests.MockOrganizationTeamHooks, serviceUtils *ServiceUtils) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrBadRequest,
+			expectErr: coreerrors.ErrBadRequest,
 		},
 		{
 			name:           "bad request empty slugify result",
@@ -149,7 +149,7 @@ func TestOrganizationTeamService_CreateTeam(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository, hooks *orgtests.MockOrganizationTeamHooks, serviceUtils *ServiceUtils) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrBadRequest,
+			expectErr: coreerrors.ErrBadRequest,
 		},
 		{
 			name:           "slug lookup error",
@@ -171,7 +171,7 @@ func TestOrganizationTeamService_CreateTeam(t *testing.T) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 				teamRepo.On("GetByOrganizationIDAndSlug", mock.Anything, "org-1", "platform").Return(&types.OrganizationTeam{ID: "team-2"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrConflict,
+			expectErr: coreerrors.ErrConflict,
 		},
 		{
 			name:           "create error",
@@ -274,7 +274,7 @@ func TestOrganizationTeamService_GetAllTeams(t *testing.T) {
 		expectErr      error
 		expectLen      int
 	}{
-		{name: "unauthorized", actorUserID: "", organizationID: "org-1", expectErr: internalerrors.ErrUnauthorized},
+		{name: "unauthorized", actorUserID: "", organizationID: "org-1", expectErr: coreerrors.ErrUnauthorized},
 		{
 			name:           "organization not found",
 			actorUserID:    "user-1",
@@ -282,7 +282,7 @@ func TestOrganizationTeamService_GetAllTeams(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(nil, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:           "organization lookup error",
@@ -300,7 +300,7 @@ func TestOrganizationTeamService_GetAllTeams(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:           "repo error",
@@ -386,7 +386,7 @@ func TestOrganizationTeamService_GetTeam(t *testing.T) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(nil, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 	}
 
@@ -443,7 +443,7 @@ func TestOrganizationTeamService_UpdateTeam(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationTeamHooks, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:           "success",
@@ -491,7 +491,7 @@ func TestOrganizationTeamService_UpdateTeam(t *testing.T) {
 		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationTeamRepository, *orgtests.MockOrganizationMemberRepository, *orgtests.MockOrganizationTeamHooks, *orgtests.MockOrganizationTeamMemberRepository)
 		expectErr      error
 	}{
-		{name: "unauthorized", actorUserID: "", organizationID: "org-1", teamID: "team-1", request: types.UpdateOrganizationTeamRequest{Name: "Platform"}, expectErr: internalerrors.ErrUnauthorized},
+		{name: "unauthorized", actorUserID: "", organizationID: "org-1", teamID: "team-1", request: types.UpdateOrganizationTeamRequest{Name: "Platform"}, expectErr: coreerrors.ErrUnauthorized},
 		{
 			name:           "organization not found",
 			actorUserID:    "user-1",
@@ -501,7 +501,7 @@ func TestOrganizationTeamService_UpdateTeam(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationTeamHooks, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(nil, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:           "organization lookup error",
@@ -523,7 +523,7 @@ func TestOrganizationTeamService_UpdateTeam(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationTeamHooks, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:           "team lookup error",
@@ -553,7 +553,7 @@ func TestOrganizationTeamService_UpdateTeam(t *testing.T) {
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Once()
 				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "mem-1").Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "mem-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:           "team from another organization",
@@ -568,7 +568,7 @@ func TestOrganizationTeamService_UpdateTeam(t *testing.T) {
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Once()
 				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "mem-1").Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "mem-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:           "bad request empty name",
@@ -582,7 +582,7 @@ func TestOrganizationTeamService_UpdateTeam(t *testing.T) {
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Once()
 				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "mem-1").Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "mem-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrBadRequest,
+			expectErr: coreerrors.ErrBadRequest,
 		},
 		{
 			name:           "bad request empty slugify result",
@@ -596,7 +596,7 @@ func TestOrganizationTeamService_UpdateTeam(t *testing.T) {
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Once()
 				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "mem-1").Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "mem-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrBadRequest,
+			expectErr: coreerrors.ErrBadRequest,
 		},
 		{
 			name:           "slug lookup error",
@@ -626,7 +626,7 @@ func TestOrganizationTeamService_UpdateTeam(t *testing.T) {
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Once()
 				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "mem-1").Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "mem-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrConflict,
+			expectErr: coreerrors.ErrConflict,
 		},
 		{
 			name:           "update error",
@@ -726,7 +726,7 @@ func TestOrganizationTeamService_DeleteTeam(t *testing.T) {
 		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationTeamRepository, *orgtests.MockOrganizationMemberRepository, *orgtests.MockOrganizationTeamHooks, *orgtests.MockOrganizationTeamMemberRepository)
 		expectErr      error
 	}{
-		{name: "unauthorized", actorUserID: "", organizationID: "org-1", teamID: "team-1", expectErr: internalerrors.ErrUnauthorized},
+		{name: "unauthorized", actorUserID: "", organizationID: "org-1", teamID: "team-1", expectErr: coreerrors.ErrUnauthorized},
 		{
 			name:           "organization not found",
 			actorUserID:    "user-1",
@@ -735,7 +735,7 @@ func TestOrganizationTeamService_DeleteTeam(t *testing.T) {
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationTeamHooks, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(nil, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:           "organization lookup error",
@@ -756,7 +756,7 @@ func TestOrganizationTeamService_DeleteTeam(t *testing.T) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(nil, nil).Once()
 			},
-			expectErr: internalerrors.ErrForbidden,
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:           "team lookup error",
@@ -784,7 +784,7 @@ func TestOrganizationTeamService_DeleteTeam(t *testing.T) {
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Once()
 				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "mem-1").Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "mem-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:           "team from another organization",
@@ -798,7 +798,7 @@ func TestOrganizationTeamService_DeleteTeam(t *testing.T) {
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Once()
 				teamMemberRepo.On("GetByTeamIDAndMemberID", mock.Anything, "team-1", "mem-1").Return(&types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "mem-1"}, nil).Once()
 			},
-			expectErr: internalerrors.ErrNotFound,
+			expectErr: coreerrors.ErrNotFound,
 		},
 		{
 			name:           "delete error",
