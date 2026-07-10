@@ -4,11 +4,11 @@ import (
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/uptrace/bun"
 
+	coreevents "github.com/Authula/authula/core/events"
 	corerepositories "github.com/Authula/authula/core/repositories"
 	coreservices "github.com/Authula/authula/core/services"
 	"github.com/Authula/authula/events"
 	internalbootstrap "github.com/Authula/authula/internal/bootstrap"
-	internalevents "github.com/Authula/authula/internal/events"
 	internalsecurity "github.com/Authula/authula/internal/security"
 	internalsystemssession "github.com/Authula/authula/internal/systems/session"
 	internalsystemsverification "github.com/Authula/authula/internal/systems/verification"
@@ -52,12 +52,12 @@ func InitEventBus(config *models.Config) (models.EventBus, error) {
 
 	logger := watermill.NewStdLogger(false, false)
 
-	pubsub, err := internalevents.InitWatermillProvider(&eventBusConfig, logger)
+	pubsub, err := coreevents.InitWatermillProvider(&eventBusConfig, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	return internalevents.NewEventBus(config, logger, pubsub), nil
+	return coreevents.NewEventBus(config, logger, pubsub), nil
 }
 
 func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.ServiceRegistry) *serviceinterfaces.CoreServices {
