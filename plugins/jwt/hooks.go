@@ -1,9 +1,7 @@
 package jwt
 
 import (
-	"encoding/json"
 	"fmt"
-	"maps"
 	"net/http"
 	"time"
 
@@ -123,16 +121,6 @@ func (p *JWTPlugin) respondHook(reqCtx *models.RequestContext) error {
 
 	if refresh, ok := reqCtx.Values[types.JWTTokenTypeRefresh.String()].(string); ok && refresh != "" {
 		payload["refresh_token"] = refresh
-	}
-
-	if reqCtx.ResponseReady && len(reqCtx.ResponseBody) > 0 {
-		var existing map[string]any
-		if err := json.Unmarshal(reqCtx.ResponseBody, &existing); err == nil {
-			maps.Copy(existing, payload)
-			reqCtx.SetJSONResponse(reqCtx.ResponseStatus, existing)
-			reqCtx.Handled = true
-			return nil
-		}
 	}
 
 	reqCtx.SetJSONResponse(http.StatusOK, payload)
