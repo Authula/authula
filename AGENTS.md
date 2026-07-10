@@ -41,6 +41,8 @@ This is now supported in Go 1.26+ which the project is using. This makes the cod
 - Use table-driven tests to cover multiple scenarios in a concise manner.
 - Mock external dependencies to isolate the unit being tested.
 - Regularly run tests during development to catch issues early.
+- Run `make format` to format the code.
+- Run `make lint` to check if there are any linting issues.
 - Run `make build` to ensure the project builds successfully after changes.
 - Then run `make test` to run all tests in the project.
 
