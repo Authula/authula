@@ -8,11 +8,11 @@ import (
 	"time"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/api-key/repositories"
 	"github.com/Authula/authula/plugins/api-key/types"
 	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type apiKeyService struct {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/Authula/authula/internal/util"
+	"github.com/Authula/authula/util"
 )
 
 // ValidateRedirectTo validates a redirect URL against trusted origins

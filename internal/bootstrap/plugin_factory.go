@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"fmt"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	accesscontrolplugin "github.com/Authula/authula/plugins/access-control"
 	accesscontrolplugintypes "github.com/Authula/authula/plugins/access-control/types"
@@ -31,6 +30,7 @@ import (
 	sessionplugin "github.com/Authula/authula/plugins/session"
 	totpplugin "github.com/Authula/authula/plugins/totp"
 	totplugintypes "github.com/Authula/authula/plugins/totp/types"
+	"github.com/Authula/authula/util"
 )
 
 // PluginFactory defines a factory function for creating a plugin instance from typed config data.

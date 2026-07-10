@@ -8,10 +8,10 @@ import (
 
 	emailconstants "github.com/Authula/authula/internal/email/constants"
 	emailtmpl "github.com/Authula/authula/internal/email/template"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/magic-link/types"
 	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type SignInUseCaseImpl struct {

@@ -5,8 +5,8 @@ import (
 
 	"github.com/Authula/authula/internal/types"
 	"github.com/Authula/authula/internal/usecases"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/util"
 )
 
 type SignOutHandler struct {

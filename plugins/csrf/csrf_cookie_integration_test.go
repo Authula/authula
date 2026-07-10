@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Authula/authula/internal/router"
-	"github.com/Authula/authula/internal/util"
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	rootservices "github.com/Authula/authula/services"
 )
@@ -68,7 +68,7 @@ func TestCSRFCookiePreservedWithSetJSONResponse(t *testing.T) {
 	registry := newMockServiceRegistry()
 	registry.Register(models.ServiceToken.String(), &mockTokenService{})
 	ctx := &models.PluginContext{
-		Logger:          util.NewMockLogger(),
+		Logger:          &internaltests.MockLogger{},
 		ServiceRegistry: registry,
 		GetConfig: func() *models.Config {
 			return &models.Config{
@@ -111,7 +111,7 @@ func TestCSRFCookiePreservedWithSetJSONResponse(t *testing.T) {
 	// and testing the override flow
 	drw := &router.DeferredResponseWriter{
 		Wrapped: w,
-		Logger:  util.NewMockLogger(),
+		Logger:  &internaltests.MockLogger{},
 	}
 
 	// Override with context (this is what router.finalizeResponse does)

@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/Authula/authula/env"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/util"
 )
 
 type SecondaryStoragePlugin struct {

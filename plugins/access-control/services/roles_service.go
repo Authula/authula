@@ -4,11 +4,11 @@ import (
 	"context"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
+	"github.com/Authula/authula/util"
 )
 
 type RolesService struct {

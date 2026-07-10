@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/totp/constants"
 	"github.com/Authula/authula/plugins/totp/types"
 	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 func createTrustedDevice(

@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email/constants"
 	"github.com/Authula/authula/plugins/email/providers"
 	emailtypes "github.com/Authula/authula/plugins/email/types"
 	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type EmailPlugin struct {

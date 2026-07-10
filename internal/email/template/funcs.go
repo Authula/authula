@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Authula/authula/internal/util"
+	"github.com/Authula/authula/util"
 )
 
 func FormatDuration(d time.Duration) string {

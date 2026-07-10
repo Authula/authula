@@ -6,10 +6,10 @@ import (
 	"github.com/uptrace/bun"
 
 	emailtmpl "github.com/Authula/authula/internal/email/template"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
 	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type EmailPasswordPlugin struct {

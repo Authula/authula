@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
 	"github.com/Authula/authula/plugins/email-password/usecases"
+	"github.com/Authula/authula/util"
 )
 
 type SignInHandler struct {

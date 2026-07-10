@@ -8,7 +8,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/Authula/authula/internal/cleanup"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
 	apiconstants "github.com/Authula/authula/plugins/api-key/constants"
@@ -18,6 +17,7 @@ import (
 	"github.com/Authula/authula/plugins/api-key/usecases"
 	orgplugins "github.com/Authula/authula/plugins/organizations"
 	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type ApiKeyPlugin struct {

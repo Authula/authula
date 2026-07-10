@@ -3,10 +3,10 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/types"
 	"github.com/Authula/authula/plugins/jwt/usecases"
+	"github.com/Authula/authula/util"
 )
 
 type RefreshTokenHandler struct {

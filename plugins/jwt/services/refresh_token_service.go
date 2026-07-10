@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/constants"
 	"github.com/Authula/authula/plugins/jwt/events"
 	"github.com/Authula/authula/plugins/jwt/types"
 	coreservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type refreshTokenService struct {

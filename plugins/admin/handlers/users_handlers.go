@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/types"
 	"github.com/Authula/authula/plugins/admin/usecases"
+	"github.com/Authula/authula/util"
 )
 
 type CreateUserHandler struct {

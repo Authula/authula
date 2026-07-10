@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
 	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
@@ -13,6 +12,7 @@ import (
 	"github.com/Authula/authula/plugins/access-control/types"
 	"github.com/Authula/authula/plugins/access-control/usecases"
 	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type AccessControlPlugin struct {

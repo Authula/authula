@@ -1,12 +1,12 @@
 package ratelimit
 
 import (
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
 	pluginservices "github.com/Authula/authula/plugins/rate-limit/services"
 	"github.com/Authula/authula/plugins/rate-limit/types"
 	"github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type RateLimitPlugin struct {

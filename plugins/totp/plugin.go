@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/totp/repository"
@@ -12,6 +11,7 @@ import (
 	"github.com/Authula/authula/plugins/totp/systems"
 	"github.com/Authula/authula/plugins/totp/types"
 	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type TOTPPlugin struct {

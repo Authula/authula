@@ -4,10 +4,10 @@ import (
 	"net/http"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/api-key/types"
 	"github.com/Authula/authula/plugins/api-key/usecases"
+	"github.com/Authula/authula/util"
 )
 
 type GetAllApiKeysHandler struct {

@@ -7,12 +7,12 @@ import (
 	"github.com/uptrace/bun"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/constants"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"
 	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type organizationMemberTxRunner interface {

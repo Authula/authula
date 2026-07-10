@@ -3,10 +3,10 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/access-control/types"
 	"github.com/Authula/authula/plugins/access-control/usecases"
+	"github.com/Authula/authula/util"
 )
 
 type CreatePermissionHandler struct {

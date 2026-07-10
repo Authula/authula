@@ -5,9 +5,9 @@ import (
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	repositories "github.com/Authula/authula/internal/repositories"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/types"
+	"github.com/Authula/authula/util"
 )
 
 type UsersService struct {

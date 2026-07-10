@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Authula/authula/internal/util"
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 )
 
@@ -16,7 +16,7 @@ func TestFlushPreservesCookies(t *testing.T) {
 	// Create DeferredResponseWriter
 	drw := &DeferredResponseWriter{
 		Wrapped: originalWriter,
-		Logger:  util.NewMockLogger(),
+		Logger:  &internaltests.MockLogger{},
 	}
 
 	// Set a cookie directly on the original ResponseWriter (like CSRF plugin does)
@@ -78,7 +78,7 @@ func TestFlushPreservesMultipleCookies(t *testing.T) {
 	// Create DeferredResponseWriter
 	drw := &DeferredResponseWriter{
 		Wrapped: originalWriter,
-		Logger:  util.NewMockLogger(),
+		Logger:  &internaltests.MockLogger{},
 	}
 
 	// Set multiple cookies directly on the original ResponseWriter

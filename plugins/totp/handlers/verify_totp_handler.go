@@ -4,11 +4,11 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/totp/constants"
 	"github.com/Authula/authula/plugins/totp/types"
 	"github.com/Authula/authula/plugins/totp/usecases"
+	"github.com/Authula/authula/util"
 )
 
 type VerifyTOTPHandler struct {

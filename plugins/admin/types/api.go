@@ -3,9 +3,9 @@ package types
 import (
 	"time"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/constants"
+	"github.com/Authula/authula/util"
 )
 
 type AdminUserID struct {

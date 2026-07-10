@@ -6,10 +6,10 @@ import (
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	corerepositories "github.com/Authula/authula/internal/repositories"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/types"
 	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type AccountsService struct {

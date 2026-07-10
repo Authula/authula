@@ -5,9 +5,9 @@ import (
 	"errors"
 
 	"github.com/Authula/authula/internal/repositories"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type userService struct {

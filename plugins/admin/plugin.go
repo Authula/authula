@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	coreinternalrepos "github.com/Authula/authula/internal/repositories"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
 	adminconstants "github.com/Authula/authula/plugins/admin/constants"
@@ -13,6 +12,7 @@ import (
 	"github.com/Authula/authula/plugins/admin/types"
 	"github.com/Authula/authula/plugins/admin/usecases"
 	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type AdminPlugin struct {

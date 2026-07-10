@@ -16,9 +16,9 @@ import (
 	"github.com/Authula/authula/cmd/shared/configloader"
 	"github.com/Authula/authula/internal/bootstrap"
 	"github.com/Authula/authula/internal/migrationmanager"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/util"
 )
 
 var (

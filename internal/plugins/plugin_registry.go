@@ -7,8 +7,8 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/Authula/authula/internal/migrationmanager"
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/util"
 )
 
 // PluginRegistry manages plugin registration and lifecycle

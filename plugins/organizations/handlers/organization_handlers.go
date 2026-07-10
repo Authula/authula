@@ -3,11 +3,11 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/Authula/authula/internal/util"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
 	"github.com/Authula/authula/plugins/organizations/types"
 	orgusecases "github.com/Authula/authula/plugins/organizations/usecases"
+	"github.com/Authula/authula/util"
 )
 
 type CreateOrganizationHandler struct {
