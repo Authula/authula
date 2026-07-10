@@ -6,12 +6,12 @@ import (
 
 	coreevents "github.com/Authula/authula/core/events"
 	corerepositories "github.com/Authula/authula/core/repositories"
+	coresecurity "github.com/Authula/authula/core/security"
 	coreservices "github.com/Authula/authula/core/services"
 	coresystemssession "github.com/Authula/authula/core/systems/session"
 	coresystemsverification "github.com/Authula/authula/core/systems/verification"
 	"github.com/Authula/authula/events"
 	internalbootstrap "github.com/Authula/authula/internal/bootstrap"
-	internalsecurity "github.com/Authula/authula/internal/security"
 	"github.com/Authula/authula/models"
 	serviceinterfaces "github.com/Authula/authula/services"
 )
@@ -61,7 +61,7 @@ func InitEventBus(config *models.Config) (models.EventBus, error) {
 }
 
 func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.ServiceRegistry) *serviceinterfaces.CoreServices {
-	signer := internalsecurity.NewHMACSigner(config.Secret)
+	signer := coresecurity.NewHMACSigner(config.Secret)
 
 	userRepo := corerepositories.NewBunUserRepository(db)
 	accountRepo := corerepositories.NewBunAccountRepository(db)

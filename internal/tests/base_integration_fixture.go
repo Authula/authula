@@ -10,10 +10,10 @@ import (
 
 	"github.com/Authula/authula/config"
 	corerepos "github.com/Authula/authula/core/repositories"
+	coresecurity "github.com/Authula/authula/core/security"
 	coreservices "github.com/Authula/authula/core/services"
 	"github.com/Authula/authula/events"
 	coreplugins "github.com/Authula/authula/internal/plugins"
-	coreinternalsecurity "github.com/Authula/authula/internal/security"
 	"github.com/Authula/authula/models"
 	servicesinterfaces "github.com/Authula/authula/services"
 )
@@ -55,7 +55,7 @@ func NewBaseTestFixture(t *testing.T, options ...config.ConfigOption) *BaseTestF
 	sessionRepo := corerepos.NewBunSessionRepository(db)
 	sessionService := coreservices.NewSessionService(sessionRepo, nil, nil)
 	verificationRepo := corerepos.NewBunVerificationRepository(db)
-	tokenSigner := coreinternalsecurity.NewHMACSigner(cfg.Secret)
+	tokenSigner := coresecurity.NewHMACSigner(cfg.Secret)
 	verificationService := coreservices.NewVerificationService(verificationRepo, tokenSigner, nil)
 	tokenService := coreservices.NewTokenService(tokenRepo)
 
