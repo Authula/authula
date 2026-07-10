@@ -7,11 +7,11 @@ import (
 	coreevents "github.com/Authula/authula/core/events"
 	corerepositories "github.com/Authula/authula/core/repositories"
 	coreservices "github.com/Authula/authula/core/services"
+	coresystemssession "github.com/Authula/authula/core/systems/session"
+	coresystemsverification "github.com/Authula/authula/core/systems/verification"
 	"github.com/Authula/authula/events"
 	internalbootstrap "github.com/Authula/authula/internal/bootstrap"
 	internalsecurity "github.com/Authula/authula/internal/security"
-	internalsystemssession "github.com/Authula/authula/internal/systems/session"
-	internalsystemsverification "github.com/Authula/authula/internal/systems/verification"
 	"github.com/Authula/authula/models"
 	serviceinterfaces "github.com/Authula/authula/services"
 )
@@ -95,12 +95,12 @@ func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.
 
 func InitCoreSystems(logger models.Logger, config *models.Config, coreServices *serviceinterfaces.CoreServices) []models.CoreSystem {
 	return []models.CoreSystem{
-		internalsystemssession.NewSessionCleanupSystem(
+		coresystemssession.NewSessionCleanupSystem(
 			logger,
 			config.Session,
 			coreServices.SessionService,
 		),
-		internalsystemsverification.NewVerificationCleanupSystem(
+		coresystemsverification.NewVerificationCleanupSystem(
 			logger,
 			config.Verification,
 			coreServices.VerificationService,

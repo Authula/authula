@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Authula/authula/internal/cleanup"
+	"github.com/Authula/authula/core/cleanup"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/services"
 )

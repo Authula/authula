@@ -7,7 +7,7 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/Authula/authula/internal/cleanup"
+	"github.com/Authula/authula/core/cleanup"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
 	apiconstants "github.com/Authula/authula/plugins/api-key/constants"
