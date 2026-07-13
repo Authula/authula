@@ -149,12 +149,6 @@ If you'd like to support the ongoing development of this project, consider subsc
 
 ---
 
-### GitHub Stars
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Authula/authula&type=date&legend=top-left)](https://www.star-history.com/#Authula/authula&type=date&legend=top-left)
-
----
-
 ### Our Sponsors
 
 #### 🏢 Corporate Sponsors
