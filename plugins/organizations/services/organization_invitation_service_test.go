@@ -215,11 +215,11 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				invRepo.On("Create", mock.Anything, mock.MatchedBy(func(inv *types.OrganizationInvitation) bool {
 					return inv != nil && inv.OrganizationID == "org-1" && inv.InviterID == "user-1" && inv.Email == "user@example.com" && inv.Role == "member" && inv.Status == types.OrganizationInvitationStatusPending && inv.ExpiresAt.After(expectedExpiresAt.Add(-2*time.Second)) && inv.ExpiresAt.Before(expectedExpiresAt.Add(2*time.Second))
 				})).Return(&types.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", InviterID: "user-1", Email: "user@example.com", Role: "member", Status: types.OrganizationInvitationStatusPending, ExpiresAt: expectedExpiresAt}, nil).Once()
-				hooks.Before = func(invitation *types.OrganizationInvitation) error {
+				hooks.BeforeCreate = func(ctx context.Context, actor *models.Actor, invitation *types.OrganizationInvitation) error {
 					require.Equal(t, "user@example.com", invitation.Email)
 					return nil
 				}
-				hooks.After = func(invitation types.OrganizationInvitation) error {
+				hooks.AfterCreate = func(ctx context.Context, actor *models.Actor, invitation *types.OrganizationInvitation) error {
 					require.Equal(t, "inv-1", invitation.ID)
 					return nil
 				}

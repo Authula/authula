@@ -27,10 +27,15 @@ type organizationMemberService struct {
 	serviceUtils         *ServiceUtils
 	membersLimit         *int
 	txRunner             organizationMemberTxRunner
+	hooks                *ServiceHookExecutor
 }
 
-func NewOrganizationMemberService(userService rootservices.UserService, accessControlService rootservices.AccessControlService, orgRepo repositories.OrganizationRepository, orgMemberRepo repositories.OrganizationMemberRepository, membersLimit *int, txRunner organizationMemberTxRunner, serviceUtils *ServiceUtils) *organizationMemberService {
-	return &organizationMemberService{userService: userService, accessControlService: accessControlService, orgRepo: orgRepo, orgMemberRepo: orgMemberRepo, serviceUtils: serviceUtils, membersLimit: membersLimit, txRunner: txRunner}
+func NewOrganizationMemberService(userService rootservices.UserService, accessControlService rootservices.AccessControlService, orgRepo repositories.OrganizationRepository, orgMemberRepo repositories.OrganizationMemberRepository, membersLimit *int, txRunner organizationMemberTxRunner, serviceUtils *ServiceUtils, hooks ...*ServiceHookExecutor) *organizationMemberService {
+	var hook *ServiceHookExecutor
+	if len(hooks) > 0 {
+		hook = hooks[0]
+	}
+	return &organizationMemberService{userService: userService, accessControlService: accessControlService, orgRepo: orgRepo, orgMemberRepo: orgMemberRepo, serviceUtils: serviceUtils, membersLimit: membersLimit, txRunner: txRunner, hooks: hook}
 }
 
 func (s *organizationMemberService) AddMember(ctx context.Context, actor *models.Actor, organizationID string, request types.AddOrganizationMemberRequest) (*types.OrganizationMember, error) {
@@ -77,18 +82,24 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actor *models
 		return nil, coreerrors.ErrBadRequest
 	}
 
+	member := &types.OrganizationMember{
+		ID:             util.GenerateUUID(),
+		OrganizationID: organizationID,
+		UserID:         userID,
+		Role:           role,
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.BeforeCreateOrganizationMember(ctx, actor, member); err != nil {
+			return nil, err
+		}
+	}
+
 	var created *types.OrganizationMember
 	err = s.txRunner.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		memberRepo := s.orgMemberRepo.WithTx(tx)
 		if err := ensureOrganizationMembersLimit(ctx, memberRepo, organizationID, s.membersLimit); err != nil {
 			return err
-		}
-
-		member := &types.OrganizationMember{
-			ID:             util.GenerateUUID(),
-			OrganizationID: organizationID,
-			UserID:         userID,
-			Role:           role,
 		}
 
 		createdMember, err := memberRepo.Create(ctx, member)
@@ -101,6 +112,12 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actor *models
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterCreateOrganizationMember(ctx, actor, created); err != nil {
+			return nil, err
+		}
 	}
 
 	return created, nil
@@ -174,9 +191,21 @@ func (s *organizationMemberService) UpdateMember(ctx context.Context, actor *mod
 
 	member.Role = role
 
+	if s.hooks != nil {
+		if err := s.hooks.BeforeUpdateOrganizationMember(ctx, actor, member); err != nil {
+			return nil, err
+		}
+	}
+
 	updated, err := s.orgMemberRepo.Update(ctx, member)
 	if err != nil {
 		return nil, err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterUpdateOrganizationMember(ctx, actor, updated); err != nil {
+			return nil, err
+		}
 	}
 
 	return updated, nil
@@ -195,8 +224,20 @@ func (s *organizationMemberService) RemoveMember(ctx context.Context, actor *mod
 		return coreerrors.ErrNotFound
 	}
 
+	if s.hooks != nil {
+		if err := s.hooks.BeforeDeleteOrganizationMember(ctx, actor, member); err != nil {
+			return err
+		}
+	}
+
 	if err := s.orgMemberRepo.Delete(ctx, member.ID); err != nil {
 		return err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterDeleteOrganizationMember(ctx, actor, member); err != nil {
+			return err
+		}
 	}
 
 	return nil

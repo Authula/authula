@@ -16,6 +16,7 @@ type organizationTeamMemberService struct {
 	orgTeamRepo       repositories.OrganizationTeamRepository
 	orgTeamMemberRepo repositories.OrganizationTeamMemberRepository
 	serviceUtils      *ServiceUtils
+	hooks             *ServiceHookExecutor
 }
 
 func NewOrganizationTeamMemberService(
@@ -24,8 +25,13 @@ func NewOrganizationTeamMemberService(
 	teamRepo repositories.OrganizationTeamRepository,
 	orgTeamMemberRepo repositories.OrganizationTeamMemberRepository,
 	serviceUtils *ServiceUtils,
+	hooks ...*ServiceHookExecutor,
 ) *organizationTeamMemberService {
-	return &organizationTeamMemberService{orgRepo: orgRepo, orgMemberRepo: orgMemberRepo, orgTeamRepo: teamRepo, orgTeamMemberRepo: orgTeamMemberRepo, serviceUtils: serviceUtils}
+	var hook *ServiceHookExecutor
+	if len(hooks) > 0 {
+		hook = hooks[0]
+	}
+	return &organizationTeamMemberService{orgRepo: orgRepo, orgMemberRepo: orgMemberRepo, orgTeamRepo: teamRepo, orgTeamMemberRepo: orgTeamMemberRepo, serviceUtils: serviceUtils, hooks: hook}
 }
 
 func (s *organizationTeamMemberService) AddTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, request types.AddOrganizationTeamMemberRequest) (*types.OrganizationTeamMember, error) {
@@ -70,9 +76,21 @@ func (s *organizationTeamMemberService) AddTeamMember(ctx context.Context, actor
 		MemberID: orgMember.ID,
 	}
 
+	if s.hooks != nil {
+		if err := s.hooks.BeforeCreateOrganizationTeamMember(ctx, actor, teamMember); err != nil {
+			return nil, err
+		}
+	}
+
 	created, err := s.orgTeamMemberRepo.Create(ctx, teamMember)
 	if err != nil {
 		return nil, err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterCreateOrganizationTeamMember(ctx, actor, created); err != nil {
+			return nil, err
+		}
 	}
 
 	return created, nil
@@ -167,8 +185,20 @@ func (s *organizationTeamMemberService) RemoveTeamMember(ctx context.Context, ac
 		return coreerrors.ErrNotFound
 	}
 
+	if s.hooks != nil {
+		if err := s.hooks.BeforeDeleteOrganizationTeamMember(ctx, actor, teamMember); err != nil {
+			return err
+		}
+	}
+
 	if err := s.orgTeamMemberRepo.DeleteByTeamIDAndMemberID(ctx, teamID, orgMember.ID); err != nil {
 		return err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterDeleteOrganizationTeamMember(ctx, actor, teamMember); err != nil {
+			return err
+		}
 	}
 
 	return nil

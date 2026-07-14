@@ -10,26 +10,15 @@ import (
 )
 
 type BunOrganizationTeamMemberRepository struct {
-	db    bun.IDB
-	hooks OrganizationTeamMemberHookExecutor
+	db bun.IDB
 }
 
-func NewBunOrganizationTeamMemberRepository(db bun.IDB, hooks ...OrganizationTeamMemberHookExecutor) OrganizationTeamMemberRepository {
-	var hook OrganizationTeamMemberHookExecutor
-	if len(hooks) > 0 {
-		hook = hooks[0]
-	}
-	return &BunOrganizationTeamMemberRepository{db: db, hooks: hook}
+func NewBunOrganizationTeamMemberRepository(db bun.IDB) OrganizationTeamMemberRepository {
+	return &BunOrganizationTeamMemberRepository{db: db}
 }
 
 func (r *BunOrganizationTeamMemberRepository) Create(ctx context.Context, teamMember *types.OrganizationTeamMember) (*types.OrganizationTeamMember, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if r.hooks != nil {
-			if err := r.hooks.BeforeCreateOrganizationTeamMember(teamMember); err != nil {
-				return err
-			}
-		}
-
 		_, err := tx.NewInsert().Model(teamMember).Exec(ctx)
 		if err != nil {
 			return err
@@ -37,12 +26,6 @@ func (r *BunOrganizationTeamMemberRepository) Create(ctx context.Context, teamMe
 
 		if err := tx.NewSelect().Model(teamMember).WherePK().Scan(ctx); err != nil {
 			return err
-		}
-
-		if r.hooks != nil {
-			if err := r.hooks.AfterCreateOrganizationTeamMember(*teamMember); err != nil {
-				return err
-			}
 		}
 
 		return nil
@@ -89,30 +72,9 @@ func (r *BunOrganizationTeamMemberRepository) GetAllByTeamID(ctx context.Context
 
 func (r *BunOrganizationTeamMemberRepository) DeleteByTeamIDAndMemberID(ctx context.Context, teamID, memberID string) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		teamMemberRepo := r.WithTx(tx)
-		teamMember, err := teamMemberRepo.GetByTeamIDAndMemberID(ctx, teamID, memberID)
+		_, err := tx.NewDelete().Model(&types.OrganizationTeamMember{}).Where("team_id = ? AND member_id = ?", teamID, memberID).Exec(ctx)
 		if err != nil {
 			return err
-		}
-		if teamMember == nil {
-			return nil
-		}
-
-		if r.hooks != nil {
-			if err := r.hooks.BeforeDeleteOrganizationTeamMember(teamMember); err != nil {
-				return err
-			}
-		}
-
-		_, err = tx.NewDelete().Model(&types.OrganizationTeamMember{}).Where("team_id = ? AND member_id = ?", teamID, memberID).Exec(ctx)
-		if err != nil {
-			return err
-		}
-
-		if r.hooks != nil {
-			if err := r.hooks.AfterDeleteOrganizationTeamMember(*teamMember); err != nil {
-				return err
-			}
 		}
 
 		return nil
@@ -120,5 +82,5 @@ func (r *BunOrganizationTeamMemberRepository) DeleteByTeamIDAndMemberID(ctx cont
 }
 
 func (r *BunOrganizationTeamMemberRepository) WithTx(tx bun.IDB) OrganizationTeamMemberRepository {
-	return &BunOrganizationTeamMemberRepository{db: tx, hooks: r.hooks}
+	return &BunOrganizationTeamMemberRepository{db: tx}
 }
