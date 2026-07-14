@@ -8,47 +8,6 @@ import (
 	"github.com/Authula/authula/plugins/organizations/types"
 )
 
-type OrganizationHookExecutor interface {
-	BeforeCreateOrganization(organization *types.Organization) error
-	AfterCreateOrganization(organization types.Organization) error
-	BeforeUpdateOrganization(organization *types.Organization) error
-	AfterUpdateOrganization(organization types.Organization) error
-	BeforeDeleteOrganization(organization *types.Organization) error
-	AfterDeleteOrganization(organization types.Organization) error
-}
-
-type OrganizationInvitationHookExecutor interface {
-	BeforeCreateOrganizationInvitation(invitation *types.OrganizationInvitation) error
-	AfterCreateOrganizationInvitation(invitation types.OrganizationInvitation) error
-	BeforeUpdateOrganizationInvitation(invitation *types.OrganizationInvitation) error
-	AfterUpdateOrganizationInvitation(invitation types.OrganizationInvitation) error
-}
-
-type OrganizationMemberHookExecutor interface {
-	BeforeCreateOrganizationMember(member *types.OrganizationMember) error
-	AfterCreateOrganizationMember(member types.OrganizationMember) error
-	BeforeUpdateOrganizationMember(member *types.OrganizationMember) error
-	AfterUpdateOrganizationMember(member types.OrganizationMember) error
-	BeforeDeleteOrganizationMember(member *types.OrganizationMember) error
-	AfterDeleteOrganizationMember(member types.OrganizationMember) error
-}
-
-type OrganizationTeamHookExecutor interface {
-	BeforeCreateOrganizationTeam(team *types.OrganizationTeam) error
-	AfterCreateOrganizationTeam(team types.OrganizationTeam) error
-	BeforeUpdateOrganizationTeam(team *types.OrganizationTeam) error
-	AfterUpdateOrganizationTeam(team types.OrganizationTeam) error
-	BeforeDeleteOrganizationTeam(team *types.OrganizationTeam) error
-	AfterDeleteOrganizationTeam(team types.OrganizationTeam) error
-}
-
-type OrganizationTeamMemberHookExecutor interface {
-	BeforeCreateOrganizationTeamMember(teamMember *types.OrganizationTeamMember) error
-	AfterCreateOrganizationTeamMember(teamMember types.OrganizationTeamMember) error
-	BeforeDeleteOrganizationTeamMember(teamMember *types.OrganizationTeamMember) error
-	AfterDeleteOrganizationTeamMember(teamMember types.OrganizationTeamMember) error
-}
-
 type OrganizationRepository interface {
 	Create(ctx context.Context, organization *types.Organization) (*types.Organization, error)
 	GetByID(ctx context.Context, organizationID string) (*types.Organization, error)

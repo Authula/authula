@@ -26,6 +26,7 @@ type organizationService struct {
 	accessControlService rootservices.AccessControlService
 	organizationsLimit   *int
 	txRunner             organizationTxRunner
+	hooks                *ServiceHookExecutor
 }
 
 type organizationTxRunner interface {
@@ -39,7 +40,12 @@ func NewOrganizationService(
 	accessControlService rootservices.AccessControlService,
 	organizationsLimit *int,
 	txRunner organizationTxRunner,
+	hooks ...*ServiceHookExecutor,
 ) *organizationService {
+	var hook *ServiceHookExecutor
+	if len(hooks) > 0 {
+		hook = hooks[0]
+	}
 	return &organizationService{
 		orgRepo:              orgRepo,
 		orgMemberRepo:        orgMemberRepo,
@@ -47,6 +53,7 @@ func NewOrganizationService(
 		accessControlService: accessControlService,
 		organizationsLimit:   organizationsLimit,
 		txRunner:             txRunner,
+		hooks:                hook,
 	}
 }
 
@@ -95,6 +102,12 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actor *mod
 		organization.Metadata = make(map[string]any)
 	}
 
+	if s.hooks != nil {
+		if err := s.hooks.BeforeCreateOrganization(ctx, actor, organization); err != nil {
+			return nil, err
+		}
+	}
+
 	var created *types.Organization
 	createFn := func(ctx context.Context, orgRepo repositories.OrganizationRepository, memberRepo repositories.OrganizationMemberRepository) error {
 		if err := s.ensureOrganizationLimit(ctx, actor, orgRepo, memberRepo); err != nil {
@@ -127,6 +140,12 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actor *mod
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterCreateOrganization(ctx, actor, created); err != nil {
+			return nil, err
+		}
 	}
 
 	return created, nil
@@ -286,9 +305,21 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, actor *mod
 		organization.Metadata = make(map[string]any)
 	}
 
+	if s.hooks != nil {
+		if err := s.hooks.BeforeUpdateOrganization(ctx, actor, organization); err != nil {
+			return nil, err
+		}
+	}
+
 	updated, err := s.orgRepo.Update(ctx, organization)
 	if err != nil {
 		return nil, err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterUpdateOrganization(ctx, actor, updated); err != nil {
+			return nil, err
+		}
 	}
 
 	return updated, nil
@@ -303,13 +334,25 @@ func (s *organizationService) ExistsByID(ctx context.Context, organizationID str
 }
 
 func (s *organizationService) DeleteOrganization(ctx context.Context, actor *models.Actor, organizationID string) error {
-	_, err := s.serviceUtils.authorizeOwner(ctx, actor, organizationID)
+	organization, err := s.serviceUtils.authorizeOwner(ctx, actor, organizationID)
 	if err != nil {
 		return err
 	}
 
+	if s.hooks != nil {
+		if err := s.hooks.BeforeDeleteOrganization(ctx, actor, organization); err != nil {
+			return err
+		}
+	}
+
 	if err := s.orgRepo.Delete(ctx, organizationID); err != nil {
 		return err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterDeleteOrganization(ctx, actor, organization); err != nil {
+			return err
+		}
 	}
 
 	return nil

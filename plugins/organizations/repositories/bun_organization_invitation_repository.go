@@ -11,26 +11,15 @@ import (
 )
 
 type BunOrganizationInvitationRepository struct {
-	db    bun.IDB
-	hooks OrganizationInvitationHookExecutor
+	db bun.IDB
 }
 
-func NewBunOrganizationInvitationRepository(db bun.IDB, hooks ...OrganizationInvitationHookExecutor) OrganizationInvitationRepository {
-	var hook OrganizationInvitationHookExecutor
-	if len(hooks) > 0 {
-		hook = hooks[0]
-	}
-	return &BunOrganizationInvitationRepository{db: db, hooks: hook}
+func NewBunOrganizationInvitationRepository(db bun.IDB) OrganizationInvitationRepository {
+	return &BunOrganizationInvitationRepository{db: db}
 }
 
 func (r *BunOrganizationInvitationRepository) Create(ctx context.Context, invitation *types.OrganizationInvitation) (*types.OrganizationInvitation, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if r.hooks != nil {
-			if err := r.hooks.BeforeCreateOrganizationInvitation(invitation); err != nil {
-				return err
-			}
-		}
-
 		_, err := tx.NewInsert().Model(invitation).Exec(ctx)
 		if err != nil {
 			return err
@@ -38,12 +27,6 @@ func (r *BunOrganizationInvitationRepository) Create(ctx context.Context, invita
 
 		if err := tx.NewSelect().Model(invitation).WherePK().Scan(ctx); err != nil {
 			return err
-		}
-
-		if r.hooks != nil {
-			if err := r.hooks.AfterCreateOrganizationInvitation(*invitation); err != nil {
-				return err
-			}
 		}
 
 		return nil
@@ -111,12 +94,6 @@ func (r *BunOrganizationInvitationRepository) GetAllPendingByEmail(ctx context.C
 
 func (r *BunOrganizationInvitationRepository) Update(ctx context.Context, invitation *types.OrganizationInvitation) (*types.OrganizationInvitation, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if r.hooks != nil {
-			if err := r.hooks.BeforeUpdateOrganizationInvitation(invitation); err != nil {
-				return err
-			}
-		}
-
 		_, err := tx.NewUpdate().Model(invitation).WherePK().Exec(ctx)
 		if err != nil {
 			return err
@@ -124,12 +101,6 @@ func (r *BunOrganizationInvitationRepository) Update(ctx context.Context, invita
 
 		if err := tx.NewSelect().Model(invitation).WherePK().Scan(ctx); err != nil {
 			return err
-		}
-
-		if r.hooks != nil {
-			if err := r.hooks.AfterUpdateOrganizationInvitation(*invitation); err != nil {
-				return err
-			}
 		}
 
 		return nil
@@ -146,5 +117,5 @@ func (r *BunOrganizationInvitationRepository) CountByOrganizationIDAndEmail(ctx 
 }
 
 func (r *BunOrganizationInvitationRepository) WithTx(tx bun.IDB) OrganizationInvitationRepository {
-	return &BunOrganizationInvitationRepository{db: tx, hooks: r.hooks}
+	return &BunOrganizationInvitationRepository{db: tx}
 }

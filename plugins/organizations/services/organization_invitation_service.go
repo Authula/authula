@@ -40,6 +40,7 @@ type organizationInvitationService struct {
 	orgMemberRepo        repositories.OrganizationMemberRepository
 	serviceUtils         *ServiceUtils
 	emailTemplateManager *emailtmpl.Manager
+	hooks                *ServiceHookExecutor
 }
 
 func NewOrganizationInvitationService(
@@ -56,7 +57,12 @@ func NewOrganizationInvitationService(
 	orgMemberRepo repositories.OrganizationMemberRepository,
 	serviceUtils *ServiceUtils,
 	emailTemplateManager *emailtmpl.Manager,
+	hooks ...*ServiceHookExecutor,
 ) *organizationInvitationService {
+	var hook *ServiceHookExecutor
+	if len(hooks) > 0 {
+		hook = hooks[0]
+	}
 	return &organizationInvitationService{
 		txRunner:             txRunner,
 		globalConfig:         globalConfig,
@@ -71,6 +77,7 @@ func NewOrganizationInvitationService(
 		orgMemberRepo:        orgMemberRepo,
 		serviceUtils:         serviceUtils,
 		emailTemplateManager: emailTemplateManager,
+		hooks:                hook,
 	}
 }
 
@@ -106,6 +113,26 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
+	expiresAt := time.Now().UTC().Add(s.pluginConfig.InvitationExpiresIn)
+	if !expiresAt.After(time.Now().UTC()) {
+		return nil, coreerrors.ErrUnprocessableEntity
+	}
+	invitation := &types.OrganizationInvitation{
+		ID:             util.GenerateUUID(),
+		Email:          request.Email,
+		InviterID:      actorID,
+		OrganizationID: organizationID,
+		Role:           role,
+		Status:         types.OrganizationInvitationStatusPending,
+		ExpiresAt:      expiresAt,
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.BeforeCreateOrganizationInvitation(ctx, actor, invitation); err != nil {
+			return nil, err
+		}
+	}
+
 	var created *types.OrganizationInvitation
 	err = s.txRunner.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		invitationRepo := s.orgInvitationRepo.WithTx(tx)
@@ -130,20 +157,6 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 			}
 		}
 
-		expiresAt := time.Now().UTC().Add(s.pluginConfig.InvitationExpiresIn)
-		if !expiresAt.After(time.Now().UTC()) {
-			return coreerrors.ErrUnprocessableEntity
-		}
-		invitation := &types.OrganizationInvitation{
-			ID:             util.GenerateUUID(),
-			Email:          request.Email,
-			InviterID:      actorID,
-			OrganizationID: organizationID,
-			Role:           role,
-			Status:         types.OrganizationInvitationStatusPending,
-			ExpiresAt:      expiresAt,
-		}
-
 		createdInvitation, err := invitationRepo.Create(ctx, invitation)
 		if err != nil {
 			return err
@@ -154,6 +167,12 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterCreateOrganizationInvitation(ctx, actor, created); err != nil {
+			return nil, err
+		}
 	}
 
 	s.publishOrganizationInvitationCreatedEvent(created, organization)
@@ -311,9 +330,21 @@ func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context
 
 	invitation.Status = types.OrganizationInvitationStatusRevoked
 
+	if s.hooks != nil {
+		if err := s.hooks.BeforeUpdateOrganizationInvitation(ctx, actor, invitation); err != nil {
+			return nil, err
+		}
+	}
+
 	updated, err := s.orgInvitationRepo.Update(ctx, invitation)
 	if err != nil {
 		return nil, err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterUpdateOrganizationInvitation(ctx, actor, updated); err != nil {
+			return nil, err
+		}
 	}
 
 	return updated, nil
@@ -346,12 +377,24 @@ func (s *organizationInvitationService) AcceptOrganizationInvitation(ctx context
 		return nil, coreerrors.ErrForbidden
 	}
 
+	if s.hooks != nil {
+		if err := s.hooks.BeforeUpdateOrganizationInvitation(ctx, actor, invitation); err != nil {
+			return nil, err
+		}
+	}
+
 	accepted, err := s.acceptOrganizationInvitations(ctx, actorID, []types.OrganizationInvitation{*invitation})
 	if err != nil {
 		return nil, err
 	}
 	if len(accepted) == 0 {
 		return nil, coreerrors.ErrConflict
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterUpdateOrganizationInvitation(ctx, actor, &accepted[0]); err != nil {
+			return nil, err
+		}
 	}
 
 	return &accepted[0], nil
@@ -390,9 +433,21 @@ func (s *organizationInvitationService) RejectOrganizationInvitation(ctx context
 
 	invitation.Status = types.OrganizationInvitationStatusRejected
 
+	if s.hooks != nil {
+		if err := s.hooks.BeforeUpdateOrganizationInvitation(ctx, actor, invitation); err != nil {
+			return nil, err
+		}
+	}
+
 	updated, err := s.orgInvitationRepo.Update(ctx, invitation)
 	if err != nil {
 		return nil, err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterUpdateOrganizationInvitation(ctx, actor, updated); err != nil {
+			return nil, err
+		}
 	}
 
 	return updated, nil

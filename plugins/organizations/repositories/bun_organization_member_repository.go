@@ -10,26 +10,15 @@ import (
 )
 
 type BunOrganizationMemberRepository struct {
-	db    bun.IDB
-	hooks OrganizationMemberHookExecutor
+	db bun.IDB
 }
 
-func NewBunOrganizationMemberRepository(db bun.IDB, hooks ...OrganizationMemberHookExecutor) OrganizationMemberRepository {
-	var hook OrganizationMemberHookExecutor
-	if len(hooks) > 0 {
-		hook = hooks[0]
-	}
-	return &BunOrganizationMemberRepository{db: db, hooks: hook}
+func NewBunOrganizationMemberRepository(db bun.IDB) OrganizationMemberRepository {
+	return &BunOrganizationMemberRepository{db: db}
 }
 
 func (r *BunOrganizationMemberRepository) Create(ctx context.Context, member *types.OrganizationMember) (*types.OrganizationMember, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if r.hooks != nil {
-			if err := r.hooks.BeforeCreateOrganizationMember(member); err != nil {
-				return err
-			}
-		}
-
 		_, err := tx.NewInsert().Model(member).Exec(ctx)
 		if err != nil {
 			return err
@@ -37,12 +26,6 @@ func (r *BunOrganizationMemberRepository) Create(ctx context.Context, member *ty
 
 		if err := tx.NewSelect().Model(member).WherePK().Scan(ctx); err != nil {
 			return err
-		}
-
-		if r.hooks != nil {
-			if err := r.hooks.AfterCreateOrganizationMember(*member); err != nil {
-				return err
-			}
 		}
 
 		return nil
@@ -104,12 +87,6 @@ func (r *BunOrganizationMemberRepository) GetByOrganizationIDAndUserID(ctx conte
 
 func (r *BunOrganizationMemberRepository) Update(ctx context.Context, member *types.OrganizationMember) (*types.OrganizationMember, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if r.hooks != nil {
-			if err := r.hooks.BeforeUpdateOrganizationMember(member); err != nil {
-				return err
-			}
-		}
-
 		_, err := tx.NewUpdate().Model(member).WherePK().Exec(ctx)
 		if err != nil {
 			return err
@@ -117,12 +94,6 @@ func (r *BunOrganizationMemberRepository) Update(ctx context.Context, member *ty
 
 		if err := tx.NewSelect().Model(member).WherePK().Scan(ctx); err != nil {
 			return err
-		}
-
-		if r.hooks != nil {
-			if err := r.hooks.AfterUpdateOrganizationMember(*member); err != nil {
-				return err
-			}
 		}
 
 		return nil
@@ -136,29 +107,8 @@ func (r *BunOrganizationMemberRepository) Update(ctx context.Context, member *ty
 
 func (r *BunOrganizationMemberRepository) Delete(ctx context.Context, memberID string) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		memberRepo := r.WithTx(tx)
-		member, err := memberRepo.GetByID(ctx, memberID)
-		if err != nil {
-			return err
-		}
-		if member == nil {
-			return nil
-		}
-
-		if r.hooks != nil {
-			if err := r.hooks.BeforeDeleteOrganizationMember(member); err != nil {
-				return err
-			}
-		}
-
 		if _, err := tx.NewDelete().Model(&types.OrganizationMember{}).Where("id = ?", memberID).Exec(ctx); err != nil {
 			return err
-		}
-
-		if r.hooks != nil {
-			if err := r.hooks.AfterDeleteOrganizationMember(*member); err != nil {
-				return err
-			}
 		}
 
 		return nil
@@ -166,5 +116,5 @@ func (r *BunOrganizationMemberRepository) Delete(ctx context.Context, memberID s
 }
 
 func (r *BunOrganizationMemberRepository) WithTx(tx bun.IDB) OrganizationMemberRepository {
-	return &BunOrganizationMemberRepository{db: tx, hooks: r.hooks}
+	return &BunOrganizationMemberRepository{db: tx}
 }

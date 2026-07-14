@@ -20,6 +20,7 @@ type organizationTeamService struct {
 	orgTeamMemberRepo repositories.OrganizationTeamMemberRepository
 	serviceUtils      *ServiceUtils
 	txRunner          organizationTeamTxRunner
+	hooks             *ServiceHookExecutor
 }
 
 type organizationTeamTxRunner interface {
@@ -33,8 +34,13 @@ func NewOrganizationTeamService(
 	orgTeamMemberRepo repositories.OrganizationTeamMemberRepository,
 	serviceUtils *ServiceUtils,
 	txRunner organizationTeamTxRunner,
+	hooks ...*ServiceHookExecutor,
 ) *organizationTeamService {
-	return &organizationTeamService{orgRepo: orgRepo, orgTeamRepo: orgTeamRepo, orgMemberRepo: orgMemberRepo, orgTeamMemberRepo: orgTeamMemberRepo, serviceUtils: serviceUtils, txRunner: txRunner}
+	var hook *ServiceHookExecutor
+	if len(hooks) > 0 {
+		hook = hooks[0]
+	}
+	return &organizationTeamService{orgRepo: orgRepo, orgTeamRepo: orgTeamRepo, orgMemberRepo: orgMemberRepo, orgTeamMemberRepo: orgTeamMemberRepo, serviceUtils: serviceUtils, txRunner: txRunner, hooks: hook}
 }
 
 func (s *organizationTeamService) CreateTeam(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationTeamRequest) (*types.OrganizationTeam, error) {
@@ -78,6 +84,12 @@ func (s *organizationTeamService) CreateTeam(ctx context.Context, actor *models.
 		team.Metadata = make(map[string]any)
 	}
 
+	if s.hooks != nil {
+		if err := s.hooks.BeforeCreateOrganizationTeam(ctx, actor, team); err != nil {
+			return nil, err
+		}
+	}
+
 	var created *types.OrganizationTeam
 	createFn := func(ctx context.Context, memberRepo repositories.OrganizationMemberRepository, teamRepo repositories.OrganizationTeamRepository, teamMemberRepo repositories.OrganizationTeamMemberRepository) error {
 		createdTeam, err := teamRepo.Create(ctx, team)
@@ -114,11 +126,24 @@ func (s *organizationTeamService) CreateTeam(ctx context.Context, actor *models.
 		if err != nil {
 			return nil, err
 		}
+
+		if s.hooks != nil {
+			if err := s.hooks.AfterCreateOrganizationTeam(ctx, actor, created); err != nil {
+				return nil, err
+			}
+		}
+
 		return created, nil
 	}
 
 	if err := createFn(ctx, s.orgMemberRepo, s.orgTeamRepo, s.orgTeamMemberRepo); err != nil {
 		return nil, err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterCreateOrganizationTeam(ctx, actor, created); err != nil {
+			return nil, err
+		}
 	}
 
 	return created, nil
@@ -199,9 +224,21 @@ func (s *organizationTeamService) UpdateTeam(ctx context.Context, actor *models.
 		team.Metadata = make(map[string]any)
 	}
 
+	if s.hooks != nil {
+		if err := s.hooks.BeforeUpdateOrganizationTeam(ctx, actor, team); err != nil {
+			return nil, err
+		}
+	}
+
 	updated, err := s.orgTeamRepo.Update(ctx, team)
 	if err != nil {
 		return nil, err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterUpdateOrganizationTeam(ctx, actor, updated); err != nil {
+			return nil, err
+		}
 	}
 
 	return updated, nil
@@ -224,8 +261,20 @@ func (s *organizationTeamService) DeleteTeam(ctx context.Context, actor *models.
 		return coreerrors.ErrNotFound
 	}
 
+	if s.hooks != nil {
+		if err := s.hooks.BeforeDeleteOrganizationTeam(ctx, actor, team); err != nil {
+			return err
+		}
+	}
+
 	if err := s.orgTeamRepo.Delete(ctx, teamID); err != nil {
 		return err
+	}
+
+	if s.hooks != nil {
+		if err := s.hooks.AfterDeleteOrganizationTeam(ctx, actor, team); err != nil {
+			return err
+		}
 	}
 
 	return nil
