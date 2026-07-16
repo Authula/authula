@@ -85,6 +85,38 @@
         }
       }
     },
+    "/access-control/permissions/by-key/{permission_key}": {
+      "get": {
+        "tags": [
+          "Access Control"
+        ],
+        "summary": "Get permission by key",
+        "description": "Retrieves a permission by its key.",
+        "operationId": "getPermissionByKey",
+        "parameters": [
+          {
+            "name": "permission_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Permission"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/access-control/permissions/{permission_id}": {
       "get": {
         "tags": [
