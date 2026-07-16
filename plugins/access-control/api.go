@@ -56,6 +56,10 @@ func (a *API) GetPermissionByID(ctx context.Context, actor *models.Actor, permis
 	return a.useCases.GetPermissionByID(ctx, actor, permissionID)
 }
 
+func (a *API) GetPermissionByKey(ctx context.Context, actor *models.Actor, permissionKey string) (*types.Permission, error) {
+	return a.useCases.GetPermissionByKey(ctx, actor, permissionKey)
+}
+
 func (a *API) GetRolePermissions(ctx context.Context, actor *models.Actor, roleID string) ([]types.UserPermissionInfo, error) {
 	return a.useCases.GetRolePermissions(ctx, actor, roleID)
 }

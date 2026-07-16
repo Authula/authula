@@ -103,6 +103,16 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 			openapi.WithResponseStatus(http.StatusOK, &types.Permission{}),
 		),
 		svc.AddOperation(
+			http.MethodGet,
+			"/access-control/permissions/by-key/{permission_key}",
+			openapi.WithOperationID("getPermissionByKey"),
+			openapi.WithSummary("Get permission by key"),
+			openapi.WithDescription("Retrieves a permission by its key."),
+			openapi.WithTags("Access Control"),
+			openapi.WithRequest(&types.PermissionKey{}),
+			openapi.WithResponseStatus(http.StatusOK, &types.Permission{}),
+		),
+		svc.AddOperation(
 			http.MethodPatch,
 			"/access-control/permissions/{permission_id}",
 			openapi.WithOperationID("updatePermission"),

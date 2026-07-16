@@ -96,6 +96,31 @@ func (h *GetPermissionByIDHandler) Handler() http.HandlerFunc {
 	}
 }
 
+type GetPermissionByKeyHandler struct {
+	useCase *usecases.PermissionsUseCase
+}
+
+func NewGetPermissionByKeyHandler(useCase *usecases.PermissionsUseCase) *GetPermissionByKeyHandler {
+	return &GetPermissionByKeyHandler{useCase: useCase}
+}
+
+func (h *GetPermissionByKeyHandler) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
+		permissionKey := r.PathValue("permission_key")
+
+		permission, err := h.useCase.GetPermissionByKey(ctx, actor, permissionKey)
+		if err != nil {
+			respondRolePermissionError(reqCtx, err)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusOK, permission)
+	}
+}
+
 type UpdatePermissionHandler struct {
 	useCase *usecases.PermissionsUseCase
 }

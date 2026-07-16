@@ -298,6 +298,89 @@ func TestGetPermissionByIDHandler(t *testing.T) {
 	}
 }
 
+func TestGetPermissionByKeyHandler(t *testing.T) {
+	t.Parallel()
+
+	fixedTime := time.Date(2026, 3, 29, 12, 0, 0, 0, time.UTC)
+	description := new(string)
+	*description = "read access"
+
+	tests := []struct {
+		name           string
+		permissionKey  string
+		setupMock      func(*accesscontroltests.MockPermissionsRepository)
+		expectedStatus int
+		expectedBody   any
+	}{
+		{
+			name:          "service error",
+			permissionKey: "missing.key",
+			setupMock: func(m *accesscontroltests.MockPermissionsRepository) {
+				m.On("GetPermissionByKey", mock.Anything, "missing.key").Return((*types.Permission)(nil), coreerrors.ErrNotFound).Once()
+			},
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   map[string]string{"message": "not found"},
+		},
+		{
+			name:          "success",
+			permissionKey: "users.read",
+			setupMock: func(m *accesscontroltests.MockPermissionsRepository) {
+				m.On("GetPermissionByKey", mock.Anything, "users.read").Return(&types.Permission{
+					ID:          "perm-1",
+					Key:         "users.read",
+					Description: description,
+					IsSystem:    false,
+					CreatedAt:   fixedTime,
+					UpdatedAt:   fixedTime,
+				}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody: &types.Permission{
+				ID:          "perm-1",
+				Key:         "users.read",
+				Description: description,
+				IsSystem:    false,
+				CreatedAt:   fixedTime,
+				UpdatedAt:   fixedTime,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
+			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
+			if tc.setupMock != nil {
+				tc.setupMock(permissionsRepo)
+			}
+
+			useCase := newPermissionsUseCase(permissionsRepo, rolePermissionsRepo)
+			handler := NewGetPermissionByKeyHandler(useCase)
+			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodGet, "/permissions/by-key/"+tc.permissionKey, nil, internaltests.TestActor())
+			req.SetPathValue("permission_key", tc.permissionKey)
+
+			handler.Handler()(w, req)
+
+			if tc.expectedStatus != http.StatusOK {
+				internaltests.AssertErrorMessage(t, reqCtx, tc.expectedStatus, tc.expectedBody.(map[string]string)["message"])
+				permissionsRepo.AssertExpectations(t)
+				return
+			}
+
+			if reqCtx.ResponseStatus != tc.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tc.expectedStatus, reqCtx.ResponseStatus)
+			}
+
+			payload := internaltests.DecodeResponseJSON[types.Permission](t, reqCtx)
+			assertPermissionEqual(t, payload, *tc.expectedBody.(*types.Permission))
+
+			permissionsRepo.AssertExpectations(t)
+		})
+	}
+}
+
 func TestUpdatePermissionHandler(t *testing.T) {
 	t.Parallel()
 

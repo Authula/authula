@@ -20,6 +20,10 @@ type PermissionID struct {
 	PermissionID string `path:"permission_id"`
 }
 
+type PermissionKey struct {
+	PermissionKey string `path:"permission_key"`
+}
+
 type UserID struct {
 	UserID string `path:"user_id"`
 }

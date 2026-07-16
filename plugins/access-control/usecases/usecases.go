@@ -91,6 +91,10 @@ func (u *UseCases) GetPermissionByID(ctx context.Context, actor *models.Actor, p
 	return u.permissions.GetPermissionByID(ctx, actor, permissionID)
 }
 
+func (u *UseCases) GetPermissionByKey(ctx context.Context, actor *models.Actor, permissionKey string) (*types.Permission, error) {
+	return u.permissions.GetPermissionByKey(ctx, actor, permissionKey)
+}
+
 func (u *UseCases) UpdatePermission(ctx context.Context, actor *models.Actor, permissionID string, req types.UpdatePermissionRequest) (*types.Permission, error) {
 	return u.permissions.UpdatePermission(ctx, actor, permissionID, req)
 }

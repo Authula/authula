@@ -100,6 +100,14 @@ func Routes(api *API) []models.Route {
 		},
 		{
 			Method: http.MethodGet,
+			Path:   "/access-control/permissions/by-key/{permission_key}",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequireAuthenticated(),
+			},
+			Handler: handlers.NewGetPermissionByKeyHandler(usecases.permissions).Handler(),
+		},
+		{
+			Method: http.MethodGet,
 			Path:   "/access-control/permissions/{permission_id}",
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireAuthenticated(),
