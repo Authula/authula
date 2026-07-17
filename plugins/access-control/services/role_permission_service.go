@@ -61,9 +61,6 @@ func (s *RolePermissionsService) AddPermissionToRole(ctx context.Context, actor 
 	if permission == nil {
 		return coreerrors.ErrNotFound
 	}
-	if permission.IsSystem {
-		return coreerrors.ErrBadRequest
-	}
 
 	return s.rolePermissionsRepo.AddRolePermission(ctx, roleID, permissionID, grantedByUserID)
 }
@@ -93,9 +90,6 @@ func (s *RolePermissionsService) RemovePermissionFromRole(ctx context.Context, a
 	}
 	if permission == nil {
 		return coreerrors.ErrNotFound
-	}
-	if permission.IsSystem {
-		return coreerrors.ErrBadRequest
 	}
 
 	return s.rolePermissionsRepo.RemoveRolePermission(ctx, roleID, permissionID)
@@ -134,9 +128,6 @@ func (s *RolePermissionsService) ReplaceRolePermissions(ctx context.Context, act
 		}
 		if permission == nil {
 			return coreerrors.ErrNotFound
-		}
-		if permission.IsSystem {
-			return coreerrors.ErrBadRequest
 		}
 
 		normalized = append(normalized, permissionID)
