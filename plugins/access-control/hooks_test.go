@@ -24,7 +24,7 @@ func (a *noopAuthorizer) AuthorizeScope(_ context.Context, _ *authmodels.Actor, 
 	return nil
 }
 
-func (a *noopAuthorizer) AuthorizeOrganizationAccess(_ context.Context, _ *authmodels.Actor, _ string, _ string) error {
+func (a *noopAuthorizer) AuthorizeOrganizationAccess(_ context.Context, _ *authmodels.Actor, _ string) error {
 	return nil
 }
 

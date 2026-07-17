@@ -13,7 +13,7 @@ func (a *NoopAuthorizer) AuthorizeScope(_ context.Context, _ *models.Actor, _ st
 	return nil
 }
 
-func (a *NoopAuthorizer) AuthorizeOrganizationAccess(_ context.Context, _ *models.Actor, _ string, _ string) error {
+func (a *NoopAuthorizer) AuthorizeOrganizationAccess(_ context.Context, _ *models.Actor, _ string) error {
 	return nil
 }
 
@@ -26,8 +26,8 @@ func (m *MockAuthorizer) AuthorizeScope(ctx context.Context, actor *models.Actor
 	return args.Error(0)
 }
 
-func (m *MockAuthorizer) AuthorizeOrganizationAccess(ctx context.Context, actor *models.Actor, orgID string, scope string) error {
-	args := m.Called(ctx, actor, orgID, scope)
+func (m *MockAuthorizer) AuthorizeOrganizationAccess(ctx context.Context, actor *models.Actor, orgID string) error {
+	args := m.Called(ctx, actor, orgID)
 	return args.Error(0)
 }
 

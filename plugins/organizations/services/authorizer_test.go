@@ -85,48 +85,35 @@ func TestAuthorizer_AuthorizeOrganizationAccess(t *testing.T) {
 		name    string
 		actor   *models.Actor
 		orgID   string
-		scope   string
 		wantErr error
 	}{
 		{
 			name:    "nil actor returns unauthorized",
 			actor:   nil,
 			orgID:   "org-1",
-			scope:   "organizations:read",
 			wantErr: coreerrors.ErrUnauthorized,
 		},
 		{
 			name:    "empty ID actor returns unauthorized",
 			actor:   &models.Actor{ID: "", Type: models.ActorUser},
 			orgID:   "org-1",
-			scope:   "organizations:read",
 			wantErr: coreerrors.ErrUnauthorized,
 		},
 		{
-			name:  "allows user with matching scope",
-			actor: &models.Actor{ID: "user-1", Type: models.ActorUser, Scopes: []string{"organizations:read"}},
+			name:  "allows user access to org",
+			actor: &models.Actor{ID: "user-1", Type: models.ActorUser},
 			orgID: "org-1",
-			scope: "organizations:read",
 		},
 		{
-			name:  "allows machine with matching scope and org claim",
-			actor: &models.Actor{ID: "machine-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}, Scopes: []string{"organizations:read"}},
+			name:  "allows machine with matching org claim",
+			actor: &models.Actor{ID: "machine-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}},
 			orgID: "org-1",
-			scope: "organizations:read",
 		},
 		{
 			name:    "denies machine with wrong org claim",
-			actor:   &models.Actor{ID: "machine-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}, Scopes: []string{"organizations:read"}},
+			actor:   &models.Actor{ID: "machine-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}},
 			orgID:   "org-2",
-			scope:   "organizations:read",
 			wantErr: coreerrors.ErrForbidden,
-		},
-		{
-			name:    "denies actor without scope",
-			actor:   &models.Actor{ID: "user-1", Type: models.ActorUser},
-			orgID:   "org-1",
-			scope:   "organizations:read",
-			wantErr: coreerrors.ErrInsufficientPermissions,
 		},
 	}
 
@@ -135,7 +122,7 @@ func TestAuthorizer_AuthorizeOrganizationAccess(t *testing.T) {
 			t.Parallel()
 
 			a := authorizer()
-			err := a.AuthorizeOrganizationAccess(ctx, tt.actor, tt.orgID, tt.scope)
+			err := a.AuthorizeOrganizationAccess(ctx, tt.actor, tt.orgID)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				return
