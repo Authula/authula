@@ -42,15 +42,18 @@ func (p *RateLimitPlugin) checkEndpointRateLimitHook() models.HookHandler {
 		window := p.pluginConfig.Window
 		max := p.pluginConfig.Max
 
-		if rule, exists := p.pluginConfig.CustomRules[reqCtx.Request.RequestURI]; exists {
-			if rule.Disabled {
+		if rule, exists := p.pluginConfig.CustomRules[reqCtx.Path]; exists {
+			if len(rule.Methods) > 0 && !slices.Contains(rule.Methods, reqCtx.Request.Method) {
+				// rule doesn't apply to this method; use defaults
+			} else if rule.Disabled {
 				return nil
-			}
-			if rule.Window > 0 {
-				window = rule.Window
-			}
-			if rule.Max > 0 {
-				max = rule.Max
+			} else {
+				if rule.Window > 0 {
+					window = rule.Window
+				}
+				if rule.Max > 0 {
+					max = rule.Max
+				}
 			}
 		}
 

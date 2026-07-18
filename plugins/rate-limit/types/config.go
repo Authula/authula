@@ -62,4 +62,5 @@ type RateLimitRule struct {
 	Window   time.Duration `json:"window" toml:"window"`
 	Max      int           `json:"max" toml:"max"`
 	Prefix   string        `json:"prefix,omitempty" toml:"prefix"`
+	Methods  []string      `json:"methods,omitempty" toml:"methods"`
 }
