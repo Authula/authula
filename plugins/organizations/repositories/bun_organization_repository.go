@@ -57,7 +57,7 @@ func (r *BunOrganizationRepository) GetBySlug(ctx context.Context, slug string) 
 
 func (r *BunOrganizationRepository) GetAllByOwnerID(ctx context.Context, ownerID string) ([]types.Organization, error) {
 	organizations := make([]types.Organization, 0)
-	err := r.db.NewSelect().Model(&organizations).Where("owner_id = ?", ownerID).Scan(ctx)
+	err := r.db.NewSelect().Model(&organizations).Where("owner_id = ?", ownerID).Order("created_at DESC").Scan(ctx)
 	if err == sql.ErrNoRows {
 		return []types.Organization{}, nil
 	}
