@@ -22,6 +22,7 @@ func TestRateLimitPluginCheckEndpointRateLimitHook(t *testing.T) {
 		method              string
 		requestURI          string
 		clientIP            string
+		routePattern        string
 		config              types.RateLimitPluginConfig
 		provider            *plugintests.FakeRateLimitProvider
 		expectedHandled     bool
@@ -61,7 +62,7 @@ func TestRateLimitPluginCheckEndpointRateLimitHook(t *testing.T) {
 			expectedStatusCode:  0,
 			expectedLimit:       "10",
 			expectedRemaining:   "7",
-			expectedProviderKey: "ratelimit:127.0.0.1",
+			expectedProviderKey: "ratelimit:{127.0.0.1}",
 		},
 		{
 			name:       "blocks request when over limit",
@@ -79,7 +80,7 @@ func TestRateLimitPluginCheckEndpointRateLimitHook(t *testing.T) {
 			expectedStatusCode:  http.StatusTooManyRequests,
 			expectedLimit:       "5",
 			expectedRemaining:   "0",
-			expectedProviderKey: "ratelimit:127.0.0.1",
+			expectedProviderKey: "ratelimit:{127.0.0.1}",
 		},
 		{
 			name:       "custom rule overrides default limits",
@@ -99,7 +100,7 @@ func TestRateLimitPluginCheckEndpointRateLimitHook(t *testing.T) {
 			expectedStatusCode:  0,
 			expectedLimit:       "2",
 			expectedRemaining:   "1",
-			expectedProviderKey: "ratelimit:127.0.0.1",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:335933e86f5c1d0e5c215f9399d23d30cf190d0d48dccfad9db4fc992d47b554",
 		},
 		{
 			name:       "custom rule with methods matching request method",
@@ -111,7 +112,7 @@ func TestRateLimitPluginCheckEndpointRateLimitHook(t *testing.T) {
 				Window: time.Minute,
 				Max:    10,
 				CustomRules: map[string]types.RateLimitRule{
-					"/orgs": {Methods: []string{"POST"}, Max: 5, Window: time.Minute},
+					"POST:/orgs": {Max: 5, Window: time.Minute},
 				},
 			},
 			provider:            plugintests.NewFakeRateLimitProvider().WithCheckResult(true, 1, time.Unix(4000, 0), nil),
@@ -119,27 +120,7 @@ func TestRateLimitPluginCheckEndpointRateLimitHook(t *testing.T) {
 			expectedStatusCode:  0,
 			expectedLimit:       "5",
 			expectedRemaining:   "4",
-			expectedProviderKey: "ratelimit:127.0.0.1",
-		},
-		{
-			name:       "custom rule with methods not matching request method uses defaults",
-			method:     http.MethodGet,
-			requestURI: "/orgs",
-			clientIP:   "127.0.0.1",
-			config: types.RateLimitPluginConfig{
-				Prefix: "ratelimit:",
-				Window: time.Minute,
-				Max:    10,
-				CustomRules: map[string]types.RateLimitRule{
-					"/orgs": {Methods: []string{"POST"}, Max: 5, Window: time.Minute},
-				},
-			},
-			provider:            plugintests.NewFakeRateLimitProvider().WithCheckResult(true, 1, time.Unix(4000, 0), nil),
-			expectedHandled:     false,
-			expectedStatusCode:  0,
-			expectedLimit:       "10",
-			expectedRemaining:   "9",
-			expectedProviderKey: "ratelimit:127.0.0.1",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:61d8e3ca8d9639ad3b2c76e2c734e88c21bdf72fd359f8ad7a367c9acebc5b46",
 		},
 		{
 			name:       "custom rule with empty methods applies to all methods",
@@ -159,7 +140,7 @@ func TestRateLimitPluginCheckEndpointRateLimitHook(t *testing.T) {
 			expectedStatusCode:  0,
 			expectedLimit:       "3",
 			expectedRemaining:   "3",
-			expectedProviderKey: "ratelimit:127.0.0.1",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:c47aecfffdf8e75f3aee92f370238c70cced3349f6981e91e570fa69046deba4",
 		},
 		{
 			name:       "custom rule with methods and disabled skips rate limiting",
@@ -171,7 +152,7 @@ func TestRateLimitPluginCheckEndpointRateLimitHook(t *testing.T) {
 				Window: time.Minute,
 				Max:    10,
 				CustomRules: map[string]types.RateLimitRule{
-					"/disabled": {Methods: []string{"POST"}, Disabled: true},
+					"POST:/disabled": {Disabled: true},
 				},
 			},
 			provider:            plugintests.NewFakeRateLimitProvider(),
@@ -197,7 +178,233 @@ func TestRateLimitPluginCheckEndpointRateLimitHook(t *testing.T) {
 			expectedStatusCode:  0,
 			expectedLimit:       "5",
 			expectedRemaining:   "3",
-			expectedProviderKey: "ratelimit:127.0.0.1",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:863e103d83c10ef6909164ebdaf15a7122883fd80194bd174bc7f753947155fb",
+		},
+		{
+			name:         "custom rule matches parameterized route pattern exactly",
+			method:       http.MethodGet,
+			requestURI:   "/orgs/my-org",
+			clientIP:     "127.0.0.1",
+			routePattern: "GET:/orgs/{org}",
+			config: types.RateLimitPluginConfig{
+				Prefix: "ratelimit:",
+				Window: time.Minute,
+				Max:    10,
+				CustomRules: map[string]types.RateLimitRule{
+					"GET:/orgs/{org}": {Window: time.Minute, Max: 3},
+				},
+			},
+			provider:            plugintests.NewFakeRateLimitProvider().WithCheckResult(true, 1, time.Unix(4000, 0), nil),
+			expectedHandled:     false,
+			expectedStatusCode:  0,
+			expectedLimit:       "3",
+			expectedRemaining:   "2",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:a2aa82efc70403a7a2e6a07ab0e8befaf6df33a448c3338b96264a371aa7faf4",
+		},
+		{
+			name:         "custom rule matches parameterized route with different param name",
+			method:       http.MethodGet,
+			requestURI:   "/orgs/my-org",
+			clientIP:     "127.0.0.1",
+			routePattern: "GET:/orgs/{org}",
+			config: types.RateLimitPluginConfig{
+				Prefix: "ratelimit:",
+				Window: time.Minute,
+				Max:    10,
+				CustomRules: map[string]types.RateLimitRule{
+					"GET:/orgs/{organization_id}": {Window: time.Minute, Max: 5},
+				},
+			},
+			provider:            plugintests.NewFakeRateLimitProvider().WithCheckResult(true, 1, time.Unix(4000, 0), nil),
+			expectedHandled:     false,
+			expectedStatusCode:  0,
+			expectedLimit:       "5",
+			expectedRemaining:   "4",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:a2aa82efc70403a7a2e6a07ab0e8befaf6df33a448c3338b96264a371aa7faf4",
+		},
+		{
+			name:         "path-only normalized rule matches parameterized route",
+			method:       http.MethodGet,
+			requestURI:   "/orgs/my-org",
+			clientIP:     "127.0.0.1",
+			routePattern: "GET:/orgs/{org}",
+			config: types.RateLimitPluginConfig{
+				Prefix: "ratelimit:",
+				Window: time.Minute,
+				Max:    10,
+				CustomRules: map[string]types.RateLimitRule{
+					"/orgs/{id}": {Window: time.Minute, Max: 5},
+				},
+			},
+			provider:            plugintests.NewFakeRateLimitProvider().WithCheckResult(true, 2, time.Unix(4000, 0), nil),
+			expectedHandled:     false,
+			expectedStatusCode:  0,
+			expectedLimit:       "5",
+			expectedRemaining:   "3",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:74e74464cd07ae4752ef1b4d612f23f88c7055125c5311ffc818784ab01c1e44",
+		},
+		{
+			name:         "auto-pattern fallback creates key for parameterized route without custom rule",
+			method:       http.MethodGet,
+			requestURI:   "/orgs/my-org",
+			clientIP:     "127.0.0.1",
+			routePattern: "GET:/orgs/{org}",
+			config: types.RateLimitPluginConfig{
+				Prefix:      "ratelimit:",
+				Window:      time.Minute,
+				Max:         10,
+				CustomRules: map[string]types.RateLimitRule{},
+			},
+			provider:            plugintests.NewFakeRateLimitProvider().WithCheckResult(true, 1, time.Unix(4000, 0), nil),
+			expectedHandled:     false,
+			expectedStatusCode:  0,
+			expectedLimit:       "10",
+			expectedRemaining:   "9",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:a2aa82efc70403a7a2e6a07ab0e8befaf6df33a448c3338b96264a371aa7faf4",
+		},
+		{
+			name:         "auto-pattern fallback creates key for wildcard route",
+			method:       http.MethodGet,
+			requestURI:   "/api/v1/auth/any/path",
+			clientIP:     "127.0.0.1",
+			routePattern: "GET:/api/v1/auth/*",
+			config: types.RateLimitPluginConfig{
+				Prefix:      "ratelimit:",
+				Window:      time.Minute,
+				Max:         10,
+				CustomRules: map[string]types.RateLimitRule{},
+			},
+			provider:            plugintests.NewFakeRateLimitProvider().WithCheckResult(true, 1, time.Unix(4000, 0), nil),
+			expectedHandled:     false,
+			expectedStatusCode:  0,
+			expectedLimit:       "10",
+			expectedRemaining:   "9",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:a69fd86c68cc5df41d7cad70051dc48edbaf72fdb73515136f7c61d875022ec8",
+		},
+		{
+			name:         "disabled parameterized custom rule skips rate limiting entirely",
+			method:       http.MethodGet,
+			requestURI:   "/orgs/my-org",
+			clientIP:     "127.0.0.1",
+			routePattern: "GET:/orgs/{org}",
+			config: types.RateLimitPluginConfig{
+				Prefix: "ratelimit:",
+				Window: time.Minute,
+				Max:    10,
+				CustomRules: map[string]types.RateLimitRule{
+					"GET:/orgs/{org}": {Disabled: true, Window: time.Hour, Max: 1},
+				},
+			},
+			provider:            plugintests.NewFakeRateLimitProvider(),
+			expectedHandled:     false,
+			expectedStatusCode:  0,
+			expectedProviderKey: "",
+		},
+		{
+			name:         "custom rule with method-prefixed pattern on parameterized route exact param name",
+			method:       http.MethodPost,
+			requestURI:   "/orgs/my-org",
+			clientIP:     "127.0.0.1",
+			routePattern: "POST:/orgs/{org}",
+			config: types.RateLimitPluginConfig{
+				Prefix: "ratelimit:",
+				Window: time.Minute,
+				Max:    10,
+				CustomRules: map[string]types.RateLimitRule{
+					"POST:/orgs/{org}": {Window: 2 * time.Minute, Max: 2},
+				},
+			},
+			provider:            plugintests.NewFakeRateLimitProvider().WithCheckResult(true, 0, time.Unix(4000, 0), nil),
+			expectedHandled:     false,
+			expectedStatusCode:  0,
+			expectedLimit:       "2",
+			expectedRemaining:   "2",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:e954424096dfcd16453e40da6ab50c878cf12847dbf72aa8c8016877df6e101b",
+		},
+		{
+			name:         "custom rule with param matches wildcard route pattern via normalized match",
+			method:       http.MethodGet,
+			requestURI:   "/api/v1/auth/organizations/my-org",
+			clientIP:     "127.0.0.1",
+			routePattern: "GET:/api/v1/auth/organizations/*",
+			config: types.RateLimitPluginConfig{
+				Prefix: "ratelimit:",
+				Window: time.Minute,
+				Max:    10,
+				CustomRules: map[string]types.RateLimitRule{
+					"GET:/api/v1/auth/organizations/{organization_id}": {Window: time.Minute, Max: 3},
+				},
+			},
+			provider:            plugintests.NewFakeRateLimitProvider().WithCheckResult(true, 1, time.Unix(4000, 0), nil),
+			expectedHandled:     false,
+			expectedStatusCode:  0,
+			expectedLimit:       "3",
+			expectedRemaining:   "2",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:50efd03ebe9bf7735e524bc92eab347722d67e556c1965f023903e00cae2f98f",
+		},
+		{
+			name:         "custom rule with star matches param route pattern via normalized match",
+			method:       http.MethodGet,
+			requestURI:   "/api/v1/auth/organizations/my-org",
+			clientIP:     "127.0.0.1",
+			routePattern: "GET:/api/v1/auth/organizations/{org}",
+			config: types.RateLimitPluginConfig{
+				Prefix: "ratelimit:",
+				Window: time.Minute,
+				Max:    10,
+				CustomRules: map[string]types.RateLimitRule{
+					"GET:/api/v1/auth/organizations/*": {Window: time.Minute, Max: 3},
+				},
+			},
+			provider:            plugintests.NewFakeRateLimitProvider().WithCheckResult(true, 1, time.Unix(4000, 0), nil),
+			expectedHandled:     false,
+			expectedStatusCode:  0,
+			expectedLimit:       "3",
+			expectedRemaining:   "2",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:7688d9b834fe8b7a352ebbda3e285c077424480ac333f553d0ceee95255f0335",
+		},
+		{
+			name:         "path-only custom rule with param matches wildcard route via normalized match",
+			method:       http.MethodGet,
+			requestURI:   "/api/v1/auth/organizations/my-org",
+			clientIP:     "127.0.0.1",
+			routePattern: "GET:/api/v1/auth/organizations/*",
+			config: types.RateLimitPluginConfig{
+				Prefix: "ratelimit:",
+				Window: time.Minute,
+				Max:    10,
+				CustomRules: map[string]types.RateLimitRule{
+					"/api/v1/auth/organizations/{org}": {Window: time.Minute, Max: 4},
+				},
+			},
+			provider:            plugintests.NewFakeRateLimitProvider().WithCheckResult(true, 1, time.Unix(4000, 0), nil),
+			expectedHandled:     false,
+			expectedStatusCode:  0,
+			expectedLimit:       "4",
+			expectedRemaining:   "3",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:ecf641468f45887365ead5d80d4cad8fd53d8e6e77b1cee381a4eeee12f9fda3",
+		},
+		{
+			name:         "wildcard route with list endpoint does not match param rule with different segment count",
+			method:       http.MethodGet,
+			requestURI:   "/api/v1/auth/organizations",
+			clientIP:     "127.0.0.1",
+			routePattern: "GET:/api/v1/auth/organizations/*",
+			config: types.RateLimitPluginConfig{
+				Prefix: "ratelimit:",
+				Window: time.Minute,
+				Max:    10,
+				CustomRules: map[string]types.RateLimitRule{
+					"GET:/api/v1/auth/organizations":                          {Window: time.Hour, Max: 5},
+					"GET:/api/v1/auth/organizations/{organization_id}":        {Window: time.Hour, Max: 1},
+				},
+			},
+			provider:            plugintests.NewFakeRateLimitProvider().WithCheckResult(true, 1, time.Unix(4000, 0), nil),
+			expectedHandled:     false,
+			expectedStatusCode:  0,
+			expectedLimit:       "5",
+			expectedRemaining:   "4",
+			expectedProviderKey: "ratelimit:{127.0.0.1}:6323512646ff410bbbc1c3de6d7d308645e15f57c30b31b234bdd792220b4454",
 		},
 		{
 			name:       "provider errors fail open",
@@ -213,7 +420,7 @@ func TestRateLimitPluginCheckEndpointRateLimitHook(t *testing.T) {
 			provider:            plugintests.NewFakeRateLimitProvider().WithCheckError(errors.New("boom")),
 			expectedHandled:     false,
 			expectedStatusCode:  0,
-			expectedProviderKey: "ratelimit:127.0.0.1",
+			expectedProviderKey: "ratelimit:{127.0.0.1}",
 		},
 	}
 
@@ -234,6 +441,10 @@ func TestRateLimitPluginCheckEndpointRateLimitHook(t *testing.T) {
 				Path:           req.URL.Path,
 				ClientIP:       tc.clientIP,
 				Values:         map[string]any{},
+			}
+
+			if tc.routePattern != "" {
+				reqCtx.Route = &models.Route{Pattern: tc.routePattern}
 			}
 
 			if err := plugin.checkEndpointRateLimitHook()(reqCtx); err != nil {
@@ -597,6 +808,38 @@ func TestRateLimitContextSetters(t *testing.T) {
 			reqCtx := &models.RequestContext{Values: make(map[string]any)}
 			tc.setter(reqCtx)
 			assertRateLimitRuleContext(t, reqCtx, tc.expected)
+		})
+	}
+}
+
+func TestNormalizeParams(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{input: "", expected: ""},
+		{input: "/api/users", expected: "/api/users"},
+		{input: "GET:/api/users", expected: "GET:/api/users"},
+		{input: "/api/users/{id}", expected: "/api/users/{*}"},
+		{input: "GET:/api/users/{id}", expected: "GET:/api/users/{*}"},
+		{input: "GET:/api/users/{user_id}/posts/{post_id}", expected: "GET:/api/users/{*}/posts/{*}"},
+		{input: "/api/users/{org}/settings", expected: "/api/users/{*}/settings"},
+		{input: "GET:/api/*", expected: "GET:/api/{*}"},
+		{input: "GET:/api/users/{id}?foo=bar", expected: "GET:/api/users/{*}?foo=bar"},
+		{input: "{unclosed", expected: "{unclosed"},
+		{input: "no/curly/braces", expected: "no/curly/braces"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			t.Parallel()
+
+			got := normalizeParams(tc.input)
+			if got != tc.expected {
+				t.Fatalf("normalizeParams(%q) = %q, want %q", tc.input, got, tc.expected)
+			}
 		})
 	}
 }

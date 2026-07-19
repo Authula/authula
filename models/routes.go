@@ -7,6 +7,7 @@ import (
 type Route struct {
 	Method     string
 	Path       string
+	Pattern    string
 	Handler    http.Handler
 	Middleware []func(http.Handler) http.Handler
 	// Metadata holds route-specific metadata, including plugin IDs ("plugins"),

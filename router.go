@@ -582,17 +582,19 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Lookup route metadata
-	metadata, _, exists := r.getRouteMetadata(req.Method, req.URL.Path)
+	metadata, pattern, exists := r.getRouteMetadata(req.Method, req.URL.Path)
 	if exists {
 		reqCtx.Route = &models.Route{
 			Method:   req.Method,
 			Path:     req.URL.Path,
+			Pattern:  pattern,
 			Metadata: metadata,
 		}
 	} else {
 		reqCtx.Route = &models.Route{
 			Method:   req.Method,
 			Path:     req.URL.Path,
+			Pattern:  pattern,
 			Metadata: make(map[string]any),
 		}
 	}

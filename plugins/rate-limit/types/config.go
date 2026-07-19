@@ -20,14 +20,15 @@ func (r RateLimitProviderType) String() string {
 }
 
 type RateLimitPluginConfig struct {
-	Enabled     bool                     `json:"enabled" toml:"enabled"`
-	Window      time.Duration            `json:"window" toml:"window"`
-	Max         int                      `json:"max" toml:"max"`
-	Prefix      string                   `json:"prefix,omitempty" toml:"prefix"`
-	CustomRules map[string]RateLimitRule `json:"custom_rules" toml:"custom_rules"`
-	Provider    RateLimitProviderType    `json:"provider" toml:"provider"`
-	Memory      *MemoryStorageConfig     `json:"memory,omitempty" toml:"memory"`
-	Database    *DatabaseStorageConfig   `json:"database,omitempty" toml:"database"`
+	Enabled      bool                     `json:"enabled" toml:"enabled"`
+	Window       time.Duration            `json:"window" toml:"window"`
+	Max          int                      `json:"max" toml:"max"`
+	Prefix       string                   `json:"prefix,omitempty" toml:"prefix"`
+	HashClientIP bool                     `json:"hash_client_ip,omitempty" toml:"hash_client_ip"`
+	CustomRules  map[string]RateLimitRule `json:"custom_rules" toml:"custom_rules"`
+	Provider     RateLimitProviderType    `json:"provider" toml:"provider"`
+	Memory       *MemoryStorageConfig     `json:"memory,omitempty" toml:"memory"`
+	Database     *DatabaseStorageConfig   `json:"database,omitempty" toml:"database"`
 }
 
 func (config *RateLimitPluginConfig) ApplyDefaults() {
@@ -61,6 +62,4 @@ type RateLimitRule struct {
 	Disabled bool          `json:"disabled" toml:"disabled"`
 	Window   time.Duration `json:"window" toml:"window"`
 	Max      int           `json:"max" toml:"max"`
-	Prefix   string        `json:"prefix,omitempty" toml:"prefix"`
-	Methods  []string      `json:"methods,omitempty" toml:"methods"`
 }

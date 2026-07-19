@@ -1,6 +1,8 @@
 package util
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"maps"
 	"net/http"
@@ -225,6 +227,11 @@ func MergeStringSlices(values ...[]string) []string {
 	}
 
 	return merged
+}
+
+func SHA256Hex(s string) string {
+	h := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(h[:])
 }
 
 func NormalizeRoutePattern(pattern string) string {

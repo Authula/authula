@@ -4,9 +4,12 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/rate-limit/types"
+	"github.com/Authula/authula/util"
 )
 
 func (p *RateLimitPlugin) buildHooks() []models.Hook {
@@ -19,7 +22,7 @@ func (p *RateLimitPlugin) buildHooks() []models.Hook {
 		{
 			Stage:   models.HookBefore,
 			Handler: p.checkRateLimitRuleHook(),
-			Order:   15, // This must run after any plugin that sets the ContextRateLimitRule value, so it should have a higher order than those plugins
+			Order:   15,
 		},
 		{
 			Stage:   models.HookAfter,
@@ -38,29 +41,97 @@ func (p *RateLimitPlugin) checkEndpointRateLimitHook() models.HookHandler {
 			return nil
 		}
 
-		key := p.pluginConfig.Prefix + reqCtx.ClientIP
 		window := p.pluginConfig.Window
 		max := p.pluginConfig.Max
 
-		if rule, exists := p.pluginConfig.CustomRules[reqCtx.Path]; exists {
-			if len(rule.Methods) > 0 && !slices.Contains(rule.Methods, reqCtx.Request.Method) {
-				// rule doesn't apply to this method; use defaults
-			} else if rule.Disabled {
-				return nil
-			} else {
+		var identifier string
+		if p.pluginConfig.HashClientIP {
+			identifier = util.SHA256Hex(reqCtx.ClientIP)
+		} else {
+			identifier = normalizeIP(reqCtx.ClientIP)
+		}
+
+		key := p.pluginConfig.Prefix + hashTagKey(identifier)
+
+		patterns := []string{""}
+		if reqCtx.Route != nil && reqCtx.Route.Pattern != "" {
+			patterns = append(patterns, reqCtx.Route.Pattern)
+		}
+		patterns = append(patterns, reqCtx.Request.Method+":"+reqCtx.Path)
+
+		matched := false
+
+		for _, pattern := range patterns {
+			if pattern == "" {
+				continue
+			}
+
+			var rule *types.RateLimitRule
+			hashInput := ""
+
+			if rateLimitRule, exists := p.pluginConfig.CustomRules[pattern]; exists {
+				rule = &rateLimitRule
+				hashInput = pattern
+			}
+
+			if rule == nil {
+				normPattern := normalizeParams(pattern)
+				for rateLimitRuleKey, rateLimitRule := range p.pluginConfig.CustomRules {
+					if normalizeParams(rateLimitRuleKey) == normPattern && segmentsMatch(reqCtx.Path, rateLimitRuleKey) {
+						rule = &rateLimitRule
+						hashInput = pattern
+						break
+					}
+				}
+			}
+
+			if rule == nil {
+				if pathOnly, ok := strings.CutPrefix(pattern, reqCtx.Request.Method+":"); ok {
+					if r, exists := p.pluginConfig.CustomRules[pathOnly]; exists {
+						rule = &r
+						hashInput = pathOnly
+					}
+				}
+			}
+
+			if rule == nil {
+				if pathOnly, ok := strings.CutPrefix(pattern, reqCtx.Request.Method+":"); ok {
+					normPathOnly := normalizeParams(pathOnly)
+					for rateLimitRuleKey, rateLimitRule := range p.pluginConfig.CustomRules {
+						if normalizeParams(rateLimitRuleKey) == normPathOnly && segmentsMatch(reqCtx.Path, rateLimitRuleKey) {
+							rule = &rateLimitRule
+							hashInput = pathOnly
+							break
+						}
+					}
+				}
+			}
+
+			if rule != nil {
+				if rule.Disabled {
+					return nil
+				}
 				if rule.Window > 0 {
 					window = rule.Window
 				}
 				if rule.Max > 0 {
 					max = rule.Max
 				}
+				key = key + ":" + util.SHA256Hex(hashInput)
+				matched = true
+				break
 			}
+		}
+
+		if !matched && reqCtx.Route != nil && reqCtx.Route.Pattern != "" && strings.ContainsAny(reqCtx.Route.Pattern, "{*") {
+			window = p.pluginConfig.Window
+			max = p.pluginConfig.Max
+			key = key + ":" + util.SHA256Hex(reqCtx.Route.Pattern)
 		}
 
 		allowed, count, resetTime, err := p.provider.CheckAndIncrement(ctx, key, window, max)
 		if err != nil {
 			p.logger.Error("failed to check rate limit", "error", err, "key", key)
-			// On error, allow the request to proceed (fail-open)
 			return nil
 		}
 
@@ -157,4 +228,44 @@ func getRateLimitRuleContext(value any) (models.RateLimitRuleContext, bool) {
 	default:
 		return models.RateLimitRuleContext{}, false
 	}
+}
+
+func segmentsMatch(requestPath, ruleKey string) bool {
+	rulePath := ruleKey
+	if _, after, ok := strings.Cut(ruleKey, ":"); ok {
+		rulePath = after
+	}
+	reqSegs := strings.FieldsFunc(requestPath, func(r rune) bool { return r == '/' })
+	ruleSegs := strings.FieldsFunc(rulePath, func(r rune) bool { return r == '/' })
+	return len(reqSegs) == len(ruleSegs)
+}
+
+func normalizeParams(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == '{' {
+			if j := strings.IndexByte(s[i:], '}'); j >= 0 {
+				b.WriteString("{*}")
+				i += j
+				continue
+			}
+		}
+		if s[i] == '*' {
+			b.WriteString("{*}")
+			continue
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
+}
+
+func hashTagKey(identifier string) string {
+	return "{" + identifier + "}"
+}
+
+func normalizeIP(ip string) string {
+	if strings.Contains(ip, ":") {
+		return "[" + ip + "]"
+	}
+	return ip
 }
