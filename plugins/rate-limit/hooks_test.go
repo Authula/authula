@@ -395,8 +395,8 @@ func TestRateLimitPluginCheckEndpointRateLimitHook(t *testing.T) {
 				Window: time.Minute,
 				Max:    10,
 				CustomRules: map[string]types.RateLimitRule{
-					"GET:/api/v1/auth/organizations":                          {Window: time.Hour, Max: 5},
-					"GET:/api/v1/auth/organizations/{organization_id}":        {Window: time.Hour, Max: 1},
+					"GET:/api/v1/auth/organizations":                   {Window: time.Hour, Max: 5},
+					"GET:/api/v1/auth/organizations/{organization_id}": {Window: time.Hour, Max: 1},
 				},
 			},
 			provider:            plugintests.NewFakeRateLimitProvider().WithCheckResult(true, 1, time.Unix(4000, 0), nil),
