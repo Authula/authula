@@ -91,7 +91,6 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 	})
 	reqCtx.Values[models.ContextSessionID.String()] = session.ID
 
-	// Optionally renew session if it's past 50% of its max age
 	if p.shouldRenewSession(session) {
 		p.renewSession(reqCtx.ResponseWriter, reqCtx.Request, session)
 	}

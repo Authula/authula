@@ -91,7 +91,6 @@ func (p *SessionPlugin) AuthMiddleware() func(http.Handler) http.Handler {
 				return
 			}
 
-			// Check if session should be renewed (sliding window: <50% life remaining)
 			if p.shouldRenewSession(session) {
 				p.renewSession(w, r, session)
 			}
@@ -108,7 +107,6 @@ func (p *SessionPlugin) OptionalAuthMiddleware() func(http.Handler) http.Handler
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if session, err := p.validateSessionCookie(r); err == nil && session != nil {
-				// Check if session should be renewed (sliding window: <50% life remaining)
 				if p.shouldRenewSession(session) {
 					p.renewSession(w, r, session)
 				}
@@ -187,27 +185,37 @@ func (p *SessionPlugin) ClearSessionCookie(w http.ResponseWriter) {
 	})
 }
 
-// shouldRenewSession checks if the session is past 50% of its max age and should be renewed
 func (p *SessionPlugin) shouldRenewSession(session *models.Session) bool {
 	now := time.Now().UTC()
 	timeToExpiry := session.ExpiresAt.Sub(now)
 	return timeToExpiry <= p.globalConfig.Session.UpdateAge
 }
 
-// renewSession extends the session expiration in the database and updates the cookie
 func (p *SessionPlugin) renewSession(w http.ResponseWriter, r *http.Request, session *models.Session) {
-	cookie, _ := r.Cookie(p.globalConfig.Session.CookieName)
-	if cookie == nil {
+	newToken, err := p.tokenService.Generate()
+	if err != nil {
+		p.logger.Error("session renewal failed: token generation error", "error", err)
 		return
 	}
 
-	session.ExpiresAt = time.Now().UTC().Add(p.globalConfig.Session.ExpiresIn)
-	if _, err := p.sessionService.Update(r.Context(), session); err != nil {
-		p.logger.Error("session renewal failed", "error", err)
+	hashedToken := p.tokenService.Hash(newToken)
+
+	if err := p.sessionService.Delete(r.Context(), session.ID); err != nil {
+		p.logger.Error("session renewal failed: delete error", "error", err)
 		return
 	}
 
-	p.SetSessionCookie(w, cookie.Value)
+	newSession, err := p.sessionService.Create(r.Context(), session.UserID, hashedToken, session.IPAddress, session.UserAgent, p.globalConfig.Session.ExpiresIn)
+	if err != nil {
+		p.logger.Error("session renewal failed: create error", "error", err)
+		return
+	}
+
+	session.ID = newSession.ID
+	session.Token = hashedToken
+	session.ExpiresAt = newSession.ExpiresAt
+
+	p.SetSessionCookie(w, newToken)
 }
 
 func (p *SessionPlugin) Close() error {
