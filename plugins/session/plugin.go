@@ -91,7 +91,6 @@ func (p *SessionPlugin) AuthMiddleware() func(http.Handler) http.Handler {
 				return
 			}
 
-			// Check if session should be renewed (sliding window: <50% life remaining)
 			if p.shouldRenewSession(session) {
 				p.renewSession(w, r, session)
 			}
@@ -108,7 +107,6 @@ func (p *SessionPlugin) OptionalAuthMiddleware() func(http.Handler) http.Handler
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if session, err := p.validateSessionCookie(r); err == nil && session != nil {
-				// Check if session should be renewed (sliding window: <50% life remaining)
 				if p.shouldRenewSession(session) {
 					p.renewSession(w, r, session)
 				}
@@ -187,14 +185,12 @@ func (p *SessionPlugin) ClearSessionCookie(w http.ResponseWriter) {
 	})
 }
 
-// shouldRenewSession checks if the session is past 50% of its max age and should be renewed
 func (p *SessionPlugin) shouldRenewSession(session *models.Session) bool {
 	now := time.Now().UTC()
 	timeToExpiry := session.ExpiresAt.Sub(now)
 	return timeToExpiry <= p.globalConfig.Session.UpdateAge
 }
 
-// renewSession rotates the session token, deletes the previous session, and creates a new one
 func (p *SessionPlugin) renewSession(w http.ResponseWriter, r *http.Request, session *models.Session) {
 	newToken, err := p.tokenService.Generate()
 	if err != nil {
@@ -215,7 +211,6 @@ func (p *SessionPlugin) renewSession(w http.ResponseWriter, r *http.Request, ses
 		return
 	}
 
-	// Update the caller's session pointer so downstream code uses the new session identity
 	session.ID = newSession.ID
 	session.Token = hashedToken
 	session.ExpiresAt = newSession.ExpiresAt
