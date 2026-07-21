@@ -194,20 +194,33 @@ func (p *SessionPlugin) shouldRenewSession(session *models.Session) bool {
 	return timeToExpiry <= p.globalConfig.Session.UpdateAge
 }
 
-// renewSession extends the session expiration in the database and updates the cookie
+// renewSession rotates the session token, deletes the previous session, and creates a new one
 func (p *SessionPlugin) renewSession(w http.ResponseWriter, r *http.Request, session *models.Session) {
-	cookie, _ := r.Cookie(p.globalConfig.Session.CookieName)
-	if cookie == nil {
+	newToken, err := p.tokenService.Generate()
+	if err != nil {
+		p.logger.Error("session renewal failed: token generation error", "error", err)
 		return
 	}
 
-	session.ExpiresAt = time.Now().UTC().Add(p.globalConfig.Session.ExpiresIn)
-	if _, err := p.sessionService.Update(r.Context(), session); err != nil {
-		p.logger.Error("session renewal failed", "error", err)
+	hashedToken := p.tokenService.Hash(newToken)
+
+	if err := p.sessionService.Delete(r.Context(), session.ID); err != nil {
+		p.logger.Error("session renewal failed: delete error", "error", err)
 		return
 	}
 
-	p.SetSessionCookie(w, cookie.Value)
+	newSession, err := p.sessionService.Create(r.Context(), session.UserID, hashedToken, session.IPAddress, session.UserAgent, p.globalConfig.Session.ExpiresIn)
+	if err != nil {
+		p.logger.Error("session renewal failed: create error", "error", err)
+		return
+	}
+
+	// Update the caller's session pointer so downstream code uses the new session identity
+	session.ID = newSession.ID
+	session.Token = hashedToken
+	session.ExpiresAt = newSession.ExpiresAt
+
+	p.SetSessionCookie(w, newToken)
 }
 
 func (p *SessionPlugin) Close() error {
