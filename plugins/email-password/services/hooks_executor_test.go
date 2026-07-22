@@ -311,3 +311,42 @@ func (l *testLogger) Warn(msg string, args ...any)  {}
 func (l *testLogger) Error(msg string, args ...any) {
 	l.errorCalled = true
 }
+
+type testPluginRegistry struct{}
+
+func (r *testPluginRegistry) Register(p models.Plugin) error           { return nil }
+func (r *testPluginRegistry) InitAll() error                           { return nil }
+func (r *testPluginRegistry) RunMigrations(ctx context.Context) error  { return nil }
+func (r *testPluginRegistry) DropMigrations(ctx context.Context) error { return nil }
+func (r *testPluginRegistry) Plugins() []models.Plugin                 { return nil }
+func (r *testPluginRegistry) GetConfig() *models.Config                { return nil }
+func (r *testPluginRegistry) CloseAll()                                {}
+func (r *testPluginRegistry) GetPlugin(pluginID string) models.Plugin  { return nil }
+
+func TestServiceHookExecutor_PluginRegistryAccessibleInHook(t *testing.T) {
+	t.Parallel()
+
+	var receivedPluginRegistry models.PluginRegistry
+	pluginRegistry := &testPluginRegistry{}
+
+	executor := NewServiceHookExecutor(&types.EmailPasswordServiceHooksConfig{
+		SignUp: &types.SignUpServiceHooksConfig{
+			BeforeSignUp: func(ctx context.Context, user *models.User) error {
+				reg := models.GetPluginRegistryFromContext(ctx)
+				if reg == nil {
+					return errors.New("plugin registry not found in context")
+				}
+				receivedPluginRegistry = reg
+				return nil
+			},
+		},
+	}, nil, pluginRegistry)
+
+	err := executor.BeforeSignUp(context.Background(), &models.User{ID: "user-1"})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if receivedPluginRegistry != pluginRegistry {
+		t.Fatal("expected the injected plugin registry to be accessible from context")
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/types"
 )
@@ -185,42 +186,30 @@ func TestServiceHookExecutor_MemberUpdateDeleteHooks(t *testing.T) {
 	}
 }
 
-type testRegistry struct {
-	services map[string]any
-}
-
-func (r *testRegistry) Register(name string, service any) {}
-
-func (r *testRegistry) Get(name string) any {
-	return r.services[name]
-}
-
-func TestServiceHookExecutor_RegistryAccessibleInHook(t *testing.T) {
+func TestServiceHookExecutor_PluginRegistryAccessibleInHook(t *testing.T) {
 	t.Parallel()
 
-	var receivedService any
-	registry := &testRegistry{services: map[string]any{
-		models.ServiceUser.String(): "mock-user-service",
-	}}
+	var receivedPluginRegistry models.PluginRegistry
+	pluginRegistry := &internaltests.MockPluginRegistry{}
 
 	executor := NewServiceHookExecutor(&types.OrganizationsServiceHooksConfig{
 		Organizations: &types.OrganizationServiceHooksConfig{
 			BeforeCreate: func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
-				ok, svc := models.GetServiceFromContext[string](ctx, models.ServiceUser)
-				if !ok {
-					return errors.New("service not found in context")
+				reg := models.GetPluginRegistryFromContext(ctx)
+				if reg == nil {
+					return errors.New("plugin registry not found in context")
 				}
-				receivedService = svc
+				receivedPluginRegistry = reg
 				return nil
 			},
 		},
-	}, registry)
+	}, pluginRegistry)
 
 	err := executor.BeforeCreateOrganization(context.Background(), &models.Actor{ID: "user-1"}, &types.Organization{ID: "org-1"})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if receivedService != "mock-user-service" {
-		t.Fatalf("expected 'mock-user-service', got %v", receivedService)
+	if receivedPluginRegistry != pluginRegistry {
+		t.Fatal("expected the injected plugin registry to be accessible from context")
 	}
 }

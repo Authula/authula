@@ -46,7 +46,19 @@ type PluginContext struct {
 	Logger          Logger
 	EventBus        EventBus
 	ServiceRegistry ServiceRegistry
+	PluginRegistry  PluginRegistry
 	GetConfig       func() *Config
+}
+
+const ContextPluginRegistry ContextKey = "plugin.plugin_registry"
+
+func NewContextWithPluginRegistry(ctx context.Context, registry PluginRegistry) context.Context {
+	return context.WithValue(ctx, ContextPluginRegistry, registry)
+}
+
+func GetPluginRegistryFromContext(ctx context.Context) PluginRegistry {
+	registry, _ := ctx.Value(ContextPluginRegistry).(PluginRegistry)
+	return registry
 }
 
 // Plugin is the base interface all plugins must implement

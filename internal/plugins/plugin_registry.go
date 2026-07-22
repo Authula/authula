@@ -86,6 +86,7 @@ func (r *PluginRegistry) InitAll() error {
 			EventBus:        r.eventBus,
 			Logger:          r.logger,
 			ServiceRegistry: r.serviceRegistry,
+			PluginRegistry:  r,
 			GetConfig:       r.configProvider,
 		}
 

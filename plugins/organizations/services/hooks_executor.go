@@ -8,19 +8,19 @@ import (
 )
 
 type ServiceHookExecutor struct {
-	config   *types.OrganizationsServiceHooksConfig
-	registry models.ServiceRegistry
+	config         *types.OrganizationsServiceHooksConfig
+	pluginRegistry models.PluginRegistry
 }
 
-func NewServiceHookExecutor(config *types.OrganizationsServiceHooksConfig, registry models.ServiceRegistry) *ServiceHookExecutor {
-	return &ServiceHookExecutor{config: config, registry: registry}
+func NewServiceHookExecutor(config *types.OrganizationsServiceHooksConfig, pluginRegistry models.PluginRegistry) *ServiceHookExecutor {
+	return &ServiceHookExecutor{config: config, pluginRegistry: pluginRegistry}
 }
 
 func (e *ServiceHookExecutor) BeforeCreateOrganization(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
 	if e == nil || e.config == nil || e.config.Organizations == nil || e.config.Organizations.BeforeCreate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Organizations.BeforeCreate(ctx, actor, organization)
 }
 
@@ -28,7 +28,7 @@ func (e *ServiceHookExecutor) AfterCreateOrganization(ctx context.Context, actor
 	if e == nil || e.config == nil || e.config.Organizations == nil || e.config.Organizations.AfterCreate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Organizations.AfterCreate(ctx, actor, organization)
 }
 
@@ -36,7 +36,7 @@ func (e *ServiceHookExecutor) BeforeUpdateOrganization(ctx context.Context, acto
 	if e == nil || e.config == nil || e.config.Organizations == nil || e.config.Organizations.BeforeUpdate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Organizations.BeforeUpdate(ctx, actor, organization)
 }
 
@@ -44,7 +44,7 @@ func (e *ServiceHookExecutor) AfterUpdateOrganization(ctx context.Context, actor
 	if e == nil || e.config == nil || e.config.Organizations == nil || e.config.Organizations.AfterUpdate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Organizations.AfterUpdate(ctx, actor, organization)
 }
 
@@ -52,7 +52,7 @@ func (e *ServiceHookExecutor) BeforeDeleteOrganization(ctx context.Context, acto
 	if e == nil || e.config == nil || e.config.Organizations == nil || e.config.Organizations.BeforeDelete == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Organizations.BeforeDelete(ctx, actor, organization)
 }
 
@@ -60,7 +60,7 @@ func (e *ServiceHookExecutor) AfterDeleteOrganization(ctx context.Context, actor
 	if e == nil || e.config == nil || e.config.Organizations == nil || e.config.Organizations.AfterDelete == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Organizations.AfterDelete(ctx, actor, organization)
 }
 
@@ -68,7 +68,7 @@ func (e *ServiceHookExecutor) BeforeCreateOrganizationMember(ctx context.Context
 	if e == nil || e.config == nil || e.config.Members == nil || e.config.Members.BeforeCreate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Members.BeforeCreate(ctx, actor, member)
 }
 
@@ -76,7 +76,7 @@ func (e *ServiceHookExecutor) AfterCreateOrganizationMember(ctx context.Context,
 	if e == nil || e.config == nil || e.config.Members == nil || e.config.Members.AfterCreate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Members.AfterCreate(ctx, actor, member)
 }
 
@@ -84,7 +84,7 @@ func (e *ServiceHookExecutor) BeforeUpdateOrganizationMember(ctx context.Context
 	if e == nil || e.config == nil || e.config.Members == nil || e.config.Members.BeforeUpdate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Members.BeforeUpdate(ctx, actor, member)
 }
 
@@ -92,7 +92,7 @@ func (e *ServiceHookExecutor) AfterUpdateOrganizationMember(ctx context.Context,
 	if e == nil || e.config == nil || e.config.Members == nil || e.config.Members.AfterUpdate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Members.AfterUpdate(ctx, actor, member)
 }
 
@@ -100,7 +100,7 @@ func (e *ServiceHookExecutor) BeforeDeleteOrganizationMember(ctx context.Context
 	if e == nil || e.config == nil || e.config.Members == nil || e.config.Members.BeforeDelete == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Members.BeforeDelete(ctx, actor, member)
 }
 
@@ -108,7 +108,7 @@ func (e *ServiceHookExecutor) AfterDeleteOrganizationMember(ctx context.Context,
 	if e == nil || e.config == nil || e.config.Members == nil || e.config.Members.AfterDelete == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Members.AfterDelete(ctx, actor, member)
 }
 
@@ -116,7 +116,7 @@ func (e *ServiceHookExecutor) BeforeCreateOrganizationInvitation(ctx context.Con
 	if e == nil || e.config == nil || e.config.Invitations == nil || e.config.Invitations.BeforeCreate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Invitations.BeforeCreate(ctx, actor, invitation)
 }
 
@@ -124,7 +124,7 @@ func (e *ServiceHookExecutor) AfterCreateOrganizationInvitation(ctx context.Cont
 	if e == nil || e.config == nil || e.config.Invitations == nil || e.config.Invitations.AfterCreate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Invitations.AfterCreate(ctx, actor, invitation)
 }
 
@@ -132,7 +132,7 @@ func (e *ServiceHookExecutor) BeforeUpdateOrganizationInvitation(ctx context.Con
 	if e == nil || e.config == nil || e.config.Invitations == nil || e.config.Invitations.BeforeUpdate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Invitations.BeforeUpdate(ctx, actor, invitation)
 }
 
@@ -140,7 +140,7 @@ func (e *ServiceHookExecutor) AfterUpdateOrganizationInvitation(ctx context.Cont
 	if e == nil || e.config == nil || e.config.Invitations == nil || e.config.Invitations.AfterUpdate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Invitations.AfterUpdate(ctx, actor, invitation)
 }
 
@@ -148,7 +148,7 @@ func (e *ServiceHookExecutor) BeforeCreateOrganizationTeam(ctx context.Context, 
 	if e == nil || e.config == nil || e.config.Teams == nil || e.config.Teams.BeforeCreate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Teams.BeforeCreate(ctx, actor, team)
 }
 
@@ -156,7 +156,7 @@ func (e *ServiceHookExecutor) AfterCreateOrganizationTeam(ctx context.Context, a
 	if e == nil || e.config == nil || e.config.Teams == nil || e.config.Teams.AfterCreate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Teams.AfterCreate(ctx, actor, team)
 }
 
@@ -164,7 +164,7 @@ func (e *ServiceHookExecutor) BeforeUpdateOrganizationTeam(ctx context.Context, 
 	if e == nil || e.config == nil || e.config.Teams == nil || e.config.Teams.BeforeUpdate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Teams.BeforeUpdate(ctx, actor, team)
 }
 
@@ -172,7 +172,7 @@ func (e *ServiceHookExecutor) AfterUpdateOrganizationTeam(ctx context.Context, a
 	if e == nil || e.config == nil || e.config.Teams == nil || e.config.Teams.AfterUpdate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Teams.AfterUpdate(ctx, actor, team)
 }
 
@@ -180,7 +180,7 @@ func (e *ServiceHookExecutor) BeforeDeleteOrganizationTeam(ctx context.Context, 
 	if e == nil || e.config == nil || e.config.Teams == nil || e.config.Teams.BeforeDelete == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Teams.BeforeDelete(ctx, actor, team)
 }
 
@@ -188,7 +188,7 @@ func (e *ServiceHookExecutor) AfterDeleteOrganizationTeam(ctx context.Context, a
 	if e == nil || e.config == nil || e.config.Teams == nil || e.config.Teams.AfterDelete == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.Teams.AfterDelete(ctx, actor, team)
 }
 
@@ -196,7 +196,7 @@ func (e *ServiceHookExecutor) BeforeCreateOrganizationTeamMember(ctx context.Con
 	if e == nil || e.config == nil || e.config.TeamMembers == nil || e.config.TeamMembers.BeforeCreate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.TeamMembers.BeforeCreate(ctx, actor, member)
 }
 
@@ -204,7 +204,7 @@ func (e *ServiceHookExecutor) AfterCreateOrganizationTeamMember(ctx context.Cont
 	if e == nil || e.config == nil || e.config.TeamMembers == nil || e.config.TeamMembers.AfterCreate == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.TeamMembers.AfterCreate(ctx, actor, member)
 }
 
@@ -212,7 +212,7 @@ func (e *ServiceHookExecutor) BeforeDeleteOrganizationTeamMember(ctx context.Con
 	if e == nil || e.config == nil || e.config.TeamMembers == nil || e.config.TeamMembers.BeforeDelete == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.TeamMembers.BeforeDelete(ctx, actor, member)
 }
 
@@ -220,6 +220,6 @@ func (e *ServiceHookExecutor) AfterDeleteOrganizationTeamMember(ctx context.Cont
 	if e == nil || e.config == nil || e.config.TeamMembers == nil || e.config.TeamMembers.AfterDelete == nil {
 		return nil
 	}
-	ctx = models.NewContextWithServiceRegistry(ctx, e.registry)
+	ctx = models.NewContextWithPluginRegistry(ctx, e.pluginRegistry)
 	return e.config.TeamMembers.AfterDelete(ctx, actor, member)
 }
