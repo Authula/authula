@@ -33,7 +33,7 @@ func TestSignUpUseCaseHooks(t *testing.T) {
 							return nil
 						},
 					},
-				}, f.logger)
+				}, f.logger, nil)
 				f.userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(nil, nil)
 				f.userSvc.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&models.User{ID: "user-1", Name: "Test User", Email: "test@example.com"}, nil)
 				f.passwordSvc.On("Hash", mock.Anything).Return("hashed", nil)
@@ -57,7 +57,7 @@ func TestSignUpUseCaseHooks(t *testing.T) {
 							return errors.New("hook rejected")
 						},
 					},
-				}, f.logger)
+				}, f.logger, nil)
 				f.userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(nil, nil)
 			},
 			assert: func(t *testing.T, result *types.SignUpResult, err error) {
@@ -77,7 +77,7 @@ func TestSignUpUseCaseHooks(t *testing.T) {
 							return nil
 						},
 					},
-				}, f.logger)
+				}, f.logger, nil)
 				f.userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(nil, nil)
 				f.userSvc.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&models.User{ID: "user-1", Name: "Test User", Email: "test@example.com"}, nil)
 				f.passwordSvc.On("Hash", mock.Anything).Return("hashed", nil)

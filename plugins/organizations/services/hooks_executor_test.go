@@ -12,7 +12,7 @@ import (
 func TestServiceHookExecutor_NilConfigIsNoop(t *testing.T) {
 	t.Parallel()
 
-	executor := NewServiceHookExecutor(nil)
+	executor := NewServiceHookExecutor(nil, nil)
 	ctx := context.Background()
 	actor := &models.Actor{ID: "user-1"}
 
@@ -83,7 +83,7 @@ func TestServiceHookExecutor_OrganizationCreateHooks(t *testing.T) {
 				return nil
 			},
 		},
-	})
+	}, nil)
 
 	ctx := context.Background()
 	actor := &models.Actor{ID: "user-1"}
@@ -114,7 +114,7 @@ func TestServiceHookExecutor_OrganizationCreateHookError(t *testing.T) {
 				return someErr
 			},
 		},
-	})
+	}, nil)
 
 	err := executor.BeforeCreateOrganization(context.Background(), &models.Actor{ID: "user-1"}, &types.Organization{ID: "org-1"})
 	if !errors.Is(err, someErr) {
@@ -161,7 +161,7 @@ func TestServiceHookExecutor_MemberUpdateDeleteHooks(t *testing.T) {
 				return nil
 			},
 		},
-	})
+	}, nil)
 
 	ctx := context.Background()
 	actor := &models.Actor{ID: "user-1"}
@@ -182,5 +182,45 @@ func TestServiceHookExecutor_MemberUpdateDeleteHooks(t *testing.T) {
 
 	if !beforeUpdateCalled || !afterUpdateCalled || !beforeDeleteCalled || !afterDeleteCalled {
 		t.Fatal("expected member update and delete hooks to be called")
+	}
+}
+
+type testRegistry struct {
+	services map[string]any
+}
+
+func (r *testRegistry) Register(name string, service any) {}
+
+func (r *testRegistry) Get(name string) any {
+	return r.services[name]
+}
+
+func TestServiceHookExecutor_RegistryAccessibleInHook(t *testing.T) {
+	t.Parallel()
+
+	var receivedService any
+	registry := &testRegistry{services: map[string]any{
+		models.ServiceUser.String(): "mock-user-service",
+	}}
+
+	executor := NewServiceHookExecutor(&types.OrganizationsServiceHooksConfig{
+		Organizations: &types.OrganizationServiceHooksConfig{
+			BeforeCreate: func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
+				ok, svc := models.GetServiceFromContext[string](ctx, models.ServiceUser)
+				if !ok {
+					return errors.New("service not found in context")
+				}
+				receivedService = svc
+				return nil
+			},
+		},
+	}, registry)
+
+	err := executor.BeforeCreateOrganization(context.Background(), &models.Actor{ID: "user-1"}, &types.Organization{ID: "org-1"})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if receivedService != "mock-user-service" {
+		t.Fatalf("expected 'mock-user-service', got %v", receivedService)
 	}
 }

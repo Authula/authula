@@ -33,7 +33,7 @@ func TestRequestPasswordResetUseCaseHooks(t *testing.T) {
 							return nil
 						},
 					},
-				}, f.logger)
+				}, f.logger, nil)
 				f.userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil)
 				f.tokenSvc.On("Generate").Return("token-123", nil)
 				f.tokenSvc.On("Hash", mock.Anything).Return("hashed-token", nil)
@@ -53,7 +53,7 @@ func TestRequestPasswordResetUseCaseHooks(t *testing.T) {
 							return errors.New("rate limited")
 						},
 					},
-				}, f.logger)
+				}, f.logger, nil)
 				f.userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil)
 			},
 			assert: func(t *testing.T, err error) {
@@ -72,7 +72,7 @@ func TestRequestPasswordResetUseCaseHooks(t *testing.T) {
 							return nil
 						},
 					},
-				}, f.logger)
+				}, f.logger, nil)
 				f.userSvc.On("GetByEmail", mock.Anything, "nonexistent@example.com").Return(nil, nil)
 			},
 			assert: func(t *testing.T, err error) {

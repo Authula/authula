@@ -32,7 +32,7 @@ func TestVerifyEmailUseCaseHooks(t *testing.T) {
 							return nil
 						},
 					},
-				}, f.logger)
+				}, f.logger, nil)
 				f.tokenSvc.On("Hash", mock.Anything).Return("hashed-token", nil)
 				f.verificationSvc.On("GetByToken", mock.Anything, "hashed-token").Return(&models.Verification{
 					ID: "ver-1", UserID: new("user-1"), Type: models.TypeEmailVerification, ExpiresAt: time.Now().Add(time.Hour), Identifier: "test@example.com",
@@ -57,7 +57,7 @@ func TestVerifyEmailUseCaseHooks(t *testing.T) {
 							return nil
 						},
 					},
-				}, f.logger)
+				}, f.logger, nil)
 				f.tokenSvc.On("Hash", mock.Anything).Return("hashed-token", nil)
 				f.verificationSvc.On("GetByToken", mock.Anything, "hashed-token").Return(&models.Verification{
 					ID: "ver-1", UserID: new("user-1"), Type: models.TypePasswordResetRequest, ExpiresAt: time.Now().Add(time.Hour), Identifier: "test@example.com",
@@ -79,7 +79,7 @@ func TestVerifyEmailUseCaseHooks(t *testing.T) {
 							return nil
 						},
 					},
-				}, f.logger)
+				}, f.logger, nil)
 				f.tokenSvc.On("Hash", mock.Anything).Return("hashed-token", nil)
 				f.verificationSvc.On("GetByToken", mock.Anything, "hashed-token").Return(&models.Verification{
 					ID: "ver-1", UserID: new("user-1"), Type: models.TypeEmailResetRequest, ExpiresAt: time.Now().Add(time.Hour), Identifier: "new@example.com",

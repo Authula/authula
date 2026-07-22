@@ -31,7 +31,7 @@ func TestRequestEmailChangeUseCaseHooks(t *testing.T) {
 							return nil
 						},
 					},
-				}, f.logger)
+				}, f.logger, nil)
 				f.userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "old@example.com"}, nil)
 				f.userSvc.On("GetByEmail", mock.Anything, "new@example.com").Return(nil, nil)
 				f.tokenSvc.On("Generate").Return("token-123", nil)
@@ -52,7 +52,7 @@ func TestRequestEmailChangeUseCaseHooks(t *testing.T) {
 							return errors.New("email change not allowed")
 						},
 					},
-				}, f.logger)
+				}, f.logger, nil)
 				f.userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "old@example.com"}, nil)
 				f.userSvc.On("GetByEmail", mock.Anything, "new@example.com").Return(nil, nil)
 			},
