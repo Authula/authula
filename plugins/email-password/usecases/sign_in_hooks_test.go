@@ -33,7 +33,7 @@ func TestSignInUseCaseHooks(t *testing.T) {
 							return nil
 						},
 					},
-				}, f.logger, nil)
+				}, f.logger, nil, nil)
 				f.userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil)
 				f.accountSvc.On("GetByUserIDAndProvider", mock.Anything, "user-1", mock.Anything).Return(&models.Account{ID: "acc-1", Password: new("hashed")}, nil)
 				f.passwordSvc.On("Verify", mock.Anything, mock.Anything).Return(true)
@@ -57,7 +57,7 @@ func TestSignInUseCaseHooks(t *testing.T) {
 							return errors.New("hook rejected")
 						},
 					},
-				}, f.logger, nil)
+				}, f.logger, nil, nil)
 				f.userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil)
 			},
 			assert: func(t *testing.T, result *types.SignInResult, err error) {
@@ -77,7 +77,7 @@ func TestSignInUseCaseHooks(t *testing.T) {
 							return nil
 						},
 					},
-				}, f.logger, nil)
+				}, f.logger, nil, nil)
 				f.userSvc.On("GetByEmail", mock.Anything, "nonexistent@example.com").Return(nil, nil)
 			},
 			assert: func(t *testing.T, result *types.SignInResult, err error) {
@@ -97,7 +97,7 @@ func TestSignInUseCaseHooks(t *testing.T) {
 							return nil
 						},
 					},
-				}, f.logger, nil)
+				}, f.logger, nil, nil)
 				f.userSvc.On("GetByEmail", mock.Anything, "test@example.com").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil)
 				f.accountSvc.On("GetByUserIDAndProvider", mock.Anything, "user-1", mock.Anything).Return(&models.Account{ID: "acc-1", Password: new("hashed")}, nil)
 				f.passwordSvc.On("Verify", mock.Anything, mock.Anything).Return(true)

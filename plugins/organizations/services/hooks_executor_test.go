@@ -13,7 +13,7 @@ import (
 func TestServiceHookExecutor_NilConfigIsNoop(t *testing.T) {
 	t.Parallel()
 
-	executor := NewServiceHookExecutor(nil, nil)
+	executor := NewServiceHookExecutor(nil, nil, nil)
 	ctx := context.Background()
 	actor := &models.Actor{ID: "user-1"}
 
@@ -84,7 +84,7 @@ func TestServiceHookExecutor_OrganizationCreateHooks(t *testing.T) {
 				return nil
 			},
 		},
-	}, nil)
+	}, nil, nil)
 
 	ctx := context.Background()
 	actor := &models.Actor{ID: "user-1"}
@@ -115,7 +115,7 @@ func TestServiceHookExecutor_OrganizationCreateHookError(t *testing.T) {
 				return someErr
 			},
 		},
-	}, nil)
+	}, nil, nil)
 
 	err := executor.BeforeCreateOrganization(context.Background(), &models.Actor{ID: "user-1"}, &types.Organization{ID: "org-1"})
 	if !errors.Is(err, someErr) {
@@ -162,7 +162,7 @@ func TestServiceHookExecutor_MemberUpdateDeleteHooks(t *testing.T) {
 				return nil
 			},
 		},
-	}, nil)
+	}, nil, nil)
 
 	ctx := context.Background()
 	actor := &models.Actor{ID: "user-1"}
@@ -186,11 +186,27 @@ func TestServiceHookExecutor_MemberUpdateDeleteHooks(t *testing.T) {
 	}
 }
 
-func TestServiceHookExecutor_PluginRegistryAccessibleInHook(t *testing.T) {
+type mockServiceRegistry struct {
+	services map[string]any
+}
+
+func (r *mockServiceRegistry) Register(name string, service any) {}
+func (r *mockServiceRegistry) Get(name string) any {
+	if r == nil || r.services == nil {
+		return nil
+	}
+	return r.services[name]
+}
+
+func TestServiceHookExecutor_BothRegistriesAccessibleInHook(t *testing.T) {
 	t.Parallel()
 
 	var receivedPluginRegistry models.PluginRegistry
-	pluginRegistry := &internaltests.MockPluginRegistry{}
+	var receivedService any
+	pluginRegistry := &internaltests.TestPluginRegistry{}
+	serviceRegistry := &mockServiceRegistry{services: map[string]any{
+		models.ServiceUser.String(): "mock-user-service",
+	}}
 
 	executor := NewServiceHookExecutor(&types.OrganizationsServiceHooksConfig{
 		Organizations: &types.OrganizationServiceHooksConfig{
@@ -200,10 +216,16 @@ func TestServiceHookExecutor_PluginRegistryAccessibleInHook(t *testing.T) {
 					return errors.New("plugin registry not found in context")
 				}
 				receivedPluginRegistry = reg
+
+				ok, svc := models.GetServiceFromContext[string](ctx, models.ServiceUser)
+				if !ok {
+					return errors.New("service not found in context")
+				}
+				receivedService = svc
 				return nil
 			},
 		},
-	}, pluginRegistry)
+	}, pluginRegistry, serviceRegistry)
 
 	err := executor.BeforeCreateOrganization(context.Background(), &models.Actor{ID: "user-1"}, &types.Organization{ID: "org-1"})
 	if err != nil {
@@ -211,5 +233,8 @@ func TestServiceHookExecutor_PluginRegistryAccessibleInHook(t *testing.T) {
 	}
 	if receivedPluginRegistry != pluginRegistry {
 		t.Fatal("expected the injected plugin registry to be accessible from context")
+	}
+	if receivedService != "mock-user-service" {
+		t.Fatalf("expected 'mock-user-service', got %v", receivedService)
 	}
 }

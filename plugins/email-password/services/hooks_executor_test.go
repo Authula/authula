@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
 )
@@ -12,7 +13,7 @@ import (
 func TestServiceHookExecutor_NilConfigIsNoop(t *testing.T) {
 	t.Parallel()
 
-	executor := NewServiceHookExecutor(nil, nil, nil)
+	executor := NewServiceHookExecutor(nil, nil, nil, nil)
 	ctx := context.Background()
 	user := &models.User{ID: "user-1", Email: "test@example.com"}
 	signUpResult := &types.SignUpResult{User: user}
@@ -99,7 +100,7 @@ func TestServiceHookExecutor_SignUpHooks(t *testing.T) {
 				return nil
 			},
 		},
-	}, nil, nil)
+	}, nil, nil, nil)
 
 	ctx := context.Background()
 	user := &models.User{ID: "user-1", Email: "test@example.com"}
@@ -143,7 +144,7 @@ func TestServiceHookExecutor_SignInHooks(t *testing.T) {
 				return nil
 			},
 		},
-	}, nil, nil)
+	}, nil, nil, nil)
 
 	ctx := context.Background()
 	user := &models.User{ID: "user-1", Email: "test@example.com"}
@@ -178,7 +179,7 @@ func TestServiceHookExecutor_AfterVerifyEmailHook(t *testing.T) {
 				return nil
 			},
 		},
-	}, nil, nil)
+	}, nil, nil, nil)
 
 	ctx := context.Background()
 	user := &models.User{ID: "user-1"}
@@ -209,7 +210,7 @@ func TestServiceHookExecutor_BeforeChangePasswordHook(t *testing.T) {
 				return nil
 			},
 		},
-	}, nil, nil)
+	}, nil, nil, nil)
 
 	ctx := context.Background()
 	user := &models.User{ID: "user-1"}
@@ -242,7 +243,7 @@ func TestServiceHookExecutor_AfterEmailChangedHook(t *testing.T) {
 				return nil
 			},
 		},
-	}, nil, nil)
+	}, nil, nil, nil)
 
 	ctx := context.Background()
 	user := &models.User{ID: "user-1"}
@@ -272,7 +273,7 @@ func TestServiceHookExecutor_BeforeHookError(t *testing.T) {
 				return someErr
 			},
 		},
-	}, nil, nil)
+	}, nil, nil, nil)
 
 	err := executor.BeforeSignUp(context.Background(), &models.User{ID: "user-1"})
 	if !errors.Is(err, someErr) {
@@ -290,7 +291,7 @@ func TestServiceHookExecutor_AfterHookErrorIsLoggedNotReturned(t *testing.T) {
 				return errors.New("hook error")
 			},
 		},
-	}, logger, nil)
+	}, logger, nil, nil)
 
 	err := executor.AfterSignUp(context.Background(), &types.SignUpResult{User: &models.User{ID: "user-1"}})
 	if err != nil {
@@ -312,22 +313,15 @@ func (l *testLogger) Error(msg string, args ...any) {
 	l.errorCalled = true
 }
 
-type testPluginRegistry struct{}
-
-func (r *testPluginRegistry) Register(p models.Plugin) error           { return nil }
-func (r *testPluginRegistry) InitAll() error                           { return nil }
-func (r *testPluginRegistry) RunMigrations(ctx context.Context) error  { return nil }
-func (r *testPluginRegistry) DropMigrations(ctx context.Context) error { return nil }
-func (r *testPluginRegistry) Plugins() []models.Plugin                 { return nil }
-func (r *testPluginRegistry) GetConfig() *models.Config                { return nil }
-func (r *testPluginRegistry) CloseAll()                                {}
-func (r *testPluginRegistry) GetPlugin(pluginID string) models.Plugin  { return nil }
-
-func TestServiceHookExecutor_PluginRegistryAccessibleInHook(t *testing.T) {
+func TestServiceHookExecutor_BothRegistriesAccessibleInHook(t *testing.T) {
 	t.Parallel()
 
 	var receivedPluginRegistry models.PluginRegistry
-	pluginRegistry := &testPluginRegistry{}
+	var receivedService any
+	pluginRegistry := &internaltests.TestPluginRegistry{}
+	serviceRegistry := &internaltests.TestServiceRegistry{Services: map[string]any{
+		models.ServiceUser.String(): "mock-user-service",
+	}}
 
 	executor := NewServiceHookExecutor(&types.EmailPasswordServiceHooksConfig{
 		SignUp: &types.SignUpServiceHooksConfig{
@@ -337,10 +331,16 @@ func TestServiceHookExecutor_PluginRegistryAccessibleInHook(t *testing.T) {
 					return errors.New("plugin registry not found in context")
 				}
 				receivedPluginRegistry = reg
+
+				ok, svc := models.GetServiceFromContext[string](ctx, models.ServiceUser)
+				if !ok {
+					return errors.New("service not found in context")
+				}
+				receivedService = svc
 				return nil
 			},
 		},
-	}, nil, pluginRegistry)
+	}, nil, pluginRegistry, serviceRegistry)
 
 	err := executor.BeforeSignUp(context.Background(), &models.User{ID: "user-1"})
 	if err != nil {
@@ -348,5 +348,8 @@ func TestServiceHookExecutor_PluginRegistryAccessibleInHook(t *testing.T) {
 	}
 	if receivedPluginRegistry != pluginRegistry {
 		t.Fatal("expected the injected plugin registry to be accessible from context")
+	}
+	if receivedService != "mock-user-service" {
+		t.Fatalf("expected 'mock-user-service', got %v", receivedService)
 	}
 }

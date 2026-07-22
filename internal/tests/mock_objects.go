@@ -41,13 +41,25 @@ func (m *MockEventBus) Unsubscribe(topic string, subscriptionID models.Subscript
 	m.Called(topic, subscriptionID)
 }
 
-type MockPluginRegistry struct{}
+type TestPluginRegistry struct{}
 
-func (r *MockPluginRegistry) Register(p models.Plugin) error           { return nil }
-func (r *MockPluginRegistry) InitAll() error                           { return nil }
-func (r *MockPluginRegistry) RunMigrations(ctx context.Context) error  { return nil }
-func (r *MockPluginRegistry) DropMigrations(ctx context.Context) error { return nil }
-func (r *MockPluginRegistry) Plugins() []models.Plugin                 { return nil }
-func (r *MockPluginRegistry) GetConfig() *models.Config                { return nil }
-func (r *MockPluginRegistry) CloseAll()                                {}
-func (r *MockPluginRegistry) GetPlugin(pluginID string) models.Plugin  { return nil }
+func (r *TestPluginRegistry) Register(p models.Plugin) error           { return nil }
+func (r *TestPluginRegistry) InitAll() error                           { return nil }
+func (r *TestPluginRegistry) RunMigrations(ctx context.Context) error  { return nil }
+func (r *TestPluginRegistry) DropMigrations(ctx context.Context) error { return nil }
+func (r *TestPluginRegistry) Plugins() []models.Plugin                 { return nil }
+func (r *TestPluginRegistry) GetConfig() *models.Config                { return nil }
+func (r *TestPluginRegistry) CloseAll()                                {}
+func (r *TestPluginRegistry) GetPlugin(pluginID string) models.Plugin  { return nil }
+
+type TestServiceRegistry struct {
+	Services map[string]any
+}
+
+func (r *TestServiceRegistry) Register(name string, service any) {}
+func (r *TestServiceRegistry) Get(name string) any {
+	if r == nil || r.Services == nil {
+		return nil
+	}
+	return r.Services[name]
+}

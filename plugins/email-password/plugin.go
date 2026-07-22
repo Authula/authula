@@ -110,7 +110,7 @@ func (p *EmailPasswordPlugin) Init(ctx *models.PluginContext) error {
 	}
 	p.emailTemplateManager = emailTemplateManager
 
-	p.hooksExecutor = services.NewServiceHookExecutor(p.pluginConfig.ServiceHooks, p.logger, ctx.PluginRegistry)
+	p.hooksExecutor = services.NewServiceHookExecutor(p.pluginConfig.ServiceHooks, p.logger, ctx.PluginRegistry, ctx.ServiceRegistry)
 
 	p.Api = BuildAPI(p)
 
