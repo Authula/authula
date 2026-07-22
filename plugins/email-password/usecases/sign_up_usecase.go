@@ -6,6 +6,7 @@ import (
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
+	"github.com/Authula/authula/plugins/email-password/services"
 	"github.com/Authula/authula/plugins/email-password/types"
 	rootservices "github.com/Authula/authula/services"
 	"github.com/Authula/authula/util"
@@ -21,6 +22,7 @@ type signUpUseCase struct {
 	TokenService    rootservices.TokenService
 	PasswordService rootservices.PasswordService
 	EventBus        models.EventBus
+	hooks           *services.ServiceHookExecutor
 }
 
 func NewSignUpUseCase(
@@ -33,8 +35,13 @@ func NewSignUpUseCase(
 	tokenService rootservices.TokenService,
 	passwordService rootservices.PasswordService,
 	eventBus models.EventBus,
+	hooks ...*services.ServiceHookExecutor,
 ) SignUpUseCase {
-	return &signUpUseCase{GlobalConfig: globalConfig, PluginConfig: pluginConfig, Logger: logger, UserService: userService, AccountService: accountService, SessionService: sessionService, TokenService: tokenService, PasswordService: passwordService, EventBus: eventBus}
+	var h *services.ServiceHookExecutor
+	if len(hooks) > 0 {
+		h = hooks[0]
+	}
+	return &signUpUseCase{GlobalConfig: globalConfig, PluginConfig: pluginConfig, Logger: logger, UserService: userService, AccountService: accountService, SessionService: sessionService, TokenService: tokenService, PasswordService: passwordService, EventBus: eventBus, hooks: h}
 }
 
 func (uc *signUpUseCase) SignUp(
@@ -62,17 +69,34 @@ func (uc *signUpUseCase) SignUp(
 		return nil, constants.ErrEmailAlreadyExists
 	}
 
+	user := &models.User{
+		Name:          name,
+		Email:         email,
+		EmailVerified: !uc.PluginConfig.RequireEmailVerification,
+		Image:         image,
+		Metadata:      metadata,
+	}
+	if len(user.Metadata) == 0 {
+		user.Metadata = make(map[string]any)
+	}
+
+	if uc.hooks != nil {
+		if err := uc.hooks.BeforeSignUp(ctx, user); err != nil {
+			return nil, err
+		}
+	}
+
+	createdUser, err := uc.UserService.Create(ctx, user.Name, user.Email, user.EmailVerified, user.Image, user.Metadata)
+	if err != nil {
+		return nil, err
+	}
+
 	hash, err := uc.PasswordService.Hash(password)
 	if err != nil {
 		return nil, err
 	}
 
-	user, err := uc.UserService.Create(ctx, name, email, !uc.PluginConfig.RequireEmailVerification, image, metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = uc.AccountService.Create(ctx, user.ID, user.Email, models.AuthProviderEmail.String(), &hash)
+	_, err = uc.AccountService.Create(ctx, createdUser.ID, createdUser.Email, models.AuthProviderEmail.String(), &hash)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +116,7 @@ func (uc *signUpUseCase) SignUp(
 
 		session, err = uc.SessionService.Create(
 			ctx,
-			user.ID,
+			createdUser.ID,
 			hashedToken,
 			ipAddress,
 			userAgent,
@@ -104,10 +128,20 @@ func (uc *signUpUseCase) SignUp(
 		}
 	}
 
-	uc.publishSignedUpEvent(user)
+	if uc.hooks != nil {
+		if err := uc.hooks.AfterSignUp(ctx, &types.SignUpResult{
+			User:         createdUser,
+			Session:      session,
+			SessionToken: sessionToken,
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	uc.publishSignedUpEvent(createdUser)
 
 	return &types.SignUpResult{
-		User:         user,
+		User:         createdUser,
 		Session:      session,
 		SessionToken: sessionToken,
 	}, nil

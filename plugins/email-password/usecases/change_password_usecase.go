@@ -8,6 +8,7 @@ import (
 	emailtmpl "github.com/Authula/authula/core/email/template"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
+	"github.com/Authula/authula/plugins/email-password/services"
 	"github.com/Authula/authula/plugins/email-password/types"
 	rootservices "github.com/Authula/authula/services"
 	"github.com/Authula/authula/util"
@@ -25,6 +26,7 @@ type changePasswordUseCase struct {
 	MailerService        rootservices.MailerService
 	EventBus             models.EventBus
 	EmailTemplateManager *emailtmpl.Manager
+	hooks                *services.ServiceHookExecutor
 }
 
 func NewChangePasswordUseCase(
@@ -39,7 +41,12 @@ func NewChangePasswordUseCase(
 	mailerService rootservices.MailerService,
 	eventBus models.EventBus,
 	emailTemplateManager *emailtmpl.Manager,
+	hooks ...*services.ServiceHookExecutor,
 ) ChangePasswordUseCase {
+	var h *services.ServiceHookExecutor
+	if len(hooks) > 0 {
+		h = hooks[0]
+	}
 	return &changePasswordUseCase{
 		GlobalConfig:         globalConfig,
 		Logger:               logger,
@@ -52,6 +59,7 @@ func NewChangePasswordUseCase(
 		MailerService:        mailerService,
 		EventBus:             eventBus,
 		EmailTemplateManager: emailTemplateManager,
+		hooks:                h,
 	}
 }
 
@@ -92,6 +100,12 @@ func (uc *changePasswordUseCase) ChangePassword(ctx context.Context, tokenValue 
 		return constants.ErrAccountNotFound
 	}
 
+	if uc.hooks != nil {
+		if err := uc.hooks.BeforeChangePassword(ctx, user, newPassword); err != nil {
+			return err
+		}
+	}
+
 	hash, err := uc.PasswordService.Hash(newPassword)
 	if err != nil {
 		return err
@@ -104,6 +118,12 @@ func (uc *changePasswordUseCase) ChangePassword(ctx context.Context, tokenValue 
 
 	if err := uc.VerificationService.Delete(ctx, verification.ID); err != nil {
 		return err
+	}
+
+	if uc.hooks != nil {
+		if err := uc.hooks.AfterChangePassword(ctx, user); err != nil {
+			return err
+		}
 	}
 
 	uc.publishChangedPasswordEvent(user)

@@ -9,6 +9,7 @@ import (
 	emailtmpl "github.com/Authula/authula/core/email/template"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
+	"github.com/Authula/authula/plugins/email-password/services"
 	"github.com/Authula/authula/plugins/email-password/types"
 	rootservices "github.com/Authula/authula/services"
 	"github.com/Authula/authula/util"
@@ -25,6 +26,7 @@ type verifyEmailUseCase struct {
 	MailerService        rootservices.MailerService
 	EventBus             models.EventBus
 	EmailTemplateManager *emailtmpl.Manager
+	hooks                *services.ServiceHookExecutor
 }
 
 func NewVerifyEmailUseCase(
@@ -38,7 +40,12 @@ func NewVerifyEmailUseCase(
 	mailerService rootservices.MailerService,
 	eventBus models.EventBus,
 	emailTemplateManager *emailtmpl.Manager,
+	hooks ...*services.ServiceHookExecutor,
 ) VerifyEmailUseCase {
+	var h *services.ServiceHookExecutor
+	if len(hooks) > 0 {
+		h = hooks[0]
+	}
 	return &verifyEmailUseCase{
 		GlobalConfig:         globalConfig,
 		PluginConfig:         pluginConfig,
@@ -50,6 +57,7 @@ func NewVerifyEmailUseCase(
 		MailerService:        mailerService,
 		EventBus:             eventBus,
 		EmailTemplateManager: emailTemplateManager,
+		hooks:                h,
 	}
 }
 
@@ -77,22 +85,32 @@ func (uc *verifyEmailUseCase) VerifyEmail(ctx context.Context, tokenStr string) 
 		return "", constants.ErrUserNotFound
 	}
 
+	var verificationType models.VerificationType
+
 	switch verification.Type {
 	case models.TypeEmailVerification:
 		if err := uc.handleEmailVerification(ctx, user, verification.ID); err != nil {
 			return "", err
 		}
+		verificationType = verification.Type
 	case models.TypePasswordResetRequest:
-		// No action needed for password reset verification as the change password flow will handle deleting the verification record after password reset.
+		verificationType = verification.Type
 	case models.TypeEmailResetRequest:
 		if err := uc.handleEmailChangeVerificationEmail(ctx, *verification.UserID, tokenStr, verification.Identifier); err != nil {
 			return "", err
 		}
+		verificationType = verification.Type
 	default:
 		return "", constants.ErrInvalidEmailVerificationType
 	}
 
-	return verification.Type, nil
+	if uc.hooks != nil {
+		if err := uc.hooks.AfterVerifyEmail(ctx, user, verificationType); err != nil {
+			return "", err
+		}
+	}
+
+	return verificationType, nil
 }
 
 func (uc *verifyEmailUseCase) handleEmailVerification(ctx context.Context, user *models.User, tokenID string) error {
@@ -189,6 +207,12 @@ func (uc *verifyEmailUseCase) handleEmailChangeVerificationEmail(
 
 	if err := uc.VerificationService.Delete(ctx, verification.ID); err != nil {
 		return err
+	}
+
+	if uc.hooks != nil {
+		if err := uc.hooks.AfterEmailChanged(ctx, user, oldEmail, newEmail); err != nil {
+			return err
+		}
 	}
 
 	uc.publishEmailChangedEvent(user, oldEmail, newEmail)

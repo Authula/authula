@@ -7,6 +7,7 @@ import (
 
 	emailtmpl "github.com/Authula/authula/core/email/template"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/email-password/services"
 	"github.com/Authula/authula/plugins/email-password/types"
 	rootservices "github.com/Authula/authula/services"
 	"github.com/Authula/authula/util"
@@ -26,6 +27,7 @@ type EmailPasswordPlugin struct {
 	passwordService      rootservices.PasswordService
 	mailerService        rootservices.MailerService
 	emailTemplateManager *emailtmpl.Manager
+	hooksExecutor        *services.ServiceHookExecutor
 	Api                  *API
 }
 
@@ -107,6 +109,8 @@ func (p *EmailPasswordPlugin) Init(ctx *models.PluginContext) error {
 		return fmt.Errorf("failed to initialize email templates: %w", err)
 	}
 	p.emailTemplateManager = emailTemplateManager
+
+	p.hooksExecutor = services.NewServiceHookExecutor(p.pluginConfig.ServiceHooks, p.logger)
 
 	p.Api = BuildAPI(p)
 

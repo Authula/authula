@@ -8,6 +8,7 @@ import (
 	emailconstants "github.com/Authula/authula/core/email/constants"
 	emailtmpl "github.com/Authula/authula/core/email/template"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/email-password/services"
 	"github.com/Authula/authula/plugins/email-password/types"
 	"github.com/Authula/authula/plugins/email-password/utils"
 	rootservices "github.com/Authula/authula/services"
@@ -22,6 +23,7 @@ type requestPasswordResetUseCase struct {
 	TokenService         rootservices.TokenService
 	MailerService        rootservices.MailerService
 	EmailTemplateManager *emailtmpl.Manager
+	hooks                *services.ServiceHookExecutor
 }
 
 func NewRequestPasswordResetUseCase(
@@ -33,7 +35,12 @@ func NewRequestPasswordResetUseCase(
 	tokenService rootservices.TokenService,
 	mailerService rootservices.MailerService,
 	emailTemplateManager *emailtmpl.Manager,
+	hooks ...*services.ServiceHookExecutor,
 ) RequestPasswordResetUseCase {
+	var h *services.ServiceHookExecutor
+	if len(hooks) > 0 {
+		h = hooks[0]
+	}
 	return &requestPasswordResetUseCase{
 		Logger:               logger,
 		GlobalConfig:         globalConfig,
@@ -43,6 +50,7 @@ func NewRequestPasswordResetUseCase(
 		TokenService:         tokenService,
 		MailerService:        mailerService,
 		EmailTemplateManager: emailTemplateManager,
+		hooks:                h,
 	}
 }
 
@@ -56,6 +64,12 @@ func (uc *requestPasswordResetUseCase) RequestReset(
 	user, err := uc.UserService.GetByEmail(ctx, email)
 	if err != nil || user == nil {
 		return nil
+	}
+
+	if uc.hooks != nil {
+		if err := uc.hooks.BeforeRequestPasswordReset(ctx, user); err != nil {
+			return err
+		}
 	}
 
 	token, err := uc.TokenService.Generate()

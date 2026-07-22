@@ -7,6 +7,7 @@ import (
 	emailtmpl "github.com/Authula/authula/core/email/template"
 	inttests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/email-password/services"
 	"github.com/Authula/authula/plugins/email-password/types"
 )
 
@@ -23,6 +24,7 @@ type emailPasswordTestFixture struct {
 	logger          *inttests.MockLogger
 	eventBus        *inttests.MockEventBus
 	tmplMgr         *emailtmpl.Manager
+	hooksExecutor   *services.ServiceHookExecutor
 }
 
 func newEmailPasswordTestFixture() *emailPasswordTestFixture {
@@ -88,15 +90,15 @@ func newEmailPasswordTestFixture() *emailPasswordTestFixture {
 }
 
 func (f *emailPasswordTestFixture) signUpUseCase() SignUpUseCase {
-	return NewSignUpUseCase(f.globalConfig, f.pluginConfig, f.logger, f.userSvc, f.accountSvc, f.sessionSvc, f.tokenSvc, f.passwordSvc, f.eventBus)
+	return NewSignUpUseCase(f.globalConfig, f.pluginConfig, f.logger, f.userSvc, f.accountSvc, f.sessionSvc, f.tokenSvc, f.passwordSvc, f.eventBus, f.hooksExecutor)
 }
 
 func (f *emailPasswordTestFixture) signInUseCase() SignInUseCase {
-	return NewSignInUseCase(f.globalConfig, f.pluginConfig, f.logger, f.userSvc, f.accountSvc, f.sessionSvc, f.tokenSvc, f.passwordSvc, f.eventBus)
+	return NewSignInUseCase(f.globalConfig, f.pluginConfig, f.logger, f.userSvc, f.accountSvc, f.sessionSvc, f.tokenSvc, f.passwordSvc, f.eventBus, f.hooksExecutor)
 }
 
 func (f *emailPasswordTestFixture) verifyEmailUseCase() VerifyEmailUseCase {
-	return NewVerifyEmailUseCase(f.globalConfig, f.pluginConfig, f.logger, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.eventBus, f.tmplMgr)
+	return NewVerifyEmailUseCase(f.globalConfig, f.pluginConfig, f.logger, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.eventBus, f.tmplMgr, f.hooksExecutor)
 }
 
 func (f *emailPasswordTestFixture) sendEmailVerificationUseCase() SendEmailVerificationUseCase {
@@ -104,15 +106,15 @@ func (f *emailPasswordTestFixture) sendEmailVerificationUseCase() SendEmailVerif
 }
 
 func (f *emailPasswordTestFixture) requestPasswordResetUseCase() RequestPasswordResetUseCase {
-	return NewRequestPasswordResetUseCase(f.logger, f.globalConfig, f.pluginConfig, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr)
+	return NewRequestPasswordResetUseCase(f.logger, f.globalConfig, f.pluginConfig, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr, f.hooksExecutor)
 }
 
 func (f *emailPasswordTestFixture) changePasswordUseCase() ChangePasswordUseCase {
-	return NewChangePasswordUseCase(f.globalConfig, f.logger, f.pluginConfig, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.passwordSvc, f.mailerSvc, f.eventBus, f.tmplMgr)
+	return NewChangePasswordUseCase(f.globalConfig, f.logger, f.pluginConfig, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.passwordSvc, f.mailerSvc, f.eventBus, f.tmplMgr, f.hooksExecutor)
 }
 
 func (f *emailPasswordTestFixture) requestEmailChangeUseCase() RequestEmailChangeUseCase {
-	return NewRequestEmailChangeUseCase(f.logger, f.globalConfig, f.pluginConfig, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr)
+	return NewRequestEmailChangeUseCase(f.logger, f.globalConfig, f.pluginConfig, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr, f.hooksExecutor)
 }
 
 func testRequestContext() context.Context {

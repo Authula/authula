@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"time"
 
 	"github.com/Authula/authula/models"
@@ -25,6 +26,8 @@ type EmailPasswordPluginConfig struct {
 	SendRequestEmailChangeEmail func(params SendRequestEmailChangeEmailParams, reqCtx *models.RequestContext) error `json:"-" toml:"-"`
 	SendChangedEmailToOldEmail  func(params SendChangedEmailToOldEmailParams, reqCtx *models.RequestContext) error  `json:"-" toml:"-"`
 	SendChangedEmailToNewEmail  func(params SendChangedEmailToNewEmailParams, reqCtx *models.RequestContext) error  `json:"-" toml:"-"`
+
+	ServiceHooks *EmailPasswordServiceHooksConfig `json:"-" toml:"-"`
 }
 
 func (config *EmailPasswordPluginConfig) ApplyDefaults() {
@@ -83,4 +86,41 @@ type SendChangedEmailToOldEmailParams struct {
 type SendChangedEmailToNewEmailParams struct {
 	User  models.User
 	Email string
+}
+
+type EmailPasswordServiceHooksConfig struct {
+	SignUp            *SignUpServiceHooksConfig
+	SignIn            *SignInServiceHooksConfig
+	EmailVerification *EmailVerificationServiceHooksConfig
+	PasswordReset     *PasswordResetServiceHooksConfig
+	PasswordChange    *PasswordChangeServiceHooksConfig
+	EmailChange       *EmailChangeServiceHooksConfig
+}
+
+type SignUpServiceHooksConfig struct {
+	BeforeSignUp func(ctx context.Context, user *models.User) error
+	AfterSignUp  func(ctx context.Context, result *SignUpResult) error
+}
+
+type SignInServiceHooksConfig struct {
+	BeforeSignIn func(ctx context.Context, user *models.User) error
+	AfterSignIn  func(ctx context.Context, result *SignInResult) error
+}
+
+type EmailVerificationServiceHooksConfig struct {
+	AfterVerifyEmail func(ctx context.Context, user *models.User, verificationType models.VerificationType) error
+}
+
+type PasswordResetServiceHooksConfig struct {
+	BeforeRequestPasswordReset func(ctx context.Context, user *models.User) error
+}
+
+type PasswordChangeServiceHooksConfig struct {
+	BeforeChangePassword func(ctx context.Context, user *models.User, newPassword string) error
+	AfterChangePassword  func(ctx context.Context, user *models.User) error
+}
+
+type EmailChangeServiceHooksConfig struct {
+	BeforeRequestEmailChange func(ctx context.Context, user *models.User) error
+	AfterEmailChanged        func(ctx context.Context, user *models.User, oldEmail, newEmail string) error
 }

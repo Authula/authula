@@ -9,6 +9,7 @@ import (
 	emailtmpl "github.com/Authula/authula/core/email/template"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
+	"github.com/Authula/authula/plugins/email-password/services"
 	"github.com/Authula/authula/plugins/email-password/types"
 	"github.com/Authula/authula/plugins/email-password/utils"
 	rootservices "github.com/Authula/authula/services"
@@ -23,6 +24,7 @@ type requestEmailChangeUseCase struct {
 	TokenService         rootservices.TokenService
 	MailerService        rootservices.MailerService
 	EmailTemplateManager *emailtmpl.Manager
+	hooks                *services.ServiceHookExecutor
 }
 
 func NewRequestEmailChangeUseCase(
@@ -34,8 +36,13 @@ func NewRequestEmailChangeUseCase(
 	tokenService rootservices.TokenService,
 	mailerService rootservices.MailerService,
 	emailTemplateManager *emailtmpl.Manager,
+	hooks ...*services.ServiceHookExecutor,
 ) RequestEmailChangeUseCase {
-	return &requestEmailChangeUseCase{Logger: logger, GlobalConfig: globalConfig, PluginConfig: pluginConfig, UserService: userService, VerificationService: verificationService, TokenService: tokenService, MailerService: mailerService, EmailTemplateManager: emailTemplateManager}
+	var h *services.ServiceHookExecutor
+	if len(hooks) > 0 {
+		h = hooks[0]
+	}
+	return &requestEmailChangeUseCase{Logger: logger, GlobalConfig: globalConfig, PluginConfig: pluginConfig, UserService: userService, VerificationService: verificationService, TokenService: tokenService, MailerService: mailerService, EmailTemplateManager: emailTemplateManager, hooks: h}
 }
 
 func (uc *requestEmailChangeUseCase) RequestChange(
@@ -60,6 +67,12 @@ func (uc *requestEmailChangeUseCase) RequestChange(
 	}
 	if existing != nil && existing.ID != user.ID {
 		return constants.ErrEmailAlreadyExists
+	}
+
+	if uc.hooks != nil {
+		if err := uc.hooks.BeforeRequestEmailChange(ctx, user); err != nil {
+			return err
+		}
 	}
 
 	token, err := uc.TokenService.Generate()

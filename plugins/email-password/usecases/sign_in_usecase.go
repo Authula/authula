@@ -6,6 +6,7 @@ import (
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
+	"github.com/Authula/authula/plugins/email-password/services"
 	"github.com/Authula/authula/plugins/email-password/types"
 	rootservices "github.com/Authula/authula/services"
 	"github.com/Authula/authula/util"
@@ -21,6 +22,7 @@ type signInUseCase struct {
 	TokenService    rootservices.TokenService
 	PasswordService rootservices.PasswordService
 	EventBus        models.EventBus
+	hooks           *services.ServiceHookExecutor
 }
 
 func NewSignInUseCase(
@@ -33,8 +35,13 @@ func NewSignInUseCase(
 	tokenService rootservices.TokenService,
 	passwordService rootservices.PasswordService,
 	eventBus models.EventBus,
+	hooks ...*services.ServiceHookExecutor,
 ) SignInUseCase {
-	return &signInUseCase{GlobalConfig: globalConfig, PluginConfig: pluginConfig, Logger: logger, UserService: userService, AccountService: accountService, SessionService: sessionService, TokenService: tokenService, PasswordService: passwordService, EventBus: eventBus}
+	var h *services.ServiceHookExecutor
+	if len(hooks) > 0 {
+		h = hooks[0]
+	}
+	return &signInUseCase{GlobalConfig: globalConfig, PluginConfig: pluginConfig, Logger: logger, UserService: userService, AccountService: accountService, SessionService: sessionService, TokenService: tokenService, PasswordService: passwordService, EventBus: eventBus, hooks: h}
 }
 
 func (uc *signInUseCase) SignIn(
@@ -51,6 +58,12 @@ func (uc *signInUseCase) SignIn(
 	}
 	if user == nil {
 		return nil, constants.ErrInvalidCredentials
+	}
+
+	if uc.hooks != nil {
+		if err := uc.hooks.BeforeSignIn(ctx, user); err != nil {
+			return nil, err
+		}
 	}
 
 	account, err := uc.AccountService.GetByUserIDAndProvider(ctx, user.ID, models.AuthProviderEmail.String())
@@ -80,6 +93,16 @@ func (uc *signInUseCase) SignIn(
 	if err != nil {
 		uc.Logger.Error("failed to create session", "error", err)
 		return nil, err
+	}
+
+	if uc.hooks != nil {
+		if err := uc.hooks.AfterSignIn(ctx, &types.SignInResult{
+			User:         user,
+			Session:      newSession,
+			SessionToken: token,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	uc.publishSignedInEvent(user)
