@@ -1,5 +1,7 @@
 package models
 
+import "context"
+
 type ServiceID string
 
 const (
@@ -28,4 +30,25 @@ func (id ServiceID) String() string {
 type ServiceRegistry interface {
 	Register(name string, service any)
 	Get(name string) any
+}
+
+const ContextServiceRegistry ContextKey = "service.service_registry"
+
+func NewContextWithServiceRegistry(ctx context.Context, registry ServiceRegistry) context.Context {
+	return context.WithValue(ctx, ContextServiceRegistry, registry)
+}
+
+func GetServiceRegistry(ctx context.Context) ServiceRegistry {
+	registry, _ := ctx.Value(ContextServiceRegistry).(ServiceRegistry)
+	return registry
+}
+
+func GetServiceFromContext[T any](ctx context.Context, id ServiceID) (bool, T) {
+	registry := GetServiceRegistry(ctx)
+	if registry == nil {
+		var zero T
+		return false, zero
+	}
+	svc, ok := registry.Get(id.String()).(T)
+	return ok, svc
 }

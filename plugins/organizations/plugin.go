@@ -84,7 +84,7 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 		return err
 	}
 
-	p.hooksExecutor = services.NewServiceHookExecutor(p.pluginConfig.ServiceHooks)
+	p.hooksExecutor = services.NewServiceHookExecutor(p.pluginConfig.ServiceHooks, ctx.ServiceRegistry)
 	p.organizationRepo = repositories.NewBunOrganizationRepository(ctx.DB)
 	p.invitationRepo = repositories.NewBunOrganizationInvitationRepository(ctx.DB)
 	p.memberRepo = repositories.NewBunOrganizationMemberRepository(ctx.DB)

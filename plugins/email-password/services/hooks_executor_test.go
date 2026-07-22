@@ -12,7 +12,7 @@ import (
 func TestServiceHookExecutor_NilConfigIsNoop(t *testing.T) {
 	t.Parallel()
 
-	executor := NewServiceHookExecutor(nil, nil)
+	executor := NewServiceHookExecutor(nil, nil, nil)
 	ctx := context.Background()
 	user := &models.User{ID: "user-1", Email: "test@example.com"}
 	signUpResult := &types.SignUpResult{User: user}
@@ -99,7 +99,7 @@ func TestServiceHookExecutor_SignUpHooks(t *testing.T) {
 				return nil
 			},
 		},
-	}, nil)
+	}, nil, nil)
 
 	ctx := context.Background()
 	user := &models.User{ID: "user-1", Email: "test@example.com"}
@@ -143,7 +143,7 @@ func TestServiceHookExecutor_SignInHooks(t *testing.T) {
 				return nil
 			},
 		},
-	}, nil)
+	}, nil, nil)
 
 	ctx := context.Background()
 	user := &models.User{ID: "user-1", Email: "test@example.com"}
@@ -178,7 +178,7 @@ func TestServiceHookExecutor_AfterVerifyEmailHook(t *testing.T) {
 				return nil
 			},
 		},
-	}, nil)
+	}, nil, nil)
 
 	ctx := context.Background()
 	user := &models.User{ID: "user-1"}
@@ -209,7 +209,7 @@ func TestServiceHookExecutor_BeforeChangePasswordHook(t *testing.T) {
 				return nil
 			},
 		},
-	}, nil)
+	}, nil, nil)
 
 	ctx := context.Background()
 	user := &models.User{ID: "user-1"}
@@ -242,7 +242,7 @@ func TestServiceHookExecutor_AfterEmailChangedHook(t *testing.T) {
 				return nil
 			},
 		},
-	}, nil)
+	}, nil, nil)
 
 	ctx := context.Background()
 	user := &models.User{ID: "user-1"}
@@ -272,7 +272,7 @@ func TestServiceHookExecutor_BeforeHookError(t *testing.T) {
 				return someErr
 			},
 		},
-	}, nil)
+	}, nil, nil)
 
 	err := executor.BeforeSignUp(context.Background(), &models.User{ID: "user-1"})
 	if !errors.Is(err, someErr) {
@@ -290,7 +290,7 @@ func TestServiceHookExecutor_AfterHookErrorIsLoggedNotReturned(t *testing.T) {
 				return errors.New("hook error")
 			},
 		},
-	}, logger)
+	}, logger, nil)
 
 	err := executor.AfterSignUp(context.Background(), &types.SignUpResult{User: &models.User{ID: "user-1"}})
 	if err != nil {
