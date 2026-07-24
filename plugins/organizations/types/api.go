@@ -20,6 +20,11 @@ type MemberID struct {
 	MemberID       string `path:"member_id"`
 }
 
+type MemberUserID struct {
+	OrganizationID string `path:"organization_id"`
+	UserID         string `path:"user_id"`
+}
+
 type TeamID struct {
 	OrganizationID string `path:"organization_id"`
 	TeamID         string `path:"team_id"`

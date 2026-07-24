@@ -2559,7 +2559,7 @@
     "/organizations/{organization_id}/invitations": {
       "get": {
         "tags": [
-          "Invitations"
+          "Organization Invitations"
         ],
         "summary": "List invitations",
         "description": "Lists all invitations for an organization.",
@@ -2595,7 +2595,7 @@
       },
       "post": {
         "tags": [
-          "Invitations"
+          "Organization Invitations"
         ],
         "summary": "Create invitation",
         "description": "Creates an invitation for a user to join an organization.",
@@ -2636,7 +2636,7 @@
     "/organizations/{organization_id}/invitations/{invitation_id}": {
       "get": {
         "tags": [
-          "Invitations"
+          "Organization Invitations"
         ],
         "summary": "Get invitation",
         "description": "Retrieves a single invitation by its ID.",
@@ -2674,7 +2674,7 @@
       },
       "patch": {
         "tags": [
-          "Invitations"
+          "Organization Invitations"
         ],
         "summary": "Revoke invitation",
         "description": "Revokes a pending invitation.",
@@ -2714,7 +2714,7 @@
     "/organizations/{organization_id}/invitations/{invitation_id}/accept": {
       "post": {
         "tags": [
-          "Invitations"
+          "Organization Invitations"
         ],
         "summary": "Accept invitation",
         "description": "Accepts an invitation to join an organization. Optionally redirects if a redirect_url is provided.",
@@ -2770,7 +2770,7 @@
     "/organizations/{organization_id}/invitations/{invitation_id}/reject": {
       "post": {
         "tags": [
-          "Invitations"
+          "Organization Invitations"
         ],
         "summary": "Reject invitation",
         "description": "Rejects an invitation to join an organization.",
@@ -2810,7 +2810,7 @@
     "/organizations/{organization_id}/members": {
       "get": {
         "tags": [
-          "Members"
+          "Organization Members"
         ],
         "summary": "List members",
         "description": "Lists all members of an organization with pagination.",
@@ -2860,7 +2860,7 @@
       },
       "post": {
         "tags": [
-          "Members"
+          "Organization Members"
         ],
         "summary": "Add member",
         "description": "Adds a user as a member of an organization with the specified role.",
@@ -2898,10 +2898,50 @@
         }
       }
     },
+    "/organizations/{organization_id}/members/by-user/{user_id}": {
+      "get": {
+        "tags": [
+          "Organization Members"
+        ],
+        "summary": "Get member by user ID",
+        "description": "Retrieves an organization member by the user's ID.",
+        "operationId": "getOrganizationMemberByUserID",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMember"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/organizations/{organization_id}/members/{member_id}": {
       "get": {
         "tags": [
-          "Members"
+          "Organization Members"
         ],
         "summary": "Get member",
         "description": "Retrieves a single organization member by ID.",
@@ -2939,7 +2979,7 @@
       },
       "delete": {
         "tags": [
-          "Members"
+          "Organization Members"
         ],
         "summary": "Delete member",
         "description": "Removes a member from an organization.",
@@ -2977,7 +3017,7 @@
       },
       "patch": {
         "tags": [
-          "Members"
+          "Organization Members"
         ],
         "summary": "Update member",
         "description": "Updates the role of an organization member.",
@@ -3026,7 +3066,7 @@
     "/organizations/{organization_id}/teams": {
       "get": {
         "tags": [
-          "Teams"
+          "Organization Teams"
         ],
         "summary": "List teams",
         "description": "Lists all teams within an organization.",
@@ -3062,7 +3102,7 @@
       },
       "post": {
         "tags": [
-          "Teams"
+          "Organization Teams"
         ],
         "summary": "Create team",
         "description": "Creates a new team within an organization.",
@@ -3103,7 +3143,7 @@
     "/organizations/{organization_id}/teams/{team_id}": {
       "get": {
         "tags": [
-          "Teams"
+          "Organization Teams"
         ],
         "summary": "Get team",
         "description": "Retrieves a single team by its ID.",
@@ -3141,7 +3181,7 @@
       },
       "delete": {
         "tags": [
-          "Teams"
+          "Organization Teams"
         ],
         "summary": "Delete team",
         "description": "Deletes a team.",
@@ -3179,7 +3219,7 @@
       },
       "patch": {
         "tags": [
-          "Teams"
+          "Organization Teams"
         ],
         "summary": "Update team",
         "description": "Updates an existing team.",
@@ -3228,7 +3268,7 @@
     "/organizations/{organization_id}/teams/{team_id}/members": {
       "get": {
         "tags": [
-          "Team Members"
+          "Organization Team Members"
         ],
         "summary": "List team members",
         "description": "Lists all members of a team with pagination.",
@@ -3286,7 +3326,7 @@
       },
       "post": {
         "tags": [
-          "Team Members"
+          "Organization Team Members"
         ],
         "summary": "Add team member",
         "description": "Adds a member to a team.",
@@ -3335,7 +3375,7 @@
     "/organizations/{organization_id}/teams/{team_id}/members/{member_id}": {
       "get": {
         "tags": [
-          "Team Members"
+          "Organization Team Members"
         ],
         "summary": "Get team member",
         "description": "Retrieves a single team member by ID.",
@@ -3381,7 +3421,7 @@
       },
       "delete": {
         "tags": [
-          "Team Members"
+          "Organization Team Members"
         ],
         "summary": "Delete team member",
         "description": "Removes a member from a team.",
