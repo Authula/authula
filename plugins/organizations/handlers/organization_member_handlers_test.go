@@ -27,6 +27,7 @@ type organizationMemberHandlerCase struct {
 	body            []byte
 	organizationID  string
 	memberID        string
+	targetUserID    string
 	prepare         func(*organizationMemberHandlerFixture)
 	expectedStatus  int
 	expectedMessage string
@@ -68,6 +69,9 @@ func runOrganizationMemberHandlerCases(t *testing.T, method, path string, buildH
 
 			handler := buildHandler(fixture)
 			req, w, reqCtx := fixture.newRequest(t, method, path, tt.body, tt.userID, tt.organizationID, tt.memberID)
+			if tt.targetUserID != "" {
+				req.SetPathValue("user_id", tt.targetUserID)
+			}
 			if tt.name == "missing_user" {
 				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
 				reqCtx.Handled = true
@@ -226,6 +230,48 @@ func TestGetOrganizationMemberHandler(t *testing.T) {
 			memberID:       "mem-1",
 			prepare: func(fixture *organizationMemberHandlerFixture) {
 				fixture.service.On("GetMember", mock.Anything, "user-1", "org-1", "mem-1").Return(&orgtypes.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
+				member := internaltests.DecodeResponseJSON[orgtypes.OrganizationMember](t, reqCtx)
+				assert.Equal(t, "mem-1", member.ID)
+				assert.Equal(t, "user-2", member.UserID)
+			},
+		},
+	})
+}
+
+func TestGetOrganizationMemberByUserIDHandler(t *testing.T) {
+	t.Parallel()
+
+	runOrganizationMemberHandlerCases(t, http.MethodGet, "/organizations/org-1/members/by-user/user-2", func(fixture *organizationMemberHandlerFixture) http.HandlerFunc {
+		return (&GetOrganizationMemberByUserIDHandler{UseCases: newMemberUseCases(fixture.service)}).Handle()
+	}, []organizationMemberHandlerCase{
+		{
+			name:            "missing_user",
+			organizationID:  "org-1",
+			targetUserID:    "user-2",
+			expectedStatus:  http.StatusUnauthorized,
+			expectedMessage: "Unauthorized",
+		},
+		{
+			name:           "not_found",
+			userID:         new("user-1"),
+			organizationID: "org-1",
+			targetUserID:   "user-2",
+			prepare: func(fixture *organizationMemberHandlerFixture) {
+				fixture.service.On("GetMemberByUserID", mock.Anything, "user-1", "org-1", "user-2").Return((*orgtypes.OrganizationMember)(nil), coreerrors.ErrNotFound).Once()
+			},
+			expectedStatus:  http.StatusNotFound,
+			expectedMessage: "not found",
+		},
+		{
+			name:           "success",
+			userID:         new("user-1"),
+			organizationID: "org-1",
+			targetUserID:   "user-2",
+			prepare: func(fixture *organizationMemberHandlerFixture) {
+				fixture.service.On("GetMemberByUserID", mock.Anything, "user-1", "org-1", "user-2").Return(&orgtypes.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {

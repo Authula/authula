@@ -84,6 +84,10 @@ func (a *API) GetMember(ctx context.Context, actor *models.Actor, organizationID
 	return a.useCases.GetMember(ctx, actor, organizationID, memberID)
 }
 
+func (a *API) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMember, error) {
+	return a.useCases.GetMemberByUserID(ctx, actor, organizationID, userID)
+}
+
 func (a *API) UpdateMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error) {
 	return a.useCases.UpdateMember(ctx, actor, organizationID, memberID, request)
 }

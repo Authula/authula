@@ -151,6 +151,26 @@ func (s *organizationMemberService) GetMember(ctx context.Context, actor *models
 	return member, nil
 }
 
+func (s *organizationMemberService) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMember, error) {
+	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+		return nil, err
+	}
+
+	if userID == "" {
+		return nil, coreerrors.ErrUnprocessableEntity
+	}
+
+	member, err := s.orgMemberRepo.GetByOrganizationIDAndUserID(ctx, organizationID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if member == nil {
+		return nil, coreerrors.ErrNotFound
+	}
+
+	return member, nil
+}
+
 func (s *organizationMemberService) UpdateMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error) {
 	_, actorMember, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {

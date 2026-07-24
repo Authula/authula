@@ -95,6 +95,28 @@ func (h *GetOrganizationMemberHandler) Handle() http.HandlerFunc {
 	}
 }
 
+type GetOrganizationMemberByUserIDHandler struct {
+	UseCases *orgusecases.UseCases
+}
+
+func (h *GetOrganizationMemberByUserIDHandler) Handle() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
+
+		organizationID := r.PathValue("organization_id")
+		userID := r.PathValue("user_id")
+		member, err := h.UseCases.GetMemberByUserID(ctx, actor, organizationID, userID)
+		if err != nil {
+			orgconstants.HandleError(err, reqCtx)
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusOK, member)
+	}
+}
+
 type UpdateOrganizationMemberHandler struct {
 	UseCases *orgusecases.UseCases
 }

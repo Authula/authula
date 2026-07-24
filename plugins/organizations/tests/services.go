@@ -151,6 +151,14 @@ func (m *MockOrganizationMemberService) UpdateMember(ctx context.Context, actor 
 	return args.Get(0).(*types.OrganizationMember), args.Error(1)
 }
 
+func (m *MockOrganizationMemberService) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMember, error) {
+	args := m.Called(ctx, actorID(actor), organizationID, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*types.OrganizationMember), args.Error(1)
+}
+
 func (m *MockOrganizationMemberService) RemoveMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) error {
 	args := m.Called(ctx, actorID(actor), organizationID, memberID)
 	return args.Error(0)

@@ -163,6 +163,16 @@ func (u *UseCases) GetMember(ctx context.Context, actor *models.Actor, organizat
 	return u.memberService.GetMember(ctx, actor, organizationID, memberID)
 }
 
+func (u *UseCases) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMember, error) {
+	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+		return nil, err
+	}
+	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsMembersReadPermission); err != nil {
+		return nil, err
+	}
+	return u.memberService.GetMemberByUserID(ctx, actor, organizationID, userID)
+}
+
 func (u *UseCases) UpdateMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error) {
 	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err

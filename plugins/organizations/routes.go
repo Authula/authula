@@ -25,6 +25,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 	addMemberHandler := &handlers.AddOrganizationMemberHandler{UseCases: plugin.useCases}
 	getAllMembersHandler := &handlers.GetAllOrganizationMembersHandler{UseCases: plugin.useCases}
 	getMemberHandler := &handlers.GetOrganizationMemberHandler{UseCases: plugin.useCases}
+	getMemberByUserIDHandler := &handlers.GetOrganizationMemberByUserIDHandler{UseCases: plugin.useCases}
 	updateMemberHandler := &handlers.UpdateOrganizationMemberHandler{UseCases: plugin.useCases}
 	deleteMemberHandler := &handlers.DeleteOrganizationMemberHandler{UseCases: plugin.useCases}
 
@@ -154,6 +155,14 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 				middleware.RequireAuthenticated(),
 			},
 			Handler: getMemberHandler.Handle(),
+		},
+		{
+			Method: http.MethodGet,
+			Path:   "/organizations/{organization_id}/members/by-user/{user_id}",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequireAuthenticated(),
+			},
+			Handler: getMemberByUserIDHandler.Handle(),
 		},
 		{
 			Method: http.MethodPatch,

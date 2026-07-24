@@ -543,6 +543,126 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 	}
 }
 
+func TestOrganizationMemberService_GetMemberByUserID(t *testing.T) {
+	t.Parallel()
+
+	repoErr := errors.New("repository error")
+
+	tests := []struct {
+		name           string
+		actorUserID    string
+		organizationID string
+		userID         string
+		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository)
+		expectErr      error
+		expectMemberID string
+	}{
+		{
+			name:           "unauthorized",
+			actorUserID:    "",
+			organizationID: "org-1",
+			userID:         "user-2",
+			expectErr:      coreerrors.ErrUnauthorized,
+		},
+		{
+			name:           "empty user id",
+			actorUserID:    "user-1",
+			organizationID: "org-1",
+			userID:         "",
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+			},
+			expectErr: coreerrors.ErrUnprocessableEntity,
+		},
+		{
+			name:           "organization not found",
+			actorUserID:    "user-1",
+			organizationID: "org-1",
+			userID:         "user-2",
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(nil, nil).Once()
+			},
+			expectErr: coreerrors.ErrNotFound,
+		},
+		{
+			name:           "forbidden",
+			actorUserID:    "user-1",
+			organizationID: "org-1",
+			userID:         "user-2",
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(nil, nil).Once()
+			},
+			expectErr: coreerrors.ErrForbidden,
+		},
+		{
+			name:           "repository error",
+			actorUserID:    "user-1",
+			organizationID: "org-1",
+			userID:         "user-2",
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(nil, repoErr).Once()
+			},
+			expectErr: repoErr,
+		},
+		{
+			name:           "not found when member does not exist",
+			actorUserID:    "user-1",
+			organizationID: "org-1",
+			userID:         "user-2",
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(nil, nil).Once()
+			},
+			expectErr: coreerrors.ErrNotFound,
+		},
+		{
+			name:           "success",
+			actorUserID:    "user-1",
+			organizationID: "org-1",
+			userID:         "user-2",
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
+			},
+			expectMemberID: "mem-1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			orgRepo := &orgtests.MockOrganizationRepository{}
+			memberRepo := &orgtests.MockOrganizationMemberRepository{}
+			userService := &internaltests.MockUserService{}
+			if tt.setup != nil {
+				tt.setup(orgRepo, memberRepo)
+			}
+
+			svc := newTestOrganizationMemberService(userService, orgtests.NewAccessControlServiceStub(), orgRepo, memberRepo, nil)
+			member, err := svc.GetMemberByUserID(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.userID)
+			if tt.expectErr != nil {
+				require.Error(t, err)
+				require.ErrorIs(t, err, tt.expectErr)
+				if tt.setup != nil {
+					require.True(t, orgRepo.AssertExpectations(t))
+					require.True(t, memberRepo.AssertExpectations(t))
+				}
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, member)
+			require.Equal(t, tt.expectMemberID, member.ID)
+			if tt.setup != nil {
+				require.True(t, orgRepo.AssertExpectations(t))
+				require.True(t, memberRepo.AssertExpectations(t))
+			}
+		})
+	}
+}
+
 func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 	t.Parallel()
 
