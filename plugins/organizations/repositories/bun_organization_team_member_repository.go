@@ -16,11 +16,11 @@ type teamMemberMemberUserRow struct {
 	TeamID    string    `bun:"column:team_id"`
 	CreatedAt time.Time `bun:"column:created_at"`
 
-	MemberID         string    `bun:"column:member_id"`
-	MemberOrgID      string    `bun:"column:member_organization_id"`
-	MemberRole       string    `bun:"column:member_role"`
-	MemberCreatedAt  time.Time `bun:"column:member_created_at"`
-	MemberUpdatedAt  time.Time `bun:"column:member_updated_at"`
+	MemberID        string    `bun:"column:member_id"`
+	MemberOrgID     string    `bun:"column:member_organization_id"`
+	MemberRole      string    `bun:"column:member_role"`
+	MemberCreatedAt time.Time `bun:"column:member_created_at"`
+	MemberUpdatedAt time.Time `bun:"column:member_updated_at"`
 
 	UserID            string         `bun:"column:user_id"`
 	UserName          string         `bun:"column:user_name"`
