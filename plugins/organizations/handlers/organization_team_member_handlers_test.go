@@ -164,7 +164,7 @@ func TestGetAllOrganizationTeamMembersHandler(t *testing.T) {
 			organizationID: "org-1",
 			teamID:         "team-1",
 			prepare: func(fixture *organizationTeamMemberHandlerFixture) {
-				fixture.service.On("GetAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", 1, 10).Return(([]orgtypes.OrganizationTeamMember)(nil), errors.New("some error")).Once()
+				fixture.service.On("GetAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", 1, 10).Return(([]orgtypes.OrganizationTeamMemberResponse)(nil), errors.New("some error")).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "some error",
@@ -175,11 +175,11 @@ func TestGetAllOrganizationTeamMembersHandler(t *testing.T) {
 			organizationID: "org-1",
 			teamID:         "team-1",
 			prepare: func(fixture *organizationTeamMemberHandlerFixture) {
-				fixture.service.On("GetAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", 1, 10).Return([]orgtypes.OrganizationTeamMember{{ID: "team-mem-1", TeamID: "team-1", MemberID: "mem-2"}}, nil).Once()
+				fixture.service.On("GetAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", 1, 10).Return([]orgtypes.OrganizationTeamMemberResponse{{ID: "team-mem-1", TeamID: "team-1"}}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
-				teamMembers := internaltests.DecodeResponseJSON[[]orgtypes.OrganizationTeamMember](t, reqCtx)
+				teamMembers := internaltests.DecodeResponseJSON[[]orgtypes.OrganizationTeamMemberResponse](t, reqCtx)
 				assert.Len(t, teamMembers, 1)
 				assert.Equal(t, "team-mem-1", teamMembers[0].ID)
 			},
@@ -208,7 +208,7 @@ func TestGetOrganizationTeamMemberHandler(t *testing.T) {
 			teamID:         "team-1",
 			memberID:       "mem-1",
 			prepare: func(fixture *organizationTeamMemberHandlerFixture) {
-				fixture.service.On("GetTeamMember", mock.Anything, "user-1", "org-1", "team-1", "mem-1").Return((*orgtypes.OrganizationTeamMember)(nil), coreerrors.ErrNotFound).Once()
+				fixture.service.On("GetTeamMember", mock.Anything, "user-1", "org-1", "team-1", "mem-1").Return((*orgtypes.OrganizationTeamMemberResponse)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedMessage: "not found",
@@ -220,11 +220,11 @@ func TestGetOrganizationTeamMemberHandler(t *testing.T) {
 			teamID:         "team-1",
 			memberID:       "mem-1",
 			prepare: func(fixture *organizationTeamMemberHandlerFixture) {
-				fixture.service.On("GetTeamMember", mock.Anything, "user-1", "org-1", "team-1", "mem-1").Return(&orgtypes.OrganizationTeamMember{ID: "team-mem-1", TeamID: "team-1", MemberID: "mem-2"}, nil).Once()
+				fixture.service.On("GetTeamMember", mock.Anything, "user-1", "org-1", "team-1", "mem-1").Return(&orgtypes.OrganizationTeamMemberResponse{ID: "team-mem-1", TeamID: "team-1"}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
-				teamMember := internaltests.DecodeResponseJSON[orgtypes.OrganizationTeamMember](t, reqCtx)
+				teamMember := internaltests.DecodeResponseJSON[orgtypes.OrganizationTeamMemberResponse](t, reqCtx)
 				assert.Equal(t, "team-mem-1", teamMember.ID)
 			},
 		},

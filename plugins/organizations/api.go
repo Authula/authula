@@ -76,15 +76,15 @@ func (a *API) AddMember(ctx context.Context, actor *models.Actor, organizationID
 	return a.useCases.AddMember(ctx, actor, organizationID, request)
 }
 
-func (a *API) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMember, error) {
+func (a *API) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, error) {
 	return a.useCases.GetAllMembers(ctx, actor, organizationID, page, limit)
 }
 
-func (a *API) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMember, error) {
+func (a *API) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMemberResponse, error) {
 	return a.useCases.GetMember(ctx, actor, organizationID, memberID)
 }
 
-func (a *API) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMember, error) {
+func (a *API) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMemberResponse, error) {
 	return a.useCases.GetMemberByUserID(ctx, actor, organizationID, userID)
 }
 
@@ -124,11 +124,11 @@ func (a *API) AddTeamMember(ctx context.Context, actor *models.Actor, organizati
 	return a.useCases.AddTeamMember(ctx, actor, organizationID, teamID, request)
 }
 
-func (a *API) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMember, error) {
+func (a *API) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMemberResponse, error) {
 	return a.useCases.GetAllTeamMembers(ctx, actor, organizationID, teamID, page, limit)
 }
 
-func (a *API) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMember, error) {
+func (a *API) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMemberResponse, error) {
 	return a.useCases.GetTeamMember(ctx, actor, organizationID, teamID, memberID)
 }
 

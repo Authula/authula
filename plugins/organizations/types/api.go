@@ -2,8 +2,10 @@ package types
 
 import (
 	"strings"
+	"time"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/models"
 )
 
 type OrganizationID struct {
@@ -230,4 +232,20 @@ type DeleteOrganizationTeamResponse struct {
 
 type DeleteOrganizationTeamMemberResponse struct {
 	Message string `json:"message" required:"true" nullable:"false"`
+}
+
+type OrganizationMemberResponse struct {
+	ID             string      `json:"id" required:"true" nullable:"false"`
+	OrganizationID string      `json:"organization_id" required:"true" nullable:"false"`
+	Role           string      `json:"role" required:"true" nullable:"false"`
+	CreatedAt      time.Time   `json:"created_at" required:"true" nullable:"false"`
+	UpdatedAt      time.Time   `json:"updated_at" required:"true" nullable:"false"`
+	User           models.User `json:"user" required:"true" nullable:"false"`
+}
+
+type OrganizationTeamMemberResponse struct {
+	ID        string                     `json:"id" required:"true" nullable:"false"`
+	TeamID    string                     `json:"team_id" required:"true" nullable:"false"`
+	CreatedAt time.Time                  `json:"created_at" required:"true" nullable:"false"`
+	Member    OrganizationMemberResponse `json:"member" required:"true" nullable:"false"`
 }

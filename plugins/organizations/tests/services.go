@@ -127,20 +127,20 @@ func (m *MockOrganizationMemberService) AddMember(ctx context.Context, actor *mo
 	return args.Get(0).(*types.OrganizationMember), args.Error(1)
 }
 
-func (m *MockOrganizationMemberService) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMember, error) {
+func (m *MockOrganizationMemberService) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, error) {
 	args := m.Called(ctx, actorID(actor), organizationID, page, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]types.OrganizationMember), args.Error(1)
+	return args.Get(0).([]types.OrganizationMemberResponse), args.Error(1)
 }
 
-func (m *MockOrganizationMemberService) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMember, error) {
+func (m *MockOrganizationMemberService) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMemberResponse, error) {
 	args := m.Called(ctx, actorID(actor), organizationID, memberID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.OrganizationMember), args.Error(1)
+	return args.Get(0).(*types.OrganizationMemberResponse), args.Error(1)
 }
 
 func (m *MockOrganizationMemberService) UpdateMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error) {
@@ -151,12 +151,12 @@ func (m *MockOrganizationMemberService) UpdateMember(ctx context.Context, actor 
 	return args.Get(0).(*types.OrganizationMember), args.Error(1)
 }
 
-func (m *MockOrganizationMemberService) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMember, error) {
+func (m *MockOrganizationMemberService) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMemberResponse, error) {
 	args := m.Called(ctx, actorID(actor), organizationID, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.OrganizationMember), args.Error(1)
+	return args.Get(0).(*types.OrganizationMemberResponse), args.Error(1)
 }
 
 func (m *MockOrganizationMemberService) RemoveMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) error {
@@ -217,20 +217,20 @@ func (m *MockOrganizationTeamMemberService) AddTeamMember(ctx context.Context, a
 	return args.Get(0).(*types.OrganizationTeamMember), args.Error(1)
 }
 
-func (m *MockOrganizationTeamMemberService) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMember, error) {
+func (m *MockOrganizationTeamMemberService) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMemberResponse, error) {
 	args := m.Called(ctx, actorID(actor), organizationID, teamID, page, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]types.OrganizationTeamMember), args.Error(1)
+	return args.Get(0).([]types.OrganizationTeamMemberResponse), args.Error(1)
 }
 
-func (m *MockOrganizationTeamMemberService) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMember, error) {
+func (m *MockOrganizationTeamMemberService) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMemberResponse, error) {
 	args := m.Called(ctx, actorID(actor), organizationID, teamID, memberID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.OrganizationTeamMember), args.Error(1)
+	return args.Get(0).(*types.OrganizationTeamMemberResponse), args.Error(1)
 }
 
 func (m *MockOrganizationTeamMemberService) RemoveTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) error {

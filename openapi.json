@@ -2846,7 +2846,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/OrganizationMember"
+                    "$ref": "#/components/schemas/OrganizationMemberResponse"
                   },
                   "type": [
                     "null",
@@ -2904,7 +2904,7 @@
           "Organization Members"
         ],
         "summary": "Get member by user ID",
-        "description": "Retrieves an organization member by the user's ID.",
+        "description": "Retrieves an organization member by the user's ID with nested user data.",
         "operationId": "getOrganizationMemberByUserID",
         "parameters": [
           {
@@ -2930,7 +2930,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationMember"
+                  "$ref": "#/components/schemas/OrganizationMemberResponse"
                 }
               }
             }
@@ -2944,7 +2944,7 @@
           "Organization Members"
         ],
         "summary": "Get member",
-        "description": "Retrieves a single organization member by ID.",
+        "description": "Retrieves a single organization member by ID with nested user data.",
         "operationId": "getOrganizationMember",
         "parameters": [
           {
@@ -2970,7 +2970,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationMember"
+                  "$ref": "#/components/schemas/OrganizationMemberResponse"
                 }
               }
             }
@@ -3312,7 +3312,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/OrganizationTeamMember"
+                    "$ref": "#/components/schemas/OrganizationTeamMemberResponse"
                   },
                   "type": [
                     "null",
@@ -3378,7 +3378,7 @@
           "Organization Team Members"
         ],
         "summary": "Get team member",
-        "description": "Retrieves a single team member by ID.",
+        "description": "Retrieves a single team member by ID with nested member and user data.",
         "operationId": "getOrganizationTeamMember",
         "parameters": [
           {
@@ -3412,7 +3412,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationTeamMember"
+                  "$ref": "#/components/schemas/OrganizationTeamMemberResponse"
                 }
               }
             }
@@ -5206,6 +5206,39 @@
         ],
         "type": "object"
       },
+      "OrganizationMemberResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organization_id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "id",
+          "organization_id",
+          "role",
+          "created_at",
+          "updated_at",
+          "user"
+        ],
+        "type": "object"
+      },
       "OrganizationTeam": {
         "properties": {
           "created_at": {
@@ -5273,6 +5306,30 @@
           "team_id",
           "member_id",
           "created_at"
+        ],
+        "type": "object"
+      },
+      "OrganizationTeamMemberResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "member": {
+            "$ref": "#/components/schemas/OrganizationMemberResponse"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "team_id",
+          "created_at",
+          "member"
         ],
         "type": "object"
       },

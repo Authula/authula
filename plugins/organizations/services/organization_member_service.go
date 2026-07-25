@@ -123,15 +123,15 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actor *models
 	return created, nil
 }
 
-func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMember, error) {
+func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, error) {
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
-	return s.orgMemberRepo.GetAllByOrganizationID(ctx, organizationID, page, limit)
+	return s.orgMemberRepo.GetAllByOrganizationIDWithUser(ctx, organizationID, page, limit)
 }
 
-func (s *organizationMemberService) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMember, error) {
+func (s *organizationMemberService) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMemberResponse, error) {
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (s *organizationMemberService) GetMember(ctx context.Context, actor *models
 		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
-	member, err := s.orgMemberRepo.GetByID(ctx, memberID)
+	member, err := s.orgMemberRepo.GetByIDWithUser(ctx, memberID)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func (s *organizationMemberService) GetMember(ctx context.Context, actor *models
 	return member, nil
 }
 
-func (s *organizationMemberService) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMember, error) {
+func (s *organizationMemberService) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMemberResponse, error) {
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func (s *organizationMemberService) GetMemberByUserID(ctx context.Context, actor
 		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
-	member, err := s.orgMemberRepo.GetByOrganizationIDAndUserID(ctx, organizationID, userID)
+	member, err := s.orgMemberRepo.GetByOrganizationIDAndUserIDWithUser(ctx, organizationID, userID)
 	if err != nil {
 		return nil, err
 	}

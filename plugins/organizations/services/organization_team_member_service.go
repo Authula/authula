@@ -96,7 +96,7 @@ func (s *organizationTeamMemberService) AddTeamMember(ctx context.Context, actor
 	return created, nil
 }
 
-func (s *organizationTeamMemberService) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMember, error) {
+func (s *organizationTeamMemberService) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMemberResponse, error) {
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -113,10 +113,10 @@ func (s *organizationTeamMemberService) GetAllTeamMembers(ctx context.Context, a
 		return nil, coreerrors.ErrNotFound
 	}
 
-	return s.orgTeamMemberRepo.GetAllByTeamID(ctx, teamID, page, limit)
+	return s.orgTeamMemberRepo.GetAllByTeamIDWithMemberAndUser(ctx, teamID, page, limit)
 }
 
-func (s *organizationTeamMemberService) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMember, error) {
+func (s *organizationTeamMemberService) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMemberResponse, error) {
 	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (s *organizationTeamMemberService) GetTeamMember(ctx context.Context, actor
 		return nil, coreerrors.ErrNotFound
 	}
 
-	orgMember, err := s.orgMemberRepo.GetByID(ctx, memberID)
+	orgMember, err := s.orgMemberRepo.GetByIDWithUser(ctx, memberID)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,12 @@ func (s *organizationTeamMemberService) GetTeamMember(ctx context.Context, actor
 		return nil, coreerrors.ErrNotFound
 	}
 
-	return teamMember, nil
+	return &types.OrganizationTeamMemberResponse{
+		ID:        teamMember.ID,
+		TeamID:    teamMember.TeamID,
+		CreatedAt: teamMember.CreatedAt,
+		Member:    *orgMember,
+	}, nil
 }
 
 func (s *organizationTeamMemberService) RemoveTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) error {

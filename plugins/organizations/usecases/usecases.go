@@ -143,7 +143,7 @@ func (u *UseCases) AddMember(ctx context.Context, actor *models.Actor, organizat
 	return u.memberService.AddMember(ctx, actor, organizationID, request)
 }
 
-func (u *UseCases) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMember, error) {
+func (u *UseCases) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, error) {
 	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func (u *UseCases) GetAllMembers(ctx context.Context, actor *models.Actor, organ
 	return u.memberService.GetAllMembers(ctx, actor, organizationID, page, limit)
 }
 
-func (u *UseCases) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMember, error) {
+func (u *UseCases) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMemberResponse, error) {
 	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (u *UseCases) GetMember(ctx context.Context, actor *models.Actor, organizat
 	return u.memberService.GetMember(ctx, actor, organizationID, memberID)
 }
 
-func (u *UseCases) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMember, error) {
+func (u *UseCases) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMemberResponse, error) {
 	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -257,7 +257,7 @@ func (u *UseCases) AddTeamMember(ctx context.Context, actor *models.Actor, organ
 	return u.teamMemberService.AddTeamMember(ctx, actor, organizationID, teamID, request)
 }
 
-func (u *UseCases) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMember, error) {
+func (u *UseCases) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMemberResponse, error) {
 	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -267,7 +267,7 @@ func (u *UseCases) GetAllTeamMembers(ctx context.Context, actor *models.Actor, o
 	return u.teamMemberService.GetAllTeamMembers(ctx, actor, organizationID, teamID, page, limit)
 }
 
-func (u *UseCases) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMember, error) {
+func (u *UseCases) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMemberResponse, error) {
 	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}

@@ -353,7 +353,7 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 			organizationID: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				memberRepo.On("GetAllByOrganizationID", mock.Anything, "org-1", 1, 10).Return(nil, repoErr).Once()
+				memberRepo.On("GetAllByOrganizationIDWithUser", mock.Anything, "org-1", 1, 10).Return(nil, repoErr).Once()
 			},
 			expectErr: repoErr,
 		},
@@ -363,7 +363,7 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 			organizationID: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				memberRepo.On("GetAllByOrganizationID", mock.Anything, "org-1", 1, 10).Return([]types.OrganizationMember{{ID: "mem-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}}, nil).Once()
+				memberRepo.On("GetAllByOrganizationIDWithUser", mock.Anything, "org-1", 1, 10).Return([]types.OrganizationMemberResponse{{ID: "mem-1", OrganizationID: "org-1", Role: "member"}}, nil).Once()
 			},
 			expectLen: 1,
 		},
@@ -439,7 +439,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 			memberID:       "missing",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				memberRepo.On("GetByID", mock.Anything, "missing").Return(nil, nil).Once()
+				memberRepo.On("GetByIDWithUser", mock.Anything, "missing").Return(nil, nil).Once()
 			},
 			expectErr: coreerrors.ErrNotFound,
 		},
@@ -471,7 +471,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				memberRepo.On("GetByID", mock.Anything, "mem-1").Return(nil, repoErr).Once()
+				memberRepo.On("GetByIDWithUser", mock.Anything, "mem-1").Return(nil, repoErr).Once()
 			},
 			expectErr: repoErr,
 		},
@@ -482,7 +482,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				memberRepo.On("GetByID", mock.Anything, "mem-1").Return(nil, nil).Once()
+				memberRepo.On("GetByIDWithUser", mock.Anything, "mem-1").Return(nil, nil).Once()
 			},
 			expectErr: coreerrors.ErrNotFound,
 		},
@@ -493,7 +493,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				memberRepo.On("GetByID", mock.Anything, "mem-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-2"}, nil).Once()
+				memberRepo.On("GetByIDWithUser", mock.Anything, "mem-1").Return(&types.OrganizationMemberResponse{ID: "mem-1", OrganizationID: "org-2"}, nil).Once()
 			},
 			expectErr: coreerrors.ErrNotFound,
 		},
@@ -504,7 +504,7 @@ func TestOrganizationMemberService_GetMember(t *testing.T) {
 			memberID:       "mem-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				memberRepo.On("GetByID", mock.Anything, "mem-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
+				memberRepo.On("GetByIDWithUser", mock.Anything, "mem-1").Return(&types.OrganizationMemberResponse{ID: "mem-1", OrganizationID: "org-1", Role: "member"}, nil).Once()
 			},
 			expectMemberID: "mem-1",
 		},
@@ -602,7 +602,7 @@ func TestOrganizationMemberService_GetMemberByUserID(t *testing.T) {
 			userID:         "user-2",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(nil, repoErr).Once()
+				memberRepo.On("GetByOrganizationIDAndUserIDWithUser", mock.Anything, "org-1", "user-2").Return(nil, repoErr).Once()
 			},
 			expectErr: repoErr,
 		},
@@ -613,7 +613,7 @@ func TestOrganizationMemberService_GetMemberByUserID(t *testing.T) {
 			userID:         "user-2",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(nil, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserIDWithUser", mock.Anything, "org-1", "user-2").Return(nil, nil).Once()
 			},
 			expectErr: coreerrors.ErrNotFound,
 		},
@@ -624,7 +624,7 @@ func TestOrganizationMemberService_GetMemberByUserID(t *testing.T) {
 			userID:         "user-2",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserIDWithUser", mock.Anything, "org-1", "user-2").Return(&types.OrganizationMemberResponse{ID: "mem-1", OrganizationID: "org-1", Role: "member"}, nil).Once()
 			},
 			expectMemberID: "mem-1",
 		},

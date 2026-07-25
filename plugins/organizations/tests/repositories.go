@@ -115,6 +115,30 @@ func (m *MockOrganizationMemberRepository) GetAllByOrganizationID(ctx context.Co
 	return args.Get(0).([]types.OrganizationMember), args.Error(1)
 }
 
+func (m *MockOrganizationMemberRepository) GetAllByOrganizationIDWithUser(ctx context.Context, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, error) {
+	args := m.Called(ctx, organizationID, page, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]types.OrganizationMemberResponse), args.Error(1)
+}
+
+func (m *MockOrganizationMemberRepository) GetByIDWithUser(ctx context.Context, memberID string) (*types.OrganizationMemberResponse, error) {
+	args := m.Called(ctx, memberID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*types.OrganizationMemberResponse), args.Error(1)
+}
+
+func (m *MockOrganizationMemberRepository) GetByOrganizationIDAndUserIDWithUser(ctx context.Context, organizationID string, userID string) (*types.OrganizationMemberResponse, error) {
+	args := m.Called(ctx, organizationID, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*types.OrganizationMemberResponse), args.Error(1)
+}
+
 func (m *MockOrganizationMemberRepository) GetAllByUserID(ctx context.Context, userID string) ([]types.OrganizationMember, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
@@ -298,6 +322,22 @@ func (m *MockOrganizationTeamMemberRepository) GetAllByTeamID(ctx context.Contex
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]types.OrganizationTeamMember), args.Error(1)
+}
+
+func (m *MockOrganizationTeamMemberRepository) GetAllByTeamIDWithMemberAndUser(ctx context.Context, teamID string, page int, limit int) ([]types.OrganizationTeamMemberResponse, error) {
+	args := m.Called(ctx, teamID, page, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]types.OrganizationTeamMemberResponse), args.Error(1)
+}
+
+func (m *MockOrganizationTeamMemberRepository) GetByIDWithMemberAndUser(ctx context.Context, teamMemberID string) (*types.OrganizationTeamMemberResponse, error) {
+	args := m.Called(ctx, teamMemberID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*types.OrganizationTeamMemberResponse), args.Error(1)
 }
 
 func (m *MockOrganizationTeamMemberRepository) DeleteByTeamIDAndMemberID(ctx context.Context, teamID, memberID string) error {
