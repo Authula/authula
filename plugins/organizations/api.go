@@ -70,6 +70,10 @@ func (a *API) RejectInvitation(ctx context.Context, actor *models.Actor, organiz
 	return a.useCases.RejectOrganizationInvitation(ctx, actor, organizationID, invitationID)
 }
 
+func (a *API) VerifyInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string, token string) (*types.OrganizationInvitation, error) {
+	return a.useCases.VerifyOrganizationInvitation(ctx, actor, organizationID, invitationID, token)
+}
+
 // Members
 
 func (a *API) AddMember(ctx context.Context, actor *models.Actor, organizationID string, request types.AddOrganizationMemberRequest) (*types.OrganizationMember, error) {
