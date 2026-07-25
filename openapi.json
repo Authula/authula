@@ -2678,48 +2678,10 @@
             }
           }
         }
-      },
-      "patch": {
-        "tags": [
-          "Organization Invitations"
-        ],
-        "summary": "Revoke invitation",
-        "description": "Revokes a pending invitation.",
-        "operationId": "revokeOrganizationInvitation",
-        "parameters": [
-          {
-            "name": "organization_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "invitation_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrganizationInvitation"
-                }
-              }
-            }
-          }
-        }
       }
     },
     "/organizations/{organization_id}/invitations/{invitation_id}/accept": {
-      "post": {
+      "patch": {
         "tags": [
           "Organization Invitations"
         ],
@@ -2775,13 +2737,53 @@
       }
     },
     "/organizations/{organization_id}/invitations/{invitation_id}/reject": {
-      "post": {
+      "patch": {
         "tags": [
           "Organization Invitations"
         ],
         "summary": "Reject invitation",
         "description": "Rejects an invitation to join an organization.",
         "operationId": "rejectOrganizationInvitation",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationInvitation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{organization_id}/invitations/{invitation_id}/revoke": {
+      "patch": {
+        "tags": [
+          "Organization Invitations"
+        ],
+        "summary": "Revoke invitation",
+        "description": "Revokes a pending invitation.",
+        "operationId": "revokeOrganizationInvitation",
         "parameters": [
           {
             "name": "organization_id",

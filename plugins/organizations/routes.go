@@ -118,14 +118,14 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 		},
 		{
 			Method: http.MethodPatch,
-			Path:   "/organizations/{organization_id}/invitations/{invitation_id}",
+			Path:   "/organizations/{organization_id}/invitations/{invitation_id}/revoke",
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireAuthenticated(),
 			},
 			Handler: revokeInvitationHandler.Handle(),
 		},
 		{
-			Method: http.MethodPost,
+			Method: http.MethodPatch,
 			Path:   "/organizations/{organization_id}/invitations/{invitation_id}/accept",
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireActor(models.ActorUser),
@@ -133,7 +133,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Handler: acceptInvitationHandler.Handle(),
 		},
 		{
-			Method: http.MethodPost,
+			Method: http.MethodPatch,
 			Path:   "/organizations/{organization_id}/invitations/{invitation_id}/reject",
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireActor(models.ActorUser),
