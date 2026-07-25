@@ -112,7 +112,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Method: http.MethodGet,
 			Path:   "/organizations/{organization_id}/invitations/{invitation_id}/verify",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireAuthenticated(),
+				middleware.RequireActor(models.ActorUser),
 			},
 			Handler: verifyInvitationHandler.Handle(),
 		},
@@ -128,7 +128,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/organizations/{organization_id}/invitations/{invitation_id}/accept",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireAuthenticated(),
+				middleware.RequireActor(models.ActorUser),
 			},
 			Handler: acceptInvitationHandler.Handle(),
 		},
@@ -136,7 +136,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/organizations/{organization_id}/invitations/{invitation_id}/reject",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireAuthenticated(),
+				middleware.RequireActor(models.ActorUser),
 			},
 			Handler: rejectInvitationHandler.Handle(),
 		},

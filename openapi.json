@@ -2717,7 +2717,7 @@
           "Organization Invitations"
         ],
         "summary": "Accept invitation",
-        "description": "Accepts an invitation to join an organization. Optionally redirects if a redirect_url is provided.",
+        "description": "Accepts an invitation to join an organization.",
         "operationId": "acceptOrganizationInvitation",
         "parameters": [
           {
@@ -2776,6 +2776,60 @@
         "description": "Rejects an invitation to join an organization.",
         "operationId": "rejectOrganizationInvitation",
         "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationInvitation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{organization_id}/invitations/{invitation_id}/verify": {
+      "get": {
+        "tags": [
+          "Organization Invitations"
+        ],
+        "summary": "Verify invitation",
+        "description": "Verifies an invitation token.",
+        "operationId": "verifyOrganizationInvitation",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect_url",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "organization_id",
             "in": "path",
