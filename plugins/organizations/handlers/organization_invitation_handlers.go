@@ -24,7 +24,7 @@ func (h *CreateOrganizationInvitationHandler) Handle() http.HandlerFunc {
 
 		var request types.CreateOrganizationInvitationRequest
 		if err := util.ParseJSON(r, &request); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -34,7 +34,8 @@ func (h *CreateOrganizationInvitationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		invitation, err := h.UseCases.CreateOrganizationInvitation(ctx, actor, organizationID, request)
+		redirectURL := r.URL.Query().Get("redirect_url")
+		invitation, err := h.UseCases.CreateOrganizationInvitation(ctx, actor, organizationID, request, redirectURL)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -110,7 +111,8 @@ func (h *RevokeOrganizationInvitationHandler) Handle() http.HandlerFunc {
 }
 
 type AcceptOrganizationInvitationHandler struct {
-	UseCases *orgusecases.UseCases
+	UseCases       *orgusecases.UseCases
+	TrustedOrigins []string
 }
 
 func (h *AcceptOrganizationInvitationHandler) Handle() http.HandlerFunc {
@@ -133,20 +135,66 @@ func (h *AcceptOrganizationInvitationHandler) Handle() http.HandlerFunc {
 			AssignerUserID: &invitation.InviterID,
 		}
 
-		var request types.AcceptOrganizationInvitationRequest
 		redirectURL := r.URL.Query().Get("redirect_url")
-		request.RedirectURL = &redirectURL
-		if err := request.Validate(); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
-			reqCtx.Handled = true
-			return
-		}
-		if request.RedirectURL != nil && *request.RedirectURL != "" {
-			reqCtx.RedirectURL = *request.RedirectURL
+		if redirectURL != "" {
+			validatedURL, err := util.IsTrustedCallbackURL(redirectURL, h.TrustedOrigins)
+			if err != nil {
+				reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{"message": err.Error()})
+				reqCtx.Handled = true
+				return
+			}
+			reqCtx.RedirectURL = validatedURL.String()
 			return
 		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, invitation)
+	}
+}
+
+type VerifyOrganizationInvitationHandler struct {
+	UseCases       *orgusecases.UseCases
+	TrustedOrigins []string
+}
+
+func (h *VerifyOrganizationInvitationHandler) Handle() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reqCtx, _ := models.GetRequestContext(ctx)
+		actor := reqCtx.Actor
+
+		organizationID := r.PathValue("organization_id")
+		invitationID := r.PathValue("invitation_id")
+
+		token := r.URL.Query().Get("token")
+		if token == "" {
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "token is required"})
+			reqCtx.Handled = true
+			return
+		}
+
+		resp, err := h.UseCases.VerifyOrganizationInvitation(ctx, actor, organizationID, invitationID, token)
+		if err != nil {
+			orgconstants.HandleError(err, reqCtx)
+			return
+		}
+
+		redirectURL := r.URL.Query().Get("redirect_url")
+		if redirectURL != "" {
+			validatedURL, err := util.IsTrustedCallbackURL(redirectURL, h.TrustedOrigins)
+			if err != nil {
+				reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{"message": err.Error()})
+				reqCtx.Handled = true
+				return
+			}
+			q := validatedURL.Query()
+			q.Set("invite_id", invitationID)
+			validatedURL.RawQuery = q.Encode()
+			reqCtx.RedirectURL = validatedURL.String()
+			reqCtx.ResponseStatus = http.StatusFound
+			return
+		}
+
+		reqCtx.SetJSONResponse(http.StatusOK, resp)
 	}
 }
 
@@ -159,11 +207,6 @@ func (h *RejectOrganizationInvitationHandler) Handle() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 		actor := reqCtx.Actor
-		if actor == nil || actor.ID == "" {
-			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
-			reqCtx.Handled = true
-			return
-		}
 
 		organizationID := r.PathValue("organization_id")
 		invitationID := r.PathValue("invitation_id")

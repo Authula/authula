@@ -107,7 +107,7 @@ func TestCreateOrganizationInvitationHandler(t *testing.T) {
 			organizationID:  "org-1",
 			body:            []byte("{"),
 			expectedStatus:  http.StatusUnprocessableEntity,
-			expectedMessage: "invalid request body",
+			expectedMessage: "unexpected EOF",
 		},
 		{
 			name:           "service_error",
@@ -115,7 +115,7 @@ func TestCreateOrganizationInvitationHandler(t *testing.T) {
 			organizationID: "org-1",
 			body:           internaltests.MarshalToJSON(t, orgtypes.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"}),
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
-				fixture.service.On("CreateOrganizationInvitation", mock.Anything, "user-1", "org-1", mock.Anything).Return((*orgtypes.OrganizationInvitation)(nil), errors.New("create failed")).Once()
+				fixture.service.On("CreateOrganizationInvitation", mock.Anything, "user-1", "org-1", mock.Anything, mock.Anything).Return((*orgtypes.OrganizationInvitation)(nil), errors.New("create failed")).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "create failed",
@@ -126,7 +126,7 @@ func TestCreateOrganizationInvitationHandler(t *testing.T) {
 			organizationID: "org-1",
 			body:           internaltests.MarshalToJSON(t, orgtypes.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"}),
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
-				fixture.service.On("CreateOrganizationInvitation", mock.Anything, "user-1", "org-1", mock.Anything).Return((*orgtypes.OrganizationInvitation)(nil), orgconstants.ErrInvitationsQuotaExceeded).Once()
+				fixture.service.On("CreateOrganizationInvitation", mock.Anything, "user-1", "org-1", mock.Anything, mock.Anything).Return((*orgtypes.OrganizationInvitation)(nil), orgconstants.ErrInvitationsQuotaExceeded).Once()
 			},
 			expectedStatus:  http.StatusTooManyRequests,
 			expectedMessage: orgconstants.ErrInvitationsQuotaExceeded.Error(),
@@ -137,7 +137,7 @@ func TestCreateOrganizationInvitationHandler(t *testing.T) {
 			organizationID: "org-1",
 			body:           internaltests.MarshalToJSON(t, orgtypes.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"}),
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
-				fixture.service.On("CreateOrganizationInvitation", mock.Anything, "user-1", "org-1", mock.Anything).Return(&orgtypes.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: orgtypes.OrganizationInvitationStatusPending}, nil).Once()
+				fixture.service.On("CreateOrganizationInvitation", mock.Anything, "user-1", "org-1", mock.Anything, mock.Anything).Return(&orgtypes.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: orgtypes.OrganizationInvitationStatusPending}, nil).Once()
 			},
 			expectedStatus: http.StatusCreated,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
@@ -210,7 +210,7 @@ func TestGetOrganizationInvitationHandler(t *testing.T) {
 			organizationID: "org-1",
 			invitationID:   "inv-1",
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
-				fixture.service.On("GetOrganizationInvitation", mock.Anything, "user-1", "org-1", "inv-1").Return((*orgtypes.OrganizationInvitation)(nil), coreerrors.ErrNotFound).Once()
+				fixture.service.On("GetOrganizationInvitationByID", mock.Anything, "inv-1").Return((*orgtypes.OrganizationInvitation)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedMessage: "not found",
@@ -221,6 +221,7 @@ func TestGetOrganizationInvitationHandler(t *testing.T) {
 			organizationID: "org-1",
 			invitationID:   "inv-1",
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
+				fixture.service.On("GetOrganizationInvitationByID", mock.Anything, "inv-1").Return(&orgtypes.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: orgtypes.OrganizationInvitationStatusPending}, nil).Once()
 				fixture.service.On("GetOrganizationInvitation", mock.Anything, "user-1", "org-1", "inv-1").Return(&orgtypes.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: orgtypes.OrganizationInvitationStatusPending}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,

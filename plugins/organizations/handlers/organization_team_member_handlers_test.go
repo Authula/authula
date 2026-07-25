@@ -111,7 +111,7 @@ func TestAddOrganizationTeamMemberHandler(t *testing.T) {
 			teamID:          "team-1",
 			body:            []byte("{"),
 			expectedStatus:  http.StatusUnprocessableEntity,
-			expectedMessage: "invalid request body",
+			expectedMessage: "unexpected EOF",
 		},
 		{
 			name:           "service_error",

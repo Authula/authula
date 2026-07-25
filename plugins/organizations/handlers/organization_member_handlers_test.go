@@ -110,7 +110,7 @@ func TestAddOrganizationMemberHandler(t *testing.T) {
 			organizationID:  "org-1",
 			body:            []byte("{"),
 			expectedStatus:  http.StatusUnprocessableEntity,
-			expectedMessage: "invalid request body",
+			expectedMessage: "unexpected EOF",
 		},
 		{
 			name:           "service_error",
@@ -302,7 +302,7 @@ func TestUpdateOrganizationMemberHandler(t *testing.T) {
 			memberID:        "mem-1",
 			body:            []byte("{"),
 			expectedStatus:  http.StatusUnprocessableEntity,
-			expectedMessage: "invalid request body",
+			expectedMessage: "unexpected EOF",
 		},
 		{
 			name:           "forbidden",

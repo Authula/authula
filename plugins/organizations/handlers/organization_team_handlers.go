@@ -24,7 +24,7 @@ func (h *CreateOrganizationTeamHandler) Handle() http.HandlerFunc {
 
 		var request types.CreateOrganizationTeamRequest
 		if err := util.ParseJSON(r, &request); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -102,7 +102,7 @@ func (h *UpdateOrganizationTeamHandler) Handle() http.HandlerFunc {
 
 		var request types.UpdateOrganizationTeamRequest
 		if err := util.ParseJSON(r, &request); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}

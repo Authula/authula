@@ -70,6 +70,16 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 		return fmt.Errorf("user service not available in service registry")
 	}
 
+	verificationService, ok := ctx.ServiceRegistry.Get(models.ServiceVerification.String()).(rootservices.VerificationService)
+	if !ok {
+		return fmt.Errorf("verification service not available in service registry")
+	}
+
+	tokenService, ok := ctx.ServiceRegistry.Get(models.ServiceToken.String()).(rootservices.TokenService)
+	if !ok {
+		return fmt.Errorf("token service not available in service registry")
+	}
+
 	mailerService, ok := ctx.ServiceRegistry.Get(models.ServiceMailer.String()).(rootservices.MailerService)
 	if !ok {
 		p.logger.Warn("mailer service not available in service registry: automatic email sending will be disabled for the organizations plugin")
@@ -99,13 +109,13 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 	}
 	p.emailTemplateManager = emailTemplateManager
 
-	p.invitationService = services.NewOrganizationInvitationService(ctx.DB, p.globalConfig, &p.pluginConfig, p.logger, ctx.EventBus, userService, mailerService, accessControlService, p.organizationRepo, p.invitationRepo, p.memberRepo, p.serviceUtils, p.emailTemplateManager, p.hooksExecutor)
+	p.invitationService = services.NewOrganizationInvitationService(ctx.DB, p.globalConfig, &p.pluginConfig, p.logger, ctx.EventBus, userService, mailerService, accessControlService, verificationService, tokenService, p.organizationRepo, p.invitationRepo, p.memberRepo, p.serviceUtils, p.emailTemplateManager, p.hooksExecutor)
 	p.memberService = services.NewOrganizationMemberService(userService, accessControlService, p.organizationRepo, p.memberRepo, p.pluginConfig.MembersLimit, ctx.DB, p.serviceUtils, p.hooksExecutor)
 	p.teamService = services.NewOrganizationTeamService(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo, p.serviceUtils, ctx.DB, p.hooksExecutor)
 	p.teamMemberService = services.NewOrganizationTeamMemberService(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo, p.serviceUtils, p.hooksExecutor)
 
 	authorizer := rootservices.NewDefaultAuthorizer()
-	p.useCases = usecases.NewUseCases(p.organizationService, p.invitationService, p.memberService, p.teamService, p.teamMemberService, authorizer)
+	p.useCases = usecases.NewUseCases(p.organizationService, p.invitationService, p.memberService, p.teamService, p.teamMemberService, userService, verificationService, tokenService, p.globalConfig, authorizer)
 
 	p.Api = BuildAPI(p)
 
