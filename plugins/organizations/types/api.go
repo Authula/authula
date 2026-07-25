@@ -57,6 +57,19 @@ type AcceptOrganizationInvitationQuery struct {
 	RedirectURL    string `query:"redirect_url" json:"redirect_url,omitempty" nullable:"true"`
 }
 
+type OrganizationSummary struct {
+	ID      string  `json:"id"`
+	OwnerID string  `json:"owner_id"`
+	Name    string  `json:"name"`
+	Slug    string  `json:"slug"`
+	Logo    *string `json:"logo,omitempty"`
+}
+
+type VerifyOrganizationInvitationResponse struct {
+	Invitation   *OrganizationInvitation `json:"invitation"`
+	Organization OrganizationSummary     `json:"organization"`
+}
+
 type VerifyOrganizationInvitationQuery struct {
 	OrganizationID string `path:"organization_id"`
 	InvitationID   string `path:"invitation_id"`
@@ -117,9 +130,12 @@ func (r *UpdateOrganizationRequest) Validate() error {
 }
 
 type CreateOrganizationInvitationRequest struct {
-	Email       string `json:"email" required:"true" nullable:"false"`
-	Role        string `json:"role" required:"true" nullable:"false"`
-	RedirectURL string `json:"redirect_url,omitempty" nullable:"true"`
+	Email string `json:"email" required:"true" nullable:"false"`
+	Role  string `json:"role" required:"true" nullable:"false"`
+}
+
+type CreateOrganizationInvitationQuery struct {
+	RedirectURL string `query:"redirect_url" json:"redirect_url,omitempty" nullable:"true"`
 }
 
 func (r *CreateOrganizationInvitationRequest) Validate() error {

@@ -98,14 +98,14 @@ func (u *UseCases) ExistsByID(ctx context.Context, organizationID string) (bool,
 
 // ------------- OrganizationInvitationService -------------
 
-func (u *UseCases) CreateOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationInvitationRequest) (*types.OrganizationInvitation, error) {
+func (u *UseCases) CreateOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationInvitationRequest, redirectURL string) (*types.OrganizationInvitation, error) {
 	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsInvitationsCreatePermission); err != nil {
 		return nil, err
 	}
-	return u.invitationService.CreateOrganizationInvitation(ctx, actor, organizationID, request)
+	return u.invitationService.CreateOrganizationInvitation(ctx, actor, organizationID, request, redirectURL)
 }
 
 func (u *UseCases) GetAllOrganizationInvitations(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationInvitation, error) {
@@ -144,7 +144,7 @@ func (u *UseCases) GetOrganizationInvitation(ctx context.Context, actor *models.
 	return u.invitationService.GetOrganizationInvitation(ctx, actor, organizationID, invitationID)
 }
 
-func (u *UseCases) VerifyOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string, rawToken string) (*types.OrganizationInvitation, error) {
+func (u *UseCases) VerifyOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string, rawToken string) (*types.VerifyOrganizationInvitationResponse, error) {
 	hashedToken := u.tokenService.Hash(rawToken)
 
 	verification, err := u.verificationService.GetByToken(ctx, hashedToken)
@@ -190,7 +190,23 @@ func (u *UseCases) VerifyOrganizationInvitation(ctx context.Context, actor *mode
 		return nil, err
 	}
 
-	return invitation, nil
+	org, err := u.orgService.GetByIDNoAuth(ctx, organizationID)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &types.VerifyOrganizationInvitationResponse{
+		Invitation: invitation,
+		Organization: types.OrganizationSummary{
+			ID:      org.ID,
+			OwnerID: org.OwnerID,
+			Name:    org.Name,
+			Slug:    org.Slug,
+			Logo:    org.Logo,
+		},
+	}
+
+	return resp, nil
 }
 
 func (u *UseCases) RevokeOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {

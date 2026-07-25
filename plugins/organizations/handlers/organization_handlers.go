@@ -22,7 +22,7 @@ func (h *CreateOrganizationHandler) Handle() http.HandlerFunc {
 
 		var request types.CreateOrganizationRequest
 		if err := util.ParseJSON(r, &request); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -102,7 +102,7 @@ func (h *UpdateOrganizationHandler) Handle() http.HandlerFunc {
 
 		var request types.UpdateOrganizationRequest
 		if err := util.ParseJSON(r, &request); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}

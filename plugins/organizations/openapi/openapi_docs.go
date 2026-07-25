@@ -72,6 +72,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 			openapi.WithTags("Organization Invitations"),
 			openapi.WithRequest(&types.OrganizationID{}),
 			openapi.WithRequest(&types.CreateOrganizationInvitationRequest{}),
+			openapi.WithRequest(&types.CreateOrganizationInvitationQuery{}),
 			openapi.WithResponseStatus(http.StatusCreated, &types.OrganizationInvitation{}),
 		),
 		svc.AddOperation(
@@ -132,7 +133,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 			openapi.WithDescription("Verifies an invitation token."),
 			openapi.WithTags("Organization Invitations"),
 			openapi.WithRequest(&types.VerifyOrganizationInvitationQuery{}),
-			openapi.WithResponseStatus(http.StatusOK, &types.OrganizationInvitation{}),
+			openapi.WithResponseStatus(http.StatusOK, &types.VerifyOrganizationInvitationResponse{}),
 		),
 
 		// Members

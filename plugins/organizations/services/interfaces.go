@@ -14,10 +14,11 @@ type OrganizationService interface {
 	UpdateOrganization(ctx context.Context, actor *models.Actor, organizationID string, request types.UpdateOrganizationRequest) (*types.Organization, error)
 	DeleteOrganization(ctx context.Context, actor *models.Actor, organizationID string) error
 	ExistsByID(ctx context.Context, organizationID string) (bool, error)
+	GetByIDNoAuth(ctx context.Context, organizationID string) (*types.Organization, error)
 }
 
 type OrganizationInvitationService interface {
-	CreateOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationInvitationRequest) (*types.OrganizationInvitation, error)
+	CreateOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationInvitationRequest, redirectURL string) (*types.OrganizationInvitation, error)
 	GetOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error)
 	GetOrganizationInvitationByID(ctx context.Context, invitationID string) (*types.OrganizationInvitation, error)
 	GetAllOrganizationInvitations(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationInvitation, error)

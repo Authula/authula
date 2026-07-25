@@ -46,8 +46,8 @@ func (a *API) DeleteOrganization(ctx context.Context, actor *models.Actor, organ
 
 // Invitations
 
-func (a *API) CreateInvitation(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationInvitationRequest) (*types.OrganizationInvitation, error) {
-	return a.useCases.CreateOrganizationInvitation(ctx, actor, organizationID, request)
+func (a *API) CreateInvitation(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationInvitationRequest, redirectURL string) (*types.OrganizationInvitation, error) {
+	return a.useCases.CreateOrganizationInvitation(ctx, actor, organizationID, request, redirectURL)
 }
 
 func (a *API) GetInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
@@ -70,7 +70,7 @@ func (a *API) RejectInvitation(ctx context.Context, actor *models.Actor, organiz
 	return a.useCases.RejectOrganizationInvitation(ctx, actor, organizationID, invitationID)
 }
 
-func (a *API) VerifyInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string, token string) (*types.OrganizationInvitation, error) {
+func (a *API) VerifyInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string, token string) (*types.VerifyOrganizationInvitationResponse, error) {
 	return a.useCases.VerifyOrganizationInvitation(ctx, actor, organizationID, invitationID, token)
 }
 

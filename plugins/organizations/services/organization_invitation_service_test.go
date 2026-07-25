@@ -129,6 +129,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		actorUserID          string
 		organizationID       string
 		request              types.CreateOrganizationInvitationRequest
+		redirectURL          string
 		invitationExpiresIn  time.Duration
 		accessControlService rootservices.AccessControlService
 		setup                func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationInvitationRepository, *orgtests.MockOrganizationMemberRepository, *orgtests.MockOrganizationInvitationHooks)
@@ -381,7 +382,8 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			actorUserID:         "user-1",
 			organizationID:      "org-1",
 			invitationExpiresIn: 36 * time.Hour,
-			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member", RedirectURL: "https://app.example.com/welcome"},
+			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
+			redirectURL:         "https://app.example.com/welcome",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme"}, nil).Once()
 				invRepo.On("GetByOrganizationIDAndEmail", mock.Anything, "org-1", "user@example.com", types.OrganizationInvitationStatusPending).Return(nil, nil).Once()
@@ -439,7 +441,8 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			actorUserID:         "user-1",
 			organizationID:      "org-1",
 			invitationExpiresIn: 36 * time.Hour,
-			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member", RedirectURL: "https://app.example.com/welcome"},
+			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
+			redirectURL:         "https://app.example.com/welcome",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme"}, nil).Once()
 				invRepo.On("GetByOrganizationIDAndEmail", mock.Anything, "org-1", "user@example.com", types.OrganizationInvitationStatusPending).Return(nil, nil).Once()
@@ -514,7 +517,8 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			actorUserID:         "user-1",
 			organizationID:      "org-1",
 			invitationExpiresIn: 36 * time.Hour,
-			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member", RedirectURL: "https://app.example.com/welcome"},
+			request:             types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
+			redirectURL:         "https://app.example.com/welcome",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme"}, nil).Once()
 				invRepo.On("GetByOrganizationIDAndEmail", mock.Anything, "org-1", "user@example.com", types.OrganizationInvitationStatusPending).Return(nil, nil).Once()
@@ -627,7 +631,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				serviceUtils,
 				tmplMgr,
 			)
-			inv, err := svc.CreateOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.request)
+			inv, err := svc.CreateOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.request, tt.redirectURL)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.Nil(t, inv)

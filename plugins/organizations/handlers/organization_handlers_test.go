@@ -74,7 +74,7 @@ func TestCreateOrganizationHandler(t *testing.T) {
 			userID:          new("user-1"),
 			body:            []byte("{invalid"),
 			expectedStatus:  http.StatusUnprocessableEntity,
-			expectedMessage: "invalid request body",
+			expectedMessage: "invalid character 'i' looking for beginning of object key string",
 		},
 		{
 			name:   "unprocessable_entity",
@@ -356,7 +356,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 			organizationID:  "org-1",
 			body:            []byte("{invalid"),
 			expectedStatus:  http.StatusUnprocessableEntity,
-			expectedMessage: "invalid request body",
+			expectedMessage: "invalid character 'i' looking for beginning of object key string",
 		},
 		{
 			name:            "unprocessable_entity",

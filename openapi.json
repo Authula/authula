@@ -2608,13 +2608,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "redirect_url",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateOrganizationInvitationRequest"
+                "$ref": "#/components/schemas/CreateOrganizationInvitationQuery"
               }
             }
           }
@@ -2853,7 +2860,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationInvitation"
+                  "$ref": "#/components/schemas/VerifyOrganizationInvitationResponse"
                 }
               }
             }
@@ -4400,16 +4407,21 @@
         ],
         "type": "object"
       },
-      "CreateOrganizationInvitationRequest": {
+      "CreateOrganizationInvitationQuery": {
         "properties": {
-          "email": {
-            "type": "string"
-          },
           "redirect_url": {
             "type": [
               "string",
               "null"
             ]
+          }
+        },
+        "type": "object"
+      },
+      "CreateOrganizationInvitationRequest": {
+        "properties": {
+          "email": {
+            "type": "string"
           },
           "role": {
             "type": "string"
@@ -5291,6 +5303,29 @@
           "updated_at",
           "user"
         ],
+        "type": "object"
+      },
+      "OrganizationSummary": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "logo": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "OrganizationTeam": {
@@ -6503,6 +6538,17 @@
           "user",
           "session"
         ],
+        "type": "object"
+      },
+      "VerifyOrganizationInvitationResponse": {
+        "properties": {
+          "invitation": {
+            "$ref": "#/components/schemas/OrganizationInvitation"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/OrganizationSummary"
+          }
+        },
         "type": "object"
       },
       "VerifyTOTPRequest": {

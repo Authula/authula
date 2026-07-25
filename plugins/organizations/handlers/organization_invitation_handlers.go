@@ -24,7 +24,7 @@ func (h *CreateOrganizationInvitationHandler) Handle() http.HandlerFunc {
 
 		var request types.CreateOrganizationInvitationRequest
 		if err := util.ParseJSON(r, &request); err != nil {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "invalid request body"})
+			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
 			reqCtx.Handled = true
 			return
 		}
@@ -34,7 +34,8 @@ func (h *CreateOrganizationInvitationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		invitation, err := h.UseCases.CreateOrganizationInvitation(ctx, actor, organizationID, request)
+		redirectURL := r.URL.Query().Get("redirect_url")
+		invitation, err := h.UseCases.CreateOrganizationInvitation(ctx, actor, organizationID, request, redirectURL)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -171,7 +172,7 @@ func (h *VerifyOrganizationInvitationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		invitation, err := h.UseCases.VerifyOrganizationInvitation(ctx, actor, organizationID, invitationID, token)
+		resp, err := h.UseCases.VerifyOrganizationInvitation(ctx, actor, organizationID, invitationID, token)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
@@ -193,7 +194,7 @@ func (h *VerifyOrganizationInvitationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, invitation)
+		reqCtx.SetJSONResponse(http.StatusOK, resp)
 	}
 }
 

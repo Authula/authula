@@ -87,7 +87,7 @@ func NewOrganizationInvitationService(
 	}
 }
 
-func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationInvitationRequest) (*types.OrganizationInvitation, error) {
+func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationInvitationRequest, redirectURL string) (*types.OrganizationInvitation, error) {
 	reqCtx, _ := models.GetRequestContext(ctx)
 
 	if actor == nil || actor.ID == "" || organizationID == "" {
@@ -198,7 +198,7 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 		return nil, err
 	}
 
-	verifyURL := s.buildOrganizationInvitationVerifyURL(created, rawToken, request.RedirectURL)
+	verifyURL := s.buildOrganizationInvitationVerifyURL(created, rawToken, redirectURL)
 	callbackHandled := false
 
 	if s.pluginConfig.SendOrganizationInvitationEmail != nil {
