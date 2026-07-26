@@ -29,12 +29,6 @@ func defaultMockUserService() *internaltests.MockUserService {
 	return svc
 }
 
-func defaultMockVerificationService() *internaltests.MockVerificationService {
-	svc := &internaltests.MockVerificationService{}
-	svc.On("DeleteByUserIDAndType", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-	return svc
-}
-
 func newOrgUseCases(svc orgservices.OrganizationService) *orgusecases.UseCases {
 	return orgusecases.NewUseCases(
 		svc,
@@ -43,23 +37,19 @@ func newOrgUseCases(svc orgservices.OrganizationService) *orgusecases.UseCases {
 		&orgtests.MockOrganizationTeamService{},
 		&orgtests.MockOrganizationTeamMemberService{},
 		defaultMockUserService(),
-		defaultMockVerificationService(),
-		&internaltests.MockTokenService{},
 		&models.Config{},
 		&noopAuthorizer{},
 	)
 }
 
-func newInvitationUseCases(svc orgservices.OrganizationInvitationService) *orgusecases.UseCases {
+func newInvitationUseCases(orgSvc orgservices.OrganizationService, svc orgservices.OrganizationInvitationService) *orgusecases.UseCases {
 	return orgusecases.NewUseCases(
-		&orgtests.MockOrganizationService{},
+		orgSvc,
 		svc,
 		&orgtests.MockOrganizationMemberService{},
 		&orgtests.MockOrganizationTeamService{},
 		&orgtests.MockOrganizationTeamMemberService{},
 		defaultMockUserService(),
-		defaultMockVerificationService(),
-		&internaltests.MockTokenService{},
 		&models.Config{},
 		&noopAuthorizer{},
 	)
@@ -73,8 +63,6 @@ func newMemberUseCases(svc orgservices.OrganizationMemberService) *orgusecases.U
 		&orgtests.MockOrganizationTeamService{},
 		&orgtests.MockOrganizationTeamMemberService{},
 		defaultMockUserService(),
-		defaultMockVerificationService(),
-		&internaltests.MockTokenService{},
 		&models.Config{},
 		&noopAuthorizer{},
 	)
@@ -88,8 +76,6 @@ func newTeamUseCases(svc orgservices.OrganizationTeamService) *orgusecases.UseCa
 		svc,
 		&orgtests.MockOrganizationTeamMemberService{},
 		defaultMockUserService(),
-		defaultMockVerificationService(),
-		&internaltests.MockTokenService{},
 		&models.Config{},
 		&noopAuthorizer{},
 	)
@@ -103,8 +89,6 @@ func newTeamMemberUseCases(svc orgservices.OrganizationTeamMemberService) *orgus
 		&orgtests.MockOrganizationTeamService{},
 		svc,
 		defaultMockUserService(),
-		defaultMockVerificationService(),
-		&internaltests.MockTokenService{},
 		&models.Config{},
 		&noopAuthorizer{},
 	)

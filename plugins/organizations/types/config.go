@@ -84,5 +84,5 @@ type SendOrganizationInvitationEmailParams struct {
 	Organization *Organization
 	Invitation   *OrganizationInvitation
 	Inviter      *models.User
-	AcceptURL    string
+	InviteURL    string
 }

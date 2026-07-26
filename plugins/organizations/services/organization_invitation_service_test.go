@@ -49,15 +49,13 @@ func newTestOrganizationInvitationService(
 	orgRepo repositories.OrganizationRepository,
 	invRepo repositories.OrganizationInvitationRepository,
 	memberRepo repositories.OrganizationMemberRepository,
-	verificationService rootservices.VerificationService,
-	tokenService rootservices.TokenService,
 ) *organizationInvitationService {
 	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}
 	tmplMgr := emailtmpl.NewManager()
 	_ = tmplMgr.Register(emailtmpl.Definition{
 		Name:    "organization_invitation",
 		Subject: "You're invited to join {{.OrganizationName}} on {{.AppName}}",
-		Text:    "You have been invited to join {{.OrganizationName}} on {{.AppName}} as {{.Role}}. Open this link to accept: {{.AcceptLink}}",
+		Text:    "You have been invited to join {{.OrganizationName}} on {{.AppName}} as {{.Role}}. Open this link to accept: {{.InviteLink}}",
 		HTML:    "<p>Invited to {{.OrganizationName}} as {{.Role}}</p>",
 	})
 	return NewOrganizationInvitationService(
@@ -69,8 +67,6 @@ func newTestOrganizationInvitationService(
 		userService,
 		nil,
 		accessControlService,
-		verificationService,
-		tokenService,
 		orgRepo,
 		invRepo,
 		memberRepo,
@@ -459,8 +455,8 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 					require.Equal(t, "org-1", params.Organization.ID)
 					require.Equal(t, "inv-1", params.Invitation.ID)
 					require.Equal(t, "user-1", params.Inviter.ID)
-					require.Contains(t, params.AcceptURL, "/organizations/org-1/invitations/inv-1/verify?")
-					require.Contains(t, params.AcceptURL, "token=test-raw-token")
+					require.Contains(t, params.InviteURL, "organization_id=org-1")
+					require.Contains(t, params.InviteURL, "invitation_id=inv-1")
 					require.Nil(t, reqCtx)
 					return nil
 				}
@@ -532,9 +528,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			pluginConfig: func(config *types.OrganizationsPluginConfig, callbackCalled *bool) {
 				config.SendOrganizationInvitationEmail = func(params types.SendOrganizationInvitationEmailParams, reqCtx *models.RequestContext) error {
 					*callbackCalled = true
-					require.Contains(t, params.AcceptURL, "/organizations/org-1/invitations/inv-1/verify")
-					require.Contains(t, params.AcceptURL, "token=test-raw-token")
-					require.Contains(t, params.AcceptURL, "redirect_url=https%3A%2F%2Fapp.example.com%2Fwelcome")
+					require.Equal(t, "https://app.example.com/welcome?invitation_id=inv-1&organization_id=org-1", params.InviteURL)
 					return nil
 				}
 			},
@@ -553,8 +547,6 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			logger := &testInvitationLogger{}
 			pluginConfig := &types.OrganizationsPluginConfig{
 				Enabled:             true,
@@ -599,19 +591,12 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				accessControlService = orgtests.NewAccessControlServiceStub()
 			}
 
-			tokenSvc := &internaltests.MockTokenService{}
-			tokenSvc.On("Generate").Return("test-raw-token", nil).Maybe()
-			tokenSvc.On("Hash", mock.Anything).Return("hashed-token").Maybe()
-
-			verifSvc := &internaltests.MockVerificationService{}
-			verifSvc.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&models.Verification{}, nil).Maybe()
-
 			serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}
 			tmplMgr := emailtmpl.NewManager()
 			_ = tmplMgr.Register(emailtmpl.Definition{
 				Name:    "organization_invitation",
 				Subject: "You're invited to join {{.OrganizationName}} on {{.AppName}}",
-				Text:    "You have been invited to join {{.OrganizationName}} on {{.AppName}} as {{.Role}}. Open this link to accept: {{.AcceptLink}}",
+				Text:    "You have been invited to join {{.OrganizationName}} on {{.AppName}} as {{.Role}}. Open this link to accept: {{.InviteLink}}",
 				HTML:    "<p>Invited to {{.OrganizationName}} as {{.Role}}</p>",
 			})
 			svc := NewOrganizationInvitationService(
@@ -623,8 +608,6 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				userSvc,
 				mailer,
 				accessControlService,
-				verifSvc,
-				tokenSvc,
 				orgRepo,
 				orgInvitationRepo,
 				memberRepo,
@@ -740,7 +723,7 @@ func TestOrganizationInvitationService_GetOrganizationInvitation(t *testing.T) {
 				tt.setup(orgRepo, invRepo, memberRepo)
 			}
 
-			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo, &internaltests.MockVerificationService{}, &internaltests.MockTokenService{})
+			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
 			invitation, err := svc.GetOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.invitationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
@@ -859,7 +842,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 				tt.setup(orgRepo, invRepo, memberRepo)
 			}
 
-			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo, &internaltests.MockVerificationService{}, &internaltests.MockTokenService{})
+			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
 			invitations, err := svc.GetAllOrganizationInvitations(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
@@ -967,7 +950,7 @@ func TestOrganizationInvitationService_RevokeOrganizationInvitation(t *testing.T
 				tt.setup(orgRepo, invRepo, memberRepo, hooks)
 			}
 
-			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo, &internaltests.MockVerificationService{}, &internaltests.MockTokenService{})
+			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
 			invitation, err := svc.RevokeOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.invitationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
@@ -1053,7 +1036,7 @@ func TestOrganizationInvitationService_AcceptPendingOrganizationInvitationsForEm
 			}
 
 			txRunner := &orgtests.MockOrganizationInvitationTxRunner{}
-			svc := newTestOrganizationInvitationService(txRunner, pluginConfig, userSvc, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo, &internaltests.MockVerificationService{}, &internaltests.MockTokenService{})
+			svc := newTestOrganizationInvitationService(txRunner, pluginConfig, userSvc, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
 			accepted, err := svc.AcceptPendingOrganizationInvitationsForEmail(context.Background(), tt.userID, tt.email)
 			if tt.expectErr != nil {
 				require.Error(t, err)
@@ -1302,7 +1285,7 @@ func TestOrganizationInvitationService_AcceptOrganizationInvitation(t *testing.T
 				tt.setup(userSvc, invRepo, memberRepo, hooks, memberHooks)
 			}
 
-			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, userSvc, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo, &internaltests.MockVerificationService{}, &internaltests.MockTokenService{})
+			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, userSvc, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
 			invitation, err := svc.AcceptOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization, tt.invitationID)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
@@ -1468,7 +1451,7 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 				tt.setup(userSvc, invRepo)
 			}
 
-			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, userSvc, orgtests.NewAccessControlServiceStub(), &orgtests.MockOrganizationRepository{}, invRepo, &orgtests.MockOrganizationMemberRepository{}, &internaltests.MockVerificationService{}, &internaltests.MockTokenService{})
+			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, userSvc, orgtests.NewAccessControlServiceStub(), &orgtests.MockOrganizationRepository{}, invRepo, &orgtests.MockOrganizationMemberRepository{})
 			invitation, err := svc.RejectOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization, tt.invitationID)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)

@@ -333,20 +333,6 @@ func (s *organizationService) ExistsByID(ctx context.Context, organizationID str
 	return org != nil, nil
 }
 
-func (s *organizationService) GetByIDNoAuth(ctx context.Context, organizationID string) (*types.Organization, error) {
-	if organizationID == "" {
-		return nil, coreerrors.ErrNotFound
-	}
-	org, err := s.orgRepo.GetByID(ctx, organizationID)
-	if err != nil {
-		return nil, err
-	}
-	if org == nil {
-		return nil, coreerrors.ErrNotFound
-	}
-	return org, nil
-}
-
 func (s *organizationService) DeleteOrganization(ctx context.Context, actor *models.Actor, organizationID string) error {
 	organization, err := s.serviceUtils.authorizeOwner(ctx, actor, organizationID)
 	if err != nil {

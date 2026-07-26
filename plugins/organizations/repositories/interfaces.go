@@ -21,8 +21,10 @@ type OrganizationRepository interface {
 type OrganizationInvitationRepository interface {
 	Create(ctx context.Context, invitation *types.OrganizationInvitation) (*types.OrganizationInvitation, error)
 	GetByID(ctx context.Context, invitationID string) (*types.OrganizationInvitation, error)
+	GetByIDWithOrg(ctx context.Context, invitationID string) (*types.GetOrganizationInvitationResponse, error)
 	GetByOrganizationIDAndEmail(ctx context.Context, organizationID string, email string, status ...types.OrganizationInvitationStatus) (*types.OrganizationInvitation, error)
 	GetAllByOrganizationID(ctx context.Context, organizationID string) ([]types.OrganizationInvitation, error)
+	GetAllByOrganizationIDWithOrg(ctx context.Context, organizationID string) ([]types.GetOrganizationInvitationResponse, error)
 	GetAllPendingByEmail(ctx context.Context, email string) ([]types.OrganizationInvitation, error)
 	Update(ctx context.Context, invitation *types.OrganizationInvitation) (*types.OrganizationInvitation, error)
 	CountByOrganizationIDAndEmail(ctx context.Context, organizationID string, email string) (int, error)

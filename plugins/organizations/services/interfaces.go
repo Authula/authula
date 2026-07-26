@@ -14,14 +14,15 @@ type OrganizationService interface {
 	UpdateOrganization(ctx context.Context, actor *models.Actor, organizationID string, request types.UpdateOrganizationRequest) (*types.Organization, error)
 	DeleteOrganization(ctx context.Context, actor *models.Actor, organizationID string) error
 	ExistsByID(ctx context.Context, organizationID string) (bool, error)
-	GetByIDNoAuth(ctx context.Context, organizationID string) (*types.Organization, error)
 }
 
 type OrganizationInvitationService interface {
 	CreateOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationInvitationRequest, redirectURL string) (*types.OrganizationInvitation, error)
 	GetOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error)
 	GetOrganizationInvitationByID(ctx context.Context, invitationID string) (*types.OrganizationInvitation, error)
+	GetOrganizationInvitationByIDWithOrg(ctx context.Context, invitationID string) (*types.GetOrganizationInvitationResponse, error)
 	GetAllOrganizationInvitations(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationInvitation, error)
+	GetAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string) ([]types.GetOrganizationInvitationResponse, error)
 	RevokeOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error)
 	AcceptOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error)
 	RejectOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error)

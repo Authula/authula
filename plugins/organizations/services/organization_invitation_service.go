@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"net/mail"
 	"net/url"
 	"strings"
@@ -35,8 +34,6 @@ type organizationInvitationService struct {
 	userService          rootservices.UserService
 	mailerService        rootservices.MailerService
 	accessControlService rootservices.AccessControlService
-	verificationService  rootservices.VerificationService
-	tokenService         rootservices.TokenService
 	organizationRepo     repositories.OrganizationRepository
 	orgInvitationRepo    repositories.OrganizationInvitationRepository
 	orgMemberRepo        repositories.OrganizationMemberRepository
@@ -54,8 +51,6 @@ func NewOrganizationInvitationService(
 	userService rootservices.UserService,
 	mailerService rootservices.MailerService,
 	accessControlService rootservices.AccessControlService,
-	verificationService rootservices.VerificationService,
-	tokenService rootservices.TokenService,
 	organizationRepo repositories.OrganizationRepository,
 	orgInvitationRepo repositories.OrganizationInvitationRepository,
 	orgMemberRepo repositories.OrganizationMemberRepository,
@@ -76,8 +71,6 @@ func NewOrganizationInvitationService(
 		userService:          userService,
 		mailerService:        mailerService,
 		accessControlService: accessControlService,
-		verificationService:  verificationService,
-		tokenService:         tokenService,
 		organizationRepo:     organizationRepo,
 		orgInvitationRepo:    orgInvitationRepo,
 		orgMemberRepo:        orgMemberRepo,
@@ -183,22 +176,7 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 
 	s.publishOrganizationInvitationCreatedEvent(created, organization)
 
-	rawToken, err := s.tokenService.Generate()
-	if err != nil {
-		return nil, err
-	}
-	hashedToken := s.tokenService.Hash(rawToken)
-
-	inviteeUser, _ := s.userService.GetByEmail(ctx, request.Email)
-	userID := ""
-	if inviteeUser != nil {
-		userID = inviteeUser.ID
-	}
-	if _, err := s.verificationService.Create(ctx, userID, hashedToken, models.TypeOrganizationInvitationVerify, created.ID, s.pluginConfig.InvitationExpiresIn); err != nil {
-		return nil, err
-	}
-
-	verifyURL := s.buildOrganizationInvitationVerifyURL(created, rawToken, redirectURL)
+	inviteURL := s.buildOrganizationInvitationURL(created, redirectURL)
 	callbackHandled := false
 
 	if s.pluginConfig.SendOrganizationInvitationEmail != nil {
@@ -211,7 +189,7 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 			Organization: organization,
 			Invitation:   created,
 			Inviter:      inviter,
-			AcceptURL:    verifyURL,
+			InviteURL:    inviteURL,
 		}, reqCtx)
 
 		if err != nil {
@@ -227,7 +205,7 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
 			defer cancel()
 
-			if err := s.sendOrganizationInvitationEmail(taskCtx, created, organization, verifyURL); err != nil {
+			if err := s.sendOrganizationInvitationEmail(taskCtx, created, organization, inviteURL); err != nil {
 				s.logger.Error("failed to send organization invitation email via built-in email service", "invitation_id", created.ID, "error", err)
 			}
 		}()
@@ -236,13 +214,13 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 	return created, nil
 }
 
-func (s *organizationInvitationService) sendOrganizationInvitationEmail(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, acceptURL string) error {
+func (s *organizationInvitationService) sendOrganizationInvitationEmail(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, inviteURL string) error {
 	subject, textBody, htmlBody, err := s.emailTemplateManager.Render(emailconstants.OrganizationInvitationEmailTemplateName, types.OrganizationInvitationContext{
 		CommonContext:    emailtmpl.NewCommonContext(s.globalConfig.AppName, s.globalConfig.BaseURL),
 		InvitationEmail:  invitation.Email,
 		OrganizationName: organization.Name,
 		Role:             invitation.Role,
-		AcceptLink:       acceptURL,
+		InviteLink:       inviteURL,
 		Expiry:           s.pluginConfig.InvitationExpiresIn,
 	})
 	if err != nil {
@@ -252,25 +230,23 @@ func (s *organizationInvitationService) sendOrganizationInvitationEmail(ctx cont
 	return s.mailerService.SendEmail(ctx, invitation.Email, subject, textBody, htmlBody)
 }
 
-func (s *organizationInvitationService) buildOrganizationInvitationVerifyURL(invitation *types.OrganizationInvitation, rawToken string, redirectURL string) string {
-	baseURL := s.globalConfig.BaseURL
-	basePath := s.globalConfig.BasePath
-	verifyPath := fmt.Sprintf("/organizations/%s/invitations/%s/verify", url.PathEscape(invitation.OrganizationID), url.PathEscape(invitation.ID))
+func (s *organizationInvitationService) buildOrganizationInvitationURL(invitation *types.OrganizationInvitation, redirectURL string) string {
+	base := redirectURL
+	if base == "" {
+		base = s.globalConfig.BaseURL + s.globalConfig.BasePath
+	}
 
-	fullURL := baseURL + basePath + verifyPath
-	parsedURL, err := url.Parse(fullURL)
+	parsed, err := url.Parse(base)
 	if err != nil {
-		return fullURL
+		return base
 	}
 
-	query := parsedURL.Query()
-	query.Set("token", rawToken)
-	if redirectURL != "" {
-		query.Set("redirect_url", redirectURL)
-	}
-	parsedURL.RawQuery = query.Encode()
+	q := parsed.Query()
+	q.Set("organization_id", invitation.OrganizationID)
+	q.Set("invitation_id", invitation.ID)
+	parsed.RawQuery = q.Encode()
 
-	return parsedURL.String()
+	return parsed.String()
 }
 
 func (s *organizationInvitationService) publishOrganizationInvitationCreatedEvent(invitation *types.OrganizationInvitation, organization *types.Organization) {
@@ -341,6 +317,35 @@ func (s *organizationInvitationService) GetOrganizationInvitationByID(ctx contex
 	}
 
 	return invitation, nil
+}
+
+func (s *organizationInvitationService) GetOrganizationInvitationByIDWithOrg(ctx context.Context, invitationID string) (*types.GetOrganizationInvitationResponse, error) {
+	if invitationID == "" {
+		return nil, coreerrors.ErrNotFound
+	}
+
+	resp, err := s.orgInvitationRepo.GetByIDWithOrg(ctx, invitationID)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, coreerrors.ErrNotFound
+	}
+
+	return resp, nil
+}
+
+func (s *organizationInvitationService) GetAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
+	if organizationID == "" {
+		return nil, coreerrors.ErrNotFound
+	}
+
+	resp, err := s.orgInvitationRepo.GetAllByOrganizationIDWithOrg(ctx, organizationID)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {

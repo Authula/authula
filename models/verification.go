@@ -10,13 +10,12 @@ import (
 type VerificationType string
 
 const (
-	TypeEmailVerification            VerificationType = "email_verification"
-	TypePasswordResetRequest         VerificationType = "password_reset_request"
-	TypeEmailResetRequest            VerificationType = "email_reset_request"
-	TypeMagicLinkSignInRequest       VerificationType = "magic_link_sign_in_request"
-	TypeMagicLinkExchangeCode        VerificationType = "magic_link_exchange_code"
-	TypeTOTPPendingAuth              VerificationType = "totp_pending_auth"
-	TypeOrganizationInvitationVerify VerificationType = "organization_invitation_verify"
+	TypeEmailVerification      VerificationType = "email_verification"
+	TypePasswordResetRequest   VerificationType = "password_reset_request"
+	TypeEmailResetRequest      VerificationType = "email_reset_request"
+	TypeMagicLinkSignInRequest VerificationType = "magic_link_sign_in_request"
+	TypeMagicLinkExchangeCode  VerificationType = "magic_link_exchange_code"
+	TypeTOTPPendingAuth        VerificationType = "totp_pending_auth"
 )
 
 func (vt VerificationType) String() string {
@@ -32,7 +31,6 @@ func (VerificationType) PrepareJSONSchema(schema *jsonschema.Schema) error {
 		string(TypeMagicLinkSignInRequest),
 		string(TypeMagicLinkExchangeCode),
 		string(TypeTOTPPendingAuth),
-		string(TypeOrganizationInvitationVerify),
 	}
 	schema.WithDescription("The type of the verification")
 	return nil

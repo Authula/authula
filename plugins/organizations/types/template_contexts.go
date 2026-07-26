@@ -11,6 +11,6 @@ type OrganizationInvitationContext struct {
 	InvitationEmail  string
 	OrganizationName string
 	Role             string
-	AcceptLink       string
+	InviteLink       string
 	Expiry           time.Duration
 }
