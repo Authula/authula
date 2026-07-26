@@ -2581,7 +2581,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/OrganizationInvitation"
+                    "$ref": "#/components/schemas/GetOrganizationInvitationResponse"
                   },
                   "type": [
                     "null",
@@ -2646,7 +2646,7 @@
           "Organization Invitations"
         ],
         "summary": "Get invitation",
-        "description": "Retrieves a single invitation by its ID.",
+        "description": "Retrieves a single invitation.",
         "operationId": "getOrganizationInvitation",
         "parameters": [
           {
@@ -2672,7 +2672,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationInvitation"
+                  "$ref": "#/components/schemas/GetOrganizationInvitationResponse"
                 }
               }
             }
@@ -2809,60 +2809,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrganizationInvitation"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/organizations/{organization_id}/invitations/{invitation_id}/verify": {
-      "get": {
-        "tags": [
-          "Organization Invitations"
-        ],
-        "summary": "Verify invitation",
-        "description": "Verifies an invitation token.",
-        "operationId": "verifyOrganizationInvitation",
-        "parameters": [
-          {
-            "name": "token",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "redirect_url",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "organization_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "invitation_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VerifyOrganizationInvitationResponse"
                 }
               }
             }
@@ -4911,6 +4857,21 @@
         ],
         "type": "object"
       },
+      "GetOrganizationInvitationResponse": {
+        "properties": {
+          "invitation": {
+            "$ref": "#/components/schemas/OrganizationInvitation"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/OrganizationSummary"
+          }
+        },
+        "required": [
+          "invitation",
+          "organization"
+        ],
+        "type": "object"
+      },
       "GetSessionStateResponse": {
         "properties": {
           "state": {
@@ -5318,6 +5279,13 @@
               "string"
             ]
           },
+          "metadata": {
+            "additionalProperties": {},
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "name": {
             "type": "string"
           },
@@ -5328,6 +5296,12 @@
             "type": "string"
           }
         },
+        "required": [
+          "id",
+          "owner_id",
+          "name",
+          "slug"
+        ],
         "type": "object"
       },
       "OrganizationTeam": {
@@ -6540,17 +6514,6 @@
           "user",
           "session"
         ],
-        "type": "object"
-      },
-      "VerifyOrganizationInvitationResponse": {
-        "properties": {
-          "invitation": {
-            "$ref": "#/components/schemas/OrganizationInvitation"
-          },
-          "organization": {
-            "$ref": "#/components/schemas/OrganizationSummary"
-          }
-        },
         "type": "object"
       },
       "VerifyTOTPRequest": {
