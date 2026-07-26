@@ -96,16 +96,6 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 			openapi.WithResponseStatus(http.StatusOK, &types.OrganizationInvitation{}),
 		),
 		svc.AddOperation(
-			http.MethodGet,
-			"/organizations/{organization_id}/invitations/{invitation_id}/verify",
-			openapi.WithOperationID("verifyOrganizationInvitation"),
-			openapi.WithSummary("Verify invitation"),
-			openapi.WithDescription("Verifies an invitation token."),
-			openapi.WithTags("Organization Invitations"),
-			openapi.WithRequest(&types.VerifyOrganizationInvitationQuery{}),
-			openapi.WithResponseStatus(http.StatusOK, &types.VerifyOrganizationInvitationResponse{}),
-		),
-		svc.AddOperation(
 			http.MethodPatch,
 			"/organizations/{organization_id}/invitations/{invitation_id}/revoke",
 			openapi.WithOperationID("revokeOrganizationInvitation"),

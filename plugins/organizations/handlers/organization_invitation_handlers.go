@@ -151,53 +151,6 @@ func (h *AcceptOrganizationInvitationHandler) Handle() http.HandlerFunc {
 	}
 }
 
-type VerifyOrganizationInvitationHandler struct {
-	UseCases       *orgusecases.UseCases
-	TrustedOrigins []string
-}
-
-func (h *VerifyOrganizationInvitationHandler) Handle() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
-		actor := reqCtx.Actor
-
-		organizationID := r.PathValue("organization_id")
-		invitationID := r.PathValue("invitation_id")
-
-		token := r.URL.Query().Get("token")
-		if token == "" {
-			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": "token is required"})
-			reqCtx.Handled = true
-			return
-		}
-
-		resp, err := h.UseCases.VerifyOrganizationInvitation(ctx, actor, organizationID, invitationID, token)
-		if err != nil {
-			orgconstants.HandleError(err, reqCtx)
-			return
-		}
-
-		redirectURL := r.URL.Query().Get("redirect_url")
-		if redirectURL != "" {
-			validatedURL, err := util.IsTrustedCallbackURL(redirectURL, h.TrustedOrigins)
-			if err != nil {
-				reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]any{"message": err.Error()})
-				reqCtx.Handled = true
-				return
-			}
-			q := validatedURL.Query()
-			q.Set("invite_id", invitationID)
-			validatedURL.RawQuery = q.Encode()
-			reqCtx.RedirectURL = validatedURL.String()
-			reqCtx.ResponseStatus = http.StatusFound
-			return
-		}
-
-		reqCtx.SetJSONResponse(http.StatusOK, resp)
-	}
-}
-
 type RejectOrganizationInvitationHandler struct {
 	UseCases *orgusecases.UseCases
 }

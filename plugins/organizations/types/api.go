@@ -65,18 +65,6 @@ type OrganizationSummary struct {
 	Logo    *string `json:"logo,omitempty"`
 }
 
-type VerifyOrganizationInvitationResponse struct {
-	Invitation   *OrganizationInvitation `json:"invitation"`
-	Organization OrganizationSummary     `json:"organization"`
-}
-
-type VerifyOrganizationInvitationQuery struct {
-	OrganizationID string `path:"organization_id"`
-	InvitationID   string `path:"invitation_id"`
-	Token          string `query:"token" json:"token" nullable:"false"`
-	RedirectURL    string `query:"redirect_url" json:"redirect_url,omitempty" nullable:"true"`
-}
-
 type CreateOrganizationRequest struct {
 	Name     string         `json:"name" required:"true" nullable:"false"`
 	Role     string         `json:"role" required:"true" nullable:"false"`

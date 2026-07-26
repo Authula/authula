@@ -3,7 +3,6 @@ package usecases
 import (
 	"context"
 	"strings"
-	"time"
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
@@ -14,16 +13,14 @@ import (
 )
 
 type UseCases struct {
-	orgService          orgservices.OrganizationService
-	invitationService   orgservices.OrganizationInvitationService
-	memberService       orgservices.OrganizationMemberService
-	teamService         orgservices.OrganizationTeamService
-	teamMemberService   orgservices.OrganizationTeamMemberService
-	userService         rootservices.UserService
-	verificationService rootservices.VerificationService
-	tokenService        rootservices.TokenService
-	globalConfig        *models.Config
-	authorizer          rootservices.Authorizer
+	orgService        orgservices.OrganizationService
+	invitationService orgservices.OrganizationInvitationService
+	memberService     orgservices.OrganizationMemberService
+	teamService       orgservices.OrganizationTeamService
+	teamMemberService orgservices.OrganizationTeamMemberService
+	userService       rootservices.UserService
+	globalConfig      *models.Config
+	authorizer        rootservices.Authorizer
 }
 
 func NewUseCases(
@@ -33,22 +30,18 @@ func NewUseCases(
 	teamService orgservices.OrganizationTeamService,
 	teamMemberService orgservices.OrganizationTeamMemberService,
 	userService rootservices.UserService,
-	verificationService rootservices.VerificationService,
-	tokenService rootservices.TokenService,
 	globalConfig *models.Config,
 	authorizer rootservices.Authorizer,
 ) *UseCases {
 	return &UseCases{
-		orgService:          orgService,
-		invitationService:   invitationService,
-		memberService:       memberService,
-		teamService:         teamService,
-		teamMemberService:   teamMemberService,
-		userService:         userService,
-		verificationService: verificationService,
-		tokenService:        tokenService,
-		globalConfig:        globalConfig,
-		authorizer:          authorizer,
+		orgService:        orgService,
+		invitationService: invitationService,
+		memberService:     memberService,
+		teamService:       teamService,
+		teamMemberService: teamMemberService,
+		userService:       userService,
+		globalConfig:      globalConfig,
+		authorizer:        authorizer,
 	}
 }
 
@@ -144,71 +137,6 @@ func (u *UseCases) GetOrganizationInvitation(ctx context.Context, actor *models.
 	return u.invitationService.GetOrganizationInvitation(ctx, actor, organizationID, invitationID)
 }
 
-func (u *UseCases) VerifyOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string, rawToken string) (*types.VerifyOrganizationInvitationResponse, error) {
-	hashedToken := u.tokenService.Hash(rawToken)
-
-	verification, err := u.verificationService.GetByToken(ctx, hashedToken)
-	if err != nil {
-		return nil, err
-	}
-	if verification == nil {
-		return nil, orgconstants.ErrInvitationVerificationFailed
-	}
-	if verification.Type != models.TypeOrganizationInvitationVerify {
-		return nil, orgconstants.ErrInvitationVerificationFailed
-	}
-	if u.verificationService.IsExpired(verification) {
-		return nil, orgconstants.ErrInvitationVerificationExpired
-	}
-	if verification.Identifier != invitationID {
-		return nil, orgconstants.ErrInvitationVerificationFailed
-	}
-
-	invitation, err := u.invitationService.GetOrganizationInvitationByID(ctx, invitationID)
-	if err != nil {
-		return nil, err
-	}
-	if invitation.OrganizationID != organizationID {
-		return nil, coreerrors.ErrNotFound
-	}
-	if invitation.ExpiresAt.Before(time.Now().UTC()) {
-		return nil, orgconstants.ErrInvitationVerificationExpired
-	}
-	if invitation.Status != types.OrganizationInvitationStatusPending {
-		return nil, orgconstants.ErrInvitationVerificationFailed
-	}
-
-	user, err := u.userService.GetByID(ctx, actor.ID)
-	if err != nil {
-		return nil, err
-	}
-	if user == nil || !strings.EqualFold(invitation.Email, user.Email) {
-		return nil, orgconstants.ErrInvitationEmailMismatch
-	}
-
-	if err := u.verificationService.Delete(ctx, verification.ID); err != nil {
-		return nil, err
-	}
-
-	org, err := u.orgService.GetByIDNoAuth(ctx, organizationID)
-	if err != nil {
-		return nil, err
-	}
-
-	resp := &types.VerifyOrganizationInvitationResponse{
-		Invitation: invitation,
-		Organization: types.OrganizationSummary{
-			ID:      org.ID,
-			OwnerID: org.OwnerID,
-			Name:    org.Name,
-			Slug:    org.Slug,
-			Logo:    org.Logo,
-		},
-	}
-
-	return resp, nil
-}
-
 func (u *UseCases) RevokeOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
@@ -220,29 +148,11 @@ func (u *UseCases) RevokeOrganizationInvitation(ctx context.Context, actor *mode
 }
 
 func (u *UseCases) AcceptOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
-	invitation, err := u.invitationService.AcceptOrganizationInvitation(ctx, actor, organizationID, invitationID)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := u.verificationService.DeleteByUserIDAndType(ctx, actor.ID, models.TypeOrganizationInvitationVerify); err != nil {
-		return nil, err
-	}
-
-	return invitation, nil
+	return u.invitationService.AcceptOrganizationInvitation(ctx, actor, organizationID, invitationID)
 }
 
 func (u *UseCases) RejectOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
-	invitation, err := u.invitationService.RejectOrganizationInvitation(ctx, actor, organizationID, invitationID)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := u.verificationService.DeleteByUserIDAndType(ctx, actor.ID, models.TypeOrganizationInvitationVerify); err != nil {
-		return nil, err
-	}
-
-	return invitation, nil
+	return u.invitationService.RejectOrganizationInvitation(ctx, actor, organizationID, invitationID)
 }
 
 // ------------- OrganizationMemberService -------------

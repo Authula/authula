@@ -18,7 +18,6 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 	createInvitationHandler := &handlers.CreateOrganizationInvitationHandler{UseCases: plugin.useCases}
 	getInvitationHandler := &handlers.GetOrganizationInvitationHandler{UseCases: plugin.useCases}
 	getAllInvitationsHandler := &handlers.GetAllOrganizationInvitationsHandler{UseCases: plugin.useCases}
-	verifyInvitationHandler := &handlers.VerifyOrganizationInvitationHandler{UseCases: plugin.useCases, TrustedOrigins: plugin.globalConfig.Security.TrustedOrigins}
 	revokeInvitationHandler := &handlers.RevokeOrganizationInvitationHandler{UseCases: plugin.useCases}
 	acceptInvitationHandler := &handlers.AcceptOrganizationInvitationHandler{UseCases: plugin.useCases, TrustedOrigins: plugin.globalConfig.Security.TrustedOrigins}
 	rejectInvitationHandler := &handlers.RejectOrganizationInvitationHandler{UseCases: plugin.useCases}
@@ -107,14 +106,6 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 				middleware.RequireAuthenticated(),
 			},
 			Handler: getInvitationHandler.Handle(),
-		},
-		{
-			Method: http.MethodGet,
-			Path:   "/organizations/{organization_id}/invitations/{invitation_id}/verify",
-			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireActor(models.ActorUser),
-			},
-			Handler: verifyInvitationHandler.Handle(),
 		},
 		{
 			Method: http.MethodPatch,
