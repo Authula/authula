@@ -2621,7 +2621,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateOrganizationInvitationQuery"
+                "$ref": "#/components/schemas/CreateOrganizationInvitationRequest"
               }
             }
           }

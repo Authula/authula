@@ -71,8 +71,8 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 			openapi.WithDescription("Creates an invitation for a user to join an organization."),
 			openapi.WithTags("Organization Invitations"),
 			openapi.WithRequest(&types.OrganizationID{}),
-			openapi.WithRequest(&types.CreateOrganizationInvitationRequest{}),
 			openapi.WithRequest(&types.CreateOrganizationInvitationQuery{}),
+			openapi.WithRequest(&types.CreateOrganizationInvitationRequest{}),
 			openapi.WithResponseStatus(http.StatusCreated, &types.OrganizationInvitation{}),
 		),
 		svc.AddOperation(
