@@ -176,7 +176,7 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 
 	s.publishOrganizationInvitationCreatedEvent(created, organization)
 
-	viewInviteURL := s.buildOrganizationInvitationURL(created, redirectURL)
+	inviteURL := s.buildOrganizationInvitationURL(created, redirectURL)
 	callbackHandled := false
 
 	if s.pluginConfig.SendOrganizationInvitationEmail != nil {
@@ -189,7 +189,7 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 			Organization: organization,
 			Invitation:   created,
 			Inviter:      inviter,
-			InviteURL:    viewInviteURL,
+			InviteURL:    inviteURL,
 		}, reqCtx)
 
 		if err != nil {
@@ -205,7 +205,7 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 			taskCtx, cancel := context.WithTimeout(detachedCtx, 15*time.Second)
 			defer cancel()
 
-			if err := s.sendOrganizationInvitationEmail(taskCtx, created, organization, viewInviteURL); err != nil {
+			if err := s.sendOrganizationInvitationEmail(taskCtx, created, organization, inviteURL); err != nil {
 				s.logger.Error("failed to send organization invitation email via built-in email service", "invitation_id", created.ID, "error", err)
 			}
 		}()
@@ -214,13 +214,13 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 	return created, nil
 }
 
-func (s *organizationInvitationService) sendOrganizationInvitationEmail(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, viewInviteURL string) error {
+func (s *organizationInvitationService) sendOrganizationInvitationEmail(ctx context.Context, invitation *types.OrganizationInvitation, organization *types.Organization, inviteURL string) error {
 	subject, textBody, htmlBody, err := s.emailTemplateManager.Render(emailconstants.OrganizationInvitationEmailTemplateName, types.OrganizationInvitationContext{
 		CommonContext:    emailtmpl.NewCommonContext(s.globalConfig.AppName, s.globalConfig.BaseURL),
 		InvitationEmail:  invitation.Email,
 		OrganizationName: organization.Name,
 		Role:             invitation.Role,
-		InviteLink:       viewInviteURL,
+		InviteLink:       inviteURL,
 		Expiry:           s.pluginConfig.InvitationExpiresIn,
 	})
 	if err != nil {
