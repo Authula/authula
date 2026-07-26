@@ -78,13 +78,13 @@ func (h *GetOrganizationInvitationHandler) Handle() http.HandlerFunc {
 
 		organizationID := r.PathValue("organization_id")
 		invitationID := r.PathValue("invitation_id")
-		invitation, err := h.UseCases.GetOrganizationInvitation(ctx, actor, organizationID, invitationID)
+		resp, err := h.UseCases.GetOrganizationInvitation(ctx, actor, organizationID, invitationID)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, invitation)
+		reqCtx.SetJSONResponse(http.StatusOK, resp)
 	}
 }
 

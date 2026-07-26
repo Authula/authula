@@ -50,12 +50,12 @@ func (a *API) CreateInvitation(ctx context.Context, actor *models.Actor, organiz
 	return a.useCases.CreateOrganizationInvitation(ctx, actor, organizationID, request, redirectURL)
 }
 
-func (a *API) GetInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
-	return a.useCases.GetOrganizationInvitation(ctx, actor, organizationID, invitationID)
+func (a *API) GetAllInvitations(ctx context.Context, actor *models.Actor, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
+	return a.useCases.GetAllOrganizationInvitations(ctx, actor, organizationID)
 }
 
-func (a *API) GetAllInvitations(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationInvitation, error) {
-	return a.useCases.GetAllOrganizationInvitations(ctx, actor, organizationID)
+func (a *API) GetInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.GetOrganizationInvitationResponse, error) {
+	return a.useCases.GetOrganizationInvitation(ctx, actor, organizationID, invitationID)
 }
 
 func (a *API) RevokeInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {

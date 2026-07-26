@@ -20,6 +20,7 @@ import (
 
 type organizationInvitationHandlerFixture struct {
 	service *orgtests.MockOrganizationInvitationService
+	orgSvc  *orgtests.MockOrganizationService
 }
 
 type organizationInvitationHandlerCase struct {
@@ -35,7 +36,10 @@ type organizationInvitationHandlerCase struct {
 }
 
 func newOrganizationInvitationHandlerFixture() *organizationInvitationHandlerFixture {
-	return &organizationInvitationHandlerFixture{service: &orgtests.MockOrganizationInvitationService{}}
+	return &organizationInvitationHandlerFixture{
+		service: &orgtests.MockOrganizationInvitationService{},
+		orgSvc:  &orgtests.MockOrganizationService{},
+	}
 }
 
 func (f *organizationInvitationHandlerFixture) newRequest(t *testing.T, method, path string, body []byte, userID *string, organizationID, invitationID string) (*http.Request, *httptest.ResponseRecorder, *models.RequestContext) {
@@ -84,6 +88,7 @@ func runOrganizationInvitationHandlerCases(t *testing.T, method, path string, bu
 				tt.checkResponse(t, reqCtx)
 			}
 			fixture.service.AssertExpectations(t)
+			fixture.orgSvc.AssertExpectations(t)
 		})
 	}
 }
@@ -92,7 +97,7 @@ func TestCreateOrganizationInvitationHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationInvitationHandlerCases(t, http.MethodPost, "/organizations/org-1/invitations", func(fixture *organizationInvitationHandlerFixture) http.HandlerFunc {
-		return (&CreateOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.service)}).Handle()
+		return (&CreateOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.orgSvc, fixture.service)}).Handle()
 	}, []organizationInvitationHandlerCase{
 		{
 			name:            "missing_user",
@@ -155,7 +160,7 @@ func TestGetAllOrganizationInvitationsHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationInvitationHandlerCases(t, http.MethodGet, "/organizations/org-1/invitations", func(fixture *organizationInvitationHandlerFixture) http.HandlerFunc {
-		return (&GetAllOrganizationInvitationsHandler{UseCases: newInvitationUseCases(fixture.service)}).Handle()
+		return (&GetAllOrganizationInvitationsHandler{UseCases: newInvitationUseCases(fixture.orgSvc, fixture.service)}).Handle()
 	}, []organizationInvitationHandlerCase{
 		{
 			name:            "missing_user",
@@ -168,7 +173,7 @@ func TestGetAllOrganizationInvitationsHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
-				fixture.service.On("GetAllOrganizationInvitations", mock.Anything, "user-1", "org-1").Return(([]orgtypes.OrganizationInvitation)(nil), errors.New("some error")).Once()
+				fixture.service.On("GetAllOrganizationInvitationsByOrgIDWithOrg", mock.Anything, "org-1").Return(([]orgtypes.GetOrganizationInvitationResponse)(nil), errors.New("some error")).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "some error",
@@ -178,14 +183,20 @@ func TestGetAllOrganizationInvitationsHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
-				fixture.service.On("GetAllOrganizationInvitations", mock.Anything, "user-1", "org-1").Return([]orgtypes.OrganizationInvitation{{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: orgtypes.OrganizationInvitationStatusPending}}, nil).Once()
+				fixture.service.On("GetAllOrganizationInvitationsByOrgIDWithOrg", mock.Anything, "org-1").Return([]orgtypes.GetOrganizationInvitationResponse{
+					{
+						Invitation:   &orgtypes.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: orgtypes.OrganizationInvitationStatusPending},
+						Organization: orgtypes.OrganizationSummary{ID: "org-1", Name: "Acme Corp", Slug: "acme"},
+					},
+				}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
-				invitations := internaltests.DecodeResponseJSON[[]orgtypes.OrganizationInvitation](t, reqCtx)
-				require.Len(t, invitations, 1)
-				assert.Equal(t, "inv-1", invitations[0].ID)
-				assert.Equal(t, "org-1", invitations[0].OrganizationID)
+				resp := internaltests.DecodeResponseJSON[[]orgtypes.GetOrganizationInvitationResponse](t, reqCtx)
+				require.Len(t, resp, 1)
+				assert.Equal(t, "inv-1", resp[0].Invitation.ID)
+				assert.Equal(t, "org-1", resp[0].Invitation.OrganizationID)
+				assert.Equal(t, "Acme Corp", resp[0].Organization.Name)
 			},
 		},
 	})
@@ -195,7 +206,7 @@ func TestGetOrganizationInvitationHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationInvitationHandlerCases(t, http.MethodGet, "/organizations/org-1/invitations/inv-1", func(fixture *organizationInvitationHandlerFixture) http.HandlerFunc {
-		return (&GetOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.service)}).Handle()
+		return (&GetOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.orgSvc, fixture.service)}).Handle()
 	}, []organizationInvitationHandlerCase{
 		{
 			name:            "missing_user",
@@ -210,7 +221,7 @@ func TestGetOrganizationInvitationHandler(t *testing.T) {
 			organizationID: "org-1",
 			invitationID:   "inv-1",
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
-				fixture.service.On("GetOrganizationInvitationByID", mock.Anything, "inv-1").Return((*orgtypes.OrganizationInvitation)(nil), coreerrors.ErrNotFound).Once()
+				fixture.service.On("GetOrganizationInvitationByIDWithOrg", mock.Anything, "inv-1").Return((*orgtypes.GetOrganizationInvitationResponse)(nil), coreerrors.ErrNotFound).Once()
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedMessage: "not found",
@@ -221,14 +232,20 @@ func TestGetOrganizationInvitationHandler(t *testing.T) {
 			organizationID: "org-1",
 			invitationID:   "inv-1",
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
-				fixture.service.On("GetOrganizationInvitationByID", mock.Anything, "inv-1").Return(&orgtypes.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: orgtypes.OrganizationInvitationStatusPending}, nil).Once()
-				fixture.service.On("GetOrganizationInvitation", mock.Anything, "user-1", "org-1", "inv-1").Return(&orgtypes.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: orgtypes.OrganizationInvitationStatusPending}, nil).Once()
+				fixture.service.On("GetOrganizationInvitationByIDWithOrg", mock.Anything, "inv-1").Return(&orgtypes.GetOrganizationInvitationResponse{
+					Invitation:   &orgtypes.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: orgtypes.OrganizationInvitationStatusPending},
+					Organization: orgtypes.OrganizationSummary{ID: "org-1", Name: "Acme Corp", Slug: "acme"},
+				}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
-				invitation := internaltests.DecodeResponseJSON[orgtypes.OrganizationInvitation](t, reqCtx)
-				assert.Equal(t, "inv-1", invitation.ID)
-				assert.Equal(t, "org-1", invitation.OrganizationID)
+				resp := internaltests.DecodeResponseJSON[orgtypes.GetOrganizationInvitationResponse](t, reqCtx)
+				require.NotNil(t, resp)
+				assert.Equal(t, "inv-1", resp.Invitation.ID)
+				assert.Equal(t, "org-1", resp.Invitation.OrganizationID)
+				assert.Equal(t, "org-1", resp.Organization.ID)
+				assert.Equal(t, "Acme Corp", resp.Organization.Name)
+				assert.Equal(t, "acme", resp.Organization.Slug)
 			},
 		},
 	})
@@ -238,7 +255,7 @@ func TestRevokeOrganizationInvitationHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationInvitationHandlerCases(t, http.MethodPatch, "/organizations/org-1/invitations/inv-1", func(fixture *organizationInvitationHandlerFixture) http.HandlerFunc {
-		return (&RevokeOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.service)}).Handle()
+		return (&RevokeOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.orgSvc, fixture.service)}).Handle()
 	}, []organizationInvitationHandlerCase{
 		{
 			name:            "missing_user",
@@ -280,7 +297,7 @@ func TestAcceptOrganizationInvitationHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationInvitationHandlerCases(t, http.MethodPost, "/organizations/org-1/invitations/inv-1/accept", func(fixture *organizationInvitationHandlerFixture) http.HandlerFunc {
-		return (&AcceptOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.service)}).Handle()
+		return (&AcceptOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.orgSvc, fixture.service)}).Handle()
 	}, []organizationInvitationHandlerCase{
 		{
 			name:           "redirect_url",
@@ -350,7 +367,7 @@ func TestRejectOrganizationInvitationHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationInvitationHandlerCases(t, http.MethodPost, "/organizations/org-1/invitations/inv-1/reject", func(fixture *organizationInvitationHandlerFixture) http.HandlerFunc {
-		return (&RejectOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.service)}).Handle()
+		return (&RejectOrganizationInvitationHandler{UseCases: newInvitationUseCases(fixture.orgSvc, fixture.service)}).Handle()
 	}, []organizationInvitationHandlerCase{
 		{
 			name:            "missing_user",

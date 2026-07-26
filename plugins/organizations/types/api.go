@@ -58,11 +58,17 @@ type AcceptOrganizationInvitationQuery struct {
 }
 
 type OrganizationSummary struct {
-	ID      string  `json:"id"`
-	OwnerID string  `json:"owner_id"`
-	Name    string  `json:"name"`
-	Slug    string  `json:"slug"`
-	Logo    *string `json:"logo,omitempty"`
+	ID       string         `json:"id" required:"true" nullable:"false"`
+	OwnerID  string         `json:"owner_id" required:"true" nullable:"false"`
+	Name     string         `json:"name" required:"true" nullable:"false"`
+	Slug     string         `json:"slug" required:"true" nullable:"false"`
+	Logo     *string        `json:"logo,omitempty" nullable:"true"`
+	Metadata map[string]any `json:"metadata,omitempty" nullable:"true"`
+}
+
+type GetOrganizationInvitationResponse struct {
+	Invitation   *OrganizationInvitation `json:"invitation" required:"true" nullable:"false"`
+	Organization OrganizationSummary     `json:"organization" required:"true" nullable:"false"`
 }
 
 type CreateOrganizationRequest struct {

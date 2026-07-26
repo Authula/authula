@@ -119,3 +119,88 @@ func (r *BunOrganizationInvitationRepository) CountByOrganizationIDAndEmail(ctx 
 func (r *BunOrganizationInvitationRepository) WithTx(tx bun.IDB) OrganizationInvitationRepository {
 	return &BunOrganizationInvitationRepository{db: tx}
 }
+
+type invitationOrgRow struct {
+	ID             string    `bun:"column:id"`
+	Email          string    `bun:"column:email"`
+	InviterID      string    `bun:"column:inviter_id"`
+	OrganizationID string    `bun:"column:organization_id"`
+	Role           string    `bun:"column:role"`
+	Status         string    `bun:"column:status"`
+	ExpiresAt      time.Time `bun:"column:expires_at"`
+	CreatedAt      time.Time `bun:"column:created_at"`
+
+	OrgID       string         `bun:"column:org_id"`
+	OrgOwnerID  string         `bun:"column:org_owner_id"`
+	OrgName     string         `bun:"column:org_name"`
+	OrgSlug     string         `bun:"column:org_slug"`
+	OrgLogo     *string        `bun:"column:org_logo"`
+	OrgMetadata map[string]any `bun:"column:org_metadata,type:jsonb"`
+}
+
+const invitationWithOrgColumns = `i.id, i.email, i.inviter_id, i.organization_id, i.role, i.status, i.expires_at, i.created_at,` +
+	` o.id AS org_id, o.owner_id AS org_owner_id, o.name AS org_name,` +
+	` o.slug AS org_slug, o.logo AS org_logo, o.metadata AS org_metadata`
+
+func mapToInvitationWithOrgResponse(row invitationOrgRow) types.GetOrganizationInvitationResponse {
+	return types.GetOrganizationInvitationResponse{
+		Invitation: &types.OrganizationInvitation{
+			ID:             row.ID,
+			Email:          row.Email,
+			InviterID:      row.InviterID,
+			OrganizationID: row.OrganizationID,
+			Role:           row.Role,
+			Status:         types.OrganizationInvitationStatus(row.Status),
+			ExpiresAt:      row.ExpiresAt,
+			CreatedAt:      row.CreatedAt,
+		},
+		Organization: types.OrganizationSummary{
+			ID:       row.OrgID,
+			OwnerID:  row.OrgOwnerID,
+			Name:     row.OrgName,
+			Slug:     row.OrgSlug,
+			Logo:     row.OrgLogo,
+			Metadata: row.OrgMetadata,
+		},
+	}
+}
+
+func (r *BunOrganizationInvitationRepository) GetByIDWithOrg(ctx context.Context, invitationID string) (*types.GetOrganizationInvitationResponse, error) {
+	var row invitationOrgRow
+	err := r.db.NewRaw(`
+		SELECT `+invitationWithOrgColumns+`
+		FROM organization_invitations i
+		INNER JOIN organizations o ON o.id = i.organization_id
+		WHERE i.id = ?
+	`, invitationID).Scan(ctx, &row)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	result := mapToInvitationWithOrgResponse(row)
+	return &result, nil
+}
+
+func (r *BunOrganizationInvitationRepository) GetAllByOrganizationIDWithOrg(ctx context.Context, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
+	var rows []invitationOrgRow
+	err := r.db.NewRaw(`
+		SELECT `+invitationWithOrgColumns+`
+		FROM organization_invitations i
+		INNER JOIN organizations o ON o.id = i.organization_id
+		WHERE i.organization_id = ?
+		ORDER BY i.created_at DESC
+	`, organizationID).Scan(ctx, &rows)
+	if err == sql.ErrNoRows {
+		return []types.GetOrganizationInvitationResponse{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	results := make([]types.GetOrganizationInvitationResponse, len(rows))
+	for i, row := range rows {
+		results[i] = mapToInvitationWithOrgResponse(row)
+	}
+	return results, nil
+}

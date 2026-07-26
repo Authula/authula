@@ -55,7 +55,7 @@ func newTestOrganizationInvitationService(
 	_ = tmplMgr.Register(emailtmpl.Definition{
 		Name:    "organization_invitation",
 		Subject: "You're invited to join {{.OrganizationName}} on {{.AppName}}",
-		Text:    "You have been invited to join {{.OrganizationName}} on {{.AppName}} as {{.Role}}. Open this link to accept: {{.AcceptLink}}",
+		Text:    "You have been invited to join {{.OrganizationName}} on {{.AppName}} as {{.Role}}. Open this link to accept: {{.InviteLink}}",
 		HTML:    "<p>Invited to {{.OrganizationName}} as {{.Role}}</p>",
 	})
 	return NewOrganizationInvitationService(
@@ -547,8 +547,6 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			logger := &testInvitationLogger{}
 			pluginConfig := &types.OrganizationsPluginConfig{
 				Enabled:             true,
@@ -598,7 +596,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			_ = tmplMgr.Register(emailtmpl.Definition{
 				Name:    "organization_invitation",
 				Subject: "You're invited to join {{.OrganizationName}} on {{.AppName}}",
-				Text:    "You have been invited to join {{.OrganizationName}} on {{.AppName}} as {{.Role}}. Open this link to accept: {{.AcceptLink}}",
+				Text:    "You have been invited to join {{.OrganizationName}} on {{.AppName}} as {{.Role}}. Open this link to accept: {{.InviteLink}}",
 				HTML:    "<p>Invited to {{.OrganizationName}} as {{.Role}}</p>",
 			})
 			svc := NewOrganizationInvitationService(

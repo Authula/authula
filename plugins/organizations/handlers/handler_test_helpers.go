@@ -42,9 +42,9 @@ func newOrgUseCases(svc orgservices.OrganizationService) *orgusecases.UseCases {
 	)
 }
 
-func newInvitationUseCases(svc orgservices.OrganizationInvitationService) *orgusecases.UseCases {
+func newInvitationUseCases(orgSvc orgservices.OrganizationService, svc orgservices.OrganizationInvitationService) *orgusecases.UseCases {
 	return orgusecases.NewUseCases(
-		&orgtests.MockOrganizationService{},
+		orgSvc,
 		svc,
 		&orgtests.MockOrganizationMemberService{},
 		&orgtests.MockOrganizationTeamService{},

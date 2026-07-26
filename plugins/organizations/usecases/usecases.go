@@ -101,22 +101,28 @@ func (u *UseCases) CreateOrganizationInvitation(ctx context.Context, actor *mode
 	return u.invitationService.CreateOrganizationInvitation(ctx, actor, organizationID, request, redirectURL)
 }
 
-func (u *UseCases) GetAllOrganizationInvitations(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationInvitation, error) {
+func (u *UseCases) GetAllOrganizationInvitations(ctx context.Context, actor *models.Actor, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
 	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsInvitationsListPermission); err != nil {
 		return nil, err
 	}
-	return u.invitationService.GetAllOrganizationInvitations(ctx, actor, organizationID)
-}
 
-func (u *UseCases) GetOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
-	invitation, err := u.invitationService.GetOrganizationInvitationByID(ctx, invitationID)
+	resp, err := u.invitationService.GetAllOrganizationInvitationsByOrgIDWithOrg(ctx, organizationID)
 	if err != nil {
 		return nil, err
 	}
-	if invitation.OrganizationID != organizationID {
+
+	return resp, nil
+}
+
+func (u *UseCases) GetOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.GetOrganizationInvitationResponse, error) {
+	resp, err := u.invitationService.GetOrganizationInvitationByIDWithOrg(ctx, invitationID)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Invitation.OrganizationID != organizationID {
 		return nil, coreerrors.ErrNotFound
 	}
 
@@ -124,8 +130,8 @@ func (u *UseCases) GetOrganizationInvitation(ctx context.Context, actor *models.
 	if err != nil {
 		return nil, err
 	}
-	if user != nil && strings.EqualFold(invitation.Email, user.Email) {
-		return invitation, nil
+	if user != nil && strings.EqualFold(resp.Invitation.Email, user.Email) {
+		return resp, nil
 	}
 
 	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
@@ -134,7 +140,7 @@ func (u *UseCases) GetOrganizationInvitation(ctx context.Context, actor *models.
 	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsInvitationsReadPermission); err != nil {
 		return nil, err
 	}
-	return u.invitationService.GetOrganizationInvitation(ctx, actor, organizationID, invitationID)
+	return resp, nil
 }
 
 func (u *UseCases) RevokeOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {

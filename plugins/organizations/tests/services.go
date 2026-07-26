@@ -63,14 +63,6 @@ func (m *MockOrganizationService) ExistsByID(ctx context.Context, organizationID
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *MockOrganizationService) GetByIDNoAuth(ctx context.Context, organizationID string) (*types.Organization, error) {
-	args := m.Called(ctx, organizationID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*types.Organization), args.Error(1)
-}
-
 type MockOrganizationInvitationService struct {
 	mock.Mock
 }
@@ -97,6 +89,22 @@ func (m *MockOrganizationInvitationService) GetOrganizationInvitationByID(ctx co
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*types.OrganizationInvitation), args.Error(1)
+}
+
+func (m *MockOrganizationInvitationService) GetOrganizationInvitationByIDWithOrg(ctx context.Context, invitationID string) (*types.GetOrganizationInvitationResponse, error) {
+	args := m.Called(ctx, invitationID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*types.GetOrganizationInvitationResponse), args.Error(1)
+}
+
+func (m *MockOrganizationInvitationService) GetAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
+	args := m.Called(ctx, organizationID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]types.GetOrganizationInvitationResponse), args.Error(1)
 }
 
 func (m *MockOrganizationInvitationService) GetAllOrganizationInvitations(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationInvitation, error) {

@@ -211,6 +211,22 @@ func (m *MockOrganizationInvitationRepository) GetAllByOrganizationID(ctx contex
 	return args.Get(0).([]types.OrganizationInvitation), args.Error(1)
 }
 
+func (m *MockOrganizationInvitationRepository) GetByIDWithOrg(ctx context.Context, invitationID string) (*types.GetOrganizationInvitationResponse, error) {
+	args := m.Called(ctx, invitationID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*types.GetOrganizationInvitationResponse), args.Error(1)
+}
+
+func (m *MockOrganizationInvitationRepository) GetAllByOrganizationIDWithOrg(ctx context.Context, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
+	args := m.Called(ctx, organizationID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]types.GetOrganizationInvitationResponse), args.Error(1)
+}
+
 func (m *MockOrganizationInvitationRepository) GetAllPendingByEmail(ctx context.Context, email string) ([]types.OrganizationInvitation, error) {
 	args := m.Called(ctx, email)
 	if args.Get(0) == nil {

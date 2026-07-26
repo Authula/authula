@@ -319,6 +319,35 @@ func (s *organizationInvitationService) GetOrganizationInvitationByID(ctx contex
 	return invitation, nil
 }
 
+func (s *organizationInvitationService) GetOrganizationInvitationByIDWithOrg(ctx context.Context, invitationID string) (*types.GetOrganizationInvitationResponse, error) {
+	if invitationID == "" {
+		return nil, coreerrors.ErrNotFound
+	}
+
+	resp, err := s.orgInvitationRepo.GetByIDWithOrg(ctx, invitationID)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, coreerrors.ErrNotFound
+	}
+
+	return resp, nil
+}
+
+func (s *organizationInvitationService) GetAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
+	if organizationID == "" {
+		return nil, coreerrors.ErrNotFound
+	}
+
+	resp, err := s.orgInvitationRepo.GetAllByOrganizationIDWithOrg(ctx, organizationID)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
 func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" || invitationID == "" {
 		return nil, coreerrors.ErrUnauthorized
