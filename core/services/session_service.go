@@ -13,21 +13,30 @@ import (
 )
 
 type sessionService struct {
-	repo    repositories.SessionRepository
-	signer  security.TokenSigner
-	dbHooks *models.CoreDatabaseHooksConfig
+	repo         repositories.SessionRepository
+	signer       security.TokenSigner
+	serviceHooks *models.CoreServiceHooksConfig
 }
 
 func NewSessionService(
 	repo repositories.SessionRepository,
 	signer security.TokenSigner,
-	dbHooks *models.CoreDatabaseHooksConfig,
+	serviceHooks *models.CoreServiceHooksConfig,
 ) services.SessionService {
 	return &sessionService{
-		repo:    repo,
-		signer:  signer,
-		dbHooks: dbHooks,
+		repo:         repo,
+		signer:       signer,
+		serviceHooks: serviceHooks,
 	}
+}
+
+func runSessionHooks(hooks []models.SessionHook, session *models.Session) error {
+	for _, hook := range hooks {
+		if err := hook(session); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *sessionService) Create(
@@ -51,8 +60,8 @@ func (s *sessionService) Create(
 		UserAgent: userAgent,
 	}
 
-	if s.dbHooks != nil && s.dbHooks.Sessions != nil && s.dbHooks.Sessions.BeforeCreate != nil {
-		if err := s.dbHooks.Sessions.BeforeCreate(session); err != nil {
+	if s.serviceHooks != nil && s.serviceHooks.Sessions != nil {
+		if err := runSessionHooks(s.serviceHooks.Sessions.BeforeCreateHooks(), session); err != nil {
 			return nil, err
 		}
 	}
@@ -62,8 +71,8 @@ func (s *sessionService) Create(
 		return nil, err
 	}
 
-	if s.dbHooks != nil && s.dbHooks.Sessions != nil && s.dbHooks.Sessions.AfterCreate != nil {
-		if err := s.dbHooks.Sessions.AfterCreate(*created); err != nil {
+	if s.serviceHooks != nil && s.serviceHooks.Sessions != nil {
+		if err := runSessionHooks(s.serviceHooks.Sessions.AfterCreateHooks(), created); err != nil {
 			return nil, err
 		}
 	}
@@ -84,8 +93,8 @@ func (s *sessionService) GetByToken(ctx context.Context, hashedToken string) (*m
 }
 
 func (s *sessionService) Update(ctx context.Context, session *models.Session) (*models.Session, error) {
-	if s.dbHooks != nil && s.dbHooks.Sessions != nil && s.dbHooks.Sessions.BeforeUpdate != nil {
-		if err := s.dbHooks.Sessions.BeforeUpdate(session); err != nil {
+	if s.serviceHooks != nil && s.serviceHooks.Sessions != nil {
+		if err := runSessionHooks(s.serviceHooks.Sessions.BeforeUpdateHooks(), session); err != nil {
 			return nil, err
 		}
 	}
@@ -95,8 +104,8 @@ func (s *sessionService) Update(ctx context.Context, session *models.Session) (*
 		return nil, err
 	}
 
-	if s.dbHooks != nil && s.dbHooks.Sessions != nil && s.dbHooks.Sessions.AfterUpdate != nil {
-		if err := s.dbHooks.Sessions.AfterUpdate(*updated); err != nil {
+	if s.serviceHooks != nil && s.serviceHooks.Sessions != nil {
+		if err := runSessionHooks(s.serviceHooks.Sessions.AfterUpdateHooks(), updated); err != nil {
 			return nil, err
 		}
 	}

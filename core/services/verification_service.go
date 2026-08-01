@@ -13,21 +13,30 @@ import (
 )
 
 type verificationService struct {
-	repo    repositories.VerificationRepository
-	signer  security.TokenSigner
-	dbHooks *models.CoreDatabaseHooksConfig
+	repo         repositories.VerificationRepository
+	signer       security.TokenSigner
+	serviceHooks *models.CoreServiceHooksConfig
 }
 
 func NewVerificationService(
 	repo repositories.VerificationRepository,
 	signer security.TokenSigner,
-	dbHooks *models.CoreDatabaseHooksConfig,
+	serviceHooks *models.CoreServiceHooksConfig,
 ) services.VerificationService {
 	return &verificationService{
-		repo:    repo,
-		signer:  signer,
-		dbHooks: dbHooks,
+		repo:         repo,
+		signer:       signer,
+		serviceHooks: serviceHooks,
 	}
+}
+
+func runVerificationHooks(hooks []models.VerificationHook, verification *models.Verification) error {
+	for _, hook := range hooks {
+		if err := hook(verification); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *verificationService) Create(
@@ -51,8 +60,8 @@ func (s *verificationService) Create(
 		ExpiresAt:  time.Now().UTC().Add(expiry),
 	}
 
-	if s.dbHooks != nil && s.dbHooks.Verifications != nil && s.dbHooks.Verifications.BeforeCreate != nil {
-		if err := s.dbHooks.Verifications.BeforeCreate(verification); err != nil {
+	if s.serviceHooks != nil && s.serviceHooks.Verifications != nil {
+		if err := runVerificationHooks(s.serviceHooks.Verifications.BeforeCreateHooks(), verification); err != nil {
 			return nil, err
 		}
 	}
@@ -62,8 +71,8 @@ func (s *verificationService) Create(
 		return nil, err
 	}
 
-	if s.dbHooks != nil && s.dbHooks.Verifications != nil && s.dbHooks.Verifications.AfterCreate != nil {
-		if err := s.dbHooks.Verifications.AfterCreate(*created); err != nil {
+	if s.serviceHooks != nil && s.serviceHooks.Verifications != nil {
+		if err := runVerificationHooks(s.serviceHooks.Verifications.AfterCreateHooks(), created); err != nil {
 			return nil, err
 		}
 	}

@@ -66,10 +66,10 @@ func NewConfig(options ...ConfigOption) *models.Config {
 			Provider:              events.ProviderGoChannel,
 			GoChannel:             &models.GoChannelConfig{},
 		},
-		Plugins:           models.PluginsConfig{},
-		RouteMappings:     []models.RouteMapping{},
-		PreParsedConfigs:  make(map[string]any),
-		CoreDatabaseHooks: nil,
+		Plugins:          models.PluginsConfig{},
+		RouteMappings:    []models.RouteMapping{},
+		PreParsedConfigs: make(map[string]any),
+		CoreServiceHooks: nil,
 	}
 
 	// Apply the options - they override defaults only if non-zero/non-empty
@@ -287,9 +287,9 @@ func WithDisabledPaths(paths []string) ConfigOption {
 	}
 }
 
-func WithCoreDatabaseHooks(config *models.CoreDatabaseHooksConfig) ConfigOption {
+func WithCoreServiceHooks(config *models.CoreServiceHooksConfig) ConfigOption {
 	return func(c *models.Config) {
-		c.CoreDatabaseHooks = config
+		c.CoreServiceHooks = config
 	}
 }
 

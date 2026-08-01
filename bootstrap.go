@@ -69,10 +69,10 @@ func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.
 	verificationRepo := corerepositories.NewBunVerificationRepository(db)
 	tokenRepo := corerepositories.NewCryptoTokenRepository(config.Secret)
 
-	userService := coreservices.NewUserService(userRepo, config.CoreDatabaseHooks)
-	accountService := coreservices.NewAccountService(config, accountRepo, tokenRepo, config.CoreDatabaseHooks)
-	sessionService := coreservices.NewSessionService(sessionRepo, signer, config.CoreDatabaseHooks)
-	verificationService := coreservices.NewVerificationService(verificationRepo, signer, config.CoreDatabaseHooks)
+	userService := coreservices.NewUserService(userRepo, config.CoreServiceHooks)
+	accountService := coreservices.NewAccountService(config, accountRepo, tokenRepo, config.CoreServiceHooks)
+	sessionService := coreservices.NewSessionService(sessionRepo, signer, config.CoreServiceHooks)
+	verificationService := coreservices.NewVerificationService(verificationRepo, signer, config.CoreServiceHooks)
 	tokenService := coreservices.NewTokenService(tokenRepo)
 	passwordService := coreservices.NewArgon2PasswordService()
 

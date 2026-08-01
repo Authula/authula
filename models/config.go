@@ -30,8 +30,8 @@ type Config struct {
 	// This allows skipping mapstructure unmarshalling and preserving type safety.
 	// Key: plugin ID, Value: typed config struct passed to Auth.New()
 	PreParsedConfigs map[string]any `json:"-" toml:"-"`
-	// CoreDatabaseHooks allows you to hook into database operations for users, accounts, sessions, and verifications.
-	CoreDatabaseHooks *CoreDatabaseHooksConfig `json:"-" toml:"-"`
+	// CoreServiceHooks allows you to hook into the service layer to carry out custom logic for users, accounts, sessions, and verifications.
+	CoreServiceHooks *CoreServiceHooksConfig `json:"-" toml:"-"`
 }
 
 type DatabaseConfig struct {
@@ -152,35 +152,155 @@ type RouteMapping struct {
 	Permissions []string `json:"permissions" toml:"permissions"`
 }
 
-type CoreDatabaseHooksConfig struct {
-	Users         *UserDatabaseHooksConfig
-	Accounts      *AccountDatabaseHooksConfig
-	Sessions      *SessionDatabaseHooksConfig
-	Verifications *VerificationDatabaseHooksConfig
+type CoreServiceHooksConfig struct {
+	Users         *UserServiceHooks
+	Accounts      *AccountServiceHooks
+	Sessions      *SessionServiceHooks
+	Verifications *VerificationServiceHooks
 }
 
-type UserDatabaseHooksConfig struct {
-	BeforeCreate func(user *User) error
-	AfterCreate  func(user User) error
-	BeforeUpdate func(user *User) error
-	AfterUpdate  func(user User) error
+type UserHook func(user *User) error
+
+type AccountHook func(account *Account) error
+
+type SessionHook func(session *Session) error
+
+type VerificationHook func(verification *Verification) error
+
+type UserServiceHooks struct {
+	beforeCreate []UserHook
+	afterCreate  []UserHook
+	beforeUpdate []UserHook
+	afterUpdate  []UserHook
 }
 
-type AccountDatabaseHooksConfig struct {
-	BeforeCreate func(account *Account) error
-	AfterCreate  func(account Account) error
-	BeforeUpdate func(account *Account) error
-	AfterUpdate  func(account Account) error
+func (h *UserServiceHooks) RegisterBeforeCreate(fn UserHook) {
+	h.beforeCreate = append(h.beforeCreate, fn)
 }
 
-type SessionDatabaseHooksConfig struct {
-	BeforeCreate func(session *Session) error
-	AfterCreate  func(session Session) error
-	BeforeUpdate func(session *Session) error
-	AfterUpdate  func(session Session) error
+func (h *UserServiceHooks) RegisterAfterCreate(fn UserHook) {
+	h.afterCreate = append(h.afterCreate, fn)
 }
 
-type VerificationDatabaseHooksConfig struct {
-	BeforeCreate func(verification *Verification) error
-	AfterCreate  func(verification Verification) error
+func (h *UserServiceHooks) RegisterBeforeUpdate(fn UserHook) {
+	h.beforeUpdate = append(h.beforeUpdate, fn)
+}
+
+func (h *UserServiceHooks) RegisterAfterUpdate(fn UserHook) {
+	h.afterUpdate = append(h.afterUpdate, fn)
+}
+
+func (h *UserServiceHooks) BeforeCreateHooks() []UserHook {
+	return h.beforeCreate
+}
+
+func (h *UserServiceHooks) AfterCreateHooks() []UserHook {
+	return h.afterCreate
+}
+
+func (h *UserServiceHooks) BeforeUpdateHooks() []UserHook {
+	return h.beforeUpdate
+}
+
+func (h *UserServiceHooks) AfterUpdateHooks() []UserHook {
+	return h.afterUpdate
+}
+
+type AccountServiceHooks struct {
+	beforeCreate []AccountHook
+	afterCreate  []AccountHook
+	beforeUpdate []AccountHook
+	afterUpdate  []AccountHook
+}
+
+func (h *AccountServiceHooks) RegisterBeforeCreate(fn AccountHook) {
+	h.beforeCreate = append(h.beforeCreate, fn)
+}
+
+func (h *AccountServiceHooks) RegisterAfterCreate(fn AccountHook) {
+	h.afterCreate = append(h.afterCreate, fn)
+}
+
+func (h *AccountServiceHooks) RegisterBeforeUpdate(fn AccountHook) {
+	h.beforeUpdate = append(h.beforeUpdate, fn)
+}
+
+func (h *AccountServiceHooks) RegisterAfterUpdate(fn AccountHook) {
+	h.afterUpdate = append(h.afterUpdate, fn)
+}
+
+func (h *AccountServiceHooks) BeforeCreateHooks() []AccountHook {
+	return h.beforeCreate
+}
+
+func (h *AccountServiceHooks) AfterCreateHooks() []AccountHook {
+	return h.afterCreate
+}
+
+func (h *AccountServiceHooks) BeforeUpdateHooks() []AccountHook {
+	return h.beforeUpdate
+}
+
+func (h *AccountServiceHooks) AfterUpdateHooks() []AccountHook {
+	return h.afterUpdate
+}
+
+type SessionServiceHooks struct {
+	beforeCreate []SessionHook
+	afterCreate  []SessionHook
+	beforeUpdate []SessionHook
+	afterUpdate  []SessionHook
+}
+
+func (h *SessionServiceHooks) RegisterBeforeCreate(fn SessionHook) {
+	h.beforeCreate = append(h.beforeCreate, fn)
+}
+
+func (h *SessionServiceHooks) RegisterAfterCreate(fn SessionHook) {
+	h.afterCreate = append(h.afterCreate, fn)
+}
+
+func (h *SessionServiceHooks) RegisterBeforeUpdate(fn SessionHook) {
+	h.beforeUpdate = append(h.beforeUpdate, fn)
+}
+
+func (h *SessionServiceHooks) RegisterAfterUpdate(fn SessionHook) {
+	h.afterUpdate = append(h.afterUpdate, fn)
+}
+
+func (h *SessionServiceHooks) BeforeCreateHooks() []SessionHook {
+	return h.beforeCreate
+}
+
+func (h *SessionServiceHooks) AfterCreateHooks() []SessionHook {
+	return h.afterCreate
+}
+
+func (h *SessionServiceHooks) BeforeUpdateHooks() []SessionHook {
+	return h.beforeUpdate
+}
+
+func (h *SessionServiceHooks) AfterUpdateHooks() []SessionHook {
+	return h.afterUpdate
+}
+
+type VerificationServiceHooks struct {
+	beforeCreate []VerificationHook
+	afterCreate  []VerificationHook
+}
+
+func (h *VerificationServiceHooks) RegisterBeforeCreate(fn VerificationHook) {
+	h.beforeCreate = append(h.beforeCreate, fn)
+}
+
+func (h *VerificationServiceHooks) RegisterAfterCreate(fn VerificationHook) {
+	h.afterCreate = append(h.afterCreate, fn)
+}
+
+func (h *VerificationServiceHooks) BeforeCreateHooks() []VerificationHook {
+	return h.beforeCreate
+}
+
+func (h *VerificationServiceHooks) AfterCreateHooks() []VerificationHook {
+	return h.afterCreate
 }
