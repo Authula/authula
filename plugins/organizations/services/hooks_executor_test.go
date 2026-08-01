@@ -58,32 +58,33 @@ func TestServiceHookExecutor_OrganizationCreateHooks(t *testing.T) {
 	var beforeCalled bool
 	var afterCalled bool
 
+	orgHooks := &types.OrganizationServiceHooks{}
+	orgHooks.RegisterBeforeCreate(func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
+		beforeCalled = true
+		if organization == nil {
+			return errors.New("organization is nil")
+		}
+		if organization.ID != "org-1" {
+			t.Fatalf("unexpected organization ID: %s", organization.ID)
+		}
+		if actor == nil || actor.ID != "user-1" {
+			t.Fatalf("unexpected actor: %+v", actor)
+		}
+		return nil
+	})
+	orgHooks.RegisterAfterCreate(func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
+		afterCalled = true
+		if organization.ID != "org-1" {
+			t.Fatalf("unexpected organization ID: %s", organization.ID)
+		}
+		if actor == nil || actor.ID != "user-1" {
+			t.Fatalf("unexpected actor: %+v", actor)
+		}
+		return nil
+	})
+
 	executor := NewServiceHookExecutor(&types.OrganizationsServiceHooksConfig{
-		Organizations: &types.OrganizationServiceHooksConfig{
-			BeforeCreate: func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
-				beforeCalled = true
-				if organization == nil {
-					return errors.New("organization is nil")
-				}
-				if organization.ID != "org-1" {
-					t.Fatalf("unexpected organization ID: %s", organization.ID)
-				}
-				if actor == nil || actor.ID != "user-1" {
-					t.Fatalf("unexpected actor: %+v", actor)
-				}
-				return nil
-			},
-			AfterCreate: func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
-				afterCalled = true
-				if organization.ID != "org-1" {
-					t.Fatalf("unexpected organization ID: %s", organization.ID)
-				}
-				if actor == nil || actor.ID != "user-1" {
-					t.Fatalf("unexpected actor: %+v", actor)
-				}
-				return nil
-			},
-		},
+		Organizations: orgHooks,
 	}, nil, nil)
 
 	ctx := context.Background()
@@ -105,16 +106,45 @@ func TestServiceHookExecutor_OrganizationCreateHooks(t *testing.T) {
 	}
 }
 
+func TestServiceHookExecutor_MultipleHooksRunInRegistrationOrder(t *testing.T) {
+	t.Parallel()
+
+	var callOrder []string
+
+	orgHooks := &types.OrganizationServiceHooks{}
+	orgHooks.RegisterBeforeCreate(func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
+		callOrder = append(callOrder, "first")
+		return nil
+	})
+	orgHooks.RegisterBeforeCreate(func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
+		callOrder = append(callOrder, "second")
+		return nil
+	})
+
+	executor := NewServiceHookExecutor(&types.OrganizationsServiceHooksConfig{
+		Organizations: orgHooks,
+	}, nil, nil)
+
+	err := executor.BeforeCreateOrganization(context.Background(), &models.Actor{ID: "user-1"}, &types.Organization{ID: "org-1"})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(callOrder) != 2 || callOrder[0] != "first" || callOrder[1] != "second" {
+		t.Fatalf("expected hooks to run in registration order, got %v", callOrder)
+	}
+}
+
 func TestServiceHookExecutor_OrganizationCreateHookError(t *testing.T) {
 	t.Parallel()
 
 	someErr := errors.New("some error")
+	orgHooks := &types.OrganizationServiceHooks{}
+	orgHooks.RegisterBeforeCreate(func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
+		return someErr
+	})
+
 	executor := NewServiceHookExecutor(&types.OrganizationsServiceHooksConfig{
-		Organizations: &types.OrganizationServiceHooksConfig{
-			BeforeCreate: func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
-				return someErr
-			},
-		},
+		Organizations: orgHooks,
 	}, nil, nil)
 
 	err := executor.BeforeCreateOrganization(context.Background(), &models.Actor{ID: "user-1"}, &types.Organization{ID: "org-1"})
@@ -131,37 +161,38 @@ func TestServiceHookExecutor_MemberUpdateDeleteHooks(t *testing.T) {
 	var beforeDeleteCalled bool
 	var afterDeleteCalled bool
 
+	memberHooks := &types.OrganizationMemberServiceHooks{}
+	memberHooks.RegisterBeforeUpdate(func(ctx context.Context, actor *models.Actor, member *types.OrganizationMember) error {
+		beforeUpdateCalled = true
+		if member == nil || member.ID != "mem-1" {
+			t.Fatalf("unexpected member in before update hook: %+v", member)
+		}
+		return nil
+	})
+	memberHooks.RegisterAfterUpdate(func(ctx context.Context, actor *models.Actor, member *types.OrganizationMember) error {
+		afterUpdateCalled = true
+		if member.ID != "mem-1" {
+			t.Fatalf("unexpected member in after update hook: %+v", member)
+		}
+		return nil
+	})
+	memberHooks.RegisterBeforeDelete(func(ctx context.Context, actor *models.Actor, member *types.OrganizationMember) error {
+		beforeDeleteCalled = true
+		if member == nil || member.ID != "mem-1" {
+			t.Fatalf("unexpected member in before delete hook: %+v", member)
+		}
+		return nil
+	})
+	memberHooks.RegisterAfterDelete(func(ctx context.Context, actor *models.Actor, member *types.OrganizationMember) error {
+		afterDeleteCalled = true
+		if member.ID != "mem-1" {
+			t.Fatalf("unexpected member in after delete hook: %+v", member)
+		}
+		return nil
+	})
+
 	executor := NewServiceHookExecutor(&types.OrganizationsServiceHooksConfig{
-		Members: &types.OrganizationMemberServiceHooksConfig{
-			BeforeUpdate: func(ctx context.Context, actor *models.Actor, member *types.OrganizationMember) error {
-				beforeUpdateCalled = true
-				if member == nil || member.ID != "mem-1" {
-					t.Fatalf("unexpected member in before update hook: %+v", member)
-				}
-				return nil
-			},
-			AfterUpdate: func(ctx context.Context, actor *models.Actor, member *types.OrganizationMember) error {
-				afterUpdateCalled = true
-				if member.ID != "mem-1" {
-					t.Fatalf("unexpected member in after update hook: %+v", member)
-				}
-				return nil
-			},
-			BeforeDelete: func(ctx context.Context, actor *models.Actor, member *types.OrganizationMember) error {
-				beforeDeleteCalled = true
-				if member == nil || member.ID != "mem-1" {
-					t.Fatalf("unexpected member in before delete hook: %+v", member)
-				}
-				return nil
-			},
-			AfterDelete: func(ctx context.Context, actor *models.Actor, member *types.OrganizationMember) error {
-				afterDeleteCalled = true
-				if member.ID != "mem-1" {
-					t.Fatalf("unexpected member in after delete hook: %+v", member)
-				}
-				return nil
-			},
-		},
+		Members: memberHooks,
 	}, nil, nil)
 
 	ctx := context.Background()
@@ -208,23 +239,24 @@ func TestServiceHookExecutor_BothRegistriesAccessibleInHook(t *testing.T) {
 		models.ServiceUser.String(): "mock-user-service",
 	}}
 
-	executor := NewServiceHookExecutor(&types.OrganizationsServiceHooksConfig{
-		Organizations: &types.OrganizationServiceHooksConfig{
-			BeforeCreate: func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
-				reg := models.GetPluginRegistryFromContext(ctx)
-				if reg == nil {
-					return errors.New("plugin registry not found in context")
-				}
-				receivedPluginRegistry = reg
+	orgHooks := &types.OrganizationServiceHooks{}
+	orgHooks.RegisterBeforeCreate(func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
+		reg := models.GetPluginRegistryFromContext(ctx)
+		if reg == nil {
+			return errors.New("plugin registry not found in context")
+		}
+		receivedPluginRegistry = reg
 
-				ok, svc := models.GetServiceFromContext[string](ctx, models.ServiceUser)
-				if !ok {
-					return errors.New("service not found in context")
-				}
-				receivedService = svc
-				return nil
-			},
-		},
+		ok, svc := models.GetServiceFromContext[string](ctx, models.ServiceUser)
+		if !ok {
+			return errors.New("service not found in context")
+		}
+		receivedService = svc
+		return nil
+	})
+
+	executor := NewServiceHookExecutor(&types.OrganizationsServiceHooksConfig{
+		Organizations: orgHooks,
 	}, pluginRegistry, serviceRegistry)
 
 	err := executor.BeforeCreateOrganization(context.Background(), &models.Actor{ID: "user-1"}, &types.Organization{ID: "org-1"})
