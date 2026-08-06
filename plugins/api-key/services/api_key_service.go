@@ -21,7 +21,7 @@ type apiKeyService struct {
 	tokenService         rootservices.TokenService
 	accessControlService rootservices.AccessControlService
 	rateLimiterService   rootservices.RateLimiterService
-	organizationService  rootservices.OrganizationService
+	organizationService  OrganizationLookupService
 	apiKeyRepo           repositories.ApiKeyRepository
 }
 
@@ -36,7 +36,7 @@ func NewApiKeyService(
 	tokenService rootservices.TokenService,
 	accessControlService rootservices.AccessControlService,
 	rateLimiterService rootservices.RateLimiterService,
-	organizationService rootservices.OrganizationService,
+	organizationService OrganizationLookupService,
 	apiKeyRepo repositories.ApiKeyRepository,
 ) ApiKeyService {
 	return &apiKeyService{
@@ -54,7 +54,7 @@ func NewApiKeyService(
 }
 
 func (s *apiKeyService) Create(ctx context.Context, actor *models.Actor, req types.CreateApiKeyRequest) (*types.CreateApiKeyResponse, error) {
-	if err := s.authorizeCreate(actor, req); err != nil {
+	if err := s.authorizeCreate(ctx, actor, req); err != nil {
 		return nil, err
 	}
 
@@ -169,7 +169,7 @@ func (s *apiKeyService) Create(ctx context.Context, actor *models.Actor, req typ
 	}, nil
 }
 
-func (s *apiKeyService) authorizeCreate(actor *models.Actor, req types.CreateApiKeyRequest) error {
+func (s *apiKeyService) authorizeCreate(ctx context.Context, actor *models.Actor, req types.CreateApiKeyRequest) error {
 	switch req.OwnerType {
 	case types.OwnerTypeUser:
 		if req.OwnerID != "" && req.OwnerID != actor.ID {
@@ -185,7 +185,11 @@ func (s *apiKeyService) authorizeCreate(actor *models.Actor, req types.CreateApi
 		if s.organizationService == nil {
 			return fmt.Errorf("%w: organization service is not available", coreerrors.ErrUnprocessableEntity)
 		}
-		if err := s.validatePermissionsSubset(actor.Scopes, req.Permissions); err != nil {
+		perms, err := s.organizationService.GetUserPermissionsInOrganization(ctx, actor.ID, req.OwnerID)
+		if err != nil {
+			return err
+		}
+		if err := s.validatePermissionsSubset(perms, req.Permissions); err != nil {
 			return err
 		}
 	}
@@ -270,7 +274,14 @@ func (s *apiKeyService) Update(ctx context.Context, actor *models.Actor, id stri
 		}
 	case types.OwnerTypeOrganization:
 		if len(req.Permissions) > 0 {
-			if err := s.validatePermissionsSubset(actor.Scopes, req.Permissions); err != nil {
+			if s.organizationService == nil {
+				return nil, fmt.Errorf("%w: organization service is not available", coreerrors.ErrUnprocessableEntity)
+			}
+			perms, err := s.organizationService.GetUserPermissionsInOrganization(ctx, actor.ID, apiKey.OwnerID)
+			if err != nil {
+				return nil, err
+			}
+			if err := s.validatePermissionsSubset(perms, req.Permissions); err != nil {
 				return nil, err
 			}
 		}

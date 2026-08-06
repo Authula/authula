@@ -148,13 +148,6 @@ func TestAddOrganizationMemberHandler(t *testing.T) {
 				assert.Equal(t, "mem-1", member.ID)
 				assert.Equal(t, "org-1", member.OrganizationID)
 				assert.Equal(t, "user-2", member.UserID)
-				assignRoleValue, ok := reqCtx.Values[models.ContextAccessControlAssignRole.String()]
-				assert.True(t, ok)
-				assignRoleCtx, ok := assignRoleValue.(*models.AccessControlAssignRoleContext)
-				assert.True(t, ok)
-				assert.Equal(t, "user-2", assignRoleCtx.UserID)
-				assert.Equal(t, "member", assignRoleCtx.RoleName)
-				assert.Equal(t, "user-1", *assignRoleCtx.AssignerUserID)
 			},
 		},
 	})
@@ -329,13 +322,6 @@ func TestUpdateOrganizationMemberHandler(t *testing.T) {
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
 				member := internaltests.DecodeResponseJSON[orgtypes.OrganizationMember](t, reqCtx)
 				assert.Equal(t, "admin", member.Role)
-				assignRoleValue, ok := reqCtx.Values[models.ContextAccessControlAssignRole.String()]
-				assert.True(t, ok)
-				assignRoleCtx, ok := assignRoleValue.(*models.AccessControlAssignRoleContext)
-				assert.True(t, ok)
-				assert.Equal(t, "user-2", assignRoleCtx.UserID)
-				assert.Equal(t, "admin", assignRoleCtx.RoleName)
-				assert.Equal(t, "user-1", *assignRoleCtx.AssignerUserID)
 			},
 		},
 	})

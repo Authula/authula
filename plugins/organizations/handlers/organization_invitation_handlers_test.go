@@ -351,13 +351,6 @@ func TestAcceptOrganizationInvitationHandler(t *testing.T) {
 				invitation := internaltests.DecodeResponseJSON[orgtypes.OrganizationInvitation](t, reqCtx)
 				assert.Equal(t, "inv-1", invitation.ID)
 				assert.Equal(t, orgtypes.OrganizationInvitationStatusAccepted, invitation.Status)
-				assignRoleValue, ok := reqCtx.Values[models.ContextAccessControlAssignRole.String()]
-				require.True(t, ok)
-				assignRoleCtx, ok := assignRoleValue.(*models.AccessControlAssignRoleContext)
-				require.True(t, ok)
-				assert.Equal(t, "user-1", assignRoleCtx.UserID)
-				assert.Equal(t, "member", assignRoleCtx.RoleName)
-				assert.Equal(t, "user-2", *assignRoleCtx.AssignerUserID)
 			},
 		},
 	})

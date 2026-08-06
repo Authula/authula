@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"time"
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/plugins/access-control/repositories"
@@ -30,34 +29,38 @@ func (s *AccessControlService) RoleExists(ctx context.Context, roleName string) 
 	return role != nil && role.ID != "", nil
 }
 
-func (s *AccessControlService) ValidateRoleAssignment(ctx context.Context, roleName string, assignerUserID *string) (bool, error) {
+func (s *AccessControlService) GetRolePermissionsByName(ctx context.Context, roleName string) ([]string, error) {
 	role, err := s.rolesService.GetRoleByName(ctx, nil, roleName)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if role == nil || role.ID == "" {
-		return false, coreerrors.ErrNotFound
+		return nil, coreerrors.ErrNotFound
 	}
 
-	if assignerUserID == nil || *assignerUserID == "" {
-		return false, nil
-	}
-
-	assignerRoles, err := s.userRolesService.GetUserRoles(ctx, nil, *assignerUserID)
+	details, err := s.rolesService.GetRoleByID(ctx, nil, role.ID)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	highestWeight, activeCount := determineHighestActiveRoleWeight(assignerRoles, time.Now().UTC())
-	if activeCount == 0 {
-		return false, coreerrors.ErrForbidden
+	permissions := make([]string, 0, len(details.Permissions))
+	for _, permission := range details.Permissions {
+		permissions = append(permissions, permission.PermissionKey)
 	}
 
-	if role.Weight > highestWeight {
-		return false, coreerrors.ErrForbidden
+	return permissions, nil
+}
+
+func (s *AccessControlService) GetRoleWeightByName(ctx context.Context, roleName string) (int, error) {
+	role, err := s.rolesService.GetRoleByName(ctx, nil, roleName)
+	if err != nil {
+		return 0, err
+	}
+	if role == nil || role.ID == "" {
+		return 0, coreerrors.ErrNotFound
 	}
 
-	return true, nil
+	return role.Weight, nil
 }
 
 func (s *AccessControlService) ValidatePermissionKeys(ctx context.Context, permissionKeys []string) error {

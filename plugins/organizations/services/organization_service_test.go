@@ -244,6 +244,7 @@ func TestOrganizationService_GetOrganizationByID(t *testing.T) {
 			organizationID: "org-1",
 			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "member"}, nil).Once()
 			},
 		},
 	}
@@ -328,6 +329,7 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
 			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
 				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme", Slug: "acme"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "member"}, nil).Once()
 				repo.On("Update", mock.Anything, mock.MatchedBy(func(org *types.Organization) bool {
 					return org != nil && org.ID == "org-1" && org.Name == "Acme Platform" && org.Slug == "acme"
 				})).Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Platform", Slug: "acme"}, nil).Once()

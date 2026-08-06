@@ -261,7 +261,7 @@ func (s *organizationService) GetAllOrganizationsByOwner(ctx context.Context, ac
 }
 
 func (s *organizationService) GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {
-	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
+	organization, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +270,7 @@ func (s *organizationService) GetOrganizationByID(ctx context.Context, actor *mo
 }
 
 func (s *organizationService) UpdateOrganization(ctx context.Context, actor *models.Actor, organizationID string, request types.UpdateOrganizationRequest) (*types.Organization, error) {
-	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
+	organization, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}

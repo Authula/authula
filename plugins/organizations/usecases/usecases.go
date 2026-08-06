@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	coreerrors "github.com/Authula/authula/core/errors"
@@ -21,6 +22,8 @@ type UseCases struct {
 	userService       rootservices.UserService
 	globalConfig      *models.Config
 	authorizer        rootservices.Authorizer
+	serviceUtils      *orgservices.ServiceUtils
+	accessControl     rootservices.AccessControlService
 }
 
 func NewUseCases(
@@ -32,6 +35,8 @@ func NewUseCases(
 	userService rootservices.UserService,
 	globalConfig *models.Config,
 	authorizer rootservices.Authorizer,
+	serviceUtils *orgservices.ServiceUtils,
+	accessControl rootservices.AccessControlService,
 ) *UseCases {
 	return &UseCases{
 		orgService:        orgService,
@@ -42,7 +47,49 @@ func NewUseCases(
 		userService:       userService,
 		globalConfig:      globalConfig,
 		authorizer:        authorizer,
+		serviceUtils:      serviceUtils,
+		accessControl:     accessControl,
 	}
+}
+
+func (u *UseCases) authorizeOrgAccess(ctx context.Context, actor *models.Actor, orgID, requiredScope string) error {
+	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, orgID); err != nil {
+		return err
+	}
+	_, member, err := u.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, orgID)
+	if err != nil {
+		return err
+	}
+	if member == nil {
+		if actor.Type != models.ActorMachine {
+			return coreerrors.ErrForbidden
+		}
+		return u.authorizer.AuthorizeScope(ctx, actor, requiredScope)
+	}
+
+	perms, err := u.accessControl.GetRolePermissionsByName(ctx, member.Role)
+	if err != nil {
+		if errors.Is(err, coreerrors.ErrNotFound) {
+			return coreerrors.ErrForbidden
+		}
+		return err
+	}
+	if !hasPermissionKey(perms, requiredScope) {
+		return coreerrors.ErrInsufficientPermissions
+	}
+	return nil
+}
+
+func hasPermissionKey(permissions []string, required string) bool {
+	for _, permission := range permissions {
+		if permission == "*" || permission == required {
+			return true
+		}
+		if strings.HasSuffix(permission, "*") && strings.HasPrefix(required, strings.TrimSuffix(permission, "*")) {
+			return true
+		}
+	}
+	return false
 }
 
 // ------------- OrganizationService -------------
@@ -56,30 +103,21 @@ func (u *UseCases) GetAllOrganizationsByOwner(ctx context.Context, actor *models
 }
 
 func (u *UseCases) GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsReadPermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsReadPermission); err != nil {
 		return nil, err
 	}
 	return u.orgService.GetOrganizationByID(ctx, actor, organizationID)
 }
 
 func (u *UseCases) UpdateOrganization(ctx context.Context, actor *models.Actor, organizationID string, request types.UpdateOrganizationRequest) (*types.Organization, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsUpdatePermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsUpdatePermission); err != nil {
 		return nil, err
 	}
 	return u.orgService.UpdateOrganization(ctx, actor, organizationID, request)
 }
 
 func (u *UseCases) DeleteOrganization(ctx context.Context, actor *models.Actor, organizationID string) error {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsDeletePermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsDeletePermission); err != nil {
 		return err
 	}
 	return u.orgService.DeleteOrganization(ctx, actor, organizationID)
@@ -92,20 +130,14 @@ func (u *UseCases) ExistsByID(ctx context.Context, organizationID string) (bool,
 // ------------- OrganizationInvitationService -------------
 
 func (u *UseCases) CreateOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationInvitationRequest, redirectURL string) (*types.OrganizationInvitation, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsInvitationsCreatePermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsInvitationsCreatePermission); err != nil {
 		return nil, err
 	}
 	return u.invitationService.CreateOrganizationInvitation(ctx, actor, organizationID, request, redirectURL)
 }
 
 func (u *UseCases) GetAllOrganizationInvitations(ctx context.Context, actor *models.Actor, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsInvitationsListPermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsInvitationsListPermission); err != nil {
 		return nil, err
 	}
 
@@ -144,10 +176,7 @@ func (u *UseCases) GetOrganizationInvitation(ctx context.Context, actor *models.
 }
 
 func (u *UseCases) RevokeOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsInvitationsRevokePermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsInvitationsRevokePermission); err != nil {
 		return nil, err
 	}
 	return u.invitationService.RevokeOrganizationInvitation(ctx, actor, organizationID, invitationID)
@@ -164,60 +193,42 @@ func (u *UseCases) RejectOrganizationInvitation(ctx context.Context, actor *mode
 // ------------- OrganizationMemberService -------------
 
 func (u *UseCases) AddMember(ctx context.Context, actor *models.Actor, organizationID string, request types.AddOrganizationMemberRequest) (*types.OrganizationMember, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsMembersAddPermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsMembersAddPermission); err != nil {
 		return nil, err
 	}
 	return u.memberService.AddMember(ctx, actor, organizationID, request)
 }
 
 func (u *UseCases) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsMembersListPermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsMembersListPermission); err != nil {
 		return nil, err
 	}
 	return u.memberService.GetAllMembers(ctx, actor, organizationID, page, limit)
 }
 
 func (u *UseCases) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMemberResponse, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsMembersReadPermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsMembersReadPermission); err != nil {
 		return nil, err
 	}
 	return u.memberService.GetMember(ctx, actor, organizationID, memberID)
 }
 
 func (u *UseCases) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMemberResponse, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsMembersReadPermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsMembersReadPermission); err != nil {
 		return nil, err
 	}
 	return u.memberService.GetMemberByUserID(ctx, actor, organizationID, userID)
 }
 
 func (u *UseCases) UpdateMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsMembersUpdatePermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsMembersUpdatePermission); err != nil {
 		return nil, err
 	}
 	return u.memberService.UpdateMember(ctx, actor, organizationID, memberID, request)
 }
 
 func (u *UseCases) RemoveMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) error {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsMembersRemovePermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsMembersRemovePermission); err != nil {
 		return err
 	}
 	return u.memberService.RemoveMember(ctx, actor, organizationID, memberID)
@@ -226,50 +237,35 @@ func (u *UseCases) RemoveMember(ctx context.Context, actor *models.Actor, organi
 // ------------- OrganizationTeamService -------------
 
 func (u *UseCases) CreateTeam(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationTeamRequest) (*types.OrganizationTeam, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsTeamsCreatePermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsTeamsCreatePermission); err != nil {
 		return nil, err
 	}
 	return u.teamService.CreateTeam(ctx, actor, organizationID, request)
 }
 
 func (u *UseCases) GetAllTeams(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationTeam, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsTeamsListPermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsTeamsListPermission); err != nil {
 		return nil, err
 	}
 	return u.teamService.GetAllTeams(ctx, actor, organizationID)
 }
 
 func (u *UseCases) GetTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string) (*types.OrganizationTeam, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsTeamsReadPermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsTeamsReadPermission); err != nil {
 		return nil, err
 	}
 	return u.teamService.GetTeam(ctx, actor, organizationID, teamID)
 }
 
 func (u *UseCases) UpdateTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string, request types.UpdateOrganizationTeamRequest) (*types.OrganizationTeam, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsTeamsUpdatePermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsTeamsUpdatePermission); err != nil {
 		return nil, err
 	}
 	return u.teamService.UpdateTeam(ctx, actor, organizationID, teamID, request)
 }
 
 func (u *UseCases) DeleteTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string) error {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsTeamsDeletePermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsTeamsDeletePermission); err != nil {
 		return err
 	}
 	return u.teamService.DeleteTeam(ctx, actor, organizationID, teamID)
@@ -278,40 +274,28 @@ func (u *UseCases) DeleteTeam(ctx context.Context, actor *models.Actor, organiza
 // ------------- OrganizationTeamMemberService -------------
 
 func (u *UseCases) AddTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, request types.AddOrganizationTeamMemberRequest) (*types.OrganizationTeamMember, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsTeamMembersAddPermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsTeamMembersAddPermission); err != nil {
 		return nil, err
 	}
 	return u.teamMemberService.AddTeamMember(ctx, actor, organizationID, teamID, request)
 }
 
 func (u *UseCases) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMemberResponse, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsTeamMembersListPermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsTeamMembersListPermission); err != nil {
 		return nil, err
 	}
 	return u.teamMemberService.GetAllTeamMembers(ctx, actor, organizationID, teamID, page, limit)
 }
 
 func (u *UseCases) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMemberResponse, error) {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsTeamMembersReadPermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsTeamMembersReadPermission); err != nil {
 		return nil, err
 	}
 	return u.teamMemberService.GetTeamMember(ctx, actor, organizationID, teamID, memberID)
 }
 
 func (u *UseCases) RemoveTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) error {
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsTeamMembersRemovePermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsTeamMembersRemovePermission); err != nil {
 		return err
 	}
 	return u.teamMemberService.RemoveTeamMember(ctx, actor, organizationID, teamID, memberID)

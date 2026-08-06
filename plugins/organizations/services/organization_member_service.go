@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/uptrace/bun"
 
@@ -39,8 +40,13 @@ func NewOrganizationMemberService(userService rootservices.UserService, accessCo
 }
 
 func (s *organizationMemberService) AddMember(ctx context.Context, actor *models.Actor, organizationID string, request types.AddOrganizationMemberRequest) (*types.OrganizationMember, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+	_, actorMember, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID)
+	if err != nil {
 		return nil, err
+	}
+
+	if actor.Type == models.ActorMachine {
+		return nil, coreerrors.ErrForbidden
 	}
 
 	userID := request.UserID
@@ -67,19 +73,8 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actor *models
 		return nil, coreerrors.ErrConflict
 	}
 
-	actorID := actor.ID
-	validatedRoleAssignment, err := s.accessControlService.ValidateRoleAssignment(ctx, role, &actorID)
-	if err != nil {
-		if err.Error() == coreerrors.ErrForbidden.Error() {
-			return nil, coreerrors.ErrForbidden
-		}
-		if err.Error() == coreerrors.ErrNotFound.Error() {
-			return nil, coreerrors.ErrBadRequest
-		}
+	if err := authorizeRoleWeight(ctx, s.accessControlService, actorMember, role); err != nil {
 		return nil, err
-	}
-	if !validatedRoleAssignment {
-		return nil, coreerrors.ErrBadRequest
 	}
 
 	member := &types.OrganizationMember{
@@ -124,7 +119,7 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actor *models
 }
 
 func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -132,7 +127,7 @@ func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor *mo
 }
 
 func (s *organizationMemberService) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMemberResponse, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -152,7 +147,7 @@ func (s *organizationMemberService) GetMember(ctx context.Context, actor *models
 }
 
 func (s *organizationMemberService) GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMemberResponse, error) {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -172,9 +167,13 @@ func (s *organizationMemberService) GetMemberByUserID(ctx context.Context, actor
 }
 
 func (s *organizationMemberService) UpdateMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error) {
-	_, actorMember, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
+	_, actorMember, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
+	}
+
+	if actor.Type == models.ActorMachine {
+		return nil, coreerrors.ErrForbidden
 	}
 
 	member, err := s.orgMemberRepo.GetByID(ctx, memberID)
@@ -190,19 +189,8 @@ func (s *organizationMemberService) UpdateMember(ctx context.Context, actor *mod
 		return nil, coreerrors.ErrBadRequest
 	}
 
-	actorID := actor.ID
-	validatedRoleAssignment, err := s.accessControlService.ValidateRoleAssignment(ctx, role, &actorID)
-	if err != nil {
-		if err.Error() == coreerrors.ErrForbidden.Error() {
-			return nil, coreerrors.ErrForbidden
-		}
-		if err.Error() == coreerrors.ErrNotFound.Error() {
-			return nil, coreerrors.ErrBadRequest
-		}
+	if err := authorizeRoleWeight(ctx, s.accessControlService, actorMember, role); err != nil {
 		return nil, err
-	}
-	if !validatedRoleAssignment {
-		return nil, coreerrors.ErrBadRequest
 	}
 
 	if actorMember != nil && actorMember.UserID == member.UserID {
@@ -232,7 +220,8 @@ func (s *organizationMemberService) UpdateMember(ctx context.Context, actor *mod
 }
 
 func (s *organizationMemberService) RemoveMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) error {
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+	organization, actorMember, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID)
+	if err != nil {
 		return err
 	}
 
@@ -242,6 +231,14 @@ func (s *organizationMemberService) RemoveMember(ctx context.Context, actor *mod
 	}
 	if member == nil || member.OrganizationID != organizationID {
 		return coreerrors.ErrNotFound
+	}
+
+	if err := authorizeRemoveMemberWeight(ctx, s.accessControlService, actorMember, member); err != nil {
+		return err
+	}
+
+	if member.UserID == organization.OwnerID && actor.ID != organization.OwnerID {
+		return coreerrors.ErrForbidden
 	}
 
 	if s.hooks != nil {
@@ -260,6 +257,33 @@ func (s *organizationMemberService) RemoveMember(ctx context.Context, actor *mod
 		}
 	}
 
+	return nil
+}
+
+func authorizeRemoveMemberWeight(ctx context.Context, accessControl rootservices.AccessControlService, actorMember, targetMember *types.OrganizationMember) error {
+	if actorMember == nil {
+		return coreerrors.ErrForbidden
+	}
+
+	actorWeight, err := accessControl.GetRoleWeightByName(ctx, actorMember.Role)
+	if err != nil {
+		if errors.Is(err, coreerrors.ErrNotFound) {
+			return coreerrors.ErrForbidden
+		}
+		return err
+	}
+
+	targetWeight, err := accessControl.GetRoleWeightByName(ctx, targetMember.Role)
+	if err != nil {
+		if errors.Is(err, coreerrors.ErrNotFound) {
+			return coreerrors.ErrForbidden
+		}
+		return err
+	}
+
+	if targetWeight > actorWeight {
+		return coreerrors.ErrForbidden
+	}
 	return nil
 }
 

@@ -9,6 +9,7 @@ import (
 
 type AccessControlServiceStub struct {
 	RoleWeights     map[string]int
+	RolePermissions map[string][]string
 	AssignerWeights map[string]int
 	Err             error
 }
@@ -33,6 +34,7 @@ func NewAccessControlServiceStubWithWeights(roleWeights, assignerWeights map[str
 
 	return &AccessControlServiceStub{
 		RoleWeights:     roleWeights,
+		RolePermissions: map[string][]string{},
 		AssignerWeights: assignerWeights,
 	}
 }
@@ -51,34 +53,34 @@ func (s *AccessControlServiceStub) RoleExists(ctx context.Context, roleName stri
 	return true, nil
 }
 
-func (s *AccessControlServiceStub) ValidateRoleAssignment(ctx context.Context, roleName string, assignerUserID *string) (bool, error) {
+func (s *AccessControlServiceStub) GetRolePermissionsByName(ctx context.Context, roleName string) ([]string, error) {
 	_ = ctx
 	if s != nil && s.Err != nil {
-		return false, s.Err
+		return nil, s.Err
 	}
 
-	roleWeight, ok := s.roleWeight(roleName)
+	if perms, ok := s.RolePermissions[roleName]; ok {
+		return perms, nil
+	}
+	if _, ok := s.roleWeight(roleName); ok {
+		return []string{"*"}, nil
+	}
+
+	return nil, coreerrors.ErrNotFound
+}
+
+func (s *AccessControlServiceStub) GetRoleWeightByName(ctx context.Context, roleName string) (int, error) {
+	_ = ctx
+	if s != nil && s.Err != nil {
+		return 0, s.Err
+	}
+
+	weight, ok := s.roleWeight(roleName)
 	if !ok {
-		return false, nil
-	}
-	if s == nil || len(s.AssignerWeights) == 0 {
-		return true, nil
+		return 0, coreerrors.ErrNotFound
 	}
 
-	if assignerUserID == nil || *assignerUserID == "" {
-		return false, nil
-	}
-
-	assignerWeight, ok := s.assignerWeight(*assignerUserID)
-	if !ok {
-		return false, nil
-	}
-
-	if roleWeight > assignerWeight {
-		return false, coreerrors.ErrForbidden
-	}
-
-	return true, nil
+	return weight, nil
 }
 
 func (s *AccessControlServiceStub) ValidatePermissionKeys(ctx context.Context, permissionKeys []string) error {
@@ -106,13 +108,5 @@ func (s *AccessControlServiceStub) roleWeight(roleName string) (int, bool) {
 		return 0, false
 	}
 	weight, ok := s.RoleWeights[roleName]
-	return weight, ok
-}
-
-func (s *AccessControlServiceStub) assignerWeight(userID string) (int, bool) {
-	if s == nil {
-		return 0, false
-	}
-	weight, ok := s.AssignerWeights[userID]
 	return weight, ok
 }

@@ -24,9 +24,17 @@ func (m *MockAccessControlService) RoleExists(ctx context.Context, roleName stri
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *MockAccessControlService) ValidateRoleAssignment(ctx context.Context, roleName string, assignerUserID *string) (bool, error) {
-	args := m.Called(ctx, roleName, assignerUserID)
-	return args.Bool(0), args.Error(1)
+func (m *MockAccessControlService) GetRolePermissionsByName(ctx context.Context, roleName string) ([]string, error) {
+	args := m.Called(ctx, roleName)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockAccessControlService) GetRoleWeightByName(ctx context.Context, roleName string) (int, error) {
+	args := m.Called(ctx, roleName)
+	return args.Int(0), args.Error(1)
 }
 
 func (m *MockAccessControlService) ValidatePermissionKeys(ctx context.Context, permissionKeys []string) error {

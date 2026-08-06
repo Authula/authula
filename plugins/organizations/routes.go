@@ -88,6 +88,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Path:   "/organizations/{organization_id}/invitations",
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireAuthenticated(),
+				middleware.RequireActor(models.ActorUser),
 			},
 			Handler: createInvitationHandler.Handle(),
 		},
@@ -137,6 +138,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Path:   "/organizations/{organization_id}/members",
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireAuthenticated(),
+				middleware.RequireActor(models.ActorUser),
 			},
 			Handler: addMemberHandler.Handle(),
 		},
@@ -169,6 +171,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Path:   "/organizations/{organization_id}/members/{member_id}",
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireAuthenticated(),
+				middleware.RequireActor(models.ActorUser),
 			},
 			Handler: updateMemberHandler.Handle(),
 		},

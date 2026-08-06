@@ -105,7 +105,7 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 	p.teamMemberService = services.NewOrganizationTeamMemberService(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo, p.serviceUtils, p.hooksExecutor)
 
 	authorizer := rootservices.NewDefaultAuthorizer()
-	p.useCases = usecases.NewUseCases(p.organizationService, p.invitationService, p.memberService, p.teamService, p.teamMemberService, userService, p.globalConfig, authorizer)
+	p.useCases = usecases.NewUseCases(p.organizationService, p.invitationService, p.memberService, p.teamService, p.teamMemberService, userService, p.globalConfig, authorizer, p.serviceUtils, accessControlService)
 
 	p.Api = BuildAPI(p)
 

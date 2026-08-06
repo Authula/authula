@@ -87,7 +87,7 @@ func (p *ApiKeyPlugin) Init(ctx *models.PluginContext) error {
 		p.rateLimiterService = rateLimiterService
 	}
 
-	var organizationService rootservices.OrganizationService
+	var organizationService apiservices.OrganizationLookupService
 	if p.config.AllowOrgKeys {
 		orgSvc, ok := ctx.ServiceRegistry.Get(models.ServiceOrganization.String()).(orgplugins.OrganizationLookupService)
 		if !ok {
