@@ -158,6 +158,9 @@ func WithLogger(config models.LoggerConfig) ConfigOption {
 		if config.Level != "" {
 			c.Logger.Level = config.Level
 		}
+		if config.Logger != nil {
+			c.Logger.Logger = config.Logger
+		}
 	}
 }
 
