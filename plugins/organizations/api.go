@@ -3,18 +3,25 @@ package organizations
 import (
 	"context"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"
 	"github.com/Authula/authula/plugins/organizations/usecases"
+	rootservices "github.com/Authula/authula/services"
 )
 
 type API struct {
-	useCases *usecases.UseCases
+	useCases             *usecases.UseCases
+	memberRepo           repositories.OrganizationMemberRepository
+	accessControlService rootservices.AccessControlService
 }
 
 func BuildAPI(plugin *OrganizationsPlugin) *API {
 	return &API{
-		useCases: plugin.useCases,
+		useCases:             plugin.useCases,
+		memberRepo:           plugin.memberRepo,
+		accessControlService: plugin.accessControlService,
 	}
 }
 
@@ -22,6 +29,22 @@ func BuildAPI(plugin *OrganizationsPlugin) *API {
 
 func (a *API) ExistsByID(ctx context.Context, organizationID string) (bool, error) {
 	return a.useCases.ExistsByID(ctx, organizationID)
+}
+
+func (a *API) GetUserPermissionsInOrganization(ctx context.Context, userID string, organizationID string) ([]string, error) {
+	if userID == "" || organizationID == "" {
+		return nil, coreerrors.ErrUnauthorized
+	}
+
+	member, err := a.memberRepo.GetByOrganizationIDAndUserID(ctx, organizationID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if member == nil {
+		return nil, coreerrors.ErrForbidden
+	}
+
+	return a.accessControlService.GetRolePermissionsByName(ctx, member.Role)
 }
 
 func (a *API) CreateOrganization(ctx context.Context, actor *models.Actor, request types.CreateOrganizationRequest) (*types.Organization, error) {

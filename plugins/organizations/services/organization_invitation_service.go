@@ -88,9 +88,13 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 	}
 	actorID := actor.ID
 
-	organization, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID)
+	organization, actorMember, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
+	}
+
+	if actor.Type == models.ActorMachine {
+		return nil, coreerrors.ErrForbidden
 	}
 
 	role := request.Role
@@ -98,18 +102,8 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
-	validatedRoleAssignment, err := s.accessControlService.ValidateRoleAssignment(ctx, role, &actorID)
-	if err != nil {
-		if err.Error() == coreerrors.ErrForbidden.Error() {
-			return nil, coreerrors.ErrForbidden
-		}
-		if err.Error() == coreerrors.ErrNotFound.Error() {
-			return nil, coreerrors.ErrUnprocessableEntity
-		}
+	if err := authorizeRoleWeight(ctx, s.accessControlService, actorMember, role); err != nil {
 		return nil, err
-	}
-	if !validatedRoleAssignment {
-		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
 	expiresAt := time.Now().UTC().Add(s.pluginConfig.InvitationExpiresIn)
@@ -271,7 +265,7 @@ func (s *organizationInvitationService) GetAllOrganizationInvitations(ctx contex
 		return nil, coreerrors.ErrUnauthorized
 	}
 
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -288,7 +282,7 @@ func (s *organizationInvitationService) GetOrganizationInvitation(ctx context.Co
 		return nil, coreerrors.ErrUnauthorized
 	}
 
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -353,7 +347,7 @@ func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context
 		return nil, coreerrors.ErrUnauthorized
 	}
 
-	if _, _, err := s.serviceUtils.authorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 

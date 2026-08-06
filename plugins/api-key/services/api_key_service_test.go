@@ -113,10 +113,23 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			},
 		},
 		{
-			name:    "org_create_privilege_escalation_rejected",
-			actor:   &models.Actor{ID: userID, Type: models.ActorUser, Scopes: []string{"org:api-key:create"}},
-			config:  types.ApiKeyPluginConfig{AllowOrgKeys: true},
-			req:     types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID, Permissions: []string{"admin"}},
+			name:   "org_create_privilege_escalation_rejected",
+			actor:  &models.Actor{ID: userID, Type: models.ActorUser, Scopes: []string{"org:api-key:create"}},
+			config: types.ApiKeyPluginConfig{AllowOrgKeys: true},
+			req:    types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID, Permissions: []string{"admin"}},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockOrgService.On("GetUserPermissionsInOrganization", mock.Anything, userID, orgID).Return([]string{"org:api-key:create"}, nil).Once()
+			},
+			wantErr: coreerrors.ErrForbidden,
+		},
+		{
+			name:   "org_create_member_required",
+			actor:  &models.Actor{ID: userID, Type: models.ActorUser, Scopes: []string{"org:api-key:create"}},
+			config: types.ApiKeyPluginConfig{AllowOrgKeys: true},
+			req:    types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID, Permissions: []string{"read"}},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockOrgService.On("GetUserPermissionsInOrganization", mock.Anything, userID, orgID).Return(([]string)(nil), coreerrors.ErrForbidden).Once()
+			},
 			wantErr: coreerrors.ErrForbidden,
 		},
 		{
@@ -125,6 +138,7 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			config: types.ApiKeyPluginConfig{AllowOrgKeys: true},
 			req:    types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID, Permissions: []string{"read"}},
 			setup: func(f *apiKeyServiceFixture) {
+				f.mockOrgService.On("GetUserPermissionsInOrganization", mock.Anything, userID, orgID).Return([]string{"org:api-key:create", "read"}, nil).Once()
 				f.mockAccessControlService.On("ValidatePermissionKeys", mock.Anything, []string{"read"}).Return(nil).Once()
 				f.mockOrgService.On("ExistsByID", mock.Anything, orgID).Return(true, nil).Once()
 				f.mockTokenService.On("Generate").Return(rawApiKey, nil).Once()
@@ -158,6 +172,7 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			config: types.ApiKeyPluginConfig{AllowOrgKeys: true},
 			req:    types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeOrganization, OwnerID: orgID},
 			setup: func(f *apiKeyServiceFixture) {
+				f.mockOrgService.On("GetUserPermissionsInOrganization", mock.Anything, userID, orgID).Return([]string{"org:api-key:create"}, nil).Once()
 				f.mockOrgService.On("ExistsByID", mock.Anything, orgID).Return(false, nil).Once()
 			},
 			wantErr: coreerrors.ErrNotFound,
@@ -424,6 +439,7 @@ func TestApiKeyServiceUpdate(t *testing.T) {
 			name:  "org_update_allowed",
 			actor: &models.Actor{ID: userID, Type: models.ActorUser, Scopes: []string{"org:api-key:update", "read", "write"}},
 			setup: func(f *apiKeyServiceFixture) {
+				f.mockOrgService.On("GetUserPermissionsInOrganization", mock.Anything, userID, orgID).Return([]string{"org:api-key:update", "read", "write"}, nil).Once()
 				f.mockAccessControlService.On("ValidatePermissionKeys", mock.Anything, permissions).Return(nil).Once()
 				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", Name: "old", Enabled: true, OwnerType: types.OwnerTypeOrganization, OwnerID: orgID}, nil).Once()
 				f.mockApiKeyRepo.On("Update", mock.Anything, mock.MatchedBy(func(apiKey *types.ApiKey) bool {

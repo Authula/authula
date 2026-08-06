@@ -106,6 +106,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 
 	tests := []struct {
 		name         string
+		actor        *models.Actor
 		actorUserID  string
 		organization string
 		setup        func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository)
@@ -119,8 +120,9 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Once()
 			},
-			expectOwner: "user-1",
+			expectMember: "user-1",
 		},
 		{
 			name:         "member access",
@@ -131,6 +133,42 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-2"}, nil).Once()
 			},
 			expectMember: "user-2",
+		},
+		{
+			name:         "machine with matching claim is allowed",
+			actor:        &models.Actor{ID: "key-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}},
+			organization: "org-1",
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+			},
+			expectOwner: "user-1",
+		},
+		{
+			name:         "machine without claim is forbidden",
+			actor:        &models.Actor{ID: "key-1", Type: models.ActorMachine},
+			organization: "org-1",
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+			},
+			expectErr: coreerrors.ErrForbidden,
+		},
+		{
+			name:         "machine with mismatched claim is forbidden",
+			actor:        &models.Actor{ID: "key-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-2"}},
+			organization: "org-1",
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+			},
+			expectErr: coreerrors.ErrForbidden,
+		},
+		{
+			name:         "user with mismatched claim is forbidden",
+			actor:        &models.Actor{ID: "user-1", Type: models.ActorUser, Claims: map[string]any{"organization_id": "org-2"}},
+			organization: "org-1",
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+			},
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:         "unauthorized when inputs are missing",
@@ -188,7 +226,11 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 				tt.setup(orgRepo, memberRepo)
 			}
 
-			org, member, err := (&ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}).authorizeOrganizationAccess(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization)
+			actor := tt.actor
+			if actor == nil {
+				actor = orgtests.Actor(tt.actorUserID)
+			}
+			org, member, err := (&ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}).AuthorizeOrganizationAccess(context.Background(), actor, tt.organization)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				require.Nil(t, org)

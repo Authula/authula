@@ -129,12 +129,6 @@ func (h *AcceptOrganizationInvitationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.Values[models.ContextAccessControlAssignRole.String()] = &models.AccessControlAssignRoleContext{
-			UserID:         actor.ID,
-			RoleName:       invitation.Role,
-			AssignerUserID: &invitation.InviterID,
-		}
-
 		redirectURL := r.URL.Query().Get("redirect_url")
 		if redirectURL != "" {
 			validatedURL, err := util.IsTrustedCallbackURL(redirectURL, h.TrustedOrigins)

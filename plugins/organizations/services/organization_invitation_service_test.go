@@ -152,31 +152,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 			},
-			expectErr: coreerrors.ErrUnprocessableEntity,
-		},
-		{
-			name:                 "higher role is forbidden",
-			actorUserID:          "user-1",
-			organizationID:       "org-1",
-			invitationExpiresIn:  36 * time.Hour,
-			request:              types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "manager"},
-			accessControlService: orgtests.NewAccessControlServiceStubWithWeights(nil, map[string]int{"user-1": 10}),
-			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
-				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
-			},
-			expectErr: coreerrors.ErrForbidden,
-		},
-		{
-			name:                 "access control forbidden is normalized",
-			actorUserID:          "user-1",
-			organizationID:       "org-1",
-			invitationExpiresIn:  36 * time.Hour,
-			request:              types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "manager"},
-			accessControlService: &orgtests.AccessControlServiceStub{Err: errors.New("forbidden")},
-			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
-				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
-			},
-			expectErr: coreerrors.ErrForbidden,
+			expectErr: coreerrors.ErrBadRequest,
 		},
 		{
 			name:           "forbidden for non owner",
@@ -185,6 +161,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			request:        types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(nil, nil).Once()
 			},
 			expectErr: coreerrors.ErrForbidden,
 		},
@@ -566,6 +543,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 			if tt.setup != nil {
 				tt.setup(orgRepo, orgInvitationRepo, memberRepo, orgInvitationHooks)
 			}
+			expectActorMember(memberRepo, tt.organizationID, tt.actorUserID)
 			userSvc := &internaltests.MockUserService{}
 			if tt.userSetup != nil {
 				tt.userSetup(userSvc)
@@ -722,6 +700,7 @@ func TestOrganizationInvitationService_GetOrganizationInvitation(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(orgRepo, invRepo, memberRepo)
 			}
+			expectActorMember(memberRepo, tt.organizationID, tt.actorUserID)
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
 			invitation, err := svc.GetOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.invitationID)
@@ -841,6 +820,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 			if tt.setup != nil {
 				tt.setup(orgRepo, invRepo, memberRepo)
 			}
+			expectActorMember(memberRepo, tt.organizationID, tt.actorUserID)
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
 			invitations, err := svc.GetAllOrganizationInvitations(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID)
@@ -949,6 +929,7 @@ func TestOrganizationInvitationService_RevokeOrganizationInvitation(t *testing.T
 			if tt.setup != nil {
 				tt.setup(orgRepo, invRepo, memberRepo, hooks)
 			}
+			expectActorMember(memberRepo, tt.organizationID, tt.actorUserID)
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
 			invitation, err := svc.RevokeOrganizationInvitation(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.invitationID)
@@ -1462,4 +1443,21 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 			require.Equal(t, tt.expectStatus, invitation.Status)
 		})
 	}
+}
+
+func TestOrganizationInvitationService_MachineActorForbidden(t *testing.T) {
+	t.Parallel()
+
+	actor := &models.Actor{ID: "key-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}}
+
+	orgRepo := &orgtests.MockOrganizationRepository{}
+	invRepo := &orgtests.MockOrganizationInvitationRepository{}
+	memberRepo := &orgtests.MockOrganizationMemberRepository{}
+	orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+
+	pluginConfig := &types.OrganizationsPluginConfig{Enabled: true, InvitationExpiresIn: time.Hour}
+	svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
+	_, err := svc.CreateOrganizationInvitation(context.Background(), actor, "org-1", types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"}, "")
+	require.ErrorIs(t, err, coreerrors.ErrForbidden)
+	orgRepo.AssertExpectations(t)
 }

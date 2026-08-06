@@ -20,3 +20,8 @@ type ApiKeyService interface {
 	Verify(ctx context.Context, req types.VerifyApiKeyRequest) (*types.VerifyApiKeyResult, error)
 	ValidatePermissionKeys(ctx context.Context, permissionKeys []string) error
 }
+
+type OrganizationLookupService interface {
+	ExistsByID(ctx context.Context, organizationID string) (bool, error)
+	GetUserPermissionsInOrganization(ctx context.Context, userID string, organizationID string) ([]string, error)
+}

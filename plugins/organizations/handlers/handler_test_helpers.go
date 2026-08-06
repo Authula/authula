@@ -9,6 +9,7 @@ import (
 	"github.com/Authula/authula/models"
 	orgservices "github.com/Authula/authula/plugins/organizations/services"
 	orgtests "github.com/Authula/authula/plugins/organizations/tests"
+	orgtypes "github.com/Authula/authula/plugins/organizations/types"
 	orgusecases "github.com/Authula/authula/plugins/organizations/usecases"
 )
 
@@ -29,6 +30,18 @@ func defaultMockUserService() *internaltests.MockUserService {
 	return svc
 }
 
+func defaultServiceUtils() *orgservices.ServiceUtils {
+	orgRepo := &orgtests.MockOrganizationRepository{}
+	memberRepo := &orgtests.MockOrganizationMemberRepository{}
+	orgRepo.On("GetByID", mock.Anything, mock.Anything).Return(&orgtypes.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Maybe()
+	memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, mock.Anything, mock.Anything).Return(&orgtypes.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "admin"}, nil).Maybe()
+	return orgservices.NewServiceUtils(orgRepo, memberRepo, nil, nil)
+}
+
+func defaultAccessControlService() *orgtests.AccessControlServiceStub {
+	return orgtests.NewAccessControlServiceStub()
+}
+
 func newOrgUseCases(svc orgservices.OrganizationService) *orgusecases.UseCases {
 	return orgusecases.NewUseCases(
 		svc,
@@ -39,6 +52,8 @@ func newOrgUseCases(svc orgservices.OrganizationService) *orgusecases.UseCases {
 		defaultMockUserService(),
 		&models.Config{},
 		&noopAuthorizer{},
+		defaultServiceUtils(),
+		defaultAccessControlService(),
 	)
 }
 
@@ -52,6 +67,8 @@ func newInvitationUseCases(orgSvc orgservices.OrganizationService, svc orgservic
 		defaultMockUserService(),
 		&models.Config{},
 		&noopAuthorizer{},
+		defaultServiceUtils(),
+		defaultAccessControlService(),
 	)
 }
 
@@ -65,6 +82,8 @@ func newMemberUseCases(svc orgservices.OrganizationMemberService) *orgusecases.U
 		defaultMockUserService(),
 		&models.Config{},
 		&noopAuthorizer{},
+		defaultServiceUtils(),
+		defaultAccessControlService(),
 	)
 }
 
@@ -78,6 +97,8 @@ func newTeamUseCases(svc orgservices.OrganizationTeamService) *orgusecases.UseCa
 		defaultMockUserService(),
 		&models.Config{},
 		&noopAuthorizer{},
+		defaultServiceUtils(),
+		defaultAccessControlService(),
 	)
 }
 
@@ -91,5 +112,7 @@ func newTeamMemberUseCases(svc orgservices.OrganizationTeamMemberService) *orgus
 		defaultMockUserService(),
 		&models.Config{},
 		&noopAuthorizer{},
+		defaultServiceUtils(),
+		defaultAccessControlService(),
 	)
 }
