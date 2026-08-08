@@ -79,7 +79,7 @@ func New(authConfig *AuthConfig) *Auth {
 
 	serviceRegistry := plugins.NewServiceRegistry()
 
-	coreServices := InitCoreServices(authConfig.Config, db, serviceRegistry)
+	coreServices := InitCoreServices(authConfig.Config, db, serviceRegistry, logger)
 
 	pluginRegistry := plugins.NewPluginRegistry(
 		authConfig.Config,

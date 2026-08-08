@@ -144,7 +144,7 @@ func (m *mockSessionRepository) GetDistinctUserIDs(ctx context.Context) ([]strin
 
 func TestSessionService_DeleteAllExpired(t *testing.T) {
 	mockRepo := &mockSessionRepository{}
-	service := NewSessionService(mockRepo, nil, nil)
+	service := NewSessionService(mockRepo, nil, nil, nil)
 	ctx := context.Background()
 
 	now := time.Now().UTC()

@@ -16,27 +16,21 @@ type verificationService struct {
 	repo         repositories.VerificationRepository
 	signer       security.TokenSigner
 	serviceHooks *models.CoreServiceHooksConfig
+	logger       models.Logger
 }
 
 func NewVerificationService(
 	repo repositories.VerificationRepository,
 	signer security.TokenSigner,
 	serviceHooks *models.CoreServiceHooksConfig,
+	logger models.Logger,
 ) services.VerificationService {
 	return &verificationService{
 		repo:         repo,
 		signer:       signer,
 		serviceHooks: serviceHooks,
+		logger:       logger,
 	}
-}
-
-func runVerificationHooks(hooks []models.VerificationHook, verification *models.Verification) error {
-	for _, hook := range hooks {
-		if err := hook(verification); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (s *verificationService) Create(
@@ -61,7 +55,7 @@ func (s *verificationService) Create(
 	}
 
 	if s.serviceHooks != nil && s.serviceHooks.Verifications != nil {
-		if err := runVerificationHooks(s.serviceHooks.Verifications.BeforeCreateHooks(), verification); err != nil {
+		if err := runHooks(s.serviceHooks.Verifications.BeforeCreateHooks(), verification); err != nil {
 			return nil, err
 		}
 	}
@@ -72,9 +66,7 @@ func (s *verificationService) Create(
 	}
 
 	if s.serviceHooks != nil && s.serviceHooks.Verifications != nil {
-		if err := runVerificationHooks(s.serviceHooks.Verifications.AfterCreateHooks(), created); err != nil {
-			return nil, err
-		}
+		runAfterHooks(s.logger, "after create verification", s.serviceHooks.Verifications.AfterCreateHooks(), created)
 	}
 
 	return created, nil

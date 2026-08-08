@@ -15,6 +15,19 @@ func (m *MockLogger) Info(msg string, args ...any)  {}
 func (m *MockLogger) Warn(msg string, args ...any)  {}
 func (m *MockLogger) Error(msg string, args ...any) {}
 
+// RecordingLogger records error messages so tests can assert that errors
+// were logged, e.g. after-hooks that must not fail the operation.
+type RecordingLogger struct {
+	ErrorCalls []string
+}
+
+func (l *RecordingLogger) Debug(msg string, args ...any) {}
+func (l *RecordingLogger) Info(msg string, args ...any)  {}
+func (l *RecordingLogger) Warn(msg string, args ...any)  {}
+func (l *RecordingLogger) Error(msg string, args ...any) {
+	l.ErrorCalls = append(l.ErrorCalls, msg)
+}
+
 type MockEventBus struct {
 	mock.Mock
 }

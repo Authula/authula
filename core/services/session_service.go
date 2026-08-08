@@ -16,27 +16,21 @@ type sessionService struct {
 	repo         repositories.SessionRepository
 	signer       security.TokenSigner
 	serviceHooks *models.CoreServiceHooksConfig
+	logger       models.Logger
 }
 
 func NewSessionService(
 	repo repositories.SessionRepository,
 	signer security.TokenSigner,
 	serviceHooks *models.CoreServiceHooksConfig,
+	logger models.Logger,
 ) services.SessionService {
 	return &sessionService{
 		repo:         repo,
 		signer:       signer,
 		serviceHooks: serviceHooks,
+		logger:       logger,
 	}
-}
-
-func runSessionHooks(hooks []models.SessionHook, session *models.Session) error {
-	for _, hook := range hooks {
-		if err := hook(session); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (s *sessionService) Create(
@@ -61,7 +55,7 @@ func (s *sessionService) Create(
 	}
 
 	if s.serviceHooks != nil && s.serviceHooks.Sessions != nil {
-		if err := runSessionHooks(s.serviceHooks.Sessions.BeforeCreateHooks(), session); err != nil {
+		if err := runHooks(s.serviceHooks.Sessions.BeforeCreateHooks(), session); err != nil {
 			return nil, err
 		}
 	}
@@ -72,9 +66,7 @@ func (s *sessionService) Create(
 	}
 
 	if s.serviceHooks != nil && s.serviceHooks.Sessions != nil {
-		if err := runSessionHooks(s.serviceHooks.Sessions.AfterCreateHooks(), created); err != nil {
-			return nil, err
-		}
+		runAfterHooks(s.logger, "after create session", s.serviceHooks.Sessions.AfterCreateHooks(), created)
 	}
 
 	return created, nil
@@ -94,7 +86,7 @@ func (s *sessionService) GetByToken(ctx context.Context, hashedToken string) (*m
 
 func (s *sessionService) Update(ctx context.Context, session *models.Session) (*models.Session, error) {
 	if s.serviceHooks != nil && s.serviceHooks.Sessions != nil {
-		if err := runSessionHooks(s.serviceHooks.Sessions.BeforeUpdateHooks(), session); err != nil {
+		if err := runHooks(s.serviceHooks.Sessions.BeforeUpdateHooks(), session); err != nil {
 			return nil, err
 		}
 	}
@@ -105,9 +97,7 @@ func (s *sessionService) Update(ctx context.Context, session *models.Session) (*
 	}
 
 	if s.serviceHooks != nil && s.serviceHooks.Sessions != nil {
-		if err := runSessionHooks(s.serviceHooks.Sessions.AfterUpdateHooks(), updated); err != nil {
-			return nil, err
-		}
+		runAfterHooks(s.logger, "after update session", s.serviceHooks.Sessions.AfterUpdateHooks(), updated)
 	}
 
 	return updated, nil

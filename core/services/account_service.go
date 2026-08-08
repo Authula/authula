@@ -15,6 +15,7 @@ type accountService struct {
 	accountRepo  repositories.AccountRepository
 	tokenRepo    repositories.TokenRepository
 	serviceHooks *models.CoreServiceHooksConfig
+	logger       models.Logger
 }
 
 func NewAccountService(
@@ -22,17 +23,9 @@ func NewAccountService(
 	accountRepo repositories.AccountRepository,
 	tokenRepo repositories.TokenRepository,
 	serviceHooks *models.CoreServiceHooksConfig,
+	logger models.Logger,
 ) services.AccountService {
-	return &accountService{config: config, accountRepo: accountRepo, tokenRepo: tokenRepo, serviceHooks: serviceHooks}
-}
-
-func runAccountHooks(hooks []models.AccountHook, account *models.Account) error {
-	for _, hook := range hooks {
-		if err := hook(account); err != nil {
-			return err
-		}
-	}
-	return nil
+	return &accountService{config: config, accountRepo: accountRepo, tokenRepo: tokenRepo, serviceHooks: serviceHooks, logger: logger}
 }
 func (s *accountService) Create(ctx context.Context, userID string, accountID string, providerID string, password *string) (*models.Account, error) {
 	account := &models.Account{
@@ -44,7 +37,7 @@ func (s *accountService) Create(ctx context.Context, userID string, accountID st
 	}
 
 	if s.serviceHooks != nil && s.serviceHooks.Accounts != nil {
-		if err := runAccountHooks(s.serviceHooks.Accounts.BeforeCreateHooks(), account); err != nil {
+		if err := runHooks(s.serviceHooks.Accounts.BeforeCreateHooks(), account); err != nil {
 			return nil, err
 		}
 	}
@@ -55,9 +48,7 @@ func (s *accountService) Create(ctx context.Context, userID string, accountID st
 	}
 
 	if s.serviceHooks != nil && s.serviceHooks.Accounts != nil {
-		if err := runAccountHooks(s.serviceHooks.Accounts.AfterCreateHooks(), created); err != nil {
-			return nil, err
-		}
+		runAfterHooks(s.logger, "after create account", s.serviceHooks.Accounts.AfterCreateHooks(), created)
 	}
 
 	return created, nil
@@ -91,7 +82,7 @@ func (s *accountService) CreateOAuth2(ctx context.Context, userID string, provid
 		existing.Scope = scope
 
 		if s.serviceHooks != nil && s.serviceHooks.Accounts != nil {
-			if err := runAccountHooks(s.serviceHooks.Accounts.BeforeUpdateHooks(), existing); err != nil {
+			if err := runHooks(s.serviceHooks.Accounts.BeforeUpdateHooks(), existing); err != nil {
 				return nil, err
 			}
 		}
@@ -102,9 +93,7 @@ func (s *accountService) CreateOAuth2(ctx context.Context, userID string, provid
 		}
 
 		if s.serviceHooks != nil && s.serviceHooks.Accounts != nil {
-			if err := runAccountHooks(s.serviceHooks.Accounts.AfterUpdateHooks(), updated); err != nil {
-				return nil, err
-			}
+			runAfterHooks(s.logger, "after update account", s.serviceHooks.Accounts.AfterUpdateHooks(), updated)
 		}
 
 		return updated, nil
@@ -124,7 +113,7 @@ func (s *accountService) CreateOAuth2(ctx context.Context, userID string, provid
 	}
 
 	if s.serviceHooks != nil && s.serviceHooks.Accounts != nil {
-		if err := runAccountHooks(s.serviceHooks.Accounts.BeforeCreateHooks(), account); err != nil {
+		if err := runHooks(s.serviceHooks.Accounts.BeforeCreateHooks(), account); err != nil {
 			return nil, err
 		}
 	}
@@ -135,9 +124,7 @@ func (s *accountService) CreateOAuth2(ctx context.Context, userID string, provid
 	}
 
 	if s.serviceHooks != nil && s.serviceHooks.Accounts != nil {
-		if err := runAccountHooks(s.serviceHooks.Accounts.AfterCreateHooks(), created); err != nil {
-			return nil, err
-		}
+		runAfterHooks(s.logger, "after create account", s.serviceHooks.Accounts.AfterCreateHooks(), created)
 	}
 
 	return created, nil
@@ -157,7 +144,7 @@ func (s *accountService) GetByProviderAndAccountID(ctx context.Context, provider
 
 func (s *accountService) Update(ctx context.Context, account *models.Account) (*models.Account, error) {
 	if s.serviceHooks != nil && s.serviceHooks.Accounts != nil {
-		if err := runAccountHooks(s.serviceHooks.Accounts.BeforeUpdateHooks(), account); err != nil {
+		if err := runHooks(s.serviceHooks.Accounts.BeforeUpdateHooks(), account); err != nil {
 			return nil, err
 		}
 	}
@@ -168,9 +155,7 @@ func (s *accountService) Update(ctx context.Context, account *models.Account) (*
 	}
 
 	if s.serviceHooks != nil && s.serviceHooks.Accounts != nil {
-		if err := runAccountHooks(s.serviceHooks.Accounts.AfterUpdateHooks(), updatedAccount); err != nil {
-			return nil, err
-		}
+		runAfterHooks(s.logger, "after update account", s.serviceHooks.Accounts.AfterUpdateHooks(), updatedAccount)
 	}
 
 	return updatedAccount, nil

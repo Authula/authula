@@ -241,7 +241,7 @@ func (m *MockSessionRepository) GetDistinctUserIDs(ctx context.Context) ([]strin
 	return args.Get(0).([]string), args.Error(1)
 }
 
-func (m *MockSessionRepository) WithTx(tx bun.IDB) *MockSessionRepository {
+func (m *MockSessionRepository) WithTx(tx bun.IDB) repositories.SessionRepository {
 	args := m.Called(tx)
 	if args.Get(0) != nil {
 		if v, ok := args.Get(0).(*MockSessionRepository); ok {
@@ -296,7 +296,7 @@ func (m *MockVerificationRepository) DeleteExpired(ctx context.Context) error {
 	return args.Error(0)
 }
 
-func (m *MockVerificationRepository) WithTx(tx bun.IDB) *MockVerificationRepository {
+func (m *MockVerificationRepository) WithTx(tx bun.IDB) repositories.VerificationRepository {
 	args := m.Called(tx)
 	if args.Get(0) != nil {
 		if v, ok := args.Get(0).(*MockVerificationRepository); ok {

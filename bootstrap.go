@@ -63,7 +63,7 @@ func InitEventBus(config *models.Config) (models.EventBus, error) {
 	return coreevents.NewEventBus(config, logger, pubsub), nil
 }
 
-func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.ServiceRegistry) *serviceinterfaces.CoreServices {
+func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.ServiceRegistry, logger models.Logger) *serviceinterfaces.CoreServices {
 	signer := coresecurity.NewHMACSigner(config.Secret)
 
 	userRepo := corerepositories.NewBunUserRepository(db)
@@ -72,10 +72,10 @@ func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.
 	verificationRepo := corerepositories.NewBunVerificationRepository(db)
 	tokenRepo := corerepositories.NewCryptoTokenRepository(config.Secret)
 
-	userService := coreservices.NewUserService(userRepo, config.CoreServiceHooks)
-	accountService := coreservices.NewAccountService(config, accountRepo, tokenRepo, config.CoreServiceHooks)
-	sessionService := coreservices.NewSessionService(sessionRepo, signer, config.CoreServiceHooks)
-	verificationService := coreservices.NewVerificationService(verificationRepo, signer, config.CoreServiceHooks)
+	userService := coreservices.NewUserService(userRepo, config.CoreServiceHooks, logger)
+	accountService := coreservices.NewAccountService(config, accountRepo, tokenRepo, config.CoreServiceHooks, logger)
+	sessionService := coreservices.NewSessionService(sessionRepo, signer, config.CoreServiceHooks, logger)
+	verificationService := coreservices.NewVerificationService(verificationRepo, signer, config.CoreServiceHooks, logger)
 	tokenService := coreservices.NewTokenService(tokenRepo)
 	passwordService := coreservices.NewArgon2PasswordService()
 

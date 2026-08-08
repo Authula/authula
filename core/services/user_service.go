@@ -13,19 +13,11 @@ import (
 type userService struct {
 	repo         repositories.UserRepository
 	serviceHooks *models.CoreServiceHooksConfig
+	logger       models.Logger
 }
 
-func NewUserService(repo repositories.UserRepository, serviceHooks *models.CoreServiceHooksConfig) services.UserService {
-	return &userService{repo: repo, serviceHooks: serviceHooks}
-}
-
-func runUserHooks(hooks []models.UserHook, user *models.User) error {
-	for _, hook := range hooks {
-		if err := hook(user); err != nil {
-			return err
-		}
-	}
-	return nil
+func NewUserService(repo repositories.UserRepository, serviceHooks *models.CoreServiceHooksConfig, logger models.Logger) services.UserService {
+	return &userService{repo: repo, serviceHooks: serviceHooks, logger: logger}
 }
 
 func (s *userService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata map[string]any) (*models.User, error) {
@@ -44,7 +36,7 @@ func (s *userService) Create(ctx context.Context, name string, email string, ema
 	}
 
 	if s.serviceHooks != nil && s.serviceHooks.Users != nil {
-		if err := runUserHooks(s.serviceHooks.Users.BeforeCreateHooks(), user); err != nil {
+		if err := runHooks(s.serviceHooks.Users.BeforeCreateHooks(), user); err != nil {
 			return nil, err
 		}
 	}
@@ -55,9 +47,7 @@ func (s *userService) Create(ctx context.Context, name string, email string, ema
 	}
 
 	if s.serviceHooks != nil && s.serviceHooks.Users != nil {
-		if err := runUserHooks(s.serviceHooks.Users.AfterCreateHooks(), created); err != nil {
-			return nil, err
-		}
+		runAfterHooks(s.logger, "after create user", s.serviceHooks.Users.AfterCreateHooks(), created)
 	}
 
 	return created, nil
@@ -81,7 +71,7 @@ func (s *userService) GetByEmail(ctx context.Context, email string) (*models.Use
 
 func (s *userService) Update(ctx context.Context, user *models.User) (*models.User, error) {
 	if s.serviceHooks != nil && s.serviceHooks.Users != nil {
-		if err := runUserHooks(s.serviceHooks.Users.BeforeUpdateHooks(), user); err != nil {
+		if err := runHooks(s.serviceHooks.Users.BeforeUpdateHooks(), user); err != nil {
 			return nil, err
 		}
 	}
@@ -92,9 +82,7 @@ func (s *userService) Update(ctx context.Context, user *models.User) (*models.Us
 	}
 
 	if s.serviceHooks != nil && s.serviceHooks.Users != nil {
-		if err := runUserHooks(s.serviceHooks.Users.AfterUpdateHooks(), updatedUser); err != nil {
-			return nil, err
-		}
+		runAfterHooks(s.logger, "after update user", s.serviceHooks.Users.AfterUpdateHooks(), updatedUser)
 	}
 
 	return updatedUser, nil

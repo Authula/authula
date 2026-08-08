@@ -153,155 +153,50 @@ type RouteMapping struct {
 	Permissions []string `json:"permissions" toml:"permissions"`
 }
 
+type ServiceHook[T any] func(*T) error
+
 type CoreServiceHooksConfig struct {
-	Users         *UserServiceHooks
-	Accounts      *AccountServiceHooks
-	Sessions      *SessionServiceHooks
-	Verifications *VerificationServiceHooks
+	Users         *ServiceHooks[User]
+	Accounts      *ServiceHooks[Account]
+	Sessions      *ServiceHooks[Session]
+	Verifications *ServiceHooks[Verification]
 }
 
-type UserHook func(user *User) error
-
-type AccountHook func(account *Account) error
-
-type SessionHook func(session *Session) error
-
-type VerificationHook func(verification *Verification) error
-
-type UserServiceHooks struct {
-	beforeCreate []UserHook
-	afterCreate  []UserHook
-	beforeUpdate []UserHook
-	afterUpdate  []UserHook
+type ServiceHooks[T any] struct {
+	beforeCreate []ServiceHook[T]
+	afterCreate  []ServiceHook[T]
+	beforeUpdate []ServiceHook[T]
+	afterUpdate  []ServiceHook[T]
 }
 
-func (h *UserServiceHooks) RegisterBeforeCreate(fn UserHook) {
+func (h *ServiceHooks[T]) RegisterBeforeCreate(fn ServiceHook[T]) {
 	h.beforeCreate = append(h.beforeCreate, fn)
 }
 
-func (h *UserServiceHooks) RegisterAfterCreate(fn UserHook) {
+func (h *ServiceHooks[T]) RegisterAfterCreate(fn ServiceHook[T]) {
 	h.afterCreate = append(h.afterCreate, fn)
 }
 
-func (h *UserServiceHooks) RegisterBeforeUpdate(fn UserHook) {
+func (h *ServiceHooks[T]) RegisterBeforeUpdate(fn ServiceHook[T]) {
 	h.beforeUpdate = append(h.beforeUpdate, fn)
 }
 
-func (h *UserServiceHooks) RegisterAfterUpdate(fn UserHook) {
+func (h *ServiceHooks[T]) RegisterAfterUpdate(fn ServiceHook[T]) {
 	h.afterUpdate = append(h.afterUpdate, fn)
 }
 
-func (h *UserServiceHooks) BeforeCreateHooks() []UserHook {
+func (h *ServiceHooks[T]) BeforeCreateHooks() []ServiceHook[T] {
 	return h.beforeCreate
 }
 
-func (h *UserServiceHooks) AfterCreateHooks() []UserHook {
+func (h *ServiceHooks[T]) AfterCreateHooks() []ServiceHook[T] {
 	return h.afterCreate
 }
 
-func (h *UserServiceHooks) BeforeUpdateHooks() []UserHook {
+func (h *ServiceHooks[T]) BeforeUpdateHooks() []ServiceHook[T] {
 	return h.beforeUpdate
 }
 
-func (h *UserServiceHooks) AfterUpdateHooks() []UserHook {
+func (h *ServiceHooks[T]) AfterUpdateHooks() []ServiceHook[T] {
 	return h.afterUpdate
-}
-
-type AccountServiceHooks struct {
-	beforeCreate []AccountHook
-	afterCreate  []AccountHook
-	beforeUpdate []AccountHook
-	afterUpdate  []AccountHook
-}
-
-func (h *AccountServiceHooks) RegisterBeforeCreate(fn AccountHook) {
-	h.beforeCreate = append(h.beforeCreate, fn)
-}
-
-func (h *AccountServiceHooks) RegisterAfterCreate(fn AccountHook) {
-	h.afterCreate = append(h.afterCreate, fn)
-}
-
-func (h *AccountServiceHooks) RegisterBeforeUpdate(fn AccountHook) {
-	h.beforeUpdate = append(h.beforeUpdate, fn)
-}
-
-func (h *AccountServiceHooks) RegisterAfterUpdate(fn AccountHook) {
-	h.afterUpdate = append(h.afterUpdate, fn)
-}
-
-func (h *AccountServiceHooks) BeforeCreateHooks() []AccountHook {
-	return h.beforeCreate
-}
-
-func (h *AccountServiceHooks) AfterCreateHooks() []AccountHook {
-	return h.afterCreate
-}
-
-func (h *AccountServiceHooks) BeforeUpdateHooks() []AccountHook {
-	return h.beforeUpdate
-}
-
-func (h *AccountServiceHooks) AfterUpdateHooks() []AccountHook {
-	return h.afterUpdate
-}
-
-type SessionServiceHooks struct {
-	beforeCreate []SessionHook
-	afterCreate  []SessionHook
-	beforeUpdate []SessionHook
-	afterUpdate  []SessionHook
-}
-
-func (h *SessionServiceHooks) RegisterBeforeCreate(fn SessionHook) {
-	h.beforeCreate = append(h.beforeCreate, fn)
-}
-
-func (h *SessionServiceHooks) RegisterAfterCreate(fn SessionHook) {
-	h.afterCreate = append(h.afterCreate, fn)
-}
-
-func (h *SessionServiceHooks) RegisterBeforeUpdate(fn SessionHook) {
-	h.beforeUpdate = append(h.beforeUpdate, fn)
-}
-
-func (h *SessionServiceHooks) RegisterAfterUpdate(fn SessionHook) {
-	h.afterUpdate = append(h.afterUpdate, fn)
-}
-
-func (h *SessionServiceHooks) BeforeCreateHooks() []SessionHook {
-	return h.beforeCreate
-}
-
-func (h *SessionServiceHooks) AfterCreateHooks() []SessionHook {
-	return h.afterCreate
-}
-
-func (h *SessionServiceHooks) BeforeUpdateHooks() []SessionHook {
-	return h.beforeUpdate
-}
-
-func (h *SessionServiceHooks) AfterUpdateHooks() []SessionHook {
-	return h.afterUpdate
-}
-
-type VerificationServiceHooks struct {
-	beforeCreate []VerificationHook
-	afterCreate  []VerificationHook
-}
-
-func (h *VerificationServiceHooks) RegisterBeforeCreate(fn VerificationHook) {
-	h.beforeCreate = append(h.beforeCreate, fn)
-}
-
-func (h *VerificationServiceHooks) RegisterAfterCreate(fn VerificationHook) {
-	h.afterCreate = append(h.afterCreate, fn)
-}
-
-func (h *VerificationServiceHooks) BeforeCreateHooks() []VerificationHook {
-	return h.beforeCreate
-}
-
-func (h *VerificationServiceHooks) AfterCreateHooks() []VerificationHook {
-	return h.afterCreate
 }
