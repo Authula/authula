@@ -783,6 +783,33 @@ func TestOrganizationMemberService_UpdateMember(t *testing.T) {
 			expectErr: coreerrors.ErrForbidden,
 		},
 		{
+			name:           "non-owner cannot change the owner's role",
+			actorUserID:    "user-1",
+			organizationID: "org-1",
+			memberID:       "mem-owner",
+			request:        types.UpdateOrganizationMemberRequest{Role: "viewer"},
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationMemberHooks) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
+				memberRepo.On("GetByID", mock.Anything, "mem-owner").Return(&types.OrganizationMember{ID: "mem-owner", OrganizationID: "org-1", UserID: "owner-1", Role: "owner"}, nil).Once()
+			},
+			expectErr: coreerrors.ErrForbidden,
+		},
+		{
+			name:           "owner can change another member's role",
+			actorUserID:    "owner-1",
+			organizationID: "org-1",
+			memberID:       "mem-1",
+			request:        types.UpdateOrganizationMemberRequest{Role: "admin"},
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationMemberHooks) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
+				memberRepo.On("GetByID", mock.Anything, "mem-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
+				memberRepo.On("Update", mock.Anything, mock.MatchedBy(func(member *types.OrganizationMember) bool {
+					return member != nil && member.ID == "mem-1" && member.Role == "admin"
+				})).Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-2", Role: "admin"}, nil).Once()
+			},
+			expectRole: "admin",
+		},
+		{
 			name:           "update error",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
@@ -944,6 +971,17 @@ func TestOrganizationMemberService_RemoveMember(t *testing.T) {
 				memberRepo.On("Delete", mock.Anything, "mem-1").Return(deleteErr).Once()
 			},
 			expectErr: deleteErr,
+		},
+		{
+			name:           "owner cannot remove their own membership",
+			actorUserID:    "user-1",
+			organizationID: "org-1",
+			memberID:       "mem-owner",
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationMemberHooks) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByID", mock.Anything, "mem-owner").Return(&types.OrganizationMember{ID: "mem-owner", OrganizationID: "org-1", UserID: "user-1", Role: "member"}, nil).Once()
+			},
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:           "success",

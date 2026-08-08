@@ -167,7 +167,7 @@ func (s *organizationMemberService) GetMemberByUserID(ctx context.Context, actor
 }
 
 func (s *organizationMemberService) UpdateMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error) {
-	_, actorMember, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID)
+	organization, actorMember, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -182,6 +182,10 @@ func (s *organizationMemberService) UpdateMember(ctx context.Context, actor *mod
 	}
 	if member == nil || member.OrganizationID != organizationID {
 		return nil, coreerrors.ErrNotFound
+	}
+
+	if member.UserID == organization.OwnerID && actor.ID != organization.OwnerID {
+		return nil, coreerrors.ErrForbidden
 	}
 
 	role := request.Role
@@ -237,7 +241,7 @@ func (s *organizationMemberService) RemoveMember(ctx context.Context, actor *mod
 		return err
 	}
 
-	if member.UserID == organization.OwnerID && actor.ID != organization.OwnerID {
+	if member.UserID == organization.OwnerID {
 		return coreerrors.ErrForbidden
 	}
 

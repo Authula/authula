@@ -516,3 +516,92 @@ func TestServiceUtils_slugify(t *testing.T) {
 		})
 	}
 }
+
+func TestServiceUtils_authorizeTeamAccess(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		actor     *models.Actor
+		setup     func(*orgtests.MockOrganizationTeamRepository, *orgtests.MockOrganizationMemberRepository)
+		expectErr error
+	}{
+		{
+			name:  "org admin not on the team is allowed",
+			actor: &models.Actor{ID: "user-1", Type: models.ActorUser},
+			setup: func(teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "admin"}, nil).Once()
+			},
+		},
+		{
+			name:  "org member not on the team is allowed",
+			actor: &models.Actor{ID: "user-2", Type: models.ActorUser},
+			setup: func(teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(&types.OrganizationMember{ID: "mem-2", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
+			},
+		},
+		{
+			name:  "non-member is forbidden",
+			actor: &models.Actor{ID: "user-3", Type: models.ActorUser},
+			setup: func(teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-3").Return((*types.OrganizationMember)(nil), nil).Once()
+			},
+			expectErr: coreerrors.ErrForbidden,
+		},
+		{
+			name:  "team from another organization is not found",
+			actor: &models.Actor{ID: "user-1", Type: models.ActorUser},
+			setup: func(teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-2"}, nil).Once()
+			},
+			expectErr: coreerrors.ErrNotFound,
+		},
+		{
+			name:  "missing team is not found",
+			actor: &models.Actor{ID: "user-1", Type: models.ActorUser},
+			setup: func(teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				teamRepo.On("GetByID", mock.Anything, "team-1").Return((*types.OrganizationTeam)(nil), nil).Once()
+			},
+			expectErr: coreerrors.ErrNotFound,
+		},
+		{
+			name:  "machine bound to org is allowed",
+			actor: &models.Actor{ID: "key-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}},
+			setup: func(teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
+			},
+		},
+		{
+			name:  "machine without org claim is forbidden",
+			actor: &models.Actor{ID: "key-1", Type: models.ActorMachine},
+			setup: func(teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
+			},
+			expectErr: coreerrors.ErrForbidden,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			teamRepo := &orgtests.MockOrganizationTeamRepository{}
+			memberRepo := &orgtests.MockOrganizationMemberRepository{}
+			if tt.setup != nil {
+				tt.setup(teamRepo, memberRepo)
+			}
+
+			err := (&ServiceUtils{orgRepo: nil, orgMemberRepo: memberRepo, orgTeamRepo: teamRepo}).authorizeTeamAccess(context.Background(), tt.actor, "org-1", "team-1")
+			if tt.expectErr != nil {
+				require.ErrorIs(t, err, tt.expectErr)
+				return
+			}
+			require.NoError(t, err)
+			teamRepo.AssertExpectations(t)
+			memberRepo.AssertExpectations(t)
+		})
+	}
+}

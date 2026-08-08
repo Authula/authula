@@ -9,6 +9,7 @@ import (
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
+	apikeyconstants "github.com/Authula/authula/plugins/api-key/constants"
 	"github.com/Authula/authula/plugins/api-key/repositories"
 	"github.com/Authula/authula/plugins/api-key/types"
 	rootservices "github.com/Authula/authula/services"
@@ -182,10 +183,7 @@ func (s *apiKeyService) authorizeCreate(ctx context.Context, actor *models.Actor
 		if !s.config.allowOrgKeys {
 			return fmt.Errorf("%w: organization-owned keys are not enabled", coreerrors.ErrForbidden)
 		}
-		if s.organizationService == nil {
-			return fmt.Errorf("%w: organization service is not available", coreerrors.ErrUnprocessableEntity)
-		}
-		perms, err := s.organizationService.GetUserPermissionsInOrganization(ctx, actor.ID, req.OwnerID)
+		perms, err := s.authorizeOrgKeyAccess(ctx, actor, req.OwnerID, apikeyconstants.OrgApiKeyCreate)
 		if err != nil {
 			return err
 		}
@@ -194,6 +192,26 @@ func (s *apiKeyService) authorizeCreate(ctx context.Context, actor *models.Actor
 		}
 	}
 	return nil
+}
+
+// authorizeOrgKeyAccess verifies that the actor is a member of the owning organization
+// and holds the required organization api-key permission via their membership role.
+// It returns the caller's permissions within the organization.
+func (s *apiKeyService) authorizeOrgKeyAccess(ctx context.Context, actor *models.Actor, orgID string, requiredPermission string) ([]string, error) {
+	if actor == nil || actor.ID == "" {
+		return nil, coreerrors.ErrUnauthorized
+	}
+	if s.organizationService == nil {
+		return nil, fmt.Errorf("%w: organization service is not available", coreerrors.ErrUnprocessableEntity)
+	}
+	perms, err := s.organizationService.GetUserPermissionsInOrganization(ctx, actor.ID, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if !hasPermission(perms, requiredPermission) {
+		return nil, fmt.Errorf("%w: permission %q is not within your organization permissions", coreerrors.ErrForbidden, requiredPermission)
+	}
+	return perms, nil
 }
 
 func (s *apiKeyService) GetByID(ctx context.Context, actor *models.Actor, id string) (*types.ApiKey, error) {
@@ -209,6 +227,10 @@ func (s *apiKeyService) GetByID(ctx context.Context, actor *models.Actor, id str
 	case types.OwnerTypeUser:
 		if apiKey.OwnerID != actor.ID {
 			return nil, fmt.Errorf("%w: you do not have access to this API key", coreerrors.ErrForbidden)
+		}
+	case types.OwnerTypeOrganization:
+		if _, err := s.authorizeOrgKeyAccess(ctx, actor, apiKey.OwnerID, apikeyconstants.OrgApiKeyRead); err != nil {
+			return nil, err
 		}
 	}
 
@@ -235,6 +257,13 @@ func (s *apiKeyService) GetAll(ctx context.Context, actor *models.Actor, req typ
 		req.OwnerID = &ownerID
 		ownerType := types.OwnerTypeUser
 		req.OwnerType = &ownerType
+	case *req.OwnerType == types.OwnerTypeOrganization:
+		if req.OwnerID == nil || *req.OwnerID == "" {
+			return nil, fmt.Errorf("%w: owner_id is required for organization keys", coreerrors.ErrBadRequest)
+		}
+		if _, err := s.authorizeOrgKeyAccess(ctx, actor, *req.OwnerID, apikeyconstants.OrgApiKeyList); err != nil {
+			return nil, err
+		}
 	}
 
 	items, total, err := s.apiKeyRepo.GetAll(ctx, req.OwnerType, req.OwnerID, page, limit)
@@ -273,14 +302,11 @@ func (s *apiKeyService) Update(ctx context.Context, actor *models.Actor, id stri
 			}
 		}
 	case types.OwnerTypeOrganization:
+		perms, err := s.authorizeOrgKeyAccess(ctx, actor, apiKey.OwnerID, apikeyconstants.OrgApiKeyUpdate)
+		if err != nil {
+			return nil, err
+		}
 		if len(req.Permissions) > 0 {
-			if s.organizationService == nil {
-				return nil, fmt.Errorf("%w: organization service is not available", coreerrors.ErrUnprocessableEntity)
-			}
-			perms, err := s.organizationService.GetUserPermissionsInOrganization(ctx, actor.ID, apiKey.OwnerID)
-			if err != nil {
-				return nil, err
-			}
 			if err := s.validatePermissionsSubset(perms, req.Permissions); err != nil {
 				return nil, err
 			}
@@ -341,6 +367,10 @@ func (s *apiKeyService) Delete(ctx context.Context, actor *models.Actor, id stri
 		if apiKey.OwnerID != actor.ID {
 			return fmt.Errorf("%w: you do not have access to this API key", coreerrors.ErrForbidden)
 		}
+	case types.OwnerTypeOrganization:
+		if _, err := s.authorizeOrgKeyAccess(ctx, actor, apiKey.OwnerID, apikeyconstants.OrgApiKeyDelete); err != nil {
+			return err
+		}
 	}
 
 	if s.rateLimiterService != nil && apiKey.RateLimitEnabled {
@@ -360,6 +390,10 @@ func (s *apiKeyService) DeleteAllByOwner(ctx context.Context, actor *models.Acto
 	case types.OwnerTypeUser:
 		if ownerID != actor.ID {
 			return fmt.Errorf("%w: you cannot delete API keys for another user", coreerrors.ErrForbidden)
+		}
+	case types.OwnerTypeOrganization:
+		if _, err := s.authorizeOrgKeyAccess(ctx, actor, ownerID, apikeyconstants.OrgApiKeyDelete); err != nil {
+			return err
 		}
 	}
 	return s.apiKeyRepo.DeleteAllByOwner(ctx, ownerType, ownerID)

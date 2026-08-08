@@ -79,6 +79,14 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actor *mod
 		return nil, coreerrors.ErrUnprocessableEntity
 	}
 
+	rolePermissions, err := s.accessControlService.GetRolePermissionsByName(ctx, role)
+	if err != nil {
+		return nil, err
+	}
+	if !constants.CoversAllOrganizationPermissions(rolePermissions) {
+		return nil, coreerrors.ErrUnprocessableEntity
+	}
+
 	slug := ""
 	if request.Slug != nil {
 		slug = *request.Slug
@@ -270,7 +278,7 @@ func (s *organizationService) GetOrganizationByID(ctx context.Context, actor *mo
 }
 
 func (s *organizationService) UpdateOrganization(ctx context.Context, actor *models.Actor, organizationID string, request types.UpdateOrganizationRequest) (*types.Organization, error) {
-	organization, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID)
+	organization, err := s.serviceUtils.authorizeOwner(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
 	}

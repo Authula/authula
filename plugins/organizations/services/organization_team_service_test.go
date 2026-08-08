@@ -15,10 +15,9 @@ import (
 
 func newTestOrganizationTeamService(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamRepo *orgtests.MockOrganizationTeamRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository) *organizationTeamService {
 	serviceUtils := &ServiceUtils{
-		orgRepo:           orgRepo,
-		orgMemberRepo:     memberRepo,
-		orgTeamRepo:       teamRepo,
-		orgTeamMemberRepo: teamMemberRepo,
+		orgRepo:       orgRepo,
+		orgMemberRepo: memberRepo,
+		orgTeamRepo:   teamRepo,
 	}
 
 	return NewOrganizationTeamService(orgRepo, memberRepo, teamRepo, teamMemberRepo, serviceUtils, nil)
@@ -204,10 +203,9 @@ func TestOrganizationTeamService_CreateTeam(t *testing.T) {
 			teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
 			hooks := &orgtests.MockOrganizationTeamHooks{}
 			serviceUtils := &ServiceUtils{
-				orgRepo:           orgRepo,
-				orgMemberRepo:     memberRepo,
-				orgTeamRepo:       teamRepo,
-				orgTeamMemberRepo: teamMemberRepo,
+				orgRepo:       orgRepo,
+				orgMemberRepo: memberRepo,
+				orgTeamRepo:   teamRepo,
 			}
 
 			if tt.setup != nil {

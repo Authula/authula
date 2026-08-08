@@ -13,7 +13,9 @@ func RequireAuthenticated() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			reqCtx, _ := models.GetRequestContext(r.Context())
 			if reqCtx.Actor == nil {
-				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "unauthorized"})
+				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
+					"message": "unauthorized",
+				})
 				reqCtx.Handled = true
 				return
 			}

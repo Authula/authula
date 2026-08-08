@@ -12,18 +12,16 @@ import (
 )
 
 type ServiceUtils struct {
-	orgRepo           repositories.OrganizationRepository
-	orgMemberRepo     repositories.OrganizationMemberRepository
-	orgTeamRepo       repositories.OrganizationTeamRepository
-	orgTeamMemberRepo repositories.OrganizationTeamMemberRepository
+	orgRepo       repositories.OrganizationRepository
+	orgMemberRepo repositories.OrganizationMemberRepository
+	orgTeamRepo   repositories.OrganizationTeamRepository
 }
 
-func NewServiceUtils(orgRepo repositories.OrganizationRepository, orgMemberRepo repositories.OrganizationMemberRepository, orgTeamRepo repositories.OrganizationTeamRepository, orgTeamMemberRepo repositories.OrganizationTeamMemberRepository) *ServiceUtils {
+func NewServiceUtils(orgRepo repositories.OrganizationRepository, orgMemberRepo repositories.OrganizationMemberRepository, orgTeamRepo repositories.OrganizationTeamRepository) *ServiceUtils {
 	return &ServiceUtils{
-		orgRepo:           orgRepo,
-		orgMemberRepo:     orgMemberRepo,
-		orgTeamRepo:       orgTeamRepo,
-		orgTeamMemberRepo: orgTeamMemberRepo,
+		orgRepo:       orgRepo,
+		orgMemberRepo: orgMemberRepo,
+		orgTeamRepo:   orgTeamRepo,
 	}
 }
 
@@ -105,13 +103,6 @@ func (s *ServiceUtils) authorizeTeamAccess(ctx context.Context, actor *models.Ac
 		return coreerrors.ErrForbidden
 	}
 
-	tm, err := s.orgTeamMemberRepo.GetByTeamIDAndMemberID(ctx, teamID, member.ID)
-	if err != nil {
-		return err
-	}
-	if tm == nil {
-		return coreerrors.ErrForbidden
-	}
 	return nil
 }
 

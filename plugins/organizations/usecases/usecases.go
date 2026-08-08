@@ -110,16 +110,10 @@ func (u *UseCases) GetOrganizationByID(ctx context.Context, actor *models.Actor,
 }
 
 func (u *UseCases) UpdateOrganization(ctx context.Context, actor *models.Actor, organizationID string, request types.UpdateOrganizationRequest) (*types.Organization, error) {
-	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsUpdatePermission); err != nil {
-		return nil, err
-	}
 	return u.orgService.UpdateOrganization(ctx, actor, organizationID, request)
 }
 
 func (u *UseCases) DeleteOrganization(ctx context.Context, actor *models.Actor, organizationID string) error {
-	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsDeletePermission); err != nil {
-		return err
-	}
 	return u.orgService.DeleteOrganization(ctx, actor, organizationID)
 }
 
@@ -166,10 +160,10 @@ func (u *UseCases) GetOrganizationInvitation(ctx context.Context, actor *models.
 		return resp, nil
 	}
 
-	if err := u.authorizer.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-	if err := u.authorizer.AuthorizeScope(ctx, actor, orgconstants.OrganizationsInvitationsReadPermission); err != nil {
+	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsInvitationsReadPermission); err != nil {
+		if errors.Is(err, coreerrors.ErrForbidden) || errors.Is(err, coreerrors.ErrInsufficientPermissions) {
+			return nil, coreerrors.ErrNotFound
+		}
 		return nil, err
 	}
 	return resp, nil
