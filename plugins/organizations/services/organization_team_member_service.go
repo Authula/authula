@@ -44,6 +44,10 @@ func (s *organizationTeamMemberService) AddTeamMember(ctx context.Context, actor
 		return nil, err
 	}
 
+	if actor.Type == models.ActorMachine {
+		return nil, coreerrors.ErrForbidden
+	}
+
 	if err := s.serviceUtils.authorizeTeamAccess(ctx, actor, organizationID, teamID); err != nil {
 		return nil, err
 	}
@@ -160,6 +164,10 @@ func (s *organizationTeamMemberService) GetTeamMember(ctx context.Context, actor
 func (s *organizationTeamMemberService) RemoveTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) error {
 	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return err
+	}
+
+	if actor.Type == models.ActorMachine {
+		return coreerrors.ErrForbidden
 	}
 
 	if err := s.serviceUtils.authorizeTeamAccess(ctx, actor, organizationID, teamID); err != nil {

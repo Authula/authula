@@ -91,7 +91,7 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 	p.teamRepo = repositories.NewBunOrganizationTeamRepository(ctx.DB)
 	p.teamMemberRepo = repositories.NewBunOrganizationTeamMemberRepository(ctx.DB)
 
-	p.serviceUtils = services.NewServiceUtils(p.organizationRepo, p.memberRepo, p.teamRepo, p.teamMemberRepo)
+	p.serviceUtils = services.NewServiceUtils(p.organizationRepo, p.memberRepo, p.teamRepo)
 	p.organizationService = services.NewOrganizationService(p.organizationRepo, p.memberRepo, p.serviceUtils, accessControlService, p.pluginConfig.OrganizationsLimit, ctx.DB, p.hooksExecutor)
 	emailTemplateManager, err := newOrganizationEmailTemplateManager()
 	if err != nil {
@@ -132,7 +132,7 @@ func (p *OrganizationsPlugin) Close() error {
 
 func (p *OrganizationsPlugin) ensurePermissions() error {
 	if err := p.accessControlService.EnsurePermissions(context.Background(), []rootservices.PermissionDefinition{
-		{Key: orgconstants.All, Description: "All organizations permissions"},
+		{Key: orgconstants.OrganizationsAllPermission, Description: "All organizations permissions"},
 		{Key: orgconstants.OrganizationsReadPermission, Description: "Read organization details"},
 		{Key: orgconstants.OrganizationsUpdatePermission, Description: "Update organization details"},
 		{Key: orgconstants.OrganizationsDeletePermission, Description: "Delete organizations"},

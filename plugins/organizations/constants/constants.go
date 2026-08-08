@@ -1,9 +1,11 @@
 package constants
 
+import "strings"
+
 // Permissions
 
 const (
-	All                                      = "organizations:*"
+	OrganizationsAllPermission               = "organizations:*"
 	OrganizationsReadPermission              = "organizations:read"
 	OrganizationsUpdatePermission            = "organizations:update"
 	OrganizationsDeletePermission            = "organizations:delete"
@@ -26,6 +28,55 @@ const (
 	OrganizationsInvitationsReadPermission   = "organizations:invitations:read"
 	OrganizationsInvitationsRevokePermission = "organizations:invitations:revoke"
 )
+
+// OrganizationPermissions is the full set of permissions the organizations plugin registers.
+var OrganizationPermissions = []string{
+	OrganizationsAllPermission,
+	OrganizationsReadPermission,
+	OrganizationsUpdatePermission,
+	OrganizationsDeletePermission,
+	OrganizationsMembersAddPermission,
+	OrganizationsMembersListPermission,
+	OrganizationsMembersReadPermission,
+	OrganizationsMembersUpdatePermission,
+	OrganizationsMembersRemovePermission,
+	OrganizationsTeamsCreatePermission,
+	OrganizationsTeamsListPermission,
+	OrganizationsTeamsReadPermission,
+	OrganizationsTeamsUpdatePermission,
+	OrganizationsTeamsDeletePermission,
+	OrganizationsTeamMembersAddPermission,
+	OrganizationsTeamMembersListPermission,
+	OrganizationsTeamMembersReadPermission,
+	OrganizationsTeamMembersRemovePermission,
+	OrganizationsInvitationsCreatePermission,
+	OrganizationsInvitationsListPermission,
+	OrganizationsInvitationsReadPermission,
+	OrganizationsInvitationsRevokePermission,
+}
+
+// CoversAllOrganizationPermissions reports whether the given permission set grants
+// every organization permission (wildcard-aware).
+func CoversAllOrganizationPermissions(permissions []string) bool {
+	for _, required := range OrganizationPermissions {
+		if !matchesPermission(permissions, required) {
+			return false
+		}
+	}
+	return true
+}
+
+func matchesPermission(permissions []string, required string) bool {
+	for _, permission := range permissions {
+		if permission == "*" || permission == required {
+			return true
+		}
+		if strings.HasSuffix(permission, "*") && strings.HasPrefix(required, strings.TrimSuffix(permission, "*")) {
+			return true
+		}
+	}
+	return false
+}
 
 // Events
 

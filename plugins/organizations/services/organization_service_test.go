@@ -156,6 +156,73 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 	}
 }
 
+func TestOrganizationService_CreateOrganizationRequiresPrivilegedRole(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		role          string
+		rolePerms     map[string][]string
+		expectErr     error
+		expectCreated bool
+	}{
+		{
+			name:          "role with organizations:* wildcard is accepted",
+			role:          "admin",
+			rolePerms:     map[string][]string{"admin": {"organizations:*"}},
+			expectCreated: true,
+		},
+		{
+			name:          "role with all organization permissions enumerated is accepted",
+			role:          "admin",
+			rolePerms:     map[string][]string{"admin": constants.OrganizationPermissions},
+			expectCreated: true,
+		},
+		{
+			name:          "universal wildcard role is accepted",
+			role:          "admin",
+			rolePerms:     map[string][]string{"admin": {"*"}},
+			expectCreated: true,
+		},
+		{
+			name:      "role without all organization permissions is rejected",
+			role:      "member",
+			rolePerms: map[string][]string{"member": {"organizations:members:read"}},
+			expectErr: coreerrors.ErrUnprocessableEntity,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			accessControl := orgtests.NewAccessControlServiceStub()
+			accessControl.RolePermissions = tt.rolePerms
+
+			repo := &orgtests.MockOrganizationRepository{}
+			memberRepo := &orgtests.MockOrganizationMemberRepository{}
+			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
+			svc := NewOrganizationService(repo, memberRepo, serviceUtils, accessControl, nil, &orgtests.MockTxRunner{})
+
+			if tt.expectCreated {
+				repo.On("Create", mock.Anything, mock.Anything).Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme", Slug: "acme"}, nil).Once()
+				memberRepo.On("Create", mock.Anything, mock.Anything).Return(&types.OrganizationMember{ID: "mem-1"}, nil).Once()
+			}
+
+			org, err := svc.CreateOrganization(context.Background(), orgtests.Actor("user-1"), types.CreateOrganizationRequest{Name: "Acme", Role: tt.role})
+			if tt.expectErr != nil {
+				require.ErrorIs(t, err, tt.expectErr)
+				require.Nil(t, org)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, org)
+			repo.AssertExpectations(t)
+			memberRepo.AssertExpectations(t)
+		})
+	}
+}
+
 func TestOrganizationService_GetAllOrganizationsByOwner(t *testing.T) {
 	t.Parallel()
 
@@ -310,17 +377,14 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 			expectErr: coreerrors.ErrForbidden,
 		},
 		{
-			name:           "success for member",
+			name:           "forbidden for non-owner member",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
 			request:        types.UpdateOrganizationRequest{Name: new("Acme Platform")},
 			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
 				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1", Name: "Acme", Slug: "acme"}, nil).Once()
-				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "member"}, nil).Once()
-				repo.On("Update", mock.Anything, mock.MatchedBy(func(org *types.Organization) bool {
-					return org != nil && org.ID == "org-1" && org.Name == "Acme Platform" && org.Slug == "acme"
-				})).Return(&types.Organization{ID: "org-1", OwnerID: "owner-1", Name: "Acme Platform", Slug: "acme"}, nil).Once()
 			},
+			expectErr: coreerrors.ErrForbidden,
 		},
 		{
 			name:           "success",

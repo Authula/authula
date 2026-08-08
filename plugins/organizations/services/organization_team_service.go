@@ -48,6 +48,10 @@ func (s *organizationTeamService) CreateTeam(ctx context.Context, actor *models.
 	if err != nil {
 		return nil, err
 	}
+
+	if actor.Type == models.ActorMachine {
+		return nil, coreerrors.ErrForbidden
+	}
 	actorID := actor.ID
 
 	name := request.Name
@@ -182,6 +186,10 @@ func (s *organizationTeamService) UpdateTeam(ctx context.Context, actor *models.
 		return nil, err
 	}
 
+	if actor.Type == models.ActorMachine {
+		return nil, coreerrors.ErrForbidden
+	}
+
 	if err := s.serviceUtils.authorizeTeamAccess(ctx, actor, organizationID, teamID); err != nil {
 		return nil, err
 	}
@@ -247,6 +255,10 @@ func (s *organizationTeamService) UpdateTeam(ctx context.Context, actor *models.
 func (s *organizationTeamService) DeleteTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string) error {
 	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return err
+	}
+
+	if actor.Type == models.ActorMachine {
+		return coreerrors.ErrForbidden
 	}
 
 	if err := s.serviceUtils.authorizeTeamAccess(ctx, actor, organizationID, teamID); err != nil {
