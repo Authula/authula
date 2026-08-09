@@ -25,7 +25,7 @@ func TestSendEmailVerificationHandler(t *testing.T) {
 	}{
 		{name: "invalid_json", actor: &models.Actor{ID: "user-1", Type: models.ActorUser}, body: []byte("{"), expectedStatus: http.StatusUnprocessableEntity},
 		{name: "usecase_error", actor: &models.Actor{ID: "user-1", Type: models.ActorUser}, body: internaltests.MarshalToJSON(t, map[string]any{"email": "attacker@example.com"}), prepare: func(m *plugintests.MockSendEmailVerificationUseCase) {
-			m.On("Send", mock.Anything, "user-1", (*string)(nil)).Return(errors.New("boom")).Once()
+			m.On("Send", mock.Anything, "user-1", (*string)(nil)).Return(errors.New("some error")).Once()
 		}, expectedStatus: http.StatusInternalServerError},
 		{name: "success", actor: &models.Actor{ID: "user-1", Type: models.ActorUser}, body: internaltests.MarshalToJSON(t, map[string]any{"email": "attacker@example.com"}), prepare: func(m *plugintests.MockSendEmailVerificationUseCase) {
 			m.On("Send", mock.Anything, "user-1", (*string)(nil)).Return(nil).Once()

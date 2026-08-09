@@ -9,6 +9,7 @@ import (
 	"github.com/Authula/authula/models"
 	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/repositories"
+	"github.com/Authula/authula/plugins/admin/services"
 	"github.com/Authula/authula/plugins/admin/types"
 	"github.com/Authula/authula/plugins/admin/usecases"
 	rootservices "github.com/Authula/authula/services"
@@ -21,6 +22,7 @@ type AdminPlugin struct {
 	pluginCtx            *models.PluginContext
 	logger               models.Logger
 	Api                  *API
+	useCases             *usecases.AdminUseCases
 	sessionService       rootservices.SessionService
 	tokenService         rootservices.TokenService
 	accessControlService rootservices.AccessControlService
@@ -87,21 +89,31 @@ func (p *AdminPlugin) Init(ctx *models.PluginContext) error {
 
 	authorizer := rootservices.NewDefaultAuthorizer()
 
-	adminUseCases := usecases.NewAdminUseCases(
-		p.config,
-		coreUserRepo,
-		coreAccountRepo,
+	usersService := services.NewUsersService(coreUserRepo)
+	accountsService := services.NewAccountsService(coreAccountRepo, coreUserRepo, passwordService)
+	impersonationService := services.NewImpersonationService(
+		impersonationRepo,
+		sessionStateRepo,
 		sessionService,
 		tokenService,
-		passwordService,
-		userStateRepo,
-		sessionStateRepo,
-		impersonationRepo,
 		p.globalConfig.Session.ExpiresIn,
+		p.config.ImpersonationMaxExpiresIn,
+	)
+	stateService := services.NewStateService(userStateRepo, sessionStateRepo, impersonationRepo)
+
+	adminUseCases := usecases.NewAdminUseCases(
+		usersService,
+		accountsService,
+		stateService,
+		impersonationService,
 		authorizer,
 	)
+	p.useCases = adminUseCases
 	p.Api = NewAPI(
-		adminUseCases,
+		usersService,
+		accountsService,
+		stateService,
+		impersonationService,
 		impersonationRepo,
 		userStateRepo,
 		sessionStateRepo,
@@ -120,7 +132,7 @@ func (p *AdminPlugin) DependsOn() []string {
 }
 
 func (p *AdminPlugin) Routes() []models.Route {
-	return p.buildRoutes(p.Api)
+	return p.buildRoutes(p)
 }
 
 func (p *AdminPlugin) Close() error {

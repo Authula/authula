@@ -35,7 +35,7 @@ func (p *AdminPlugin) enforceState(reqCtx *models.RequestContext) error {
 
 	ctx := reqCtx.Request.Context()
 
-	state, err := p.Api.GetSelfUserState(ctx, reqCtx.Actor, reqCtx.Actor.ID)
+	state, err := p.Api.GetSelfUserState(ctx, reqCtx.Actor)
 	if err != nil {
 		reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{"message": "failed to evaluate user state"})
 		reqCtx.Handled = true

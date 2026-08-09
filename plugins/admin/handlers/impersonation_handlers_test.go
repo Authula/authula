@@ -31,132 +31,105 @@ func testGlobalConfig() *models.Config {
 func TestGetAllImpersonationsHandler(t *testing.T) {
 	t.Parallel()
 
-	t.Run("error", func(t *testing.T) {
-		t.Parallel()
+	someErr := errors.New("some error")
 
-		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		impRepo.On("GetAllImpersonations", mock.Anything).Return(([]types.Impersonation)(nil), errors.New("internal error")).Once()
-		handler := adminhandlers.NewGetAllImpersonationsHandler(useCase)
+	tests := []struct {
+		name            string
+		setup           func(impRepo *admintests.MockImpersonationRepository)
+		expectedStatus  int
+		expectedMessage string
+	}{
+		{
+			name: "error",
+			setup: func(impRepo *admintests.MockImpersonationRepository) {
+				impRepo.On("GetAllImpersonations", mock.Anything).Return(([]types.Impersonation)(nil), someErr).Once()
+			},
+			expectedStatus:  http.StatusInternalServerError,
+			expectedMessage: "some error",
+		},
+		{
+			name: "success",
+			setup: func(impRepo *admintests.MockImpersonationRepository) {
+				now := time.Now().UTC()
+				impRepo.On("GetAllImpersonations", mock.Anything).Return([]types.Impersonation{{ID: "imp-1", ActorUserID: "actor-1", TargetUserID: "target-1", StartedAt: now, ExpiresAt: now.Add(time.Minute)}}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+		},
+	}
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations", nil, nil)
-		handler.Handler()(w, req)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusInternalServerError, "internal error")
-		impRepo.AssertExpectations(t)
-	})
+			useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
+			tt.setup(impRepo)
+			handler := adminhandlers.NewGetAllImpersonationsHandler(useCase)
 
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations", nil, nil)
+			handler.Handler()(w, req)
 
-		now := time.Now().UTC()
-		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		impRepo.On("GetAllImpersonations", mock.Anything).Return([]types.Impersonation{{ID: "imp-1", ActorUserID: "actor-1", TargetUserID: "target-1", StartedAt: now, ExpiresAt: now.Add(time.Minute)}}, nil).Once()
-		handler := adminhandlers.NewGetAllImpersonationsHandler(useCase)
-
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations", nil, nil)
-		handler.Handler()(w, req)
-
-		if reqCtx.ResponseStatus != http.StatusOK {
-			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
-		}
-		payload := internaltests.DecodeResponseJSON[[]types.Impersonation](t, reqCtx)
-		if payload == nil || len(payload) != 1 {
-			t.Fatalf("expected 1 impersonation, got %v", payload)
-		}
-		impRepo.AssertExpectations(t)
-	})
+			if reqCtx.ResponseStatus != tt.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tt.expectedStatus, reqCtx.ResponseStatus)
+			}
+			if tt.expectedMessage != "" {
+				internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+			}
+			impRepo.AssertExpectations(t)
+		})
+	}
 }
 
 func TestGetImpersonationByIDHandler(t *testing.T) {
 	t.Parallel()
 
-	t.Run("error", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name            string
+		setup           func(impRepo *admintests.MockImpersonationRepository)
+		expectedStatus  int
+		expectedMessage string
+	}{
+		{
+			name: "error",
+			setup: func(impRepo *admintests.MockImpersonationRepository) {
+				impRepo.On("GetImpersonationByID", mock.Anything, "imp-1").Return((*types.Impersonation)(nil), coreerrors.ErrNotFound).Once()
+			},
+			expectedStatus:  http.StatusNotFound,
+			expectedMessage: "not found",
+		},
+		{
+			name: "success",
+			setup: func(impRepo *admintests.MockImpersonationRepository) {
+				now := time.Now().UTC()
+				impRepo.On("GetImpersonationByID", mock.Anything, "imp-1").Return(&types.Impersonation{ID: "imp-1", ActorUserID: "actor-1", TargetUserID: "target-1", StartedAt: now, ExpiresAt: now.Add(5 * time.Minute)}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+		},
+	}
 
-		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		impRepo.On("GetImpersonationByID", mock.Anything, "imp-1").Return((*types.Impersonation)(nil), coreerrors.ErrNotFound).Once()
-		handler := adminhandlers.NewGetImpersonationByIDHandler(useCase)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations/imp-1", nil, nil)
-		req.SetPathValue("impersonation_id", "imp-1")
-		handler.Handler()(w, req)
+			useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
+			tt.setup(impRepo)
+			handler := adminhandlers.NewGetImpersonationByIDHandler(useCase)
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusNotFound, "not found")
-		impRepo.AssertExpectations(t)
-	})
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations/imp-1", nil, nil)
+			req.SetPathValue("impersonation_id", "imp-1")
+			handler.Handler()(w, req)
 
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
-
-		now := time.Now().UTC()
-		useCase, impRepo, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		impRepo.On("GetImpersonationByID", mock.Anything, "imp-1").Return(&types.Impersonation{ID: "imp-1", ActorUserID: "actor-1", TargetUserID: "target-1", StartedAt: now, ExpiresAt: now.Add(5 * time.Minute)}, nil).Once()
-		handler := adminhandlers.NewGetImpersonationByIDHandler(useCase)
-
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/admin/impersonations/imp-1", nil, nil)
-		req.SetPathValue("impersonation_id", "imp-1")
-		handler.Handler()(w, req)
-
-		if reqCtx.ResponseStatus != http.StatusOK {
-			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
-		}
-		payload := internaltests.DecodeResponseJSON[types.GetImpersonationByIDResponse](t, reqCtx)
-		if payload.Impersonation == nil {
-			t.Fatalf("expected impersonation, got %v", payload)
-		}
-		impRepo.AssertExpectations(t)
-	})
+			if reqCtx.ResponseStatus != tt.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tt.expectedStatus, reqCtx.ResponseStatus)
+			}
+			if tt.expectedMessage != "" {
+				internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+			}
+			impRepo.AssertExpectations(t)
+		})
+	}
 }
 
-func TestStartImpersonationHandler_Unauthorized(t *testing.T) {
-	t.Parallel()
-
-	useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-	handler := adminhandlers.NewStartImpersonationHandler(useCase, testGlobalConfig())
-
-	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}), nil)
-
-	handler.Handler()(w, req)
-
-	internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnauthorized, "Unauthorized")
-}
-
-func TestStartImpersonationHandler_InvalidJSON(t *testing.T) {
-	t.Parallel()
-
-	useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-	handler := adminhandlers.NewStartImpersonationHandler(useCase, testGlobalConfig())
-
-	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", []byte("{invalid"), nil)
-	userID := "actor-1"
-	reqCtx.Actor = &models.Actor{ID: userID, Type: models.ActorUser}
-
-	handler.Handler()(w, req)
-
-	internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnprocessableEntity, "invalid character 'i' looking for beginning of object key string")
-}
-
-func TestStartImpersonationHandler_UseCaseError(t *testing.T) {
-	t.Parallel()
-
-	useCase, impRepo, _, _, tokenSvc := admintests.NewImpersonationUseCaseFixture(t)
-	impRepo.On("UserExists", mock.Anything, "actor-1").Return(true, nil).Once()
-	impRepo.On("UserExists", mock.Anything, "target-1").Return(true, nil).Once()
-	tokenSvc.On("Generate").Return("", coreerrors.ErrForbidden).Once()
-	handler := adminhandlers.NewStartImpersonationHandler(useCase, testGlobalConfig())
-
-	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}), nil)
-	userID := "actor-1"
-	reqCtx.Actor = &models.Actor{ID: userID, Type: models.ActorUser}
-
-	handler.Handler()(w, req)
-
-	internaltests.AssertErrorMessage(t, reqCtx, http.StatusForbidden, "forbidden")
-	impRepo.AssertExpectations(t)
-	tokenSvc.AssertExpectations(t)
-}
-
-func TestStartImpersonationHandler_SuccessSetsContextValues(t *testing.T) {
+func TestStartImpersonationHandler(t *testing.T) {
 	t.Parallel()
 
 	sessionID := "session-2"
@@ -164,143 +137,213 @@ func TestStartImpersonationHandler_SuccessSetsContextValues(t *testing.T) {
 	actorSessionID := "session-1"
 	ipAddress := "127.0.0.1"
 	userAgent := "user-agent"
-	useCase, impRepo, sessionStateRepo, sessionSvc, tokenSvc := admintests.NewImpersonationUseCaseFixture(t)
-	impRepo.On("UserExists", mock.Anything, "actor-1").Return(true, nil).Once()
-	impRepo.On("UserExists", mock.Anything, "target-1").Return(true, nil).Once()
-	tokenSvc.On("Generate").Return(sessionToken, nil).Once()
-	tokenSvc.On("Hash", sessionToken).Return("hashed-token").Once()
-	sessionSvc.On("Create",
-		mock.Anything,
-		"target-1",
-		"hashed-token",
-		mock.MatchedBy(func(ip *string) bool { return ip != nil && *ip == ipAddress }),
-		mock.MatchedBy(func(ua *string) bool { return ua != nil && *ua == userAgent }),
-		15*time.Minute,
-	).Return(&models.Session{ID: sessionID, IPAddress: internaltests.PtrString(ipAddress), UserAgent: internaltests.PtrString(userAgent)}, nil).Once()
-	impRepo.On("CreateImpersonation", mock.Anything, mock.AnythingOfType("*types.Impersonation")).Return(nil).Once()
-	sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(nil).Once()
-	handler := adminhandlers.NewStartImpersonationHandler(useCase, testGlobalConfig())
 
-	req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"}), nil)
-	req.Header.Set("User-Agent", userAgent)
-	actorID := "actor-1"
-	reqCtx.Actor = &models.Actor{ID: actorID, Type: models.ActorUser}
-	reqCtx.Values[models.ContextSessionID.String()] = actorSessionID
+	tests := []struct {
+		name            string
+		body            []byte
+		prepare         func(t *testing.T, req *http.Request, reqCtx *models.RequestContext)
+		setup           func(impRepo *admintests.MockImpersonationRepository, sessionStateRepo *admintests.MockSessionStateRepository, sessionSvc *internaltests.MockSessionService, tokenSvc *internaltests.MockTokenService)
+		expectedStatus  int
+		expectedMessage string
+		assertResponse  func(t *testing.T, reqCtx *models.RequestContext)
+	}{
+		{
+			name:            "unauthorized when no actor",
+			expectedStatus:  http.StatusUnauthorized,
+			expectedMessage: "Unauthorized",
+		},
+		{
+			name: "invalid json",
+			body: []byte("{invalid"),
+			prepare: func(t *testing.T, req *http.Request, reqCtx *models.RequestContext) {
+				reqCtx.Actor = &models.Actor{ID: "actor-1", Type: models.ActorUser}
+			},
+			expectedStatus:  http.StatusUnprocessableEntity,
+			expectedMessage: "invalid character 'i' looking for beginning of object key string",
+		},
+		{
+			name: "use case error",
+			prepare: func(t *testing.T, req *http.Request, reqCtx *models.RequestContext) {
+				reqCtx.Actor = &models.Actor{ID: "actor-1", Type: models.ActorUser}
+			},
+			setup: func(impRepo *admintests.MockImpersonationRepository, _ *admintests.MockSessionStateRepository, _ *internaltests.MockSessionService, tokenSvc *internaltests.MockTokenService) {
+				impRepo.On("UserExists", mock.Anything, "actor-1").Return(true, nil).Once()
+				impRepo.On("UserExists", mock.Anything, "target-1").Return(true, nil).Once()
+				tokenSvc.On("Generate").Return("", coreerrors.ErrForbidden).Once()
+			},
+			expectedStatus:  http.StatusForbidden,
+			expectedMessage: "forbidden",
+		},
+		{
+			name: "success sets context values",
+			prepare: func(t *testing.T, req *http.Request, reqCtx *models.RequestContext) {
+				req.Header.Set("User-Agent", userAgent)
+				reqCtx.Actor = &models.Actor{ID: "actor-1", Type: models.ActorUser}
+				reqCtx.Values[models.ContextSessionID.String()] = actorSessionID
+			},
+			setup: func(impRepo *admintests.MockImpersonationRepository, sessionStateRepo *admintests.MockSessionStateRepository, sessionSvc *internaltests.MockSessionService, tokenSvc *internaltests.MockTokenService) {
+				impRepo.On("UserExists", mock.Anything, "actor-1").Return(true, nil).Once()
+				impRepo.On("UserExists", mock.Anything, "target-1").Return(true, nil).Once()
+				tokenSvc.On("Generate").Return(sessionToken, nil).Once()
+				tokenSvc.On("Hash", sessionToken).Return("hashed-token").Once()
+				sessionSvc.On("Create",
+					mock.Anything,
+					"target-1",
+					"hashed-token",
+					mock.MatchedBy(func(ip *string) bool { return ip != nil && *ip == ipAddress }),
+					mock.MatchedBy(func(ua *string) bool { return ua != nil && *ua == userAgent }),
+					15*time.Minute,
+				).Return(&models.Session{ID: sessionID, IPAddress: new(ipAddress), UserAgent: new(userAgent)}, nil).Once()
+				impRepo.On("CreateImpersonation", mock.Anything, mock.AnythingOfType("*types.Impersonation")).Return(nil).Once()
+				sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(nil).Once()
+			},
+			expectedStatus: http.StatusCreated,
+			assertResponse: func(t *testing.T, reqCtx *models.RequestContext) {
+				if reqCtx.Actor == nil || reqCtx.Actor.ID != "target-1" {
+					t.Fatalf("expected user id to be target-1, got %v", reqCtx.Actor.ID)
+				}
+				if reqCtx.Values[models.ContextSessionID.String()] != sessionID {
+					t.Fatalf("expected session id to be updated, got %v", reqCtx.Values[models.ContextSessionID.String()])
+				}
+				if reqCtx.Values[models.ContextSessionToken.String()] != sessionToken {
+					t.Fatalf("expected session token, got %v", reqCtx.Values[models.ContextSessionToken.String()])
+				}
+				if reqCtx.Values[models.ContextAuthSuccess.String()] != true {
+					t.Fatal("expected auth success to be true")
+				}
+				payload := internaltests.DecodeResponseJSON[types.StartImpersonationResponse](t, reqCtx)
+				if payload.Impersonation == nil {
+					t.Fatal("expected impersonation, got nil")
+				}
+			},
+		},
+	}
 
-	handler.Handler()(w, req)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	if reqCtx.ResponseStatus != http.StatusCreated {
-		t.Fatalf("expected status %d, got %d", http.StatusCreated, reqCtx.ResponseStatus)
-	}
-	if reqCtx.Actor == nil || reqCtx.Actor.ID != "target-1" {
-		t.Fatalf("expected user id to be target-1, got %v", reqCtx.Actor.ID)
-	}
-	if reqCtx.Values[models.ContextSessionID.String()] != sessionID {
-		t.Fatalf("expected session id to be updated, got %v", reqCtx.Values[models.ContextSessionID.String()])
-	}
-	if reqCtx.Values[models.ContextSessionToken.String()] != sessionToken {
-		t.Fatalf("expected session token, got %v", reqCtx.Values[models.ContextSessionToken.String()])
-	}
-	if reqCtx.Values[models.ContextAuthSuccess.String()] != true {
-		t.Fatal("expected auth success to be true")
-	}
+			useCase, impRepo, sessionStateRepo, sessionSvc, tokenSvc := admintests.NewImpersonationUseCaseFixture(t)
+			if tt.setup != nil {
+				tt.setup(impRepo, sessionStateRepo, sessionSvc, tokenSvc)
+			}
+			handler := adminhandlers.NewStartImpersonationHandler(useCase, testGlobalConfig())
 
-	payload := internaltests.DecodeResponseJSON[types.StartImpersonationResponse](t, reqCtx)
-	if payload.Impersonation == nil {
-		t.Fatal("expected impersonation, got nil")
+			body := tt.body
+			if body == nil {
+				body = internaltests.MarshalToJSON(t, types.StartImpersonationRequest{TargetUserID: "target-1", Reason: "support"})
+			}
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations", body, nil)
+			if tt.prepare != nil {
+				tt.prepare(t, req, reqCtx)
+			}
+
+			handler.Handler()(w, req)
+
+			if reqCtx.ResponseStatus != tt.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tt.expectedStatus, reqCtx.ResponseStatus)
+			}
+			if tt.expectedMessage != "" {
+				internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+			}
+			if tt.assertResponse != nil {
+				tt.assertResponse(t, reqCtx)
+			}
+
+			impRepo.AssertExpectations(t)
+			sessionStateRepo.AssertExpectations(t)
+			sessionSvc.AssertExpectations(t)
+			tokenSvc.AssertExpectations(t)
+		})
 	}
-	impRepo.AssertExpectations(t)
-	sessionStateRepo.AssertExpectations(t)
-	sessionSvc.AssertExpectations(t)
-	tokenSvc.AssertExpectations(t)
 }
 
 func TestStopImpersonationHandler(t *testing.T) {
 	t.Parallel()
 
-	t.Run("unauthorized when no user ID", func(t *testing.T) {
-		t.Parallel()
+	originalSessionToken := "orig-session-token"
 
-		useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		handler := adminhandlers.NewStopImpersonationHandler(useCase, testGlobalConfig())
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
-		req.SetPathValue("impersonation_id", "imp-1")
+	tests := []struct {
+		name            string
+		prepare         func(t *testing.T, req *http.Request, reqCtx *models.RequestContext)
+		setup           func(impRepo *admintests.MockImpersonationRepository, sessionStateRepo *admintests.MockSessionStateRepository, sessionSvc *internaltests.MockSessionService, tokenSvc *internaltests.MockTokenService)
+		expectedStatus  int
+		expectedMessage string
+	}{
+		{
+			name:            "unauthorized when no user ID",
+			expectedStatus:  http.StatusUnauthorized,
+			expectedMessage: "Unauthorized",
+		},
+		{
+			name: "unauthorized when no session ID",
+			prepare: func(t *testing.T, req *http.Request, reqCtx *models.RequestContext) {
+				reqCtx.Actor = &models.Actor{ID: "actor-1", Type: models.ActorUser}
+			},
+			expectedStatus:  http.StatusUnauthorized,
+			expectedMessage: "Unauthorized",
+		},
+		{
+			name: "no original cookie",
+			prepare: func(t *testing.T, req *http.Request, reqCtx *models.RequestContext) {
+				reqCtx.Actor = &models.Actor{ID: "actor-1", Type: models.ActorUser}
+				reqCtx.Values[models.ContextSessionID.String()] = "session-1"
+			},
+			expectedStatus:  http.StatusUnauthorized,
+			expectedMessage: "no original session found",
+		},
+		{
+			name: "success",
+			prepare: func(t *testing.T, req *http.Request, reqCtx *models.RequestContext) {
+				reqCtx.Actor = &models.Actor{ID: "actor-1", Type: models.ActorUser}
+				reqCtx.Values[models.ContextSessionID.String()] = "session-1"
+				cn := testGlobalConfig().Session.CookieName
+				req.AddCookie(&http.Cookie{Name: cn + adminconstants.OriginalSessionCookieSuffix, Value: originalSessionToken})
+			},
+			setup: func(impRepo *admintests.MockImpersonationRepository, sessionStateRepo *admintests.MockSessionStateRepository, sessionSvc *internaltests.MockSessionService, tokenSvc *internaltests.MockTokenService) {
+				actorID := "actor-1"
+				origSessionID := "orig-session"
+				sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return(&types.AdminSessionState{SessionID: "session-1", ImpersonatorUserID: &actorID, ImpersonatorSessionID: &origSessionID}, nil).Once()
+				impRepo.On("GetActiveImpersonationByID", mock.Anything, "imp-1").Return(&types.Impersonation{ID: "imp-1", ActorUserID: "actor-1", ImpersonationSessionID: new("session-1")}, nil).Once()
+				sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(nil).Once()
+				sessionSvc.On("Delete", mock.Anything, "session-1").Return(nil).Once()
+				impRepo.On("EndImpersonation", mock.Anything, "imp-1", mock.AnythingOfType("*string")).Return(nil).Once()
+				tokenSvc.On("Hash", originalSessionToken).Return("hashed-original").Once()
+				sessionSvc.On("GetByToken", mock.Anything, "hashed-original").Return(&models.Session{ID: origSessionID, UserID: actorID}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+		},
+	}
 
-		handler.Handler()(w, req)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnauthorized, "Unauthorized")
-	})
+			useCase, impRepo, sessionStateRepo, sessionSvc, tokenSvc := admintests.NewImpersonationUseCaseFixture(t)
+			if tt.setup != nil {
+				tt.setup(impRepo, sessionStateRepo, sessionSvc, tokenSvc)
+			}
+			handler := adminhandlers.NewStopImpersonationHandler(useCase, testGlobalConfig())
 
-	t.Run("unauthorized when no session ID", func(t *testing.T) {
-		t.Parallel()
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
+			req.SetPathValue("impersonation_id", "imp-1")
+			if tt.prepare != nil {
+				tt.prepare(t, req, reqCtx)
+			}
 
-		useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		handler := adminhandlers.NewStopImpersonationHandler(useCase, testGlobalConfig())
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
-		req.SetPathValue("impersonation_id", "imp-1")
-		actorID := "actor-1"
-		reqCtx.Actor = &models.Actor{ID: actorID, Type: models.ActorUser}
+			handler.Handler()(w, req)
 
-		handler.Handler()(w, req)
+			if reqCtx.ResponseStatus != tt.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tt.expectedStatus, reqCtx.ResponseStatus)
+			}
+			if tt.expectedMessage != "" {
+				internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+			}
 
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnauthorized, "Unauthorized")
-	})
-
-	t.Run("no original cookie", func(t *testing.T) {
-		t.Parallel()
-
-		useCase, _, _, _, _ := admintests.NewImpersonationUseCaseFixture(t)
-		handler := adminhandlers.NewStopImpersonationHandler(useCase, testGlobalConfig())
-
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
-		req.SetPathValue("impersonation_id", "imp-1")
-		reqCtx.Actor = &models.Actor{ID: "actor-1", Type: models.ActorUser}
-		reqCtx.Values[models.ContextSessionID.String()] = "session-1"
-
-		handler.Handler()(w, req)
-
-		internaltests.AssertErrorMessage(t, reqCtx, http.StatusUnauthorized, "no original session found")
-	})
-
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
-
-		actorID := "actor-1"
-		originalSessionToken := "orig-session-token"
-
-		useCase, impRepo, sessionStateRepo, sessSvc, tokenSvc := admintests.NewImpersonationUseCaseFixture(t)
-		origSessionID := "orig-session"
-		sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return(&types.AdminSessionState{SessionID: "session-1", ImpersonatorUserID: &actorID, ImpersonatorSessionID: &origSessionID}, nil).Once()
-		impRepo.On("GetActiveImpersonationByID", mock.Anything, "imp-1").Return(&types.Impersonation{ID: "imp-1", ActorUserID: "actor-1", ImpersonationSessionID: internaltests.PtrString("session-1")}, nil).Once()
-		sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(nil).Once()
-		sessSvc.On("Delete", mock.Anything, "session-1").Return(nil).Once()
-		impRepo.On("EndImpersonation", mock.Anything, "imp-1", mock.AnythingOfType("*string")).Return(nil).Once()
-		tokenSvc.On("Hash", originalSessionToken).Return("hashed-original").Once()
-		sessSvc.On("GetByToken", mock.Anything, "hashed-original").Return(&models.Session{ID: origSessionID, UserID: actorID}, nil).Once()
-		handler := adminhandlers.NewStopImpersonationHandler(useCase, testGlobalConfig())
-
-		cn := testGlobalConfig().Session.CookieName
-		req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/impersonations/imp-1/stop", nil, nil)
-		req.SetPathValue("impersonation_id", "imp-1")
-		req.AddCookie(&http.Cookie{
-			Name:  cn + adminconstants.OriginalSessionCookieSuffix,
-			Value: originalSessionToken,
+			impRepo.AssertExpectations(t)
+			sessionStateRepo.AssertExpectations(t)
+			sessionSvc.AssertExpectations(t)
+			tokenSvc.AssertExpectations(t)
 		})
-		reqCtx.Actor = &models.Actor{ID: actorID, Type: models.ActorUser}
-		reqCtx.Values[models.ContextSessionID.String()] = "session-1"
-
-		handler.Handler()(w, req)
-
-		if reqCtx.ResponseStatus != http.StatusOK {
-			t.Fatalf("expected status %d, got %d", http.StatusOK, reqCtx.ResponseStatus)
-		}
-		payload := internaltests.DecodeResponseJSON[types.StopImpersonationResponse](t, reqCtx)
-		if payload.Message != "Impersonation stopped" {
-			t.Fatalf("expected success message, got %v", payload.Message)
-		}
-		impRepo.AssertExpectations(t)
-		sessionStateRepo.AssertExpectations(t)
-		sessSvc.AssertExpectations(t)
-		tokenSvc.AssertExpectations(t)
-	})
+	}
 }

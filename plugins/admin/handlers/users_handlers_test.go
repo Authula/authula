@@ -293,7 +293,7 @@ func TestUpdateUserHandler(t *testing.T) {
 				tc.setup(repo)
 			}
 
-			request := types.UpdateUserRequest{Name: admintests.PtrString(t, "Updated")}
+			request := types.UpdateUserRequest{Name: new("Updated")}
 			body := tc.body
 			if body == nil {
 				body = internaltests.MarshalToJSON(t, request)

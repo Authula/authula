@@ -2,10 +2,12 @@ package services
 
 import (
 	"context"
+	"strings"
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	corerepositories "github.com/Authula/authula/core/repositories"
 	"github.com/Authula/authula/models"
+	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/types"
 	"github.com/Authula/authula/util"
 )
@@ -19,6 +21,25 @@ func NewUsersService(userRepo corerepositories.UserRepository) *UsersService {
 }
 
 func (s *UsersService) Create(ctx context.Context, actor *models.Actor, request types.CreateUserRequest) (*models.User, error) {
+	name := strings.TrimSpace(request.Name)
+	email := strings.TrimSpace(strings.ToLower(request.Email))
+
+	if name == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+	if email == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
+	emailVerified := false
+	if request.EmailVerified != nil {
+		emailVerified = *request.EmailVerified
+	}
+
+	request.Name = name
+	request.Email = email
+	request.EmailVerified = &emailVerified
+
 	existing, err := s.userRepo.GetByEmail(ctx, request.Email)
 	if err != nil {
 		return nil, err
@@ -44,6 +65,14 @@ func (s *UsersService) Create(ctx context.Context, actor *models.Actor, request 
 }
 
 func (s *UsersService) GetAll(ctx context.Context, actor *models.Actor, cursor *string, limit int) (*types.UsersPage, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if cursor != nil {
+		trimmed := strings.TrimSpace(*cursor)
+		cursor = &trimmed
+	}
+
 	users, nextCursor, err := s.userRepo.GetAll(ctx, cursor, limit)
 	if err != nil {
 		return nil, err
@@ -53,10 +82,23 @@ func (s *UsersService) GetAll(ctx context.Context, actor *models.Actor, cursor *
 }
 
 func (s *UsersService) GetByID(ctx context.Context, actor *models.Actor, userID string) (*models.User, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, adminconstants.ErrUserIDRequired
+	}
+
 	return s.userRepo.GetByID(ctx, userID)
 }
 
 func (s *UsersService) Update(ctx context.Context, actor *models.Actor, userID string, request types.UpdateUserRequest) (*models.User, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, adminconstants.ErrUserIDRequired
+	}
+	if request.Name == nil && request.Email == nil && request.EmailVerified == nil && request.Image == nil && len(request.Metadata) == 0 {
+		return nil, coreerrors.ErrBadRequest
+	}
+
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -90,6 +132,11 @@ func (s *UsersService) Update(ctx context.Context, actor *models.Actor, userID s
 }
 
 func (s *UsersService) Delete(ctx context.Context, actor *models.Actor, userID string) error {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return coreerrors.ErrBadRequest
+	}
+
 	existing, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return err

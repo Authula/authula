@@ -193,9 +193,9 @@ func TestApiKeyServiceCreate(t *testing.T) {
 			req:   types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeUser, OwnerID: userID},
 			setup: func(f *apiKeyServiceFixture) {
 				f.mockUserService.On("GetByID", mock.Anything, userID).Return(&models.User{ID: userID}, nil).Once()
-				f.mockTokenService.On("Generate").Return("", errors.New("boom")).Once()
+				f.mockTokenService.On("Generate").Return("", errors.New("some error")).Once()
 			},
-			wantErr: errors.New("boom"),
+			wantErr: errors.New("some error"),
 		},
 		{
 			name:  "unknown_permission_rejected",
@@ -287,9 +287,9 @@ func TestApiKeyServiceGetAll(t *testing.T) {
 			actor: userActor(ownerID),
 			req:   types.GetApiKeysRequest{Page: 1, Limit: 25},
 			setup: func(f *apiKeyServiceFixture) {
-				f.mockApiKeyRepo.On("GetAll", mock.Anything, &ownerType, &ownerID, 1, 25).Return(nil, 0, errors.New("boom")).Once()
+				f.mockApiKeyRepo.On("GetAll", mock.Anything, &ownerType, &ownerID, 1, 25).Return(nil, 0, errors.New("some error")).Once()
 			},
-			wantErr: errors.New("boom"),
+			wantErr: errors.New("some error"),
 		},
 		{
 			name:    "org_list_requires_owner_id",
@@ -374,9 +374,9 @@ func TestApiKeyServiceGetByID(t *testing.T) {
 			name:  "repo_error",
 			actor: userActor(userID),
 			setup: func(f *apiKeyServiceFixture) {
-				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), errors.New("boom")).Once()
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), errors.New("some error")).Once()
 			},
-			wantErr: errors.New("boom"),
+			wantErr: errors.New("some error"),
 		},
 		{
 			name:  "other_users_key_rejected",
@@ -467,9 +467,9 @@ func TestApiKeyServiceUpdate(t *testing.T) {
 			name:  "repo_error_on_lookup",
 			actor: userActor(userID),
 			setup: func(f *apiKeyServiceFixture) {
-				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), errors.New("boom")).Once()
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), errors.New("some error")).Once()
 			},
-			wantErr: errors.New("boom"),
+			wantErr: errors.New("some error"),
 		},
 		{
 			name:  "other_users_key_rejected",
@@ -723,8 +723,8 @@ func TestApiKeyServiceVerify(t *testing.T) {
 	}{
 		{name: "repo_error", setup: func(f *apiKeyServiceFixture) {
 			f.mockTokenService.On("Hash", "raw-key").Return("hashed-key").Once()
-			f.mockApiKeyRepo.On("GetByKeyHash", mock.Anything, "hashed-key").Return((*types.ApiKey)(nil), errors.New("boom")).Once()
-		}, wantErr: errors.New("boom")},
+			f.mockApiKeyRepo.On("GetByKeyHash", mock.Anything, "hashed-key").Return((*types.ApiKey)(nil), errors.New("some error")).Once()
+		}, wantErr: errors.New("some error")},
 		{name: "invalid_key_missing", setup: func(f *apiKeyServiceFixture) {
 			f.mockTokenService.On("Hash", "raw-key").Return("hashed-key").Once()
 			f.mockApiKeyRepo.On("GetByKeyHash", mock.Anything, "hashed-key").Return((*types.ApiKey)(nil), nil).Once()

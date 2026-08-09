@@ -24,7 +24,7 @@ func TestRequestPasswordResetHandler(t *testing.T) {
 	}{
 		{name: "invalid_json", body: []byte("{"), expectedStatus: http.StatusUnprocessableEntity},
 		{name: "usecase_error_is_ignored", body: internaltests.MarshalToJSON(t, types.RequestPasswordResetRequest{Email: "user@example.com"}), prepare: func(m *plugintests.MockRequestPasswordResetUseCase) {
-			m.On("RequestReset", mock.Anything, "user@example.com", (*string)(nil)).Return(errors.New("boom")).Once()
+			m.On("RequestReset", mock.Anything, "user@example.com", (*string)(nil)).Return(errors.New("some error")).Once()
 		}, expectedStatus: http.StatusOK},
 		{name: "success", body: internaltests.MarshalToJSON(t, types.RequestPasswordResetRequest{Email: "user@example.com"}), prepare: func(m *plugintests.MockRequestPasswordResetUseCase) {
 			m.On("RequestReset", mock.Anything, "user@example.com", (*string)(nil)).Return(nil).Once()

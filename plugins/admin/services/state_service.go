@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	coreerrors "github.com/Authula/authula/core/errors"
@@ -21,10 +22,20 @@ func NewStateService(userStateRepo repositories.UserStateRepository, sessionStat
 }
 
 func (s *StateService) GetUserState(ctx context.Context, actor *models.Actor, userID string) (*types.AdminUserState, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
 	return s.userStateRepo.GetByUserID(ctx, userID)
 }
 
 func (s *StateService) CreateUserState(ctx context.Context, actor *models.Actor, userID string, request types.CreateUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
 	exists, err := s.impersonationRepo.UserExists(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -50,6 +61,11 @@ func (s *StateService) CreateUserState(ctx context.Context, actor *models.Actor,
 }
 
 func (s *StateService) UpdateUserState(ctx context.Context, actor *models.Actor, userID string, request types.UpsertUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
 	exists, err := s.impersonationRepo.UserExists(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -75,6 +91,11 @@ func (s *StateService) UpdateUserState(ctx context.Context, actor *models.Actor,
 }
 
 func (s *StateService) UpsertUserState(ctx context.Context, actor *models.Actor, userID string, request types.UpsertUserStateRequest, actorUserID *string) (*types.AdminUserState, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
 	exists, err := s.impersonationRepo.UserExists(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -93,6 +114,11 @@ func (s *StateService) UpsertUserState(ctx context.Context, actor *models.Actor,
 }
 
 func (s *StateService) DeleteUserState(ctx context.Context, actor *models.Actor, userID string) error {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return coreerrors.ErrBadRequest
+	}
+
 	return s.userStateRepo.Delete(ctx, userID)
 }
 
@@ -100,22 +126,38 @@ func (s *StateService) GetBannedUserStates(ctx context.Context, actor *models.Ac
 	return s.userStateRepo.GetBanned(ctx)
 }
 
-func (s *StateService) GetSelfUserState(ctx context.Context, actor *models.Actor, userID string) (*types.AdminUserState, error) {
-	if actor.ID != userID {
-		return nil, coreerrors.ErrForbidden
+func (s *StateService) GetSelfUserState(ctx context.Context, actor *models.Actor) (*types.AdminUserState, error) {
+	if actor == nil || strings.TrimSpace(actor.ID) == "" {
+		return nil, coreerrors.ErrBadRequest
 	}
-	return s.userStateRepo.GetByUserID(ctx, userID)
+
+	return s.userStateRepo.GetByUserID(ctx, actor.ID)
 }
 
 func (s *StateService) GetSelfSessionState(ctx context.Context, sessionID string) (*types.AdminSessionState, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
 	return s.sessionStateRepo.GetBySessionID(ctx, sessionID)
 }
 
 func (s *StateService) GetSessionState(ctx context.Context, actor *models.Actor, sessionID string) (*types.AdminSessionState, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
 	return s.sessionStateRepo.GetBySessionID(ctx, sessionID)
 }
 
 func (s *StateService) CreateSessionState(ctx context.Context, actor *models.Actor, sessionID string, request types.CreateSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
 	exists, err := s.sessionStateRepo.SessionExists(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -141,6 +183,11 @@ func (s *StateService) CreateSessionState(ctx context.Context, actor *models.Act
 }
 
 func (s *StateService) UpdateSessionState(ctx context.Context, actor *models.Actor, sessionID string, request types.UpsertSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
 	exists, err := s.sessionStateRepo.SessionExists(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -166,6 +213,11 @@ func (s *StateService) UpdateSessionState(ctx context.Context, actor *models.Act
 }
 
 func (s *StateService) UpsertSessionState(ctx context.Context, actor *models.Actor, sessionID string, request types.UpsertSessionStateRequest, actorUserID *string) (*types.AdminSessionState, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
 	exists, err := s.sessionStateRepo.SessionExists(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -184,10 +236,20 @@ func (s *StateService) UpsertSessionState(ctx context.Context, actor *models.Act
 }
 
 func (s *StateService) DeleteSessionState(ctx context.Context, actor *models.Actor, sessionID string) error {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return coreerrors.ErrBadRequest
+	}
+
 	return s.sessionStateRepo.Delete(ctx, sessionID)
 }
 
 func (s *StateService) GetUserAdminSessions(ctx context.Context, actor *models.Actor, userID string) ([]types.AdminUserSession, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
 	exists, err := s.impersonationRepo.UserExists(ctx, userID)
 	if err != nil {
 		return nil, err

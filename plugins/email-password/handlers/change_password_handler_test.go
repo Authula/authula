@@ -27,7 +27,7 @@ func TestChangePasswordHandler(t *testing.T) {
 		{name: "missing_request_context", withContext: false, body: internaltests.MarshalToJSON(t, types.ChangePasswordRequest{Token: "token", Password: "password123"}), expectedStatus: http.StatusInternalServerError},
 		{name: "invalid_json", withContext: true, body: []byte("{"), expectedStatus: http.StatusUnprocessableEntity},
 		{name: "usecase_error", withContext: true, body: internaltests.MarshalToJSON(t, types.ChangePasswordRequest{Token: "token", Password: "password123"}), prepare: func(m *plugintests.MockChangePasswordUseCase) {
-			m.On("ChangePassword", mock.Anything, "token", "password123").Return(errors.New("boom")).Once()
+			m.On("ChangePassword", mock.Anything, "token", "password123").Return(errors.New("some error")).Once()
 		}, expectedStatus: http.StatusInternalServerError},
 		{name: "success", withContext: true, body: internaltests.MarshalToJSON(t, types.ChangePasswordRequest{Token: "token", Password: "password123"}), prepare: func(m *plugintests.MockChangePasswordUseCase) {
 			m.On("ChangePassword", mock.Anything, "token", "password123").Return(nil).Once()

@@ -31,239 +31,354 @@ func setupImpersonationRepo(t *testing.T) (*repositories.BunImpersonationReposit
 }
 
 func TestBunImpersonationRepository_CreateAndGetActive(t *testing.T) {
-	repo, _, cleanup := setupImpersonationRepo(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	now := time.Now().UTC()
-	imp := &types.Impersonation{
-		ID:           "imp-1",
-		ActorUserID:  "actor-1",
-		TargetUserID: "target-1",
-		Reason:       "reason",
-		StartedAt:    now,
-		ExpiresAt:    now.Add(1 * time.Hour),
+	tests := []struct {
+		name       string
+		wantActive bool
+		wantLatest bool
+	}{
+		{name: "creates and fetches active by id and actor", wantActive: true, wantLatest: true},
 	}
 
-	if err := repo.CreateImpersonation(ctx, imp); err != nil {
-		t.Fatalf("create failed: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, _, cleanup := setupImpersonationRepo(t)
+			defer cleanup()
 
-	got, err := repo.GetActiveImpersonationByID(ctx, "imp-1")
-	if err != nil {
-		t.Fatalf("get active failed: %v", err)
-	}
-	if got == nil || got.ID != "imp-1" {
-		t.Fatalf("unexpected record: %v", got)
-	}
+			ctx := context.Background()
+			now := time.Now().UTC()
+			imp := &types.Impersonation{
+				ID:           "imp-1",
+				ActorUserID:  "actor-1",
+				TargetUserID: "target-1",
+				Reason:       "reason",
+				StartedAt:    now,
+				ExpiresAt:    now.Add(1 * time.Hour),
+			}
 
-	got2, err := repo.GetLatestActiveImpersonationByActor(ctx, "actor-1")
-	if err != nil {
-		t.Fatalf("latest active failed: %v", err)
-	}
-	if got2 == nil || got2.ID != "imp-1" {
-		t.Fatalf("unexpected latest record: %v", got2)
-	}
-}
+			if err := repo.CreateImpersonation(ctx, imp); err != nil {
+				t.Fatalf("create failed: %v", err)
+			}
 
-func TestBunImpersonationRepository_GetAllImpersonations_EmptyRows(t *testing.T) {
-	repo, _, cleanup := setupImpersonationRepo(t)
-	defer cleanup()
+			if tt.wantActive {
+				got, err := repo.GetActiveImpersonationByID(ctx, "imp-1")
+				if err != nil {
+					t.Fatalf("get active failed: %v", err)
+				}
+				if got == nil || got.ID != "imp-1" {
+					t.Fatalf("unexpected record: %v", got)
+				}
+			}
 
-	ctx := context.Background()
-
-	list, err := repo.GetAllImpersonations(ctx)
-	if err != nil {
-		t.Fatalf("get all failed: %v", err)
-	}
-	if len(list) != 0 {
-		t.Fatalf("expected 0 rows, got %d", len(list))
+			if tt.wantLatest {
+				got, err := repo.GetLatestActiveImpersonationByActor(ctx, "actor-1")
+				if err != nil {
+					t.Fatalf("latest active failed: %v", err)
+				}
+				if got == nil || got.ID != "imp-1" {
+					t.Fatalf("unexpected latest record: %v", got)
+				}
+			}
+		})
 	}
 }
 
 func TestBunImpersonationRepository_GetAllImpersonations(t *testing.T) {
-	repo, _, cleanup := setupImpersonationRepo(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	now := time.Now().UTC()
-	a := &types.Impersonation{ID: "a", ActorUserID: "x", TargetUserID: "y", StartedAt: now.Add(-1 * time.Hour), ExpiresAt: now.Add(1 * time.Hour)}
-	b := &types.Impersonation{ID: "b", ActorUserID: "x", TargetUserID: "z", StartedAt: now.Add(-2 * time.Hour), ExpiresAt: now.Add(1 * time.Hour)}
-	_ = repo.CreateImpersonation(ctx, a)
-	_ = repo.CreateImpersonation(ctx, b)
-
-	list, err := repo.GetAllImpersonations(ctx)
-	if err != nil {
-		t.Fatalf("get all failed: %v", err)
+	tests := []struct {
+		name    string
+		setup   func(ctx context.Context, repo *repositories.BunImpersonationRepository)
+		wantLen int
+	}{
+		{
+			name:    "empty rows",
+			wantLen: 0,
+		},
+		{
+			name: "returns all rows in order",
+			setup: func(ctx context.Context, repo *repositories.BunImpersonationRepository) {
+				now := time.Now().UTC()
+				a := &types.Impersonation{ID: "a", ActorUserID: "x", TargetUserID: "y", StartedAt: now.Add(-1 * time.Hour), ExpiresAt: now.Add(1 * time.Hour)}
+				b := &types.Impersonation{ID: "b", ActorUserID: "x", TargetUserID: "z", StartedAt: now.Add(-2 * time.Hour), ExpiresAt: now.Add(1 * time.Hour)}
+				_ = repo.CreateImpersonation(ctx, a)
+				_ = repo.CreateImpersonation(ctx, b)
+			},
+			wantLen: 2,
+		},
 	}
-	if len(list) != 2 {
-		t.Fatalf("expected 2 rows, got %d", len(list))
-	}
-	if list[0].ID != "a" || list[1].ID != "b" {
-		t.Fatalf("ordering incorrect: %v", list)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, _, cleanup := setupImpersonationRepo(t)
+			defer cleanup()
+
+			ctx := context.Background()
+			if tt.setup != nil {
+				tt.setup(ctx, repo)
+			}
+
+			list, err := repo.GetAllImpersonations(ctx)
+			if err != nil {
+				t.Fatalf("get all failed: %v", err)
+			}
+			if len(list) != tt.wantLen {
+				t.Fatalf("expected %d rows, got %d", tt.wantLen, len(list))
+			}
+			if tt.wantLen == 2 && (list[0].ID != "a" || list[1].ID != "b") {
+				t.Fatalf("ordering incorrect: %v", list)
+			}
+		})
 	}
 }
 
-func TestBunImpersonationRepository_GetImpersonationByID_NotFound(t *testing.T) {
-	repo, _, cleanup := setupImpersonationRepo(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	imp, err := repo.GetImpersonationByID(ctx, "nope")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestBunImpersonationRepository_GetImpersonationByID(t *testing.T) {
+	tests := []struct {
+		name            string
+		impersonationID string
+		setup           func(ctx context.Context, repo *repositories.BunImpersonationRepository)
+		wantID          string
+	}{
+		{
+			name:            "not found",
+			impersonationID: "nope",
+		},
+		{
+			name:            "found",
+			impersonationID: "imp-1",
+			setup: func(ctx context.Context, repo *repositories.BunImpersonationRepository) {
+				now := time.Now().UTC()
+				_ = repo.CreateImpersonation(ctx, &types.Impersonation{ID: "imp-1", ActorUserID: "a", TargetUserID: "t", StartedAt: now, ExpiresAt: now.Add(time.Hour)})
+			},
+			wantID: "imp-1",
+		},
 	}
-	if imp != nil {
-		t.Fatalf("expected nil result, got %v", imp)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, _, cleanup := setupImpersonationRepo(t)
+			defer cleanup()
+
+			ctx := context.Background()
+			if tt.setup != nil {
+				tt.setup(ctx, repo)
+			}
+
+			imp, err := repo.GetImpersonationByID(ctx, tt.impersonationID)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantID == "" {
+				if imp != nil {
+					t.Fatalf("expected nil result, got %v", imp)
+				}
+			} else if imp == nil || imp.ID != tt.wantID {
+				t.Fatalf("unexpected record: %v", imp)
+			}
+		})
 	}
 }
 
-func TestBunImpersonationRepository_GetActiveImpersonationByID_NotFound(t *testing.T) {
-	repo, _, cleanup := setupImpersonationRepo(t)
-	defer cleanup()
+func TestBunImpersonationRepository_GetActiveImpersonationByID(t *testing.T) {
+	tests := []struct {
+		name            string
+		impersonationID string
+		setup           func(ctx context.Context, repo *repositories.BunImpersonationRepository)
+		wantID          string
+	}{
+		{
+			name:            "not found",
+			impersonationID: "nope",
+		},
+		{
+			name:            "ignores expired",
+			impersonationID: "imp-exp",
+			setup: func(ctx context.Context, repo *repositories.BunImpersonationRepository) {
+				now := time.Now().UTC()
+				_ = repo.CreateImpersonation(ctx, &types.Impersonation{
+					ID: "imp-exp", ActorUserID: "actor-1", TargetUserID: "target-1", Reason: "expired",
+					StartedAt: now.Add(-2 * time.Hour), ExpiresAt: now.Add(-1 * time.Hour),
+				})
+			},
+		},
+		{
+			name:            "ignores ended",
+			impersonationID: "imp-ended",
+			setup: func(ctx context.Context, repo *repositories.BunImpersonationRepository) {
+				now := time.Now().UTC()
+				ended := now.Add(-30 * time.Minute)
+				_ = repo.CreateImpersonation(ctx, &types.Impersonation{
+					ID: "imp-ended", ActorUserID: "actor-1", TargetUserID: "target-1", Reason: "ended",
+					StartedAt: now.Add(-3 * time.Hour), ExpiresAt: now.Add(1 * time.Hour), EndedAt: &ended,
+				})
+			},
+		},
+		{
+			name:            "found active",
+			impersonationID: "imp-active",
+			setup: func(ctx context.Context, repo *repositories.BunImpersonationRepository) {
+				now := time.Now().UTC()
+				_ = repo.CreateImpersonation(ctx, &types.Impersonation{
+					ID: "imp-active", ActorUserID: "actor-1", TargetUserID: "target-1",
+					StartedAt: now, ExpiresAt: now.Add(1 * time.Hour),
+				})
+			},
+			wantID: "imp-active",
+		},
+	}
 
-	ctx := context.Background()
-	imp, err := repo.GetActiveImpersonationByID(ctx, "nope")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if imp != nil {
-		t.Fatalf("expected nil result, got %v", imp)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, _, cleanup := setupImpersonationRepo(t)
+			defer cleanup()
 
-func TestBunImpersonationRepository_GetActiveImpersonationByID_NotActive(t *testing.T) {
-	repo, _, cleanup := setupImpersonationRepo(t)
-	defer cleanup()
+			ctx := context.Background()
+			if tt.setup != nil {
+				tt.setup(ctx, repo)
+			}
 
-	ctx := context.Background()
-	now := time.Now().UTC()
-	// expired
-	imp1 := &types.Impersonation{
-		ID:           "imp-exp",
-		ActorUserID:  "actor-1",
-		TargetUserID: "target-1",
-		Reason:       "expired",
-		StartedAt:    now.Add(-2 * time.Hour),
-		ExpiresAt:    now.Add(-1 * time.Hour),
-	}
-	// ended
-	end := now.Add(-30 * time.Minute)
-	imp2 := &types.Impersonation{
-		ID:           "imp-ended",
-		ActorUserID:  "actor-1",
-		TargetUserID: "target-1",
-		Reason:       "ended",
-		StartedAt:    now.Add(-3 * time.Hour),
-		ExpiresAt:    now.Add(1 * time.Hour),
-		EndedAt:      &end,
-	}
-	_ = repo.CreateImpersonation(ctx, imp1)
-	_ = repo.CreateImpersonation(ctx, imp2)
-
-	if imp, _ := repo.GetActiveImpersonationByID(ctx, "imp-exp"); imp != nil {
-		t.Fatalf("expected expired to be ignored")
-	}
-	if imp, _ := repo.GetActiveImpersonationByID(ctx, "imp-ended"); imp != nil {
-		t.Fatalf("expected ended to be ignored")
+			imp, err := repo.GetActiveImpersonationByID(ctx, tt.impersonationID)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantID == "" {
+				if imp != nil {
+					t.Fatalf("expected nil result, got %v", imp)
+				}
+			} else if imp == nil || imp.ID != tt.wantID {
+				t.Fatalf("unexpected record: %v", imp)
+			}
+		})
 	}
 }
 
 func TestBunImpersonationRepository_GetLatestActiveImpersonationByActor(t *testing.T) {
-	repo, _, cleanup := setupImpersonationRepo(t)
-	defer cleanup()
+	tests := []struct {
+		name   string
+		actor  string
+		setup  func(ctx context.Context, repo *repositories.BunImpersonationRepository)
+		wantID string
+	}{
+		{
+			name:  "returns latest active",
+			actor: "actor-1",
+			setup: func(ctx context.Context, repo *repositories.BunImpersonationRepository) {
+				now := time.Now().UTC()
+				_ = repo.CreateImpersonation(ctx, &types.Impersonation{
+					ID: "imp1", ActorUserID: "actor-1", TargetUserID: "target-A",
+					StartedAt: now.Add(-2 * time.Hour), ExpiresAt: now.Add(1 * time.Hour),
+				})
+				_ = repo.CreateImpersonation(ctx, &types.Impersonation{
+					ID: "imp2", ActorUserID: "actor-1", TargetUserID: "target-B",
+					StartedAt: now.Add(-1 * time.Hour), ExpiresAt: now.Add(1 * time.Hour),
+				})
+			},
+			wantID: "imp2",
+		},
+	}
 
-	ctx := context.Background()
-	now := time.Now().UTC()
-	first := &types.Impersonation{
-		ID:           "imp1",
-		ActorUserID:  "actor-1",
-		TargetUserID: "target-A",
-		StartedAt:    now.Add(-2 * time.Hour),
-		ExpiresAt:    now.Add(1 * time.Hour),
-	}
-	second := &types.Impersonation{
-		ID:           "imp2",
-		ActorUserID:  "actor-1",
-		TargetUserID: "target-B",
-		StartedAt:    now.Add(-1 * time.Hour),
-		ExpiresAt:    now.Add(1 * time.Hour),
-	}
-	_ = repo.CreateImpersonation(ctx, first)
-	_ = repo.CreateImpersonation(ctx, second)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, _, cleanup := setupImpersonationRepo(t)
+			defer cleanup()
 
-	got, err := repo.GetLatestActiveImpersonationByActor(ctx, "actor-1")
-	if err != nil {
-		t.Fatalf("latest active failed: %v", err)
-	}
-	if got == nil || got.ID != "imp2" {
-		t.Fatalf("incorrect latest active: %v", got)
+			ctx := context.Background()
+			if tt.setup != nil {
+				tt.setup(ctx, repo)
+			}
+
+			got, err := repo.GetLatestActiveImpersonationByActor(ctx, tt.actor)
+			if err != nil {
+				t.Fatalf("latest active failed: %v", err)
+			}
+			if got == nil || got.ID != tt.wantID {
+				t.Fatalf("incorrect latest active: %v", got)
+			}
+		})
 	}
 }
 
 func TestBunImpersonationRepository_EndImpersonation(t *testing.T) {
-	repo, _, cleanup := setupImpersonationRepo(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	now := time.Now().UTC()
-	imp := &types.Impersonation{
-		ID:           "imp-end",
-		ActorUserID:  "actor-1",
-		TargetUserID: "target-1",
-		StartedAt:    now,
-		ExpiresAt:    now.Add(1 * time.Hour),
-	}
-	_ = repo.CreateImpersonation(ctx, imp)
-
-	if err := repo.EndImpersonation(ctx, "imp-end", tests.PtrString("admin")); err != nil {
-		t.Fatalf("end impersonation failed: %v", err)
+	tests := []struct {
+		name    string
+		endedBy string
+	}{
+		{name: "marks record ended and no longer active", endedBy: "admin"},
 	}
 
-	got, err := repo.GetImpersonationByID(ctx, "imp-end")
-	if err != nil {
-		t.Fatalf("fetch failed: %v", err)
-	}
-	if got == nil || got.EndedAt == nil || got.EndedByUserID == nil || *got.EndedByUserID != "admin" {
-		t.Fatalf("ended data not set: %v", got)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, _, cleanup := setupImpersonationRepo(t)
+			defer cleanup()
 
-	// should no longer appear active
-	if imp2, _ := repo.GetActiveImpersonationByID(ctx, "imp-end"); imp2 != nil {
-		t.Fatalf("ended record still active: %v", imp2)
+			ctx := context.Background()
+			now := time.Now().UTC()
+			imp := &types.Impersonation{
+				ID: "imp-end", ActorUserID: "actor-1", TargetUserID: "target-1",
+				StartedAt: now, ExpiresAt: now.Add(1 * time.Hour),
+			}
+			_ = repo.CreateImpersonation(ctx, imp)
+
+			if err := repo.EndImpersonation(ctx, "imp-end", new(tt.endedBy)); err != nil {
+				t.Fatalf("end impersonation failed: %v", err)
+			}
+
+			got, err := repo.GetImpersonationByID(ctx, "imp-end")
+			if err != nil {
+				t.Fatalf("fetch failed: %v", err)
+			}
+			if got == nil || got.EndedAt == nil || got.EndedByUserID == nil || *got.EndedByUserID != tt.endedBy {
+				t.Fatalf("ended data not set: %v", got)
+			}
+			if imp2, err := repo.GetActiveImpersonationByID(ctx, "imp-end"); err != nil || imp2 != nil {
+				t.Fatalf("ended record still active: %v", imp2)
+			}
+		})
 	}
 }
 
 func TestBunImpersonationRepository_UserExists(t *testing.T) {
-	repo, db, cleanup := setupImpersonationRepo(t)
-	defer cleanup()
+	tests := []struct {
+		name      string
+		userID    string
+		setup     func(ctx context.Context, db *bun.DB)
+		wantExist bool
+	}{
+		{
+			name:      "returns false when user missing",
+			userID:    "u1",
+			wantExist: false,
+		},
+		{
+			name:   "returns true when user exists",
+			userID: "u1",
+			setup: func(ctx context.Context, db *bun.DB) {
+				user := &models.User{
+					ID: "u1", Name: "n", Email: "e@example.com", EmailVerified: true,
+					CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+				}
+				if _, err := db.NewInsert().Model(user).Exec(ctx); err != nil {
+					t.Fatalf("failed to insert user: %v", err)
+				}
+			},
+			wantExist: true,
+		},
+	}
 
-	ctx := context.Background()
-	exists, err := repo.UserExists(ctx, "u1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if exists {
-		t.Fatalf("expected false when user missing")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, db, cleanup := setupImpersonationRepo(t)
+			defer cleanup()
 
-	user := &models.User{
-		ID:            "u1",
-		Name:          "n",
-		Email:         "e@example.com",
-		EmailVerified: true,
-		CreatedAt:     time.Now().UTC(),
-		UpdatedAt:     time.Now().UTC(),
-	}
-	if _, err := db.NewInsert().Model(user).Exec(ctx); err != nil {
-		t.Fatalf("failed to insert user: %v", err)
-	}
+			ctx := context.Background()
+			if tt.setup != nil {
+				tt.setup(ctx, db)
+			}
 
-	exists2, err := repo.UserExists(ctx, "u1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !exists2 {
-		t.Fatalf("expected user to exist")
+			exists, err := repo.UserExists(ctx, tt.userID)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if exists != tt.wantExist {
+				t.Fatalf("expected exists=%v, got %v", tt.wantExist, exists)
+			}
+		})
 	}
 }

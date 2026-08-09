@@ -16,17 +16,17 @@ type routeUseCases struct {
 	impersonation usecases.ImpersonationUseCase
 }
 
-func newRouteUseCases(api *API) routeUseCases {
+func newRouteUseCases(plugin *AdminPlugin) routeUseCases {
 	return routeUseCases{
-		users:         api.useCases.UsersUseCase(),
-		accounts:      api.useCases.AccountsUseCase(),
-		state:         api.useCases.StateUseCase(),
-		impersonation: api.useCases.ImpersonationUseCase(),
+		users:         plugin.useCases.UsersUseCase(),
+		accounts:      plugin.useCases.AccountsUseCase(),
+		state:         plugin.useCases.StateUseCase(),
+		impersonation: plugin.useCases.ImpersonationUseCase(),
 	}
 }
 
-func (p *AdminPlugin) buildRoutes(api *API) []models.Route {
-	usecases := newRouteUseCases(api)
+func (p *AdminPlugin) buildRoutes(plugin *AdminPlugin) []models.Route {
+	usecases := newRouteUseCases(plugin)
 
 	return []models.Route{
 		// User management

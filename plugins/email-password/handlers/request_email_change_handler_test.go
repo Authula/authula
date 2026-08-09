@@ -26,7 +26,7 @@ func TestRequestEmailChangeHandler(t *testing.T) {
 	}{
 		{name: "invalid_json", actor: &models.Actor{ID: "user-1", Type: models.ActorUser}, body: []byte("{"), expectedStatus: http.StatusUnprocessableEntity},
 		{name: "usecase_error", actor: &models.Actor{ID: "user-1", Type: models.ActorUser}, body: internaltests.MarshalToJSON(t, types.RequestEmailChangeRequest{NewEmail: "new@example.com"}), prepare: func(m *plugintests.MockRequestEmailChangeUseCase) {
-			m.On("RequestChange", mock.Anything, "user-1", "new@example.com", (*string)(nil)).Return(errors.New("boom")).Once()
+			m.On("RequestChange", mock.Anything, "user-1", "new@example.com", (*string)(nil)).Return(errors.New("some error")).Once()
 		}, expectedStatus: http.StatusBadRequest},
 		{name: "success", actor: &models.Actor{ID: "user-1", Type: models.ActorUser}, body: internaltests.MarshalToJSON(t, types.RequestEmailChangeRequest{NewEmail: "new@example.com"}), prepare: func(m *plugintests.MockRequestEmailChangeUseCase) {
 			m.On("RequestChange", mock.Anything, "user-1", "new@example.com", (*string)(nil)).Return(nil).Once()

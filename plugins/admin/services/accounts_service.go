@@ -3,10 +3,12 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	corerepositories "github.com/Authula/authula/core/repositories"
 	"github.com/Authula/authula/models"
+	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	"github.com/Authula/authula/plugins/admin/types"
 	rootservices "github.com/Authula/authula/services"
 	"github.com/Authula/authula/util"
@@ -27,10 +29,20 @@ func NewAccountsService(
 }
 
 func (s *AccountsService) GetByID(ctx context.Context, actor *models.Actor, accountID string) (*models.Account, error) {
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
 	return s.accountRepo.GetByID(ctx, accountID)
 }
 
 func (s *AccountsService) GetByUserID(ctx context.Context, actor *models.Actor, userID string) ([]models.Account, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, adminconstants.ErrUserIDRequired
+	}
+
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -43,6 +55,21 @@ func (s *AccountsService) GetByUserID(ctx context.Context, actor *models.Actor, 
 }
 
 func (s *AccountsService) Create(ctx context.Context, actor *models.Actor, userID string, request types.CreateAccountRequest) (*models.Account, error) {
+	userID = strings.TrimSpace(userID)
+	request.ProviderID = strings.TrimSpace(strings.ToLower(request.ProviderID))
+	request.AccountID = strings.TrimSpace(request.AccountID)
+	if request.Scope != nil {
+		trimmed := strings.TrimSpace(*request.Scope)
+		request.Scope = &trimmed
+	}
+
+	if userID == "" {
+		return nil, adminconstants.ErrUserIDRequired
+	}
+	if request.ProviderID == "" || request.AccountID == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -89,6 +116,36 @@ func (s *AccountsService) Create(ctx context.Context, actor *models.Actor, userI
 }
 
 func (s *AccountsService) Update(ctx context.Context, actor *models.Actor, accountID string, request types.UpdateAccountRequest) (*models.Account, error) {
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return nil, coreerrors.ErrBadRequest
+	}
+
+	if request.ProviderID == nil &&
+		request.AccountID == nil &&
+		request.AccessToken == nil &&
+		request.RefreshToken == nil &&
+		request.IDToken == nil &&
+		request.AccessTokenExpiresAt == nil &&
+		request.RefreshTokenExpiresAt == nil &&
+		request.Scope == nil &&
+		request.Password == nil {
+		return nil, coreerrors.ErrBadRequest
+	}
+
+	if request.ProviderID != nil {
+		trimmed := strings.TrimSpace(strings.ToLower(*request.ProviderID))
+		request.ProviderID = &trimmed
+	}
+	if request.AccountID != nil {
+		trimmed := strings.TrimSpace(*request.AccountID)
+		request.AccountID = &trimmed
+	}
+	if request.Scope != nil {
+		trimmed := strings.TrimSpace(*request.Scope)
+		request.Scope = &trimmed
+	}
+
 	account, err := s.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
 		return nil, err
@@ -136,6 +193,11 @@ func (s *AccountsService) Update(ctx context.Context, actor *models.Actor, accou
 }
 
 func (s *AccountsService) Delete(ctx context.Context, actor *models.Actor, accountID string) error {
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return coreerrors.ErrBadRequest
+	}
+
 	account, err := s.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
 		return err

@@ -65,9 +65,9 @@ func TestPermissionsServiceCreatePermission(t *testing.T) {
 			name: "repository error is returned",
 			req:  types.CreatePermissionRequest{Key: "users.write"},
 			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
-				permissionsRepo.On("CreatePermission", mock.Anything, mock.AnythingOfType("*types.Permission")).Return(errors.New("boom")).Once()
+				permissionsRepo.On("CreatePermission", mock.Anything, mock.AnythingOfType("*types.Permission")).Return(errors.New("some error")).Once()
 			},
-			wantErr: errors.New("boom"),
+			wantErr: errors.New("some error"),
 		},
 	}
 
@@ -120,9 +120,9 @@ func TestPermissionsServiceGetAllPermissions(t *testing.T) {
 		{
 			name: "error",
 			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
-				permissionsRepo.On("GetAllPermissions", mock.Anything).Return(nil, errors.New("boom")).Once()
+				permissionsRepo.On("GetAllPermissions", mock.Anything).Return(nil, errors.New("some error")).Once()
 			},
-			wantErr: errors.New("boom"),
+			wantErr: errors.New("some error"),
 		},
 	}
 

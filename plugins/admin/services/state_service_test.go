@@ -19,101 +19,139 @@ import (
 func newStateServiceFixture() (*adminservices.StateService, *admintests.MockUserStateRepository, *admintests.MockSessionStateRepository, *admintests.MockImpersonationRepository) {
 	return admintests.NewStateServiceFixture()
 }
+
 func TestStateService_GetUserState(t *testing.T) {
 	t.Parallel()
 
-	svc, usr, _, _ := newStateServiceFixture()
-	ctx := context.Background()
+	tests := []struct {
+		name    string
+		userID  string
+		setup   func(usr *admintests.MockUserStateRepository)
+		wantErr error
+	}{
+		{
+			name:   "success",
+			userID: "u1",
+			setup: func(usr *admintests.MockUserStateRepository) {
+				usr.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1"}, nil).Once()
+			},
+		},
+		{
+			name:    "missing user id",
+			userID:  "   ",
+			wantErr: coreerrors.ErrBadRequest,
+		},
+	}
 
-	usr.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1"}, nil).Once()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	state, err := svc.GetUserState(ctx, internaltests.TestActor(), "u1")
-	assert.NoError(t, err)
-	assert.Equal(t, "u1", state.UserID)
-	usr.AssertExpectations(t)
+			svc, usr, _, _ := newStateServiceFixture()
+			if tt.setup != nil {
+				tt.setup(usr)
+			}
+
+			state, err := svc.GetUserState(context.Background(), internaltests.TestActor(), tt.userID)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, state)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.userID, state.UserID)
+			}
+			usr.AssertExpectations(t)
+		})
+	}
 }
 
 func TestStateService_UpsertUserState(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC()
+	upsertErr := errors.New("some error")
+
 	tests := []struct {
-		name       string
-		userExists bool
-		hasRepoErr bool
-		request    admintypes.UpsertUserStateRequest
-		actor      *string
-		expectCall func(*admintypes.AdminUserState) bool
-		wantErr    error
+		name    string
+		userID  string
+		request admintypes.UpsertUserStateRequest
+		actor   *string
+		setup   func(usr *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository)
+		wantErr error
 	}{
 		{
-			name:       "user not found",
-			userExists: false,
-			wantErr:    coreerrors.ErrNotFound,
+			name:    "missing user id",
+			userID:  "   ",
+			request: admintypes.UpsertUserStateRequest{},
+			wantErr: coreerrors.ErrBadRequest,
 		},
 		{
-			name:       "ban with details",
-			userExists: true,
+			name:    "user not found",
+			userID:  "u1",
+			request: admintypes.UpsertUserStateRequest{},
+			setup: func(_ *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository) {
+				imp.On("UserExists", mock.Anything, "u1").Return(false, nil).Once()
+			},
+			wantErr: coreerrors.ErrNotFound,
+		},
+		{
+			name:   "ban with details",
+			userID: "u1",
 			request: admintypes.UpsertUserStateRequest{
 				Banned:       true,
 				BannedUntil:  &now,
-				BannedReason: admintests.PtrString(t, "reason"),
+				BannedReason: new("reason"),
 			},
-			actor: admintests.PtrString(t, "actor"),
-			expectCall: func(s *admintypes.AdminUserState) bool {
-				return s.Banned &&
-					*s.BannedByUserID == "actor" &&
-					s.BannedReason != nil && *s.BannedReason == "reason" &&
-					s.BannedUntil.Equal(now)
-			},
-		},
-		{
-			name:       "unban",
-			userExists: true,
-			request: admintypes.UpsertUserStateRequest{
-				Banned: false,
-			},
-			expectCall: func(s *admintypes.AdminUserState) bool {
-				return !s.Banned
+			actor: new("actor"),
+			setup: func(usr *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository) {
+				imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
+				usr.On("Upsert", mock.Anything, mock.MatchedBy(func(s *admintypes.AdminUserState) bool {
+					return s.Banned &&
+						*s.BannedByUserID == "actor" &&
+						s.BannedReason != nil && *s.BannedReason == "reason" &&
+						s.BannedUntil.Equal(now)
+				})).Return(nil).Once()
+				usr.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1"}, nil).Once()
 			},
 		},
 		{
-			name:       "repo error",
-			userExists: true,
-			hasRepoErr: true,
+			name:   "unban",
+			userID: "u1",
 			request: admintypes.UpsertUserStateRequest{
 				Banned: false,
 			},
+			setup: func(usr *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository) {
+				imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
+				usr.On("Upsert", mock.Anything, mock.MatchedBy(func(s *admintypes.AdminUserState) bool {
+					return !s.Banned
+				})).Return(nil).Once()
+				usr.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1"}, nil).Once()
+			},
+		},
+		{
+			name:    "repo error",
+			userID:  "u1",
+			request: admintypes.UpsertUserStateRequest{Banned: false},
+			setup: func(usr *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository) {
+				imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
+				usr.On("Upsert", mock.Anything, mock.Anything).Return(upsertErr).Once()
+			},
+			wantErr: upsertErr,
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			svc, usr, _, imp := newStateServiceFixture()
-			ctx := context.Background()
-
-			imp.On("UserExists", mock.Anything, "u1").Return(tc.userExists, nil).Once()
-			if tc.userExists {
-				// always prepare an Upsert expectation when user exists
-				if tc.hasRepoErr {
-					usr.On("Upsert", mock.Anything, mock.Anything).Return(errors.New("some error")).Once()
-				} else if tc.expectCall != nil {
-					usr.On("Upsert", mock.Anything, mock.MatchedBy(tc.expectCall)).Return(nil).Once()
-				} else {
-					usr.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
-				}
-				if !tc.hasRepoErr {
-					usr.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1"}, nil).Once()
-				}
+			if tt.setup != nil {
+				tt.setup(usr, imp)
 			}
 
-			_, err := svc.UpsertUserState(ctx, internaltests.TestActor(), "u1", tc.request, tc.actor)
-			if tc.wantErr != nil {
-				assert.ErrorIs(t, err, tc.wantErr)
-			} else if tc.hasRepoErr {
-				assert.Error(t, err)
+			_, err := svc.UpsertUserState(context.Background(), internaltests.TestActor(), tt.userID, tt.request, tt.actor)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -127,100 +165,201 @@ func TestStateService_UpsertUserState(t *testing.T) {
 func TestStateService_DeleteUserState(t *testing.T) {
 	t.Parallel()
 
-	svc, usr, _, _ := newStateServiceFixture()
-	ctx := context.Background()
+	tests := []struct {
+		name    string
+		userID  string
+		setup   func(usr *admintests.MockUserStateRepository)
+		wantErr error
+	}{
+		{
+			name:   "success",
+			userID: "u1",
+			setup: func(usr *admintests.MockUserStateRepository) {
+				usr.On("Delete", mock.Anything, "u1").Return(nil).Once()
+			},
+		},
+		{
+			name:    "missing user id",
+			userID:  "   ",
+			wantErr: coreerrors.ErrBadRequest,
+		},
+	}
 
-	usr.On("Delete", mock.Anything, "u1").Return(nil).Once()
-	assert.NoError(t, svc.DeleteUserState(ctx, internaltests.TestActor(), "u1"))
-	usr.AssertExpectations(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, usr, _, _ := newStateServiceFixture()
+			if tt.setup != nil {
+				tt.setup(usr)
+			}
+
+			err := svc.DeleteUserState(context.Background(), internaltests.TestActor(), tt.userID)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+			usr.AssertExpectations(t)
+		})
+	}
 }
 
 func TestStateService_GetBannedUserStates(t *testing.T) {
 	t.Parallel()
 
-	svc, usr, _, _ := newStateServiceFixture()
-	ctx := context.Background()
+	someErr := errors.New("some error")
 
-	usr.On("GetBanned", mock.Anything).Return([]admintypes.AdminUserState{{UserID: "u1", Banned: true}}, nil).Once()
-	list, err := svc.GetBannedUserStates(ctx, internaltests.TestActor())
-	assert.NoError(t, err)
-	assert.Len(t, list, 1)
-	usr.AssertExpectations(t)
+	tests := []struct {
+		name    string
+		setup   func(usr *admintests.MockUserStateRepository)
+		wantErr error
+	}{
+		{
+			name: "success",
+			setup: func(usr *admintests.MockUserStateRepository) {
+				usr.On("GetBanned", mock.Anything).Return([]admintypes.AdminUserState{{UserID: "u1", Banned: true}}, nil).Once()
+			},
+		},
+		{
+			name: "repo error",
+			setup: func(usr *admintests.MockUserStateRepository) {
+				usr.On("GetBanned", mock.Anything).Return(nil, someErr).Once()
+			},
+			wantErr: someErr,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, usr, _, _ := newStateServiceFixture()
+			tt.setup(usr)
+
+			list, err := svc.GetBannedUserStates(context.Background(), internaltests.TestActor())
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, list)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, list, 1)
+			}
+			usr.AssertExpectations(t)
+		})
+	}
 }
 
 func TestStateService_GetSessionState(t *testing.T) {
 	t.Parallel()
 
-	svc, _, sess, _ := newStateServiceFixture()
-	ctx := context.Background()
+	tests := []struct {
+		name      string
+		sessionID string
+		setup     func(sess *admintests.MockSessionStateRepository)
+		wantErr   error
+	}{
+		{
+			name:      "success",
+			sessionID: "s1",
+			setup: func(sess *admintests.MockSessionStateRepository) {
+				sess.On("GetBySessionID", mock.Anything, "s1").Return(&admintypes.AdminSessionState{SessionID: "s1"}, nil).Once()
+			},
+		},
+		{
+			name:      "missing session id",
+			sessionID: "",
+			wantErr:   coreerrors.ErrBadRequest,
+		},
+	}
 
-	sess.On("GetBySessionID", mock.Anything, "s1").Return(&admintypes.AdminSessionState{SessionID: "s1"}, nil).Once()
-	res, err := svc.GetSessionState(ctx, internaltests.TestActor(), "s1")
-	assert.NoError(t, err)
-	assert.Equal(t, "s1", res.SessionID)
-	sess.AssertExpectations(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, _, sess, _ := newStateServiceFixture()
+			if tt.setup != nil {
+				tt.setup(sess)
+			}
+
+			res, err := svc.GetSessionState(context.Background(), internaltests.TestActor(), tt.sessionID)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, res)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.sessionID, res.SessionID)
+			}
+			sess.AssertExpectations(t)
+		})
+	}
 }
 
 func TestStateService_UpsertSessionState(t *testing.T) {
 	t.Parallel()
 
+	someErr := errors.New("fail")
+
 	tests := []struct {
-		name       string
-		exists     bool
-		hasErr     bool
-		request    admintypes.UpsertSessionStateRequest
-		actor      *string
-		expectCall func(*admintypes.AdminSessionState) bool
-		wantErr    error
+		name      string
+		sessionID string
+		request   admintypes.UpsertSessionStateRequest
+		actor     *string
+		setup     func(sess *admintests.MockSessionStateRepository)
+		wantErr   error
 	}{
 		{
-			name:    "session not found",
-			exists:  false,
+			name:      "missing session id",
+			sessionID: "",
+			request:   admintypes.UpsertSessionStateRequest{},
+			wantErr:   coreerrors.ErrBadRequest,
+		},
+		{
+			name:      "session not found",
+			sessionID: "s1",
+			request:   admintypes.UpsertSessionStateRequest{},
+			setup: func(sess *admintests.MockSessionStateRepository) {
+				sess.On("SessionExists", mock.Anything, "s1").Return(false, nil).Once()
+			},
 			wantErr: coreerrors.ErrNotFound,
 		},
 		{
-			name:    "revoke",
-			exists:  true,
-			request: admintypes.UpsertSessionStateRequest{Revoke: true, RevokedReason: admintests.PtrString(t, "r")},
-			actor:   admintests.PtrString(t, "actor"),
-			expectCall: func(s *admintypes.AdminSessionState) bool {
-				return s.RevokedAt != nil && s.RevokedByUserID != nil && *s.RevokedByUserID == "actor"
+			name:      "revoke",
+			sessionID: "s1",
+			request:   admintypes.UpsertSessionStateRequest{Revoke: true, RevokedReason: new("r")},
+			actor:     new("actor"),
+			setup: func(sess *admintests.MockSessionStateRepository) {
+				sess.On("SessionExists", mock.Anything, "s1").Return(true, nil).Once()
+				sess.On("Upsert", mock.Anything, mock.MatchedBy(func(s *admintypes.AdminSessionState) bool {
+					return s.RevokedAt != nil && s.RevokedByUserID != nil && *s.RevokedByUserID == "actor"
+				})).Return(nil).Once()
+				sess.On("GetBySessionID", mock.Anything, "s1").Return(&admintypes.AdminSessionState{SessionID: "s1"}, nil).Once()
 			},
 		},
 		{
-			name:    "repo failure",
-			exists:  true,
-			hasErr:  true,
-			request: admintypes.UpsertSessionStateRequest{},
+			name:      "repo failure",
+			sessionID: "s1",
+			request:   admintypes.UpsertSessionStateRequest{},
+			setup: func(sess *admintests.MockSessionStateRepository) {
+				sess.On("SessionExists", mock.Anything, "s1").Return(true, nil).Once()
+				sess.On("Upsert", mock.Anything, mock.Anything).Return(someErr).Once()
+			},
+			wantErr: someErr,
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			svc, _, sess, _ := newStateServiceFixture()
-			ctx := context.Background()
-
-			sess.On("SessionExists", mock.Anything, "s1").Return(tc.exists, nil).Once()
-			if tc.exists {
-				if tc.hasErr {
-					sess.On("Upsert", mock.Anything, mock.Anything).Return(errors.New("fail")).Once()
-				} else if tc.expectCall != nil {
-					sess.On("Upsert", mock.Anything, mock.MatchedBy(tc.expectCall)).Return(nil).Once()
-				} else {
-					sess.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
-				}
-				if !tc.hasErr {
-					sess.On("GetBySessionID", mock.Anything, "s1").Return(&admintypes.AdminSessionState{SessionID: "s1"}, nil).Once()
-				}
+			if tt.setup != nil {
+				tt.setup(sess)
 			}
 
-			_, err := svc.UpsertSessionState(ctx, internaltests.TestActor(), "s1", tc.request, tc.actor)
-			if tc.wantErr != nil {
-				assert.ErrorIs(t, err, tc.wantErr)
-			} else if tc.hasErr {
-				assert.Error(t, err)
+			_, err := svc.UpsertSessionState(context.Background(), internaltests.TestActor(), tt.sessionID, tt.request, tt.actor)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -233,66 +372,287 @@ func TestStateService_UpsertSessionState(t *testing.T) {
 func TestStateService_DeleteSessionState(t *testing.T) {
 	t.Parallel()
 
-	svc, _, sess, _ := newStateServiceFixture()
-	ctx := context.Background()
+	tests := []struct {
+		name      string
+		sessionID string
+		setup     func(sess *admintests.MockSessionStateRepository)
+		wantErr   error
+	}{
+		{
+			name:      "success",
+			sessionID: "s1",
+			setup: func(sess *admintests.MockSessionStateRepository) {
+				sess.On("Delete", mock.Anything, "s1").Return(nil).Once()
+			},
+		},
+		{
+			name:      "missing session id",
+			sessionID: "",
+			wantErr:   coreerrors.ErrBadRequest,
+		},
+	}
 
-	sess.On("Delete", mock.Anything, "s1").Return(nil).Once()
-	assert.NoError(t, svc.DeleteSessionState(ctx, internaltests.TestActor(), "s1"))
-	sess.AssertExpectations(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, _, sess, _ := newStateServiceFixture()
+			if tt.setup != nil {
+				tt.setup(sess)
+			}
+
+			err := svc.DeleteSessionState(context.Background(), internaltests.TestActor(), tt.sessionID)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+			sess.AssertExpectations(t)
+		})
+	}
 }
 
 func TestStateService_GetUserAdminSessions(t *testing.T) {
 	t.Parallel()
 
-	svc, _, sess, imp := newStateServiceFixture()
-	ctx := context.Background()
+	tests := []struct {
+		name    string
+		userID  string
+		setup   func(sess *admintests.MockSessionStateRepository, imp *admintests.MockImpersonationRepository)
+		wantErr error
+	}{
+		{
+			name:   "success",
+			userID: "u1",
+			setup: func(sess *admintests.MockSessionStateRepository, imp *admintests.MockImpersonationRepository) {
+				imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
+				sess.On("GetByUserID", mock.Anything, "u1").Return([]admintypes.AdminUserSession{}, nil).Once()
+			},
+		},
+		{
+			name:   "user not found",
+			userID: "u1",
+			setup: func(_ *admintests.MockSessionStateRepository, imp *admintests.MockImpersonationRepository) {
+				imp.On("UserExists", mock.Anything, "u1").Return(false, nil).Once()
+			},
+			wantErr: coreerrors.ErrNotFound,
+		},
+		{
+			name:    "missing user id",
+			userID:  "   ",
+			wantErr: coreerrors.ErrBadRequest,
+		},
+	}
 
-	imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
-	sess.On("GetByUserID", mock.Anything, "u1").Return([]admintypes.AdminUserSession{}, nil).Once()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	_, err := svc.GetUserAdminSessions(ctx, internaltests.TestActor(), "u1")
-	assert.NoError(t, err)
-	imp.AssertExpectations(t)
-	sess.AssertExpectations(t)
+			svc, _, sess, imp := newStateServiceFixture()
+			if tt.setup != nil {
+				tt.setup(sess, imp)
+			}
+
+			_, err := svc.GetUserAdminSessions(context.Background(), internaltests.TestActor(), tt.userID)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			imp.AssertExpectations(t)
+			sess.AssertExpectations(t)
+		})
+	}
 }
 
-func TestStateService_RevokeSessionAndRevokedList(t *testing.T) {
+func TestStateService_RevokeSession(t *testing.T) {
 	t.Parallel()
 
-	svc, _, sess, _ := newStateServiceFixture()
-	ctx := context.Background()
+	tests := []struct {
+		name      string
+		sessionID string
+		setup     func(sess *admintests.MockSessionStateRepository)
+		wantErr   error
+	}{
+		{
+			name:      "success",
+			sessionID: "s1",
+			setup: func(sess *admintests.MockSessionStateRepository) {
+				sess.On("SessionExists", mock.Anything, "s1").Return(true, nil).Once()
+				sess.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
+				sess.On("GetBySessionID", mock.Anything, "s1").Return(&admintypes.AdminSessionState{SessionID: "s1"}, nil).Once()
+			},
+		},
+		{
+			name:      "session not found",
+			sessionID: "s1",
+			setup: func(sess *admintests.MockSessionStateRepository) {
+				sess.On("SessionExists", mock.Anything, "s1").Return(false, nil).Once()
+			},
+			wantErr: coreerrors.ErrNotFound,
+		},
+	}
 
-	sess.On("SessionExists", mock.Anything, "s1").Return(true, nil).Once()
-	sess.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
-	sess.On("GetBySessionID", mock.Anything, "s1").Return(&admintypes.AdminSessionState{SessionID: "s1"}, nil).Once()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	_, err := svc.RevokeSession(ctx, internaltests.TestActor(), "s1", admintests.PtrString(t, "reason"), admintests.PtrString(t, "actor"))
-	assert.NoError(t, err)
+			svc, _, sess, _ := newStateServiceFixture()
+			if tt.setup != nil {
+				tt.setup(sess)
+			}
 
-	sess.On("GetRevoked", mock.Anything).Return([]admintypes.AdminSessionState{{SessionID: "s1"}}, nil).Once()
-	list, err := svc.GetRevokedSessionStates(ctx, internaltests.TestActor())
-	assert.NoError(t, err)
-	assert.Len(t, list, 1)
+			_, err := svc.RevokeSession(context.Background(), internaltests.TestActor(), tt.sessionID, new("reason"), new("actor"))
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+			sess.AssertExpectations(t)
+		})
+	}
 }
 
-func TestStateService_BanAndUnbanUser(t *testing.T) {
+func TestStateService_GetRevokedSessionStates(t *testing.T) {
 	t.Parallel()
 
-	svc, usr, _, imp := newStateServiceFixture()
-	ctx := context.Background()
+	tests := []struct {
+		name    string
+		setup   func(sess *admintests.MockSessionStateRepository)
+		wantErr error
+	}{
+		{
+			name: "success",
+			setup: func(sess *admintests.MockSessionStateRepository) {
+				sess.On("GetRevoked", mock.Anything).Return([]admintypes.AdminSessionState{{SessionID: "s1"}}, nil).Once()
+			},
+		},
+		{
+			name: "repo error",
+			setup: func(sess *admintests.MockSessionStateRepository) {
+				sess.On("GetRevoked", mock.Anything).Return(nil, coreerrors.ErrNotFound).Once()
+			},
+			wantErr: coreerrors.ErrNotFound,
+		},
+	}
 
-	imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
-	usr.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
-	usr.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1"}, nil).Once()
-	_, err := svc.BanUser(ctx, internaltests.TestActor(), "u1", admintypes.BanUserRequest{Reason: admintests.PtrString(t, "r")}, admintests.PtrString(t, "actor"))
-	assert.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	imp.AssertExpectations(t)
-	usr.AssertExpectations(t)
+			svc, _, sess, _ := newStateServiceFixture()
+			tt.setup(sess)
 
-	imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
-	usr.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
-	usr.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1"}, nil).Once()
-	_, err = svc.UnbanUser(ctx, internaltests.TestActor(), "u1")
-	assert.NoError(t, err)
+			list, err := svc.GetRevokedSessionStates(context.Background(), internaltests.TestActor())
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, list)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, list, 1)
+			}
+			sess.AssertExpectations(t)
+		})
+	}
+}
+
+func TestStateService_BanUser(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		userID  string
+		setup   func(usr *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository)
+		wantErr error
+	}{
+		{
+			name:   "success",
+			userID: "u1",
+			setup: func(usr *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository) {
+				imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
+				usr.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
+				usr.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1", Banned: true}, nil).Once()
+			},
+		},
+		{
+			name:   "user not found",
+			userID: "u1",
+			setup: func(_ *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository) {
+				imp.On("UserExists", mock.Anything, "u1").Return(false, nil).Once()
+			},
+			wantErr: coreerrors.ErrNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, usr, _, imp := newStateServiceFixture()
+			if tt.setup != nil {
+				tt.setup(usr, imp)
+			}
+
+			_, err := svc.BanUser(context.Background(), internaltests.TestActor(), tt.userID, admintypes.BanUserRequest{Reason: new("r")}, new("actor"))
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			imp.AssertExpectations(t)
+			usr.AssertExpectations(t)
+		})
+	}
+}
+
+func TestStateService_UnbanUser(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		userID  string
+		setup   func(usr *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository)
+		wantErr error
+	}{
+		{
+			name:   "success",
+			userID: "u1",
+			setup: func(usr *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository) {
+				imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
+				usr.On("Upsert", mock.Anything, mock.Anything).Return(nil).Once()
+				usr.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1", Banned: false}, nil).Once()
+			},
+		},
+		{
+			name:   "user not found",
+			userID: "u1",
+			setup: func(_ *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository) {
+				imp.On("UserExists", mock.Anything, "u1").Return(false, nil).Once()
+			},
+			wantErr: coreerrors.ErrNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, usr, _, imp := newStateServiceFixture()
+			if tt.setup != nil {
+				tt.setup(usr, imp)
+			}
+
+			_, err := svc.UnbanUser(context.Background(), internaltests.TestActor(), tt.userID)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			imp.AssertExpectations(t)
+			usr.AssertExpectations(t)
+		})
+	}
 }

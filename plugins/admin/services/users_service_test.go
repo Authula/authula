@@ -11,6 +11,7 @@ import (
 	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
+	adminconstants "github.com/Authula/authula/plugins/admin/constants"
 	adminservices "github.com/Authula/authula/plugins/admin/services"
 	admintypes "github.com/Authula/authula/plugins/admin/types"
 )
@@ -23,41 +24,57 @@ func newUsersServiceFixture() (*adminservices.UsersService, *internaltests.MockU
 func TestUsersService_Create(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	actor := internaltests.TestActor()
+	repoErr := errors.New("error")
+	createErr := errors.New("fail")
 
 	tests := []struct {
-		name         string
-		existing     *models.User
-		repoErr      error
-		createErr    error
-		request      admintypes.CreateUserRequest
-		wantErr      error
-		expectCreate bool
+		name    string
+		request admintypes.CreateUserRequest
+		setup   func(repo *internaltests.MockUserRepository)
+		wantErr error
 	}{
 		{
-			name:     "email conflict",
-			existing: &models.User{Email: "a@b"},
-			request:  admintypes.CreateUserRequest{Email: "a@b"},
-			wantErr:  coreerrors.ErrConflict,
+			name:    "missing name",
+			request: admintypes.CreateUserRequest{Email: "a@b"},
+			wantErr: coreerrors.ErrBadRequest,
+		},
+		{
+			name:    "missing email",
+			request: admintypes.CreateUserRequest{Name: "n"},
+			wantErr: coreerrors.ErrBadRequest,
+		},
+		{
+			name:    "email conflict",
+			request: admintypes.CreateUserRequest{Email: "a@b", Name: "n"},
+			setup: func(repo *internaltests.MockUserRepository) {
+				repo.On("GetByEmail", mock.Anything, "a@b").Return(&models.User{Email: "a@b"}, nil).Once()
+			},
+			wantErr: coreerrors.ErrConflict,
 		},
 		{
 			name:    "repo get error",
-			repoErr: errors.New("error"),
-			request: admintypes.CreateUserRequest{Email: "a@b"},
+			request: admintypes.CreateUserRequest{Email: "a@b", Name: "n"},
+			setup: func(repo *internaltests.MockUserRepository) {
+				repo.On("GetByEmail", mock.Anything, "a@b").Return((*models.User)(nil), repoErr).Once()
+			},
+			wantErr: repoErr,
 		},
 		{
-			name:         "create failure",
-			existing:     nil,
-			createErr:    errors.New("fail"),
-			request:      admintypes.CreateUserRequest{Email: "a@b", Name: "n", EmailVerified: func(b bool) *bool { return &b }(true)},
-			expectCreate: true,
+			name:    "create failure",
+			request: admintypes.CreateUserRequest{Email: "a@b", Name: "n", EmailVerified: new(true)},
+			setup: func(repo *internaltests.MockUserRepository) {
+				repo.On("GetByEmail", mock.Anything, "a@b").Return((*models.User)(nil), nil).Once()
+				repo.On("Create", mock.Anything, mock.Anything).Return(&models.User{Email: "a@b"}, createErr).Once()
+			},
+			wantErr: createErr,
 		},
 		{
-			name:         "success",
-			existing:     nil,
-			request:      admintypes.CreateUserRequest{Email: "a@b", Name: "n", EmailVerified: func(b bool) *bool { return &b }(true)},
-			expectCreate: true,
+			name:    "success",
+			request: admintypes.CreateUserRequest{Email: "a@b", Name: "n", EmailVerified: new(true)},
+			setup: func(repo *internaltests.MockUserRepository) {
+				repo.On("GetByEmail", mock.Anything, "a@b").Return((*models.User)(nil), nil).Once()
+				repo.On("Create", mock.Anything, mock.Anything).Return(&models.User{Email: "a@b"}, nil).Once()
+			},
 		},
 	}
 
@@ -66,20 +83,14 @@ func TestUsersService_Create(t *testing.T) {
 			t.Parallel()
 
 			svc, repo := newUsersServiceFixture()
-			repo.ExpectedCalls = nil
-			repo.On("GetByEmail", mock.Anything, tc.request.Email).Return(tc.existing, tc.repoErr).Once()
-			if tc.expectCreate {
-				repo.On("Create", mock.Anything, mock.Anything).
-					Return(&models.User{Email: tc.request.Email}, tc.createErr).
-					Once()
+			if tc.setup != nil {
+				tc.setup(repo)
 			}
 
-			user, err := svc.Create(ctx, actor, tc.request)
+			user, err := svc.Create(context.Background(), internaltests.TestActor(), tc.request)
 			if tc.wantErr != nil {
 				assert.ErrorIs(t, err, tc.wantErr)
 				assert.Nil(t, user)
-			} else if tc.repoErr != nil || tc.createErr != nil {
-				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, user)
@@ -94,85 +105,200 @@ func TestUsersService_Create(t *testing.T) {
 func TestUsersService_GetAll(t *testing.T) {
 	t.Parallel()
 
-	svc, repo := newUsersServiceFixture()
-	ctx := context.Background()
-	actor := internaltests.TestActor()
+	tests := []struct {
+		name   string
+		cursor *string
+		limit  int
+		want   int
+	}{
+		{
+			name:  "success",
+			limit: 10,
+			want:  1,
+		},
+		{
+			name:   "defaults limit to 10 and trims cursor",
+			cursor: new("  cur-1  "),
+			limit:  0,
+			want:   1,
+		},
+	}
 
-	repo.On("GetAll", mock.Anything, (*string)(nil), 10).Return([]models.User{{Email: "a"}}, nil, nil).Once()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	page, err := svc.GetAll(ctx, actor, nil, 10)
-	assert.NoError(t, err)
-	assert.Len(t, page.Users, 1)
-	repo.AssertExpectations(t)
+			svc, repo := newUsersServiceFixture()
+			repo.On("GetAll", mock.Anything, mock.Anything, 10).Return([]models.User{{Email: "a"}}, (*string)(nil), nil).Once()
+
+			page, err := svc.GetAll(context.Background(), internaltests.TestActor(), tc.cursor, tc.limit)
+			assert.NoError(t, err)
+			assert.Len(t, page.Users, tc.want)
+			repo.AssertExpectations(t)
+		})
+	}
 }
 
 func TestUsersService_GetByID(t *testing.T) {
 	t.Parallel()
 
-	svc, repo := newUsersServiceFixture()
-	ctx := context.Background()
-	actor := internaltests.TestActor()
+	tests := []struct {
+		name    string
+		userID  string
+		setup   func(repo *internaltests.MockUserRepository)
+		wantErr error
+	}{
+		{
+			name:   "success",
+			userID: "u1",
+			setup: func(repo *internaltests.MockUserRepository) {
+				repo.On("GetByID", mock.Anything, "u1").Return(&models.User{ID: "u1"}, nil).Once()
+			},
+		},
+		{
+			name:    "missing user id",
+			userID:  "   ",
+			wantErr: adminconstants.ErrUserIDRequired,
+		},
+	}
 
-	repo.On("GetByID", mock.Anything, "u1").Return(&models.User{ID: "u1"}, nil).Once()
-	u, err := svc.GetByID(ctx, actor, "u1")
-	assert.NoError(t, err)
-	assert.Equal(t, "u1", u.ID)
-	repo.AssertExpectations(t)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, repo := newUsersServiceFixture()
+			if tc.setup != nil {
+				tc.setup(repo)
+			}
+
+			u, err := svc.GetByID(context.Background(), internaltests.TestActor(), tc.userID)
+			if tc.wantErr != nil {
+				assert.ErrorIs(t, err, tc.wantErr)
+				assert.Nil(t, u)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.userID, u.ID)
+			}
+			repo.AssertExpectations(t)
+		})
+	}
 }
 
 func TestUsersService_Update(t *testing.T) {
 	t.Parallel()
 
-	svc, repo := newUsersServiceFixture()
-	ctx := context.Background()
-	actor := internaltests.TestActor()
+	tests := []struct {
+		name    string
+		userID  string
+		request admintypes.UpdateUserRequest
+		setup   func(repo *internaltests.MockUserRepository)
+		wantErr error
+	}{
+		{
+			name:    "success",
+			userID:  "u1",
+			request: admintypes.UpdateUserRequest{Email: new("x"), Name: new("y"), EmailVerified: new(true)},
+			setup: func(repo *internaltests.MockUserRepository) {
+				base := &models.User{ID: "u1", Email: "e", Name: "n", EmailVerified: false}
+				repo.On("GetByID", mock.Anything, "u1").Return(base, nil).Once()
+				repo.On("Update", mock.Anything, mock.Anything).Return(base, nil).Once()
+			},
+		},
+		{
+			name:    "not found",
+			userID:  "u1",
+			request: admintypes.UpdateUserRequest{Email: new("x")},
+			setup: func(repo *internaltests.MockUserRepository) {
+				repo.On("GetByID", mock.Anything, "u1").Return((*models.User)(nil), nil).Once()
+			},
+			wantErr: coreerrors.ErrNotFound,
+		},
+		{
+			name:    "missing user id",
+			userID:  "   ",
+			request: admintypes.UpdateUserRequest{Email: new("x")},
+			wantErr: adminconstants.ErrUserIDRequired,
+		},
+		{
+			name:    "nothing to update",
+			userID:  "u1",
+			request: admintypes.UpdateUserRequest{},
+			wantErr: coreerrors.ErrBadRequest,
+		},
+	}
 
-	base := &models.User{ID: "u1", Email: "e", Name: "n", EmailVerified: false}
-	repo.On("GetByID", mock.Anything, "u1").Return(base, nil).Once()
-	repo.On("Update", mock.Anything, mock.Anything).Return(base, nil).Once()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	req := admintypes.UpdateUserRequest{Email: new("x"), Name: new("y"), EmailVerified: func(b bool) *bool { return &b }(true)}
-	updated, err := svc.Update(ctx, actor, "u1", req)
-	assert.NoError(t, err)
-	assert.Equal(t, "x", updated.Email)
-	assert.Equal(t, "y", updated.Name)
-	assert.True(t, updated.EmailVerified)
-	repo.AssertExpectations(t)
-}
+			svc, repo := newUsersServiceFixture()
+			if tc.setup != nil {
+				tc.setup(repo)
+			}
 
-func TestUsersService_Update_notFound(t *testing.T) {
-	t.Parallel()
-
-	svc, repo := newUsersServiceFixture()
-	ctx := context.Background()
-	actor := internaltests.TestActor()
-	repo.On("GetByID", mock.Anything, "u1").Return(nil, nil).Once()
-
-	_, err := svc.Update(ctx, actor, "u1", admintypes.UpdateUserRequest{})
-	assert.ErrorIs(t, err, coreerrors.ErrNotFound)
-	repo.AssertExpectations(t)
+			updated, err := svc.Update(context.Background(), internaltests.TestActor(), tc.userID, tc.request)
+			if tc.wantErr != nil {
+				assert.ErrorIs(t, err, tc.wantErr)
+				assert.Nil(t, updated)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, "x", updated.Email)
+				assert.Equal(t, "y", updated.Name)
+				assert.True(t, updated.EmailVerified)
+			}
+			repo.AssertExpectations(t)
+		})
+	}
 }
 
 func TestUsersService_Delete(t *testing.T) {
 	t.Parallel()
 
-	svc, repo := newUsersServiceFixture()
-	ctx := context.Background()
-	actor := internaltests.TestActor()
+	tests := []struct {
+		name    string
+		userID  string
+		setup   func(repo *internaltests.MockUserRepository)
+		wantErr error
+	}{
+		{
+			name:   "success",
+			userID: "u1",
+			setup: func(repo *internaltests.MockUserRepository) {
+				repo.On("GetByID", mock.Anything, "u1").Return(&models.User{ID: "u1"}, nil).Once()
+				repo.On("Delete", mock.Anything, "u1").Return(nil).Once()
+			},
+		},
+		{
+			name:   "not found",
+			userID: "u1",
+			setup: func(repo *internaltests.MockUserRepository) {
+				repo.On("GetByID", mock.Anything, "u1").Return((*models.User)(nil), nil).Once()
+			},
+			wantErr: coreerrors.ErrNotFound,
+		},
+		{
+			name:    "missing user id",
+			userID:  "   ",
+			wantErr: coreerrors.ErrBadRequest,
+		},
+	}
 
-	repo.On("GetByID", mock.Anything, "u1").Return(&models.User{ID: "u1"}, nil).Once()
-	repo.On("Delete", mock.Anything, "u1").Return(nil).Once()
-	assert.NoError(t, svc.Delete(ctx, actor, "u1"))
-	repo.AssertExpectations(t)
-}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-func TestUsersService_Delete_notFound(t *testing.T) {
-	t.Parallel()
+			svc, repo := newUsersServiceFixture()
+			if tc.setup != nil {
+				tc.setup(repo)
+			}
 
-	svc, repo := newUsersServiceFixture()
-	ctx := context.Background()
-	actor := internaltests.TestActor()
-	repo.On("GetByID", mock.Anything, "u1").Return(nil, nil).Once()
-	assert.ErrorIs(t, svc.Delete(ctx, actor, "u1"), coreerrors.ErrNotFound)
-	repo.AssertExpectations(t)
+			err := svc.Delete(context.Background(), internaltests.TestActor(), tc.userID)
+			if tc.wantErr != nil {
+				assert.ErrorIs(t, err, tc.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+			repo.AssertExpectations(t)
+		})
+	}
 }

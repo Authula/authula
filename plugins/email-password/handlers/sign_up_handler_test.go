@@ -29,7 +29,7 @@ func TestSignUpHandler(t *testing.T) {
 	}{
 		{name: "invalid_json", body: []byte("{"), expectedStatus: http.StatusUnprocessableEntity},
 		{name: "usecase_error", body: internaltests.MarshalToJSON(t, types.SignUpRequest{Name: "Jane", Email: "jane@example.com", Password: "password123"}), prepare: func(m *plugintests.MockSignUpUseCase, _ *plugintests.MockSendEmailVerificationUseCase) {
-			m.On("SignUp", mock.Anything, "Jane", "jane@example.com", "password123", (*string)(nil), mock.Anything, (*string)(nil), mock.Anything, mock.Anything).Return((*types.SignUpResult)(nil), errors.New("boom")).Once()
+			m.On("SignUp", mock.Anything, "Jane", "jane@example.com", "password123", (*string)(nil), mock.Anything, (*string)(nil), mock.Anything, mock.Anything).Return((*types.SignUpResult)(nil), errors.New("some error")).Once()
 		}, expectedStatus: http.StatusForbidden},
 		{name: "success_auto_sign_in_disabled", body: internaltests.MarshalToJSON(t, types.SignUpRequest{Name: "Jane", Email: "jane@example.com", Password: "password123"}), pluginConfig: types.EmailPasswordPluginConfig{AutoSignIn: false}, prepare: func(m *plugintests.MockSignUpUseCase, _ *plugintests.MockSendEmailVerificationUseCase) {
 			m.On("SignUp", mock.Anything, "Jane", "jane@example.com", "password123", (*string)(nil), mock.Anything, (*string)(nil), mock.Anything, mock.Anything).Return(&types.SignUpResult{User: user}, nil).Once()

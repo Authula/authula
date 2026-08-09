@@ -74,8 +74,7 @@ func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqCtx, _ := models.GetRequestContext(r.Context())
 		actor := reqCtx.Actor
-		impersonatorUserID := getUserID(reqCtx)
-		if impersonatorUserID == nil {
+		if actor == nil || actor.ID == "" {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})
 			reqCtx.Handled = true
 			return
@@ -108,7 +107,7 @@ func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 
 		userAgent := r.UserAgent()
 		result, err := h.useCase.StartImpersonation(
-			r.Context(), actor, *impersonatorUserID, getSessionID(reqCtx),
+			r.Context(), actor, getSessionID(reqCtx),
 			&reqCtx.ClientIP, &userAgent, req,
 			impersonatorScopes, originalCookieVal, originalCookieMaxAge,
 		)

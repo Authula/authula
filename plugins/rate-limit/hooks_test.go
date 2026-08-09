@@ -417,7 +417,7 @@ func TestRateLimitPluginCheckEndpointRateLimitHook(t *testing.T) {
 				Max:         10,
 				CustomRules: map[string]types.RateLimitRule{},
 			},
-			provider:            plugintests.NewFakeRateLimitProvider().WithCheckError(errors.New("boom")),
+			provider:            plugintests.NewFakeRateLimitProvider().WithCheckError(errors.New("some error")),
 			expectedHandled:     false,
 			expectedStatusCode:  0,
 			expectedProviderKey: "ratelimit:{127.0.0.1}",

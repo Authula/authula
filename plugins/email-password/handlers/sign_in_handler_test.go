@@ -37,7 +37,7 @@ func TestSignInHandler(t *testing.T) {
 			m.On("GetUserByID", mock.Anything, "user-1").Return(user, nil).Once()
 		}, expectedStatus: http.StatusOK},
 		{name: "usecase_error", body: internaltests.MarshalToJSON(t, types.SignInRequest{Email: "user@example.com", Password: "password123"}), prepare: func(m *plugintests.MockSignInUseCase, _ *plugintests.MockSendEmailVerificationUseCase) {
-			m.On("SignIn", mock.Anything, "user@example.com", "password123", (*string)(nil), mock.Anything, mock.Anything).Return((*types.SignInResult)(nil), errors.New("boom")).Once()
+			m.On("SignIn", mock.Anything, "user@example.com", "password123", (*string)(nil), mock.Anything, mock.Anything).Return((*types.SignInResult)(nil), errors.New("some error")).Once()
 		}, expectedStatus: http.StatusUnauthorized},
 		{name: "success", body: internaltests.MarshalToJSON(t, types.SignInRequest{Email: "user@example.com", Password: "password123"}), pluginConfig: types.EmailPasswordPluginConfig{RequireEmailVerification: true, SendEmailOnSignIn: false}, prepare: func(m *plugintests.MockSignInUseCase, _ *plugintests.MockSendEmailVerificationUseCase) {
 			m.On("SignIn", mock.Anything, "user@example.com", "password123", (*string)(nil), mock.Anything, mock.Anything).Return(&types.SignInResult{User: user, Session: session, SessionToken: "session-token"}, nil).Once()
