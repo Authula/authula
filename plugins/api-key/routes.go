@@ -6,15 +6,16 @@ import (
 	"github.com/Authula/authula/middleware"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/api-key/handlers"
+	"github.com/Authula/authula/plugins/api-key/usecases"
 )
 
-func Routes(api *API) []models.Route {
-	createApiKeyHandler := &handlers.CreateApiKeyHandler{UseCases: api.useCases}
-	getAllApiKeysHandler := &handlers.GetAllApiKeysHandler{UseCases: api.useCases}
-	getApiKeyHandler := &handlers.GetApiKeyHandler{UseCases: api.useCases}
-	updateApiKeyHandler := &handlers.UpdateApiKeyHandler{UseCases: api.useCases}
-	deleteApiKeyHandler := &handlers.DeleteApiKeyHandler{UseCases: api.useCases}
-	verifyApiKeyHandler := &handlers.VerifyApiKeyHandler{UseCases: api.useCases}
+func Routes(useCases *usecases.UseCases) []models.Route {
+	createApiKeyHandler := &handlers.CreateApiKeyHandler{UseCases: useCases}
+	getAllApiKeysHandler := &handlers.GetAllApiKeysHandler{UseCases: useCases}
+	getApiKeyHandler := &handlers.GetApiKeyHandler{UseCases: useCases}
+	updateApiKeyHandler := &handlers.UpdateApiKeyHandler{UseCases: useCases}
+	deleteApiKeyHandler := &handlers.DeleteApiKeyHandler{UseCases: useCases}
+	verifyApiKeyHandler := &handlers.VerifyApiKeyHandler{UseCases: useCases}
 
 	return []models.Route{
 		{

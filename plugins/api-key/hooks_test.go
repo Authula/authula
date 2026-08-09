@@ -14,7 +14,6 @@ import (
 	"github.com/Authula/authula/models"
 	apiKeyTests "github.com/Authula/authula/plugins/api-key/tests"
 	"github.com/Authula/authula/plugins/api-key/types"
-	"github.com/Authula/authula/plugins/api-key/usecases"
 	rootservices "github.com/Authula/authula/services"
 )
 
@@ -234,7 +233,7 @@ func TestApiKeyPluginHook_ValidateApiKey(t *testing.T) {
 				rateLimiterService:  rateLimiterService,
 				userService:         mockUserService,
 				organizationService: mockOrgService,
-				Api:                 NewAPI(usecases.NewUseCases(service, &internaltests.NoopAuthorizer{})),
+				Api:                 NewAPI(service),
 			}
 
 			reqCtx := internaltests.NewRequestContext(t, http.MethodGet, "/protected", map[string]string{"X-Test-API-Key": "good-key"})

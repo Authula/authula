@@ -29,6 +29,7 @@ type ApiKeyPlugin struct {
 	rateLimiterService   rootservices.RateLimiterService
 	userService          rootservices.UserService
 	organizationService  rootservices.OrganizationService
+	useCases             *usecases.UseCases
 	Api                  *API
 	stopCleanup          chan struct{}
 	done                 chan struct{}
@@ -101,8 +102,9 @@ func (p *ApiKeyPlugin) Init(ctx *models.PluginContext) error {
 	authorizer := rootservices.NewDefaultAuthorizer()
 	service := apiservices.NewApiKeyService(p.config, userService, tokenService, accessControlService, rateLimiterService, organizationService, apiKeyRepo)
 	useCases := usecases.NewUseCases(service, authorizer)
+	p.useCases = useCases
 
-	p.Api = NewAPI(useCases)
+	p.Api = NewAPI(service)
 
 	if p.config.AutoCleanup {
 		p.stopCleanup = make(chan struct{})
@@ -122,7 +124,7 @@ func (p *ApiKeyPlugin) DependsOn() []string {
 }
 
 func (p *ApiKeyPlugin) Routes() []models.Route {
-	return Routes(p.Api)
+	return Routes(p.useCases)
 }
 
 func (p *ApiKeyPlugin) Hooks() []models.Hook {
