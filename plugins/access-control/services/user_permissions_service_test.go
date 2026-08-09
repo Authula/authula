@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	internaltests "github.com/Authula/authula/internal/tests"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -55,7 +54,7 @@ func TestUserPermissionsServiceGetUserPermissions(t *testing.T) {
 			}
 
 			service := NewUserPermissionsService(repo)
-			permissions, err := service.GetUserPermissions(context.Background(), internaltests.TestActor(), tc.userID)
+			permissions, err := service.GetUserPermissions(context.Background(), tc.userID)
 			if tc.expectedErr != nil {
 				if err != tc.expectedErr {
 					t.Fatalf("expected err %v, got %v", tc.expectedErr, err)
@@ -120,7 +119,7 @@ func TestUserPermissionsServiceHasPermissions(t *testing.T) {
 			}
 
 			service := NewUserPermissionsService(repo)
-			hasPermissions, err := service.HasPermissions(context.Background(), internaltests.TestActor(), tc.userID, tc.permissionKeys)
+			hasPermissions, err := service.HasPermissions(context.Background(), tc.userID, tc.permissionKeys)
 			if tc.expectedErr != nil {
 				if err != tc.expectedErr {
 					t.Fatalf("expected err %v, got %v", tc.expectedErr, err)

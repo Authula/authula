@@ -24,19 +24,19 @@ func (u *UserPermissionsUseCase) GetSelfUserPermissions(ctx context.Context, act
 	if actor.ID != userID {
 		return nil, coreerrors.ErrForbidden
 	}
-	return u.service.GetUserPermissions(ctx, actor, userID)
+	return u.service.GetUserPermissions(ctx, userID)
 }
 
 func (u *UserPermissionsUseCase) GetUserPermissions(ctx context.Context, actor *models.Actor, userID string) ([]types.UserPermissionInfo, error) {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, constants.UserPermissionsReadPermission); err != nil {
 		return nil, err
 	}
-	return u.service.GetUserPermissions(ctx, actor, userID)
+	return u.service.GetUserPermissions(ctx, userID)
 }
 
 func (u *UserPermissionsUseCase) HasPermissions(ctx context.Context, actor *models.Actor, userID string, permissionKeys []string) (bool, error) {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, constants.UserPermissionsCheckPermission); err != nil {
 		return false, err
 	}
-	return u.service.HasPermissions(ctx, actor, userID, permissionKeys)
+	return u.service.HasPermissions(ctx, userID, permissionKeys)
 }

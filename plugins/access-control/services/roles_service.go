@@ -4,7 +4,6 @@ import (
 	"context"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	"github.com/Authula/authula/models"
 	accesscontrolconstants "github.com/Authula/authula/plugins/access-control/constants"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
@@ -21,7 +20,7 @@ func NewRolesService(rolesRepo repositories.RolesRepository, rolePermissionsRepo
 	return &RolesService{rolesRepo: rolesRepo, rolePermissionsRepo: rolePermissionsRepo, userRolesRepo: userRolesRepo}
 }
 
-func (s *RolesService) CreateRole(ctx context.Context, actor *models.Actor, req types.CreateRoleRequest) (*types.Role, error) {
+func (s *RolesService) CreateRole(ctx context.Context, req types.CreateRoleRequest) (*types.Role, error) {
 	if req.Name == "" {
 		return nil, coreerrors.ErrBadRequest
 	}
@@ -50,11 +49,11 @@ func (s *RolesService) CreateRole(ctx context.Context, actor *models.Actor, req 
 	return role, nil
 }
 
-func (s *RolesService) GetAllRoles(ctx context.Context, actor *models.Actor) ([]types.Role, error) {
+func (s *RolesService) GetAllRoles(ctx context.Context) ([]types.Role, error) {
 	return s.rolesRepo.GetAllRoles(ctx)
 }
 
-func (s *RolesService) GetRoleByName(ctx context.Context, actor *models.Actor, roleName string) (*types.Role, error) {
+func (s *RolesService) GetRoleByName(ctx context.Context, roleName string) (*types.Role, error) {
 	if roleName == "" {
 		return nil, coreerrors.ErrBadRequest
 	}
@@ -70,7 +69,7 @@ func (s *RolesService) GetRoleByName(ctx context.Context, actor *models.Actor, r
 	return role, nil
 }
 
-func (s *RolesService) GetRoleByID(ctx context.Context, actor *models.Actor, roleID string) (*types.RoleDetails, error) {
+func (s *RolesService) GetRoleByID(ctx context.Context, roleID string) (*types.RoleDetails, error) {
 	if roleID == "" {
 		return nil, coreerrors.ErrBadRequest
 	}
@@ -91,7 +90,7 @@ func (s *RolesService) GetRoleByID(ctx context.Context, actor *models.Actor, rol
 	return &types.RoleDetails{Role: *role, Permissions: permissions}, nil
 }
 
-func (s *RolesService) UpdateRole(ctx context.Context, actor *models.Actor, roleID string, req types.UpdateRoleRequest) (*types.Role, error) {
+func (s *RolesService) UpdateRole(ctx context.Context, roleID string, req types.UpdateRoleRequest) (*types.Role, error) {
 	if roleID == "" {
 		return nil, coreerrors.ErrBadRequest
 	}
@@ -148,7 +147,7 @@ func (s *RolesService) UpdateRole(ctx context.Context, actor *models.Actor, role
 	return role, nil
 }
 
-func (s *RolesService) DeleteRole(ctx context.Context, actor *models.Actor, roleID string) error {
+func (s *RolesService) DeleteRole(ctx context.Context, roleID string) error {
 	if roleID == "" {
 		return coreerrors.ErrBadRequest
 	}

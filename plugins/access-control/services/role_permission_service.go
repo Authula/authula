@@ -4,7 +4,6 @@ import (
 	"context"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -19,7 +18,7 @@ func NewRolePermissionsService(rolesRepo repositories.RolesRepository, permissio
 	return &RolePermissionsService{rolesRepo: rolesRepo, permissionsRepo: permissionsRepo, rolePermissionsRepo: rolePermissionsRepo}
 }
 
-func (s *RolePermissionsService) GetRolePermissions(ctx context.Context, actor *models.Actor, roleID string) ([]types.UserPermissionInfo, error) {
+func (s *RolePermissionsService) GetRolePermissions(ctx context.Context, roleID string) ([]types.UserPermissionInfo, error) {
 	if roleID == "" {
 		return nil, coreerrors.ErrUnprocessableEntity
 	}
@@ -35,7 +34,7 @@ func (s *RolePermissionsService) GetRolePermissions(ctx context.Context, actor *
 	return s.rolePermissionsRepo.GetRolePermissions(ctx, roleID)
 }
 
-func (s *RolePermissionsService) AddPermissionToRole(ctx context.Context, actor *models.Actor, roleID string, permissionID string, grantedByUserID *string) error {
+func (s *RolePermissionsService) AddPermissionToRole(ctx context.Context, roleID string, permissionID string, grantedByUserID *string) error {
 	if roleID == "" {
 		return coreerrors.ErrBadRequest
 	}
@@ -65,7 +64,7 @@ func (s *RolePermissionsService) AddPermissionToRole(ctx context.Context, actor 
 	return s.rolePermissionsRepo.AddRolePermission(ctx, roleID, permissionID, grantedByUserID)
 }
 
-func (s *RolePermissionsService) RemovePermissionFromRole(ctx context.Context, actor *models.Actor, roleID string, permissionID string) error {
+func (s *RolePermissionsService) RemovePermissionFromRole(ctx context.Context, roleID string, permissionID string) error {
 	if roleID == "" {
 		return coreerrors.ErrUnprocessableEntity
 	}
@@ -95,7 +94,7 @@ func (s *RolePermissionsService) RemovePermissionFromRole(ctx context.Context, a
 	return s.rolePermissionsRepo.RemoveRolePermission(ctx, roleID, permissionID)
 }
 
-func (s *RolePermissionsService) ReplaceRolePermissions(ctx context.Context, actor *models.Actor, roleID string, permissionIDs []string, grantedByUserID *string) error {
+func (s *RolePermissionsService) ReplaceRolePermissions(ctx context.Context, roleID string, permissionIDs []string, grantedByUserID *string) error {
 	if roleID == "" {
 		return coreerrors.ErrBadRequest
 	}

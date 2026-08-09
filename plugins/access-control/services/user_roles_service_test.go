@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	internaltests "github.com/Authula/authula/internal/tests"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -71,7 +70,7 @@ func TestUserRolesServiceAssignRoleToUser(t *testing.T) {
 			}
 
 			service := NewUserRolesService(userRolesRepo, rolesRepo)
-			err := service.AssignRoleToUser(context.Background(), internaltests.TestActor(), "user-1", tc.req, tc.assignedByUserID)
+			err := service.AssignRoleToUser(context.Background(), "user-1", tc.req, tc.assignedByUserID)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
 			}
@@ -125,7 +124,7 @@ func TestUserRolesServiceReplaceUserRoles(t *testing.T) {
 			}
 
 			service := NewUserRolesService(userRolesRepo, rolesRepo)
-			err := service.ReplaceUserRoles(context.Background(), internaltests.TestActor(), "user-1", tc.roleIDs, tc.assignedByUserID)
+			err := service.ReplaceUserRoles(context.Background(), "user-1", tc.roleIDs, tc.assignedByUserID)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
 			}

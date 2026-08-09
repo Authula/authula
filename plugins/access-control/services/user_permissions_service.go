@@ -4,7 +4,6 @@ import (
 	"context"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -17,7 +16,7 @@ func NewUserPermissionsService(repo repositories.UserPermissionsRepository) *Use
 	return &UserPermissionsService{repo: repo}
 }
 
-func (s *UserPermissionsService) GetUserPermissions(ctx context.Context, actor *models.Actor, userID string) ([]types.UserPermissionInfo, error) {
+func (s *UserPermissionsService) GetUserPermissions(ctx context.Context, userID string) ([]types.UserPermissionInfo, error) {
 	if userID == "" {
 		return nil, coreerrors.ErrUnprocessableEntity
 	}
@@ -25,7 +24,7 @@ func (s *UserPermissionsService) GetUserPermissions(ctx context.Context, actor *
 	return s.repo.GetUserPermissions(ctx, userID)
 }
 
-func (s *UserPermissionsService) HasPermissions(ctx context.Context, actor *models.Actor, userID string, permissionKeys []string) (bool, error) {
+func (s *UserPermissionsService) HasPermissions(ctx context.Context, userID string, permissionKeys []string) (bool, error) {
 	if userID == "" {
 		return false, coreerrors.ErrUnprocessableEntity
 	}

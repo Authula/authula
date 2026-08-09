@@ -5,7 +5,6 @@ import (
 	"time"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/access-control/repositories"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -19,7 +18,7 @@ func NewUserRolesService(userRolesRepo repositories.UserRolesRepository, rolesRe
 	return &UserRolesService{userRolesRepo: userRolesRepo, rolesRepo: rolesRepo}
 }
 
-func (s *UserRolesService) GetUserRoles(ctx context.Context, actor *models.Actor, userID string) ([]types.UserRoleInfo, error) {
+func (s *UserRolesService) GetUserRoles(ctx context.Context, userID string) ([]types.UserRoleInfo, error) {
 	if userID == "" {
 		return nil, coreerrors.ErrUnprocessableEntity
 	}
@@ -27,7 +26,7 @@ func (s *UserRolesService) GetUserRoles(ctx context.Context, actor *models.Actor
 	return s.userRolesRepo.GetUserRoles(ctx, userID)
 }
 
-func (s *UserRolesService) ReplaceUserRoles(ctx context.Context, actor *models.Actor, userID string, roleIDs []string, assignedByUserID *string) error {
+func (s *UserRolesService) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, assignedByUserID *string) error {
 	if userID == "" {
 		return coreerrors.ErrBadRequest
 	}
@@ -72,7 +71,7 @@ func (s *UserRolesService) ReplaceUserRoles(ctx context.Context, actor *models.A
 	return s.userRolesRepo.ReplaceUserRoles(ctx, userID, normalized, assignedByUserID)
 }
 
-func (s *UserRolesService) AssignRoleToUser(ctx context.Context, actor *models.Actor, userID string, req types.AssignUserRoleRequest, assignedByUserID *string) error {
+func (s *UserRolesService) AssignRoleToUser(ctx context.Context, userID string, req types.AssignUserRoleRequest, assignedByUserID *string) error {
 	if userID == "" {
 		return coreerrors.ErrBadRequest
 	}
@@ -101,7 +100,7 @@ func (s *UserRolesService) AssignRoleToUser(ctx context.Context, actor *models.A
 	return s.userRolesRepo.AssignUserRole(ctx, userID, roleID, assignedByUserID, req.ExpiresAt)
 }
 
-func (s *UserRolesService) RemoveRoleFromUser(ctx context.Context, actor *models.Actor, userID string, roleID string) error {
+func (s *UserRolesService) RemoveRoleFromUser(ctx context.Context, userID string, roleID string) error {
 	if userID == "" || roleID == "" {
 		return coreerrors.ErrBadRequest
 	}

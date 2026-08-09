@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	internaltests "github.com/Authula/authula/internal/tests"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -83,7 +82,7 @@ func TestPermissionsServiceCreatePermission(t *testing.T) {
 			}
 
 			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
-			permission, err := service.CreatePermission(context.Background(), internaltests.TestActor(), tc.req)
+			permission, err := service.CreatePermission(context.Background(), tc.req)
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)
@@ -138,7 +137,7 @@ func TestPermissionsServiceGetAllPermissions(t *testing.T) {
 			}
 
 			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
-			permissions, err := service.GetAllPermissions(context.Background(), internaltests.TestActor())
+			permissions, err := service.GetAllPermissions(context.Background())
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)
@@ -200,7 +199,7 @@ func TestPermissionsServiceGetPermissionByID(t *testing.T) {
 			}
 
 			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
-			permission, err := service.GetPermissionByID(context.Background(), internaltests.TestActor(), tc.id)
+			permission, err := service.GetPermissionByID(context.Background(), tc.id)
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)
@@ -300,7 +299,7 @@ func TestPermissionsServiceUpdatePermission(t *testing.T) {
 			}
 
 			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
-			permission, err := service.UpdatePermission(context.Background(), internaltests.TestActor(), tc.id, tc.req)
+			permission, err := service.UpdatePermission(context.Background(), tc.id, tc.req)
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)
@@ -388,7 +387,7 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 			}
 
 			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
-			err := service.DeletePermission(context.Background(), internaltests.TestActor(), tc.id)
+			err := service.DeletePermission(context.Background(), tc.id)
 			if tc.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected nil err, got %v", err)

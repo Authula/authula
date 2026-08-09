@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	coreerrors "github.com/Authula/authula/core/errors"
-	internaltests "github.com/Authula/authula/internal/tests"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
 )
@@ -24,7 +23,7 @@ func TestRolesServiceGetRoleByID(t *testing.T) {
 	rolePermissionsRepo.On("GetRolePermissions", mock.Anything, "role-1").Return([]types.UserPermissionInfo{{PermissionID: "perm-1", PermissionKey: "users.read"}}, nil).Once()
 
 	service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
-	details, err := service.GetRoleByID(context.Background(), internaltests.TestActor(), "role-1")
+	details, err := service.GetRoleByID(context.Background(), "role-1")
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -80,7 +79,7 @@ func TestRolesServiceGetRoleByName(t *testing.T) {
 			}
 
 			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
-			role, err := service.GetRoleByName(context.Background(), internaltests.TestActor(), tc.roleName)
+			role, err := service.GetRoleByName(context.Background(), tc.roleName)
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
 			}
@@ -124,7 +123,7 @@ func TestRolesServiceRoleWeightOperations(t *testing.T) {
 				}).Return(nil).Once()
 			},
 			run: func(ctx context.Context, service *RolesService) (*types.Role, error) {
-				return service.CreateRole(ctx, internaltests.TestActor(), types.CreateRoleRequest{Name: "editor", Description: func() *string { s := "default weighted role"; return &s }(), IsSystem: false})
+				return service.CreateRole(ctx, types.CreateRoleRequest{Name: "editor", Description: func() *string { s := "default weighted role"; return &s }(), IsSystem: false})
 			},
 			wantRole: func(role *types.Role) bool { return role != nil && role.Weight == 10 && role.ID == "role-1" },
 		},
@@ -143,7 +142,7 @@ func TestRolesServiceRoleWeightOperations(t *testing.T) {
 			run: func(ctx context.Context, service *RolesService) (*types.Role, error) {
 				updatedDescription := "updated role description"
 				weight := 40
-				return service.UpdateRole(ctx, internaltests.TestActor(), "role-1", types.UpdateRoleRequest{Description: &updatedDescription, Weight: &weight})
+				return service.UpdateRole(ctx, "role-1", types.UpdateRoleRequest{Description: &updatedDescription, Weight: &weight})
 			},
 			wantRole: func(role *types.Role) bool {
 				return role != nil && role.Weight == 40 && role.Description != nil && *role.Description == "updated role description"
@@ -216,7 +215,7 @@ func TestRolesServiceDeleteRole(t *testing.T) {
 			}
 
 			service := NewRolesService(rolesRepo, rolePermissionsRepo, userRolesRepo)
-			err := service.DeleteRole(context.Background(), internaltests.TestActor(), "role-1")
+			err := service.DeleteRole(context.Background(), "role-1")
 			if err != tc.wantErr {
 				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
 			}

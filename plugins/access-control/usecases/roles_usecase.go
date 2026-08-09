@@ -23,40 +23,40 @@ func (u *RolesUseCase) CreateRole(ctx context.Context, actor *models.Actor, req 
 	if err := u.authorizer.AuthorizeScope(ctx, actor, accesscontrolconstants.RolesCreatePermission); err != nil {
 		return nil, err
 	}
-	return u.service.CreateRole(ctx, actor, req)
+	return u.service.CreateRole(ctx, req)
 }
 
 func (u *RolesUseCase) GetAllRoles(ctx context.Context, actor *models.Actor) ([]types.Role, error) {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, accesscontrolconstants.RolesListPermission); err != nil {
 		return nil, err
 	}
-	return u.service.GetAllRoles(ctx, actor)
+	return u.service.GetAllRoles(ctx)
 }
 
 func (u *RolesUseCase) GetRoleByName(ctx context.Context, actor *models.Actor, roleName string) (*types.Role, error) {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, accesscontrolconstants.RolesReadPermission); err != nil {
 		return nil, err
 	}
-	return u.service.GetRoleByName(ctx, actor, roleName)
+	return u.service.GetRoleByName(ctx, roleName)
 }
 
 func (u *RolesUseCase) GetRoleByID(ctx context.Context, actor *models.Actor, roleID string) (*types.RoleDetails, error) {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, accesscontrolconstants.RolesReadPermission); err != nil {
 		return nil, err
 	}
-	return u.service.GetRoleByID(ctx, actor, roleID)
+	return u.service.GetRoleByID(ctx, roleID)
 }
 
 func (u *RolesUseCase) UpdateRole(ctx context.Context, actor *models.Actor, roleID string, req types.UpdateRoleRequest) (*types.Role, error) {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, accesscontrolconstants.RolesUpdatePermission); err != nil {
 		return nil, err
 	}
-	return u.service.UpdateRole(ctx, actor, roleID, req)
+	return u.service.UpdateRole(ctx, roleID, req)
 }
 
 func (u *RolesUseCase) DeleteRole(ctx context.Context, actor *models.Actor, roleID string) error {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, accesscontrolconstants.RolesDeletePermission); err != nil {
 		return err
 	}
-	return u.service.DeleteRole(ctx, actor, roleID)
+	return u.service.DeleteRole(ctx, roleID)
 }

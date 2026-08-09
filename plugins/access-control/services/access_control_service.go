@@ -21,7 +21,7 @@ func NewAccessControlService(rolesService *RolesService, userRolesService *UserR
 }
 
 func (s *AccessControlService) RoleExists(ctx context.Context, roleName string) (bool, error) {
-	role, err := s.rolesService.GetRoleByName(ctx, nil, roleName)
+	role, err := s.rolesService.GetRoleByName(ctx, roleName)
 	if err != nil {
 		return false, err
 	}
@@ -30,7 +30,7 @@ func (s *AccessControlService) RoleExists(ctx context.Context, roleName string) 
 }
 
 func (s *AccessControlService) GetRolePermissionsByName(ctx context.Context, roleName string) ([]string, error) {
-	role, err := s.rolesService.GetRoleByName(ctx, nil, roleName)
+	role, err := s.rolesService.GetRoleByName(ctx, roleName)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (s *AccessControlService) GetRolePermissionsByName(ctx context.Context, rol
 		return nil, coreerrors.ErrNotFound
 	}
 
-	details, err := s.rolesService.GetRoleByID(ctx, nil, role.ID)
+	details, err := s.rolesService.GetRoleByID(ctx, role.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (s *AccessControlService) GetRolePermissionsByName(ctx context.Context, rol
 }
 
 func (s *AccessControlService) GetRoleWeightByName(ctx context.Context, roleName string) (int, error) {
-	role, err := s.rolesService.GetRoleByName(ctx, nil, roleName)
+	role, err := s.rolesService.GetRoleByName(ctx, roleName)
 	if err != nil {
 		return 0, err
 	}
@@ -77,12 +77,12 @@ func (s *AccessControlService) ValidatePermissionKeys(ctx context.Context, permi
 }
 
 func (s *AccessControlService) AssignRoleToUserIfMissing(ctx context.Context, userID string, roleName string, assignedByUserID *string) error {
-	role, err := s.rolesService.GetRoleByName(ctx, nil, roleName)
+	role, err := s.rolesService.GetRoleByName(ctx, roleName)
 	if err != nil {
 		return err
 	}
 
-	userRoles, err := s.userRolesService.GetUserRoles(ctx, nil, userID)
+	userRoles, err := s.userRolesService.GetUserRoles(ctx, userID)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (s *AccessControlService) AssignRoleToUserIfMissing(ctx context.Context, us
 		}
 	}
 
-	return s.userRolesService.AssignRoleToUser(ctx, nil, userID, types.AssignUserRoleRequest{RoleID: role.ID}, assignedByUserID)
+	return s.userRolesService.AssignRoleToUser(ctx, userID, types.AssignUserRoleRequest{RoleID: role.ID}, assignedByUserID)
 }
 
 func (s *AccessControlService) EnsurePermissions(ctx context.Context, permissions []rootservices.PermissionDefinition) error {

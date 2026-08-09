@@ -23,40 +23,40 @@ func (u *PermissionsUseCase) CreatePermission(ctx context.Context, actor *models
 	if err := u.authorizer.AuthorizeScope(ctx, actor, constants.PermissionsCreatePermission); err != nil {
 		return nil, err
 	}
-	return u.service.CreatePermission(ctx, actor, req)
+	return u.service.CreatePermission(ctx, req)
 }
 
 func (u *PermissionsUseCase) GetAllPermissions(ctx context.Context, actor *models.Actor) ([]types.Permission, error) {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, constants.PermissionsListPermission); err != nil {
 		return nil, err
 	}
-	return u.service.GetAllPermissions(ctx, actor)
+	return u.service.GetAllPermissions(ctx)
 }
 
 func (u *PermissionsUseCase) GetPermissionByID(ctx context.Context, actor *models.Actor, permissionID string) (*types.Permission, error) {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, constants.PermissionsReadPermission); err != nil {
 		return nil, err
 	}
-	return u.service.GetPermissionByID(ctx, actor, permissionID)
+	return u.service.GetPermissionByID(ctx, permissionID)
 }
 
 func (u *PermissionsUseCase) GetPermissionByKey(ctx context.Context, actor *models.Actor, permissionKey string) (*types.Permission, error) {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, constants.PermissionsReadPermission); err != nil {
 		return nil, err
 	}
-	return u.service.GetPermissionByKey(ctx, actor, permissionKey)
+	return u.service.GetPermissionByKey(ctx, permissionKey)
 }
 
 func (u *PermissionsUseCase) UpdatePermission(ctx context.Context, actor *models.Actor, permissionID string, req types.UpdatePermissionRequest) (*types.Permission, error) {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, constants.PermissionsUpdatePermission); err != nil {
 		return nil, err
 	}
-	return u.service.UpdatePermission(ctx, actor, permissionID, req)
+	return u.service.UpdatePermission(ctx, permissionID, req)
 }
 
 func (u *PermissionsUseCase) DeletePermission(ctx context.Context, actor *models.Actor, permissionID string) error {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, constants.PermissionsDeletePermission); err != nil {
 		return err
 	}
-	return u.service.DeletePermission(ctx, actor, permissionID)
+	return u.service.DeletePermission(ctx, permissionID)
 }

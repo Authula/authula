@@ -23,26 +23,26 @@ func (u *RolePermissionsUseCase) GetRolePermissions(ctx context.Context, actor *
 	if err := u.authorizer.AuthorizeScope(ctx, actor, constants.RolePermissionsReadPermission); err != nil {
 		return nil, err
 	}
-	return u.service.GetRolePermissions(ctx, actor, roleID)
+	return u.service.GetRolePermissions(ctx, roleID)
 }
 
 func (u *RolePermissionsUseCase) AddPermissionToRole(ctx context.Context, actor *models.Actor, roleID string, permissionID string, grantedByUserID *string) error {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, constants.RolePermissionsAssignPermission); err != nil {
 		return err
 	}
-	return u.service.AddPermissionToRole(ctx, actor, roleID, permissionID, grantedByUserID)
+	return u.service.AddPermissionToRole(ctx, roleID, permissionID, grantedByUserID)
 }
 
 func (u *RolePermissionsUseCase) RemovePermissionFromRole(ctx context.Context, actor *models.Actor, roleID string, permissionID string) error {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, constants.RolePermissionsRemovePermission); err != nil {
 		return err
 	}
-	return u.service.RemovePermissionFromRole(ctx, actor, roleID, permissionID)
+	return u.service.RemovePermissionFromRole(ctx, roleID, permissionID)
 }
 
 func (u *RolePermissionsUseCase) ReplaceRolePermissions(ctx context.Context, actor *models.Actor, roleID string, permissionIDs []string, grantedByUserID *string) error {
 	if err := u.authorizer.AuthorizeScope(ctx, actor, constants.RolePermissionsAssignPermission); err != nil {
 		return err
 	}
-	return u.service.ReplaceRolePermissions(ctx, actor, roleID, permissionIDs, grantedByUserID)
+	return u.service.ReplaceRolePermissions(ctx, roleID, permissionIDs, grantedByUserID)
 }
