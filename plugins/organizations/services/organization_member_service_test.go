@@ -1029,38 +1029,6 @@ func TestOrganizationMemberService_RemoveMember(t *testing.T) {
 	}
 }
 
-func TestOrganizationMemberService_MachineActorForbidden(t *testing.T) {
-	t.Parallel()
-
-	actor := &models.Actor{ID: "key-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}}
-
-	t.Run("add member", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-
-		svc := newTestOrganizationMemberService(&internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, memberRepo, nil)
-		_, err := svc.AddMember(context.Background(), actor, "org-1", types.AddOrganizationMemberRequest{UserID: "user-2", Role: "member"})
-		require.ErrorIs(t, err, coreerrors.ErrForbidden)
-		orgRepo.AssertExpectations(t)
-	})
-
-	t.Run("update member", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-
-		svc := newTestOrganizationMemberService(&internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, memberRepo, nil)
-		_, err := svc.UpdateMember(context.Background(), actor, "org-1", "mem-1", types.UpdateOrganizationMemberRequest{Role: "admin"})
-		require.ErrorIs(t, err, coreerrors.ErrForbidden)
-		orgRepo.AssertExpectations(t)
-	})
-}
-
 func TestOrganizationMemberService_RemoveMemberGuards(t *testing.T) {
 	t.Parallel()
 

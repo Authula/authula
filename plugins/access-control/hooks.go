@@ -54,7 +54,7 @@ func (p *AccessControlPlugin) hydrateActorScopes(reqCtx *models.RequestContext) 
 
 	switch reqCtx.Actor.Type {
 	case models.ActorUser:
-		userPermissions, err := p.Api.GetSelfUserPermissions(ctx, reqCtx.Actor, reqCtx.Actor.ID)
+		userPermissions, err := p.Api.GetUserPermissions(ctx, reqCtx.Actor, reqCtx.Actor.ID)
 		if err != nil {
 			return err
 		}

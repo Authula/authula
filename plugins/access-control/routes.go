@@ -17,18 +17,18 @@ type routeUseCases struct {
 	userPermissions *usecases.UserPermissionsUseCase
 }
 
-func newRouteUseCases(api *API) routeUseCases {
+func newRouteUseCases(plugin *AccessControlPlugin) routeUseCases {
 	return routeUseCases{
-		roles:           api.useCases.RolesUseCase(),
-		permissions:     api.useCases.PermissionsUseCase(),
-		rolePermissions: api.useCases.RolePermissionsUseCase(),
-		userRoles:       api.useCases.UserRolesUseCase(),
-		userPermissions: api.useCases.UserPermissionsUseCase(),
+		roles:           plugin.useCases.RolesUseCase(),
+		permissions:     plugin.useCases.PermissionsUseCase(),
+		rolePermissions: plugin.useCases.RolePermissionsUseCase(),
+		userRoles:       plugin.useCases.UserRolesUseCase(),
+		userPermissions: plugin.useCases.UserPermissionsUseCase(),
 	}
 }
 
-func Routes(api *API) []models.Route {
-	usecases := newRouteUseCases(api)
+func Routes(plugin *AccessControlPlugin) []models.Route {
+	usecases := newRouteUseCases(plugin)
 
 	return []models.Route{
 		// Roles

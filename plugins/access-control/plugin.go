@@ -20,6 +20,7 @@ type AccessControlPlugin struct {
 	ctx                  *models.PluginContext
 	logger               models.Logger
 	accessControlService *services.AccessControlService
+	useCases             *usecases.UseCases
 	Api                  *API
 }
 
@@ -75,7 +76,8 @@ func (p *AccessControlPlugin) Init(ctx *models.PluginContext) error {
 		usecases.NewUserRolesUseCase(userRolesService, authorizer),
 		usecases.NewUserPermissionsUseCase(userPermissionsService, authorizer),
 	)
-	p.Api = NewAPI(useCases)
+	p.useCases = useCases
+	p.Api = NewAPI(rolesService, permissionsService, rolePermissionsService, userRolesService, userPermissionsService)
 
 	ctx.ServiceRegistry.Register(models.ServiceAccessControl.String(), accessControlService)
 
@@ -91,7 +93,7 @@ func (p *AccessControlPlugin) DependsOn() []string {
 }
 
 func (p *AccessControlPlugin) Routes() []models.Route {
-	return Routes(p.Api)
+	return Routes(p)
 }
 
 func (p *AccessControlPlugin) Close() error {

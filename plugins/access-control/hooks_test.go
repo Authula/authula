@@ -43,7 +43,8 @@ func newAccessControlHookTestPlugin(logger authmodels.Logger, rolesRepo *accessc
 	)
 
 	return &AccessControlPlugin{
-		Api:                  NewAPI(useCases),
+		Api:                  NewAPI(rolesService, nil, rolePermissionsService, userRolesService, nil),
+		useCases:             useCases,
 		logger:               logger,
 		accessControlService: accessControlService,
 	}

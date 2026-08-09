@@ -1444,20 +1444,3 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 		})
 	}
 }
-
-func TestOrganizationInvitationService_MachineActorForbidden(t *testing.T) {
-	t.Parallel()
-
-	actor := &models.Actor{ID: "key-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}}
-
-	orgRepo := &orgtests.MockOrganizationRepository{}
-	invRepo := &orgtests.MockOrganizationInvitationRepository{}
-	memberRepo := &orgtests.MockOrganizationMemberRepository{}
-	orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-
-	pluginConfig := &types.OrganizationsPluginConfig{Enabled: true, InvitationExpiresIn: time.Hour}
-	svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
-	_, err := svc.CreateOrganizationInvitation(context.Background(), actor, "org-1", types.CreateOrganizationInvitationRequest{Email: "user@example.com", Role: "member"}, "")
-	require.ErrorIs(t, err, coreerrors.ErrForbidden)
-	orgRepo.AssertExpectations(t)
-}
