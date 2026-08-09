@@ -45,10 +45,6 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actor *models
 		return nil, err
 	}
 
-	if actor.Type == models.ActorMachine {
-		return nil, coreerrors.ErrForbidden
-	}
-
 	userID := request.UserID
 	if userID == "" {
 		return nil, coreerrors.ErrUnprocessableEntity
@@ -170,10 +166,6 @@ func (s *organizationMemberService) UpdateMember(ctx context.Context, actor *mod
 	organization, actorMember, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID)
 	if err != nil {
 		return nil, err
-	}
-
-	if actor.Type == models.ActorMachine {
-		return nil, coreerrors.ErrForbidden
 	}
 
 	member, err := s.orgMemberRepo.GetByID(ctx, memberID)

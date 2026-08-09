@@ -93,10 +93,6 @@ func (s *organizationInvitationService) CreateOrganizationInvitation(ctx context
 		return nil, err
 	}
 
-	if actor.Type == models.ActorMachine {
-		return nil, coreerrors.ErrForbidden
-	}
-
 	role := request.Role
 	if role == "" {
 		return nil, coreerrors.ErrUnprocessableEntity

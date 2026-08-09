@@ -46,7 +46,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/organizations",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireAuthenticated(),
+				middleware.RequireActor(models.ActorUser),
 			},
 			Handler: createOrganizationHandler.Handle(),
 		},
@@ -70,7 +70,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Method: http.MethodPatch,
 			Path:   "/organizations/{organization_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireAuthenticated(),
+				middleware.RequireActor(models.ActorUser),
 			},
 			Handler: updateOrganizationHandler.Handle(),
 		},
@@ -78,7 +78,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Method: http.MethodDelete,
 			Path:   "/organizations/{organization_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireAuthenticated(),
+				middleware.RequireActor(models.ActorUser),
 			},
 			Handler: deleteOrganizationHandler.Handle(),
 		},
@@ -87,7 +87,6 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/organizations/{organization_id}/invitations",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireAuthenticated(),
 				middleware.RequireActor(models.ActorUser),
 			},
 			Handler: createInvitationHandler.Handle(),
@@ -137,7 +136,6 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Method: http.MethodPost,
 			Path:   "/organizations/{organization_id}/members",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireAuthenticated(),
 				middleware.RequireActor(models.ActorUser),
 			},
 			Handler: addMemberHandler.Handle(),
@@ -170,7 +168,6 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Method: http.MethodPatch,
 			Path:   "/organizations/{organization_id}/members/{member_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireAuthenticated(),
 				middleware.RequireActor(models.ActorUser),
 			},
 			Handler: updateMemberHandler.Handle(),
@@ -179,7 +176,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Method: http.MethodDelete,
 			Path:   "/organizations/{organization_id}/members/{member_id}",
 			Middleware: []func(http.Handler) http.Handler{
-				middleware.RequireAuthenticated(),
+				middleware.RequireActor(models.ActorUser),
 			},
 			Handler: deleteMemberHandler.Handle(),
 		},
