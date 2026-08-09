@@ -141,6 +141,12 @@ func (h *AcceptOrganizationInvitationHandler) Handle() http.HandlerFunc {
 			return
 		}
 
+		reqCtx.Values[models.ContextAccessControlAssignRole.String()] = &models.AccessControlAssignRoleContext{
+			UserID:         actor.ID,
+			RoleName:       invitation.Role,
+			AssignerUserID: &invitation.InviterID,
+		}
+
 		reqCtx.SetJSONResponse(http.StatusOK, invitation)
 	}
 }

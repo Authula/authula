@@ -40,6 +40,12 @@ func (h *AddOrganizationMemberHandler) Handle() http.HandlerFunc {
 			return
 		}
 
+		reqCtx.Values[models.ContextAccessControlAssignRole.String()] = &models.AccessControlAssignRoleContext{
+			UserID:         request.UserID,
+			RoleName:       request.Role,
+			AssignerUserID: &actor.ID,
+		}
+
 		reqCtx.SetJSONResponse(http.StatusCreated, member)
 	}
 }
@@ -140,6 +146,12 @@ func (h *UpdateOrganizationMemberHandler) Handle() http.HandlerFunc {
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
+		}
+
+		reqCtx.Values[models.ContextAccessControlAssignRole.String()] = &models.AccessControlAssignRoleContext{
+			UserID:         member.UserID,
+			RoleName:       request.Role,
+			AssignerUserID: &actor.ID,
 		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, member)
