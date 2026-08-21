@@ -55,13 +55,31 @@ func (r *BunOrganizationRepository) GetBySlug(ctx context.Context, slug string) 
 	return organization, err
 }
 
-func (r *BunOrganizationRepository) GetAllByOwnerID(ctx context.Context, ownerID string) ([]types.Organization, error) {
+const organizationAccessibleWhere = `o.owner_id = ? OR EXISTS (` +
+	`SELECT 1 FROM organization_members m WHERE m.organization_id = o.id AND m.user_id = ?)`
+
+func (r *BunOrganizationRepository) GetAllAccessibleByUserID(ctx context.Context, userID string, page int, limit int) ([]types.Organization, int, error) {
 	organizations := make([]types.Organization, 0)
-	err := r.db.NewSelect().Model(&organizations).Where("owner_id = ?", ownerID).Order("created_at DESC").Scan(ctx)
+	limit = pageLimit(limit)
+	total, err := r.db.NewSelect().Model(&organizations).
+		ModelTableExpr("organizations AS o").
+		ColumnExpr("o.*").
+		Where(organizationAccessibleWhere, userID, userID).
+		OrderExpr("o.created_at DESC, o.id DESC").
+		Offset(pageOffset(page, limit)).Limit(limit).
+		ScanAndCount(ctx)
 	if err == sql.ErrNoRows {
-		return []types.Organization{}, nil
+		return []types.Organization{}, total, nil
 	}
-	return organizations, err
+	return organizations, total, err
+}
+
+func (r *BunOrganizationRepository) CountAccessibleByUserID(ctx context.Context, userID string) (int, error) {
+	return r.db.NewSelect().
+		Model((*types.Organization)(nil)).
+		ModelTableExpr("organizations AS o").
+		Where(organizationAccessibleWhere, userID, userID).
+		Count(ctx)
 }
 
 func (r *BunOrganizationRepository) Update(ctx context.Context, organization *types.Organization) (*types.Organization, error) {

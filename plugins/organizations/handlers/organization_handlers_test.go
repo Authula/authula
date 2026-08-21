@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
@@ -173,7 +174,7 @@ func TestCreateOrganizationHandler(t *testing.T) {
 	}
 }
 
-func TestGetAllOrganizationsByOwnerHandler(t *testing.T) {
+func TestGetAllOrganizationsHandler(t *testing.T) {
 	t.Parallel()
 
 	tests := []organizationHandlerCase{
@@ -186,7 +187,8 @@ func TestGetAllOrganizationsByOwnerHandler(t *testing.T) {
 			name:   "service_error",
 			userID: new("user-1"),
 			prepare: func(f *organizationHandlerFixture) {
-				f.service.On("GetAllOrganizationsByOwner", mock.Anything, "user-1").Return(([]orgtypes.Organization)(nil), errors.New("some error")).Once()
+				f.service.On("GetAllOrganizations", mock.Anything, "user-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+					Return((*orgtypes.ListOrganizationsResponse)(nil), errors.New("some error")).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "some error",
@@ -195,15 +197,20 @@ func TestGetAllOrganizationsByOwnerHandler(t *testing.T) {
 			name:   "success",
 			userID: new("user-1"),
 			prepare: func(f *organizationHandlerFixture) {
-				f.service.On("GetAllOrganizationsByOwner", mock.Anything, "user-1").Return([]orgtypes.Organization{{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc"}}, nil).Once()
+				f.service.On("GetAllOrganizations", mock.Anything, "user-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+					Return(&orgtypes.ListOrganizationsResponse{
+						Data:       []orgtypes.Organization{{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc"}},
+						Pagination: pagination.New(1, 10, 1),
+					}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
-				organizations := internaltests.DecodeResponseJSON[[]orgtypes.Organization](t, reqCtx)
-				require.Len(t, organizations, 1)
-				assert.Equal(t, "org-1", organizations[0].ID)
-				assert.Equal(t, "user-1", organizations[0].OwnerID)
-				assert.Equal(t, "Acme Inc", organizations[0].Name)
+				resp := internaltests.DecodeResponseJSON[orgtypes.ListOrganizationsResponse](t, reqCtx)
+				require.Len(t, resp.Data, 1)
+				assert.Equal(t, "org-1", resp.Data[0].ID)
+				assert.Equal(t, "user-1", resp.Data[0].OwnerID)
+				assert.Equal(t, "Acme Inc", resp.Data[0].Name)
+				assert.Equal(t, pagination.Pagination{Page: 1, Limit: 10, Total: 1, TotalPages: 1, HasMore: false}, resp.Pagination)
 			},
 		},
 	}
@@ -217,7 +224,7 @@ func TestGetAllOrganizationsByOwnerHandler(t *testing.T) {
 				tt.prepare(fixture)
 			}
 
-			handler := &GetAllOrganizationsByOwnerHandler{UseCases: newOrgUseCases(fixture.service)}
+			handler := &GetAllOrganizationsHandler{UseCases: newOrgUseCases(fixture.service)}
 			req, w, reqCtx := fixture.newRequest(t, http.MethodGet, "/organizations", nil, tt.userID, "")
 			if tt.name == "missing_user" {
 				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})

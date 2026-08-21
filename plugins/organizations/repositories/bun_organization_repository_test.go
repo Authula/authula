@@ -152,41 +152,74 @@ func TestBunOrganizationRepository_GetBySlug(t *testing.T) {
 	}
 }
 
-func TestBunOrganizationRepository_GetAllByOwnerID(t *testing.T) {
+func seedAccessibleOrganizations(t *testing.T) (repositories.OrganizationRepository, context.Context) {
+	t.Helper()
+
+	db := plugintests.SetupRepoDB(t)
+	ctx := context.Background()
+
+	plugintests.SeedOrganization(t, db, "org-a", "user-1", "Owned", "owned")
+	plugintests.SeedOrganization(t, db, "org-b", "user-2", "Member Only", "member-only")
+	plugintests.SeedOrganization(t, db, "org-c", "user-1", "Owner And Member", "owner-and-member")
+	plugintests.SeedOrganization(t, db, "org-d", "user-2", "Unrelated", "unrelated")
+
+	plugintests.SeedOrganizationMember(t, db, "mem-b", "org-b", "user-1", "member")
+	plugintests.SeedOrganizationMember(t, db, "mem-c", "org-c", "user-1", "owner")
+	plugintests.SeedOrganizationMember(t, db, "mem-d", "org-d", "user-2", "owner")
+
+	return repositories.NewBunOrganizationRepository(db), ctx
+}
+
+func organizationIDs(organizations []types.Organization) []string {
+	ids := make([]string, 0, len(organizations))
+	for _, organization := range organizations {
+		ids = append(ids, organization.ID)
+	}
+	return ids
+}
+
+func TestBunOrganizationRepository_GetAllAccessibleByUserID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name        string
-		ownerID     string
-		setup       func(*testing.T) (repositories.OrganizationRepository, context.Context)
-		expectCount int
+		userID      string
+		page        int
+		limit       int
+		expectedIDs []string
+		expectTotal int
 	}{
 		{
-			name:        "found",
-			ownerID:     "user-1",
-			expectCount: 2,
-			setup: func(t *testing.T) (repositories.OrganizationRepository, context.Context) {
-				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				repo := repositories.NewBunOrganizationRepository(db)
-				ctx := context.Background()
-
-				_, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc"})
-				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.Organization{ID: "org-2", OwnerID: "user-1", Name: "Platform", Slug: "platform"})
-				require.NoError(t, err)
-
-				return repo, ctx
-			},
+			name:        "returns owned and joined organizations without duplicates",
+			userID:      "user-1",
+			page:        1,
+			limit:       10,
+			expectedIDs: []string{"org-a", "org-b", "org-c"},
+			expectTotal: 3,
 		},
 		{
-			name:        "empty",
-			ownerID:     "user-2",
-			expectCount: 0,
-			setup: func(t *testing.T) (repositories.OrganizationRepository, context.Context) {
-				t.Helper()
-				return repositories.NewBunOrganizationRepository(plugintests.SetupRepoDB(t)), context.Background()
-			},
+			name:        "excludes organizations the user cannot access",
+			userID:      "user-2",
+			page:        1,
+			limit:       10,
+			expectedIDs: []string{"org-b", "org-d"},
+			expectTotal: 2,
+		},
+		{
+			name:        "page past the end is empty but keeps the true total",
+			userID:      "user-1",
+			page:        4,
+			limit:       2,
+			expectedIDs: []string{},
+			expectTotal: 3,
+		},
+		{
+			name:        "page zero does not produce a negative offset",
+			userID:      "user-1",
+			page:        0,
+			limit:       10,
+			expectedIDs: []string{"org-a", "org-b", "org-c"},
+			expectTotal: 3,
 		},
 	}
 
@@ -194,11 +227,59 @@ func TestBunOrganizationRepository_GetAllByOwnerID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			repo, ctx := tt.setup(t)
+			repo, ctx := seedAccessibleOrganizations(t)
 
-			found, err := repo.GetAllByOwnerID(ctx, tt.ownerID)
+			found, total, err := repo.GetAllAccessibleByUserID(ctx, tt.userID, tt.page, tt.limit)
 			require.NoError(t, err)
-			require.Len(t, found, tt.expectCount)
+			require.Equal(t, tt.expectTotal, total)
+			require.ElementsMatch(t, tt.expectedIDs, organizationIDs(found))
+		})
+	}
+}
+
+func TestBunOrganizationRepository_GetAllAccessibleByUserIDPagesWithoutLoss(t *testing.T) {
+	t.Parallel()
+
+	repo, ctx := seedAccessibleOrganizations(t)
+
+	seen := make([]string, 0, 3)
+	for page := 1; page <= 3; page++ {
+		found, total, err := repo.GetAllAccessibleByUserID(ctx, "user-1", page, 1)
+		require.NoError(t, err)
+		require.Equal(t, 3, total)
+		require.Len(t, found, 1)
+		seen = append(seen, found[0].ID)
+	}
+
+	require.ElementsMatch(t, []string{"org-a", "org-b", "org-c"}, seen)
+}
+
+func TestBunOrganizationRepository_CountAccessibleByUserID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		userID   string
+		expected int
+	}{
+		{name: "counts owned and joined organizations once each", userID: "user-1", expected: 3},
+		{name: "counts only what the user can access", userID: "user-2", expected: 2},
+		{name: "unknown user has no organizations", userID: "user-unknown", expected: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo, ctx := seedAccessibleOrganizations(t)
+
+			count, err := repo.CountAccessibleByUserID(ctx, tt.userID)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, count)
+
+			_, total, err := repo.GetAllAccessibleByUserID(ctx, tt.userID, 1, 10)
+			require.NoError(t, err)
+			require.Equal(t, count, total, "count must agree with the list total")
 		})
 	}
 }

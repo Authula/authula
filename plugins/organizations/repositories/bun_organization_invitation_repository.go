@@ -69,22 +69,16 @@ func (r *BunOrganizationInvitationRepository) GetByOrganizationIDAndEmail(ctx co
 	return invitation, err
 }
 
-func (r *BunOrganizationInvitationRepository) GetAllByOrganizationID(ctx context.Context, organizationID string) ([]types.OrganizationInvitation, error) {
-	invitations := make([]types.OrganizationInvitation, 0)
-	err := r.db.NewSelect().Model(&invitations).
-		Where("organization_id = ?", organizationID).
-		OrderExpr("created_at DESC").
-		Scan(ctx)
-	if err == sql.ErrNoRows {
-		return []types.OrganizationInvitation{}, nil
+func (r *BunOrganizationInvitationRepository) GetAllPendingByEmail(ctx context.Context, email string, limit int) ([]types.OrganizationInvitation, error) {
+	if limit <= 0 || limit > MaxPendingInvitationsPerBatch {
+		limit = MaxPendingInvitationsPerBatch
 	}
-	return invitations, err
-}
 
-func (r *BunOrganizationInvitationRepository) GetAllPendingByEmail(ctx context.Context, email string) ([]types.OrganizationInvitation, error) {
 	invites := make([]types.OrganizationInvitation, 0)
 	err := r.db.NewSelect().Model(&invites).
 		Where("email = ? AND status = ? AND expires_at > ?", email, types.OrganizationInvitationStatusPending, time.Now().UTC()).
+		OrderExpr("created_at ASC, id ASC").
+		Limit(limit).
 		Scan(ctx)
 	if err == sql.ErrNoRows {
 		return []types.OrganizationInvitation{}, nil
@@ -142,6 +136,10 @@ const invitationWithOrgColumns = `i.id, i.email, i.inviter_id, i.organization_id
 	` o.id AS org_id, o.owner_id AS org_owner_id, o.name AS org_name,` +
 	` o.slug AS org_slug, o.logo AS org_logo, o.metadata AS org_metadata`
 
+const invitationWithOrgByOrganizationFrom = ` FROM organization_invitations i` +
+	` INNER JOIN organizations o ON o.id = i.organization_id` +
+	` WHERE i.organization_id = ?`
+
 func mapToInvitationWithOrgResponse(row invitationOrgRow) types.GetOrganizationInvitationResponse {
 	return types.GetOrganizationInvitationResponse{
 		Invitation: &types.OrganizationInvitation{
@@ -183,24 +181,28 @@ func (r *BunOrganizationInvitationRepository) GetByIDWithOrg(ctx context.Context
 	return &result, nil
 }
 
-func (r *BunOrganizationInvitationRepository) GetAllByOrganizationIDWithOrg(ctx context.Context, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
+func (r *BunOrganizationInvitationRepository) GetAllByOrganizationIDWithOrg(ctx context.Context, organizationID string, page int, limit int) ([]types.GetOrganizationInvitationResponse, int, error) {
+	limit = pageLimit(limit)
+
+	var total int
+	if err := r.db.NewRaw(`SELECT COUNT(*)`+invitationWithOrgByOrganizationFrom, organizationID).Scan(ctx, &total); err != nil {
+		return nil, 0, err
+	}
+
 	var rows []invitationOrgRow
-	err := r.db.NewRaw(`
-		SELECT `+invitationWithOrgColumns+`
-		FROM organization_invitations i
-		INNER JOIN organizations o ON o.id = i.organization_id
-		WHERE i.organization_id = ?
-		ORDER BY i.created_at DESC
-	`, organizationID).Scan(ctx, &rows)
+	err := r.db.NewRaw(`SELECT `+invitationWithOrgColumns+invitationWithOrgByOrganizationFrom+`
+		ORDER BY i.created_at DESC, i.id DESC
+		LIMIT ? OFFSET ?
+	`, organizationID, limit, pageOffset(page, limit)).Scan(ctx, &rows)
 	if err == sql.ErrNoRows {
-		return []types.GetOrganizationInvitationResponse{}, nil
+		return []types.GetOrganizationInvitationResponse{}, total, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	results := make([]types.GetOrganizationInvitationResponse, len(rows))
 	for i, row := range rows {
 		results[i] = mapToInvitationWithOrgResponse(row)
 	}
-	return results, nil
+	return results, total, nil
 }

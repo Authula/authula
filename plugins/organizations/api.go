@@ -4,6 +4,7 @@ import (
 	"context"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/services"
@@ -59,8 +60,8 @@ func (a *API) CreateOrganization(ctx context.Context, actor *models.Actor, reque
 	return a.organizationService.CreateOrganization(ctx, actor, request)
 }
 
-func (a *API) GetAllOrganizationsByOwner(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
-	return a.organizationService.GetAllOrganizationsByOwner(ctx, actor)
+func (a *API) GetAllOrganizations(ctx context.Context, actor *models.Actor, params pagination.Params) (*types.ListOrganizationsResponse, error) {
+	return a.organizationService.GetAllOrganizations(ctx, actor, params)
 }
 
 func (a *API) GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {
@@ -81,8 +82,8 @@ func (a *API) CreateInvitation(ctx context.Context, actor *models.Actor, organiz
 	return a.invitationService.CreateOrganizationInvitation(ctx, actor, organizationID, request, redirectURL)
 }
 
-func (a *API) GetAllInvitations(ctx context.Context, actor *models.Actor, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
-	return a.invitationService.GetAllOrganizationInvitationsByOrgIDWithOrg(ctx, organizationID)
+func (a *API) GetAllInvitations(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationInvitationsResponse, error) {
+	return a.invitationService.GetAllOrganizationInvitationsByOrgIDWithOrg(ctx, organizationID, params)
 }
 
 func (a *API) GetInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.GetOrganizationInvitationResponse, error) {
@@ -115,8 +116,8 @@ func (a *API) AddMember(ctx context.Context, actor *models.Actor, organizationID
 	return a.memberService.AddMember(ctx, actor, organizationID, request)
 }
 
-func (a *API) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, error) {
-	return a.memberService.GetAllMembers(ctx, actor, organizationID, page, limit)
+func (a *API) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationMembersResponse, error) {
+	return a.memberService.GetAllMembers(ctx, actor, organizationID, params)
 }
 
 func (a *API) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMemberResponse, error) {
@@ -141,8 +142,8 @@ func (a *API) CreateTeam(ctx context.Context, actor *models.Actor, organizationI
 	return a.teamService.CreateTeam(ctx, actor, organizationID, request)
 }
 
-func (a *API) GetAllTeams(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationTeam, error) {
-	return a.teamService.GetAllTeams(ctx, actor, organizationID)
+func (a *API) GetAllTeams(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationTeamsResponse, error) {
+	return a.teamService.GetAllTeams(ctx, actor, organizationID, params)
 }
 
 func (a *API) GetTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string) (*types.OrganizationTeam, error) {
@@ -163,8 +164,8 @@ func (a *API) AddTeamMember(ctx context.Context, actor *models.Actor, organizati
 	return a.teamMemberService.AddTeamMember(ctx, actor, organizationID, teamID, request)
 }
 
-func (a *API) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMemberResponse, error) {
-	return a.teamMemberService.GetAllTeamMembers(ctx, actor, organizationID, teamID, page, limit)
+func (a *API) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, params pagination.Params) (*types.ListOrganizationTeamMembersResponse, error) {
+	return a.teamMemberService.GetAllTeamMembers(ctx, actor, organizationID, teamID, params)
 }
 
 func (a *API) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMemberResponse, error) {

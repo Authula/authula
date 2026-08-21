@@ -2,6 +2,7 @@ package repositories_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -158,56 +159,83 @@ func TestBunOrganizationTeamRepository_GetByOrganizationIDAndSlug(t *testing.T) 
 	}
 }
 
+func seedTeams(t *testing.T, count int) (repositories.OrganizationTeamRepository, context.Context) {
+	t.Helper()
+
+	db := plugintests.SetupRepoDB(t)
+	plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+
+	repo := repositories.NewBunOrganizationTeamRepository(db)
+	ctx := context.Background()
+	for i := 1; i <= count; i++ {
+		_, err := repo.Create(ctx, &types.OrganizationTeam{
+			ID:             fmt.Sprintf("team-%d", i),
+			OrganizationID: "org-1",
+			Name:           fmt.Sprintf("Team %d", i),
+			Slug:           fmt.Sprintf("team-%d", i),
+		})
+		require.NoError(t, err)
+	}
+
+	return repo, ctx
+}
+
+func teamIDs(teams []types.OrganizationTeam) []string {
+	ids := make([]string, 0, len(teams))
+	for _, team := range teams {
+		ids = append(ids, team.ID)
+	}
+	return ids
+}
+
 func TestBunOrganizationTeamRepository_GetAllByOrganizationID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name           string
 		organizationID string
-		setup          func(*testing.T) (repositories.OrganizationTeamRepository, context.Context)
+		page           int
+		limit          int
 		expectCount    int
+		expectTotal    int
 	}{
-		{
-			name:           "found",
-			organizationID: "org-1",
-			expectCount:    2,
-			setup: func(t *testing.T) (repositories.OrganizationTeamRepository, context.Context) {
-				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				repo := repositories.NewBunOrganizationTeamRepository(db)
-				ctx := context.Background()
-
-				_, err := repo.Create(ctx, &types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"})
-				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeam{ID: "team-2", OrganizationID: "org-1", Name: "Core", Slug: "core"})
-				require.NoError(t, err)
-
-				return repo, ctx
-			},
-		},
-		{
-			name:           "empty",
-			organizationID: "org-2",
-			expectCount:    0,
-			setup: func(t *testing.T) (repositories.OrganizationTeamRepository, context.Context) {
-				t.Helper()
-				return repositories.NewBunOrganizationTeamRepository(plugintests.SetupRepoDB(t)), context.Background()
-			},
-		},
+		{name: "first page", organizationID: "org-1", page: 1, limit: 2, expectCount: 2, expectTotal: 5},
+		{name: "last partial page", organizationID: "org-1", page: 3, limit: 2, expectCount: 1, expectTotal: 5},
+		{name: "page past the end keeps the true total", organizationID: "org-1", page: 4, limit: 2, expectCount: 0, expectTotal: 5},
+		{name: "page zero does not error", organizationID: "org-1", page: 0, limit: 2, expectCount: 2, expectTotal: 5},
+		{name: "negative page does not error", organizationID: "org-1", page: -1, limit: 2, expectCount: 2, expectTotal: 5},
+		{name: "zero limit falls back to a bounded page", organizationID: "org-1", page: 1, limit: 0, expectCount: 5, expectTotal: 5},
+		{name: "unknown organization is empty", organizationID: "org-2", page: 1, limit: 10, expectCount: 0, expectTotal: 0},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			repo, ctx := tt.setup(t)
+			repo, ctx := seedTeams(t, 5)
 
-			found, err := repo.GetAllByOrganizationID(ctx, tt.organizationID)
+			found, total, err := repo.GetAllByOrganizationID(ctx, tt.organizationID, tt.page, tt.limit)
 			require.NoError(t, err)
 			require.Len(t, found, tt.expectCount)
+			require.Equal(t, tt.expectTotal, total)
 		})
 	}
+}
+
+func TestBunOrganizationTeamRepository_GetAllByOrganizationIDPagesPartitionCleanly(t *testing.T) {
+	t.Parallel()
+
+	repo, ctx := seedTeams(t, 5)
+
+	seen := make([]string, 0, 5)
+	for page := 1; page <= 3; page++ {
+		found, total, err := repo.GetAllByOrganizationID(ctx, "org-1", page, 2)
+		require.NoError(t, err)
+		require.Equal(t, 5, total)
+		seen = append(seen, teamIDs(found)...)
+	}
+
+	require.ElementsMatch(t, []string{"team-1", "team-2", "team-3", "team-4", "team-5"}, seen)
 }
 
 func TestBunOrganizationTeamRepository_Update(t *testing.T) {

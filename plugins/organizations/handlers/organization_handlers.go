@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/Authula/authula/core/pagination"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
 	"github.com/Authula/authula/plugins/organizations/types"
@@ -48,16 +49,16 @@ func (h *CreateOrganizationHandler) Handle() http.HandlerFunc {
 	}
 }
 
-type GetAllOrganizationsByOwnerHandler struct {
+type GetAllOrganizationsHandler struct {
 	UseCases *orgusecases.UseCases
 }
 
-func (h *GetAllOrganizationsByOwnerHandler) Handle() http.HandlerFunc {
+func (h *GetAllOrganizationsHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 		actor := reqCtx.Actor
-		organizations, err := h.UseCases.GetAllOrganizationsByOwner(ctx, actor)
+		organizations, err := h.UseCases.GetAllOrganizations(ctx, actor, pagination.ParseFromRequest(r))
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return

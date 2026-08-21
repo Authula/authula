@@ -13,6 +13,7 @@ import (
 	emailconstants "github.com/Authula/authula/core/email/constants"
 	emailtmpl "github.com/Authula/authula/core/email/template"
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
 	"github.com/Authula/authula/plugins/organizations/repositories"
@@ -256,23 +257,6 @@ func (s *organizationInvitationService) publishOrganizationInvitationCreatedEven
 	})
 }
 
-func (s *organizationInvitationService) GetAllOrganizationInvitations(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationInvitation, error) {
-	if actor == nil || actor.ID == "" || organizationID == "" {
-		return nil, coreerrors.ErrUnauthorized
-	}
-
-	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
-	}
-
-	invitations, err := s.orgInvitationRepo.GetAllByOrganizationID(ctx, organizationID)
-	if err != nil {
-		return nil, err
-	}
-
-	return invitations, nil
-}
-
 func (s *organizationInvitationService) GetOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
 	if actor == nil || actor.ID == "" || organizationID == "" || invitationID == "" {
 		return nil, coreerrors.ErrUnauthorized
@@ -325,17 +309,25 @@ func (s *organizationInvitationService) GetOrganizationInvitationByIDWithOrg(ctx
 	return resp, nil
 }
 
-func (s *organizationInvitationService) GetAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
+func (s *organizationInvitationService) GetAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string, params pagination.Params) (*types.ListOrganizationInvitationsResponse, error) {
 	if organizationID == "" {
 		return nil, coreerrors.ErrNotFound
 	}
 
-	resp, err := s.orgInvitationRepo.GetAllByOrganizationIDWithOrg(ctx, organizationID)
+	params = pagination.Clamp(params)
+
+	invitations, total, err := s.orgInvitationRepo.GetAllByOrganizationIDWithOrg(ctx, organizationID, params.Page, params.Limit)
 	if err != nil {
 		return nil, err
 	}
+	if invitations == nil {
+		invitations = []types.GetOrganizationInvitationResponse{}
+	}
 
-	return resp, nil
+	return &types.ListOrganizationInvitationsResponse{
+		Data:       invitations,
+		Pagination: pagination.New(params.Page, params.Limit, total),
+	}, nil
 }
 
 func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
@@ -502,12 +494,19 @@ func (s *organizationInvitationService) AcceptPendingOrganizationInvitationsForE
 		}
 	}
 
-	pendingInvitations, err := s.orgInvitationRepo.GetAllPendingByEmail(ctx, email)
+	pendingInvitations, err := s.orgInvitationRepo.GetAllPendingByEmail(ctx, email, repositories.MaxPendingInvitationsPerBatch)
 	if err != nil {
 		return nil, err
 	}
 	if len(pendingInvitations) == 0 {
 		return []types.OrganizationInvitation{}, nil
+	}
+	if len(pendingInvitations) == repositories.MaxPendingInvitationsPerBatch {
+		s.logger.Warn(
+			"pending organization invitation batch hit the per-call cap; remaining invitations will be accepted on the next call",
+			"email", email,
+			"limit", repositories.MaxPendingInvitationsPerBatch,
+		)
 	}
 
 	return s.acceptOrganizationInvitations(ctx, userID, pendingInvitations)

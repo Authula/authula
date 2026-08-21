@@ -37,6 +37,7 @@ func organizationsSQLiteInitial() migrations.Migration {
 					FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
 				);`,
 				`CREATE INDEX IF NOT EXISTS idx_organizations_owner_id ON organizations(owner_id);`,
+				`CREATE INDEX IF NOT EXISTS idx_organizations_owner_created_id ON organizations(owner_id, created_at, id);`,
 				`DROP TRIGGER IF EXISTS update_organizations_updated_at_trigger;`,
 				`CREATE TRIGGER update_organizations_updated_at_trigger 
 				AFTER UPDATE ON organizations
@@ -62,6 +63,8 @@ func organizationsSQLiteInitial() migrations.Migration {
 				`CREATE INDEX IF NOT EXISTS idx_organization_invitations_organization_id ON organization_invitations(organization_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_invitations_inviter_id ON organization_invitations(inviter_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_invitations_status_expires_at ON organization_invitations(status, expires_at);`,
+				`CREATE INDEX IF NOT EXISTS idx_organization_invitations_org_created_id ON organization_invitations(organization_id, created_at, id);`,
+				`CREATE INDEX IF NOT EXISTS idx_organization_invitations_email_status_expires ON organization_invitations(email, status, expires_at);`,
 				// -----------------------------------
 				`CREATE TABLE IF NOT EXISTS organization_members (
 					id TEXT PRIMARY KEY,
@@ -76,6 +79,8 @@ func organizationsSQLiteInitial() migrations.Migration {
 				);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_members_organization_id ON organization_members(organization_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_members_user_id ON organization_members(user_id);`,
+				`CREATE INDEX IF NOT EXISTS idx_organization_members_org_created_id ON organization_members(organization_id, created_at, id);`,
+				`CREATE INDEX IF NOT EXISTS idx_organization_members_user_org ON organization_members(user_id, organization_id);`,
 				`DROP TRIGGER IF EXISTS update_organization_members_updated_at_trigger;`,
 				`CREATE TRIGGER update_organization_members_updated_at_trigger 
         AFTER UPDATE ON organization_members
@@ -97,6 +102,7 @@ func organizationsSQLiteInitial() migrations.Migration {
 				);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_teams_organization_id ON organization_teams(organization_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_teams_slug ON organization_teams(slug);`,
+				`CREATE INDEX IF NOT EXISTS idx_organization_teams_org_created_id ON organization_teams(organization_id, created_at, id);`,
 				`DROP TRIGGER IF EXISTS update_organization_teams_updated_at_trigger;`,
 				`CREATE TRIGGER update_organization_teams_updated_at_trigger 
         AFTER UPDATE ON organization_teams
@@ -115,6 +121,7 @@ func organizationsSQLiteInitial() migrations.Migration {
 				);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_team_members_team_id ON organization_team_members(team_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_team_members_member_id ON organization_team_members(member_id);`,
+				`CREATE INDEX IF NOT EXISTS idx_organization_team_members_team_created_id ON organization_team_members(team_id, created_at, id);`,
 				// -----------------------------------
 			)
 		},
@@ -164,6 +171,7 @@ func organizationsPostgresInitial() migrations.Migration {
 				FOR EACH ROW
 				EXECUTE FUNCTION organizations_set_updated_at_fn();`,
 				`CREATE INDEX IF NOT EXISTS idx_organizations_owner_id ON organizations(owner_id);`,
+				`CREATE INDEX IF NOT EXISTS idx_organizations_owner_created_id ON organizations(owner_id, created_at, id);`,
 				// -----------------------------------
 				`CREATE TABLE IF NOT EXISTS organization_invitations (
 					id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -188,6 +196,8 @@ func organizationsPostgresInitial() migrations.Migration {
 				`CREATE INDEX IF NOT EXISTS idx_organization_invitations_inviter_id ON organization_invitations(inviter_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_invitations_email ON organization_invitations(email);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_invitations_status_expires_at ON organization_invitations(status, expires_at);`,
+				`CREATE INDEX IF NOT EXISTS idx_organization_invitations_org_created_id ON organization_invitations(organization_id, created_at, id);`,
+				`CREATE INDEX IF NOT EXISTS idx_organization_invitations_email_status_expires ON organization_invitations(email, status, expires_at);`,
 				// -----------------------------------
 				`CREATE TABLE IF NOT EXISTS organization_members (
 					id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -207,6 +217,8 @@ func organizationsPostgresInitial() migrations.Migration {
 				EXECUTE FUNCTION organizations_set_updated_at_fn();`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_members_organization_id ON organization_members(organization_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_members_user_id ON organization_members(user_id);`,
+				`CREATE INDEX IF NOT EXISTS idx_organization_members_org_created_id ON organization_members(organization_id, created_at, id);`,
+				`CREATE INDEX IF NOT EXISTS idx_organization_members_user_org ON organization_members(user_id, organization_id);`,
 				// -----------------------------------
 				`CREATE TABLE IF NOT EXISTS organization_teams (
 					id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -227,6 +239,7 @@ func organizationsPostgresInitial() migrations.Migration {
 				EXECUTE FUNCTION organizations_set_updated_at_fn();`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_teams_organization_id ON organization_teams(organization_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_teams_slug ON organization_teams(slug);`,
+				`CREATE INDEX IF NOT EXISTS idx_organization_teams_org_created_id ON organization_teams(organization_id, created_at, id);`,
 				// -----------------------------------
 				`CREATE TABLE IF NOT EXISTS organization_team_members (
 					id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -239,6 +252,7 @@ func organizationsPostgresInitial() migrations.Migration {
 				);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_team_members_team_id ON organization_team_members(team_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_team_members_member_id ON organization_team_members(member_id);`,
+				`CREATE INDEX IF NOT EXISTS idx_organization_team_members_team_created_id ON organization_team_members(team_id, created_at, id);`,
 				// -----------------------------------
 			)
 		},
@@ -279,7 +293,8 @@ func organizationsMySQLInitial() migrations.Migration {
 					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 					updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 					CONSTRAINT fk_organizations_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
-					INDEX idx_organizations_owner_id (owner_id)
+					INDEX idx_organizations_owner_id (owner_id),
+					INDEX idx_organizations_owner_created_id (owner_id, created_at, id)
 				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 				// -----------------------------------
 				`CREATE TABLE IF NOT EXISTS organization_invitations (
@@ -298,7 +313,9 @@ func organizationsMySQLInitial() migrations.Migration {
 					INDEX idx_organization_invitations_organization_id (organization_id),
 					INDEX idx_organization_invitations_inviter_id (inviter_id),
 					INDEX idx_organization_invitations_email (email),
-					INDEX idx_organization_invitations_status_expires_at (status, expires_at)
+					INDEX idx_organization_invitations_status_expires_at (status, expires_at),
+					INDEX idx_organization_invitations_org_created_id (organization_id, created_at, id),
+					INDEX idx_organization_invitations_email_status_expires (email, status, expires_at)
 				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 				// -----------------------------------
 				`CREATE TABLE IF NOT EXISTS organization_members (
@@ -312,7 +329,9 @@ func organizationsMySQLInitial() migrations.Migration {
 					CONSTRAINT fk_organization_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 					CONSTRAINT uq_organization_members_organization_user UNIQUE (organization_id, user_id),
 					INDEX idx_organization_members_organization_id (organization_id),
-					INDEX idx_organization_members_user_id (user_id)
+					INDEX idx_organization_members_user_id (user_id),
+					INDEX idx_organization_members_org_created_id (organization_id, created_at, id),
+					INDEX idx_organization_members_user_org (user_id, organization_id)
 				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 				// -----------------------------------
 				`CREATE TABLE IF NOT EXISTS organization_teams (
@@ -327,7 +346,8 @@ func organizationsMySQLInitial() migrations.Migration {
 					CONSTRAINT fk_organization_teams_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
 					CONSTRAINT uq_organization_teams_organization_slug UNIQUE (organization_id, slug),
 					INDEX idx_organization_teams_organization_id (organization_id),
-					INDEX idx_organization_teams_slug (slug)
+					INDEX idx_organization_teams_slug (slug),
+					INDEX idx_organization_teams_org_created_id (organization_id, created_at, id)
 				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 				// -----------------------------------
 				`CREATE TABLE IF NOT EXISTS organization_team_members (
@@ -339,7 +359,8 @@ func organizationsMySQLInitial() migrations.Migration {
 					CONSTRAINT fk_organization_team_members_member FOREIGN KEY (member_id) REFERENCES organization_members(id) ON DELETE CASCADE,
 					CONSTRAINT uq_organization_team_members_team_member UNIQUE (team_id, member_id),
 					INDEX idx_organization_team_members_team_id (team_id),
-					INDEX idx_organization_team_members_member_id (member_id)
+					INDEX idx_organization_team_members_member_id (member_id),
+					INDEX idx_organization_team_members_team_created_id (team_id, created_at, id)
 				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 				// -----------------------------------
 			)

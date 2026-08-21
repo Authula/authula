@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
@@ -156,6 +157,8 @@ func TestAddOrganizationMemberHandler(t *testing.T) {
 func TestGetAllOrganizationMembersHandler(t *testing.T) {
 	t.Parallel()
 
+	defaultParams := pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}
+
 	runOrganizationMemberHandlerCases(t, http.MethodGet, "/organizations/org-1/members", func(fixture *organizationMemberHandlerFixture) http.HandlerFunc {
 		return (&GetAllOrganizationMembersHandler{UseCases: newMemberUseCases(fixture.service)}).Handle()
 	}, []organizationMemberHandlerCase{
@@ -170,7 +173,8 @@ func TestGetAllOrganizationMembersHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(fixture *organizationMemberHandlerFixture) {
-				fixture.service.On("GetAllMembers", mock.Anything, "user-1", "org-1", 1, 10).Return(([]orgtypes.OrganizationMemberResponse)(nil), errors.New("some error")).Once()
+				fixture.service.On("GetAllMembers", mock.Anything, "user-1", "org-1", defaultParams).
+					Return((*orgtypes.ListOrganizationMembersResponse)(nil), errors.New("some error")).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "some error",
@@ -180,16 +184,61 @@ func TestGetAllOrganizationMembersHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(fixture *organizationMemberHandlerFixture) {
-				fixture.service.On("GetAllMembers", mock.Anything, "user-1", "org-1", 1, 10).Return([]orgtypes.OrganizationMemberResponse{{ID: "mem-1", OrganizationID: "org-1", Role: "member"}}, nil).Once()
+				fixture.service.On("GetAllMembers", mock.Anything, "user-1", "org-1", defaultParams).
+					Return(&orgtypes.ListOrganizationMembersResponse{
+						Data:       []orgtypes.OrganizationMemberResponse{{ID: "mem-1", OrganizationID: "org-1", Role: "member"}},
+						Pagination: pagination.New(1, 10, 25),
+					}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
-				members := internaltests.DecodeResponseJSON[[]orgtypes.OrganizationMemberResponse](t, reqCtx)
-				assert.Len(t, members, 1)
-				assert.Equal(t, "mem-1", members[0].ID)
+				resp := internaltests.DecodeResponseJSON[orgtypes.ListOrganizationMembersResponse](t, reqCtx)
+				assert.Len(t, resp.Data, 1)
+				assert.Equal(t, "mem-1", resp.Data[0].ID)
+				assert.Equal(t, pagination.Pagination{Page: 1, Limit: 10, Total: 25, TotalPages: 3, HasMore: true}, resp.Pagination)
 			},
 		},
 	})
+}
+
+func TestGetAllOrganizationMembersHandlerParsesPagination(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		query          string
+		expectedParams pagination.Params
+	}{
+		{name: "no query string uses the defaults", query: "", expectedParams: pagination.Params{Page: 1, Limit: 10}},
+		{name: "explicit values are forwarded", query: "?page=3&limit=50", expectedParams: pagination.Params{Page: 3, Limit: 50}},
+		{name: "unparseable values fall back to the defaults", query: "?page=abc&limit=xyz", expectedParams: pagination.Params{Page: 1, Limit: 10}},
+		{name: "an absurd limit is forwarded for the service to clamp", query: "?limit=100000", expectedParams: pagination.Params{Page: 1, Limit: 100000}},
+		{name: "a negative limit is forwarded for the service to clamp", query: "?limit=-1", expectedParams: pagination.Params{Page: 1, Limit: -1}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			runOrganizationMemberHandlerCases(t, http.MethodGet, "/organizations/org-1/members"+tt.query, func(fixture *organizationMemberHandlerFixture) http.HandlerFunc {
+				return (&GetAllOrganizationMembersHandler{UseCases: newMemberUseCases(fixture.service)}).Handle()
+			}, []organizationMemberHandlerCase{
+				{
+					name:           "forwards_parsed_params",
+					userID:         new("user-1"),
+					organizationID: "org-1",
+					prepare: func(fixture *organizationMemberHandlerFixture) {
+						fixture.service.On("GetAllMembers", mock.Anything, "user-1", "org-1", tt.expectedParams).
+							Return(&orgtypes.ListOrganizationMembersResponse{
+								Data:       []orgtypes.OrganizationMemberResponse{},
+								Pagination: pagination.New(1, 10, 0),
+							}, nil).Once()
+					},
+					expectedStatus: http.StatusOK,
+				},
+			})
+		})
+	}
 }
 
 func TestGetOrganizationMemberHandler(t *testing.T) {

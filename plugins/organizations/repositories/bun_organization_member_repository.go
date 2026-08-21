@@ -54,6 +54,10 @@ const memberWithUserColumns = `m.id, m.organization_id, m.role, m.created_at, m.
 	` u.metadata AS user_metadata, u.created_at AS user_created_at,` +
 	` u.updated_at AS user_updated_at`
 
+const memberWithUserByOrganizationFrom = ` FROM organization_members m` +
+	` INNER JOIN users u ON u.id = m.user_id` +
+	` WHERE m.organization_id = ?`
+
 type BunOrganizationMemberRepository struct {
 	db bun.IDB
 }
@@ -95,37 +99,41 @@ func (r *BunOrganizationMemberRepository) GetByID(ctx context.Context, memberID 
 	return member, err
 }
 
-func (r *BunOrganizationMemberRepository) GetAllByOrganizationID(ctx context.Context, organizationID string, page int, limit int) ([]types.OrganizationMember, error) {
+func (r *BunOrganizationMemberRepository) GetAllByOrganizationID(ctx context.Context, organizationID string, page int, limit int) ([]types.OrganizationMember, int, error) {
 	members := make([]types.OrganizationMember, 0)
-	err := r.db.NewSelect().Model(&members).
+	limit = pageLimit(limit)
+	total, err := r.db.NewSelect().Model(&members).
 		Where("organization_id = ?", organizationID).
 		OrderExpr("created_at DESC, id DESC").
-		Offset((page - 1) * limit).Limit(limit).
-		Scan(ctx)
+		Offset(pageOffset(page, limit)).Limit(limit).
+		ScanAndCount(ctx)
 	if err == sql.ErrNoRows {
-		return []types.OrganizationMember{}, nil
+		return []types.OrganizationMember{}, total, nil
 	}
-	return members, err
+	return members, total, err
 }
 
-func (r *BunOrganizationMemberRepository) GetAllByOrganizationIDWithUser(ctx context.Context, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, error) {
+func (r *BunOrganizationMemberRepository) GetAllByOrganizationIDWithUser(ctx context.Context, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, int, error) {
+	limit = pageLimit(limit)
+
+	var total int
+	if err := r.db.NewRaw(`SELECT COUNT(*)`+memberWithUserByOrganizationFrom, organizationID).Scan(ctx, &total); err != nil {
+		return nil, 0, err
+	}
+
 	var rows []memberUserRow
-	err := r.db.NewRaw(`
-		SELECT `+memberWithUserColumns+`
-		FROM organization_members m
-		INNER JOIN users u ON u.id = m.user_id
-		WHERE m.organization_id = ?
+	err := r.db.NewRaw(`SELECT `+memberWithUserColumns+memberWithUserByOrganizationFrom+`
 		ORDER BY m.created_at DESC, m.id DESC
 		LIMIT ? OFFSET ?
-	`, organizationID, limit, (page-1)*limit).Scan(ctx, &rows)
+	`, organizationID, limit, pageOffset(page, limit)).Scan(ctx, &rows)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	results := make([]types.OrganizationMemberResponse, len(rows))
 	for i, row := range rows {
 		results[i] = mapToMemberResponse(row)
 	}
-	return results, nil
+	return results, total, nil
 }
 
 func (r *BunOrganizationMemberRepository) GetByIDWithUser(ctx context.Context, memberID string) (*types.OrganizationMemberResponse, error) {
@@ -162,17 +170,6 @@ func (r *BunOrganizationMemberRepository) GetByOrganizationIDAndUserIDWithUser(c
 	}
 	result := mapToMemberResponse(row)
 	return &result, nil
-}
-
-func (r *BunOrganizationMemberRepository) GetAllByUserID(ctx context.Context, userID string) ([]types.OrganizationMember, error) {
-	members := make([]types.OrganizationMember, 0)
-	err := r.db.NewSelect().Model(&members).
-		Where("user_id = ?", userID).
-		Scan(ctx)
-	if err == sql.ErrNoRows {
-		return []types.OrganizationMember{}, nil
-	}
-	return members, err
 }
 
 func (r *BunOrganizationMemberRepository) GetByOrganizationIDAndUserID(ctx context.Context, organizationID string, userID string) (*types.OrganizationMember, error) {

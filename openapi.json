@@ -2404,21 +2404,31 @@
           "Organizations"
         ],
         "summary": "List organizations",
-        "description": "Lists all organizations owned by the authenticated user.",
+        "description": "Lists every organization the authenticated user can access, both the ones they own and the ones they are a member of, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10, with a hard maximum of 100. Out-of-range values are clamped silently rather than rejected.",
         "operationId": "listOrganizations",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/Organization"
-                  },
-                  "type": [
-                    "null",
-                    "array"
-                  ]
+                  "$ref": "#/components/schemas/ListOrganizationsResponse"
                 }
               }
             }
@@ -2562,9 +2572,23 @@
           "Organization Invitations"
         ],
         "summary": "List invitations",
-        "description": "Lists all invitations for an organization.",
+        "description": "Lists the invitations for an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10, with a hard maximum of 100. Out-of-range values are clamped silently rather than rejected.",
         "operationId": "listOrganizationInvitations",
         "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
           {
             "name": "organization_id",
             "in": "path",
@@ -2580,13 +2604,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/GetOrganizationInvitationResponse"
-                  },
-                  "type": [
-                    "null",
-                    "array"
-                  ]
+                  "$ref": "#/components/schemas/ListOrganizationInvitationsResponse"
                 }
               }
             }
@@ -2822,7 +2840,7 @@
           "Organization Members"
         ],
         "summary": "List members",
-        "description": "Lists all members of an organization with pagination.",
+        "description": "Lists the members of an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10, with a hard maximum of 100. Out-of-range values are clamped silently rather than rejected.",
         "operationId": "listOrganizationMembers",
         "parameters": [
           {
@@ -2854,13 +2872,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/OrganizationMemberResponse"
-                  },
-                  "type": [
-                    "null",
-                    "array"
-                  ]
+                  "$ref": "#/components/schemas/ListOrganizationMembersResponse"
                 }
               }
             }
@@ -3078,9 +3090,23 @@
           "Organization Teams"
         ],
         "summary": "List teams",
-        "description": "Lists all teams within an organization.",
+        "description": "Lists the teams within an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10, with a hard maximum of 100. Out-of-range values are clamped silently rather than rejected.",
         "operationId": "listOrganizationTeams",
         "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
           {
             "name": "organization_id",
             "in": "path",
@@ -3096,13 +3122,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/OrganizationTeam"
-                  },
-                  "type": [
-                    "null",
-                    "array"
-                  ]
+                  "$ref": "#/components/schemas/ListOrganizationTeamsResponse"
                 }
               }
             }
@@ -3280,7 +3300,7 @@
           "Organization Team Members"
         ],
         "summary": "List team members",
-        "description": "Lists all members of a team with pagination.",
+        "description": "Lists the members of a team, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10, with a hard maximum of 100. Out-of-range values are clamped silently rather than rejected.",
         "operationId": "listOrganizationTeamMembers",
         "parameters": [
           {
@@ -3320,13 +3340,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/OrganizationTeamMemberResponse"
-                  },
-                  "type": [
-                    "null",
-                    "array"
-                  ]
+                  "$ref": "#/components/schemas/ListOrganizationTeamMembersResponse"
                 }
               }
             }
@@ -5030,6 +5044,96 @@
         ],
         "type": "object"
       },
+      "ListOrganizationInvitationsResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/GetOrganizationInvitationResponse"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "ListOrganizationMembersResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationMemberResponse"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "ListOrganizationTeamMembersResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationTeamMemberResponse"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "ListOrganizationTeamsResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationTeam"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "ListOrganizationsResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Organization"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "MagicLinkExchangeRequest": {
         "properties": {
           "token": {
@@ -5395,6 +5499,33 @@
           "team_id",
           "created_at",
           "member"
+        ],
+        "type": "object"
+      },
+      "Pagination": {
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "total_pages": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "total_pages",
+          "has_more"
         ],
         "type": "object"
       },

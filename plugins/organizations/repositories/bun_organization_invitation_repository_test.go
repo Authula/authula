@@ -2,6 +2,7 @@ package repositories_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -200,114 +201,159 @@ func TestBunOrganizationInvitationRepository_GetByOrganizationIDAndEmail(t *test
 func TestBunOrganizationInvitationRepository_GetAllPendingByEmail(t *testing.T) {
 	t.Parallel()
 
+	setup := func(t *testing.T) (repositories.OrganizationInvitationRepository, context.Context) {
+		t.Helper()
+
+		db := plugintests.SetupRepoDB(t)
+		plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+		plugintests.SeedOrganization(t, db, "org-2", "user-2", "Beta Inc", "beta-inc")
+		plugintests.SeedOrganization(t, db, "org-3", "user-2", "Gamma Inc", "gamma-inc")
+		plugintests.SeedOrganization(t, db, "org-4", "user-2", "Delta Inc", "delta-inc")
+		plugintests.SeedOrganization(t, db, "org-5", "user-2", "Epsilon Inc", "epsilon-inc")
+
+		repo := repositories.NewBunOrganizationInvitationRepository(db)
+		ctx := context.Background()
+
+		for i, invitation := range []*types.OrganizationInvitation{
+			{ID: "inv-1", OrganizationID: "org-1", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)},
+			{ID: "inv-2", OrganizationID: "org-2", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)},
+			{ID: "inv-3", OrganizationID: "org-3", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)},
+			{ID: "inv-4", OrganizationID: "org-4", Status: types.OrganizationInvitationStatusAccepted, ExpiresAt: time.Now().UTC().Add(time.Hour)},
+			{ID: "inv-5", OrganizationID: "org-5", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(-time.Hour)},
+		} {
+			invitation.Email = "user@example.com"
+			invitation.InviterID = "user-1"
+			invitation.Role = "member"
+			_, err := repo.Create(ctx, invitation)
+			require.NoError(t, err, "seeding invitation %d", i)
+		}
+
+		return repo, ctx
+	}
+
 	tests := []struct {
-		name          string
-		email         string
-		setup         func(*testing.T) (repositories.OrganizationInvitationRepository, context.Context)
-		expectPending int
+		name        string
+		email       string
+		limit       int
+		expectedIDs []string
 	}{
-		{
-			name:          "pending only",
-			email:         "user@example.com",
-			expectPending: 1,
-			setup: func(t *testing.T) (repositories.OrganizationInvitationRepository, context.Context) {
-				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganization(t, db, "org-2", "user-2", "Beta Inc", "beta-inc")
-				repo := repositories.NewBunOrganizationInvitationRepository(db)
-				ctx := context.Background()
-
-				_, err := repo.Create(ctx, &types.OrganizationInvitation{ID: "inv-1", Email: "user@example.com", InviterID: "user-1", OrganizationID: "org-1", Role: "member", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)})
-				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationInvitation{ID: "inv-2", Email: "user@example.com", InviterID: "user-1", OrganizationID: "org-2", Role: "member", Status: types.OrganizationInvitationStatusAccepted, ExpiresAt: time.Now().UTC().Add(time.Hour)})
-				require.NoError(t, err)
-
-				return repo, ctx
-			},
-		},
-		{
-			name:          "missing",
-			email:         "missing@example.com",
-			expectPending: 0,
-			setup: func(t *testing.T) (repositories.OrganizationInvitationRepository, context.Context) {
-				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganization(t, db, "org-2", "user-2", "Beta Inc", "beta-inc")
-				return repositories.NewBunOrganizationInvitationRepository(db), context.Background()
-			},
-		},
+		{name: "returns every pending invitation", email: "user@example.com", limit: 10, expectedIDs: []string{"inv-1", "inv-2", "inv-3"}},
+		{name: "capped batch returns the oldest pending invitations", email: "user@example.com", limit: 2, expectedIDs: []string{"inv-1", "inv-2"}},
+		{name: "unknown email has nothing pending", email: "missing@example.com", limit: 10, expectedIDs: []string{}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			repo, ctx := tt.setup(t)
+			repo, ctx := setup(t)
 
-			pending, err := repo.GetAllPendingByEmail(ctx, tt.email)
+			pending, err := repo.GetAllPendingByEmail(ctx, tt.email, tt.limit)
 			require.NoError(t, err)
-			require.Len(t, pending, tt.expectPending)
+
+			ids := make([]string, 0, len(pending))
+			for _, invitation := range pending {
+				ids = append(ids, invitation.ID)
+			}
+			require.Equal(t, tt.expectedIDs, ids)
 		})
 	}
 }
 
-func TestBunOrganizationInvitationRepository_GetAllByOrganizationID(t *testing.T) {
+func TestBunOrganizationInvitationRepository_GetAllByOrganizationIDWithOrg(t *testing.T) {
 	t.Parallel()
+
+	setup := func(t *testing.T) (repositories.OrganizationInvitationRepository, context.Context) {
+		t.Helper()
+
+		db := plugintests.SetupRepoDB(t)
+		plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+		plugintests.SeedOrganization(t, db, "org-2", "user-2", "Beta Inc", "beta-inc")
+
+		repo := repositories.NewBunOrganizationInvitationRepository(db)
+		ctx := context.Background()
+
+		for i := 1; i <= 5; i++ {
+			_, err := repo.Create(ctx, &types.OrganizationInvitation{
+				ID:             fmt.Sprintf("inv-%d", i),
+				Email:          fmt.Sprintf("user%d@example.com", i),
+				InviterID:      "user-1",
+				OrganizationID: "org-1",
+				Role:           "member",
+				Status:         types.OrganizationInvitationStatusPending,
+				ExpiresAt:      time.Now().UTC().Add(time.Hour),
+			})
+			require.NoError(t, err)
+		}
+
+		return repo, ctx
+	}
 
 	tests := []struct {
 		name           string
 		organizationID string
-		setup          func(*testing.T) (repositories.OrganizationInvitationRepository, context.Context)
+		page           int
+		limit          int
 		expectCount    int
-		verify         func(*testing.T, []types.OrganizationInvitation)
+		expectTotal    int
 	}{
-		{
-			name:           "returns invitations for organization",
-			organizationID: "org-1",
-			expectCount:    2,
-			setup: func(t *testing.T) (repositories.OrganizationInvitationRepository, context.Context) {
-				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganization(t, db, "org-2", "user-2", "Beta Inc", "beta-inc")
-				repo := repositories.NewBunOrganizationInvitationRepository(db)
-				ctx := context.Background()
-
-				_, err := repo.Create(ctx, &types.OrganizationInvitation{ID: "inv-1", Email: "user@example.com", InviterID: "user-1", OrganizationID: "org-1", Role: "member", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)})
-				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationInvitation{ID: "inv-2", Email: "other@example.com", InviterID: "user-1", OrganizationID: "org-1", Role: "member", Status: types.OrganizationInvitationStatusRejected, ExpiresAt: time.Now().UTC().Add(time.Hour)})
-				require.NoError(t, err)
-
-				return repo, ctx
-			},
-			verify: func(t *testing.T, invitations []types.OrganizationInvitation) {
-				t.Helper()
-				statusByID := map[string]types.OrganizationInvitationStatus{}
-				for _, invitation := range invitations {
-					statusByID[invitation.ID] = invitation.Status
-				}
-
-				require.Equal(t, types.OrganizationInvitationStatusPending, statusByID["inv-1"])
-				require.Equal(t, types.OrganizationInvitationStatusRejected, statusByID["inv-2"])
-			},
-		},
+		{name: "first page", organizationID: "org-1", page: 1, limit: 2, expectCount: 2, expectTotal: 5},
+		{name: "last partial page", organizationID: "org-1", page: 3, limit: 2, expectCount: 1, expectTotal: 5},
+		{name: "page past the end keeps the true total", organizationID: "org-1", page: 4, limit: 2, expectCount: 0, expectTotal: 5},
+		{name: "page zero does not error", organizationID: "org-1", page: 0, limit: 2, expectCount: 2, expectTotal: 5},
+		{name: "zero limit falls back to a bounded page", organizationID: "org-1", page: 1, limit: 0, expectCount: 5, expectTotal: 5},
+		{name: "organization without invitations is empty", organizationID: "org-2", page: 1, limit: 10, expectCount: 0, expectTotal: 0},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			repo, ctx := tt.setup(t)
-			invitations, err := repo.GetAllByOrganizationID(ctx, tt.organizationID)
+			repo, ctx := setup(t)
+
+			invitations, total, err := repo.GetAllByOrganizationIDWithOrg(ctx, tt.organizationID, tt.page, tt.limit)
 			require.NoError(t, err)
 			require.Len(t, invitations, tt.expectCount)
-			if tt.verify != nil {
-				tt.verify(t, invitations)
+			require.Equal(t, tt.expectTotal, total)
+			for _, invitation := range invitations {
+				require.Equal(t, tt.organizationID, invitation.Organization.ID, "joined organization must be populated")
 			}
 		})
 	}
+}
+
+func TestBunOrganizationInvitationRepository_GetAllByOrganizationIDWithOrgPagesPartitionCleanly(t *testing.T) {
+	t.Parallel()
+
+	db := plugintests.SetupRepoDB(t)
+	plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+	repo := repositories.NewBunOrganizationInvitationRepository(db)
+	ctx := context.Background()
+
+	for i := 1; i <= 5; i++ {
+		_, err := repo.Create(ctx, &types.OrganizationInvitation{
+			ID:             fmt.Sprintf("inv-%d", i),
+			Email:          fmt.Sprintf("user%d@example.com", i),
+			InviterID:      "user-1",
+			OrganizationID: "org-1",
+			Role:           "member",
+			Status:         types.OrganizationInvitationStatusPending,
+			ExpiresAt:      time.Now().UTC().Add(time.Hour),
+		})
+		require.NoError(t, err)
+	}
+
+	seen := make([]string, 0, 5)
+	for page := 1; page <= 3; page++ {
+		invitations, total, err := repo.GetAllByOrganizationIDWithOrg(ctx, "org-1", page, 2)
+		require.NoError(t, err)
+		require.Equal(t, 5, total)
+		for _, invitation := range invitations {
+			seen = append(seen, invitation.Invitation.ID)
+		}
+	}
+
+	require.ElementsMatch(t, []string{"inv-1", "inv-2", "inv-3", "inv-4", "inv-5"}, seen)
 }
 
 func TestBunOrganizationInvitationRepository_GetByID(t *testing.T) {

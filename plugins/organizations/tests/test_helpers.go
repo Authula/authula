@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -52,6 +53,21 @@ func SetupRepoDB(t *testing.T) *bun.DB {
 	SeedUser(t, db, "user-2")
 
 	return db
+}
+
+func SeedUsers(t *testing.T, db bun.IDB, n int) []string {
+	t.Helper()
+
+	userIDs := make([]string, 0, n)
+	for i := 1; i <= n; i++ {
+		userID := fmt.Sprintf("user-%d", i)
+		if i > 2 {
+			SeedUser(t, db, userID)
+		}
+		userIDs = append(userIDs, userID)
+	}
+
+	return userIDs
 }
 
 func SeedUser(t *testing.T, db bun.IDB, userID string) {

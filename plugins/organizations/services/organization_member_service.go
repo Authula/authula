@@ -8,6 +8,7 @@ import (
 	"github.com/uptrace/bun"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/constants"
 	"github.com/Authula/authula/plugins/organizations/repositories"
@@ -114,12 +115,25 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actor *models
 	return created, nil
 }
 
-func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, error) {
+func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationMembersResponse, error) {
 	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
-	return s.orgMemberRepo.GetAllByOrganizationIDWithUser(ctx, organizationID, page, limit)
+	params = pagination.Clamp(params)
+
+	members, total, err := s.orgMemberRepo.GetAllByOrganizationIDWithUser(ctx, organizationID, params.Page, params.Limit)
+	if err != nil {
+		return nil, err
+	}
+	if members == nil {
+		members = []types.OrganizationMemberResponse{}
+	}
+
+	return &types.ListOrganizationMembersResponse{
+		Data:       members,
+		Pagination: pagination.New(params.Page, params.Limit, total),
+	}, nil
 }
 
 func (s *organizationMemberService) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMemberResponse, error) {

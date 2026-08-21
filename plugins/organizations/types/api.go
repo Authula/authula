@@ -5,6 +5,7 @@ import (
 	"time"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	"github.com/Authula/authula/models"
 )
 
@@ -38,7 +39,24 @@ type TeamMemberID struct {
 	MemberID       string `path:"member_id"`
 }
 
+type ListOrganizationsRequest struct {
+	Page  int `query:"page" json:"page,omitempty" nullable:"false"`
+	Limit int `query:"limit" json:"limit,omitempty" nullable:"false"`
+}
+
+type ListOrganizationInvitationsRequest struct {
+	OrganizationID string `path:"organization_id"`
+	Page           int    `query:"page" json:"page,omitempty" nullable:"false"`
+	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false"`
+}
+
 type ListOrganizationMembersRequest struct {
+	OrganizationID string `path:"organization_id"`
+	Page           int    `query:"page" json:"page,omitempty" nullable:"false"`
+	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false"`
+}
+
+type ListOrganizationTeamsRequest struct {
 	OrganizationID string `path:"organization_id"`
 	Page           int    `query:"page" json:"page,omitempty" nullable:"false"`
 	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false"`
@@ -49,6 +67,31 @@ type ListOrganizationTeamMembersRequest struct {
 	TeamID         string `path:"team_id"`
 	Page           int    `query:"page" json:"page,omitempty" nullable:"false"`
 	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false"`
+}
+
+type ListOrganizationsResponse struct {
+	Data       []Organization        `json:"data" required:"true" nullable:"false"`
+	Pagination pagination.Pagination `json:"pagination" required:"true" nullable:"false"`
+}
+
+type ListOrganizationInvitationsResponse struct {
+	Data       []GetOrganizationInvitationResponse `json:"data" required:"true" nullable:"false"`
+	Pagination pagination.Pagination               `json:"pagination" required:"true" nullable:"false"`
+}
+
+type ListOrganizationMembersResponse struct {
+	Data       []OrganizationMemberResponse `json:"data" required:"true" nullable:"false"`
+	Pagination pagination.Pagination        `json:"pagination" required:"true" nullable:"false"`
+}
+
+type ListOrganizationTeamsResponse struct {
+	Data       []OrganizationTeam    `json:"data" required:"true" nullable:"false"`
+	Pagination pagination.Pagination `json:"pagination" required:"true" nullable:"false"`
+}
+
+type ListOrganizationTeamMembersResponse struct {
+	Data       []OrganizationTeamMemberResponse `json:"data" required:"true" nullable:"false"`
+	Pagination pagination.Pagination            `json:"pagination" required:"true" nullable:"false"`
 }
 
 type AcceptOrganizationInvitationQuery struct {
