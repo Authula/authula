@@ -56,7 +56,8 @@ func (h *GetAllOrganizationTeamsHandler) Handle() http.HandlerFunc {
 		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
-		teams, err := h.UseCases.GetAllTeams(ctx, actor, organizationID, pagination.ParseFromRequest(r))
+		paginationParams := pagination.ParseFromRequest(r)
+		teams, err := h.UseCases.GetAllTeams(ctx, actor, organizationID, paginationParams)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return

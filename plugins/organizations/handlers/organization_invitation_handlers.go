@@ -57,7 +57,8 @@ func (h *GetAllOrganizationInvitationsHandler) Handle() http.HandlerFunc {
 		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
-		invitations, err := h.UseCases.GetAllOrganizationInvitations(ctx, actor, organizationID, pagination.ParseFromRequest(r))
+		paginationParams := pagination.ParseFromRequest(r)
+		invitations, err := h.UseCases.GetAllOrganizationInvitations(ctx, actor, organizationID, paginationParams)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return

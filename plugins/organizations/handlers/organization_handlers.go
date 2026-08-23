@@ -58,7 +58,8 @@ func (h *GetAllOrganizationsHandler) Handle() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 		actor := reqCtx.Actor
-		organizations, err := h.UseCases.GetAllOrganizations(ctx, actor, pagination.ParseFromRequest(r))
+		paginationParams := pagination.ParseFromRequest(r)
+		organizations, err := h.UseCases.GetAllOrganizations(ctx, actor, paginationParams)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return
