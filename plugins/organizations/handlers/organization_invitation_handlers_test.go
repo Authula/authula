@@ -32,6 +32,7 @@ type organizationInvitationHandlerCase struct {
 	invitationID    string
 	prepare         func(*organizationInvitationHandlerFixture)
 	expectedStatus  int
+	expectedCode    string
 	expectedMessage string
 	checkResponse   func(*testing.T, *models.RequestContext)
 }
@@ -83,7 +84,11 @@ func runOrganizationInvitationHandlerCases(t *testing.T, method, path string, bu
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {
-				internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				if tt.expectedCode != "" {
+					internaltests.AssertErrorResponse(t, reqCtx, tt.expectedStatus, tt.expectedCode, tt.expectedMessage)
+				} else {
+					internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				}
 			}
 			if tt.checkResponse != nil {
 				tt.checkResponse(t, reqCtx)
@@ -134,7 +139,8 @@ func TestCreateOrganizationInvitationHandler(t *testing.T) {
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
 				fixture.service.On("CreateOrganizationInvitation", mock.Anything, "user-1", "org-1", mock.Anything, mock.Anything).Return((*orgtypes.OrganizationInvitation)(nil), orgconstants.ErrInvitationsQuotaExceeded).Once()
 			},
-			expectedStatus:  http.StatusTooManyRequests,
+			expectedStatus:  http.StatusConflict,
+			expectedCode:    orgconstants.CodeInvitationsQuotaExceeded,
 			expectedMessage: orgconstants.ErrInvitationsQuotaExceeded.Error(),
 		},
 		{

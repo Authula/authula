@@ -31,6 +31,7 @@ type organizationMemberHandlerCase struct {
 	targetUserID    string
 	prepare         func(*organizationMemberHandlerFixture)
 	expectedStatus  int
+	expectedCode    string
 	expectedMessage string
 	checkResponse   func(*testing.T, *models.RequestContext)
 }
@@ -82,7 +83,11 @@ func runOrganizationMemberHandlerCases(t *testing.T, method, path string, buildH
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {
-				internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				if tt.expectedCode != "" {
+					internaltests.AssertErrorResponse(t, reqCtx, tt.expectedStatus, tt.expectedCode, tt.expectedMessage)
+				} else {
+					internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				}
 			}
 			if tt.checkResponse != nil {
 				tt.checkResponse(t, reqCtx)
@@ -132,7 +137,8 @@ func TestAddOrganizationMemberHandler(t *testing.T) {
 			prepare: func(fixture *organizationMemberHandlerFixture) {
 				fixture.service.On("AddMember", mock.Anything, "user-1", "org-1", mock.Anything).Return((*orgtypes.OrganizationMember)(nil), orgconstants.ErrMembersQuotaExceeded).Once()
 			},
-			expectedStatus:  http.StatusTooManyRequests,
+			expectedStatus:  http.StatusConflict,
+			expectedCode:    orgconstants.CodeMembersQuotaExceeded,
 			expectedMessage: "members quota exceeded",
 		},
 		{

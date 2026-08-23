@@ -8,25 +8,50 @@ import (
 	"github.com/Authula/authula/models"
 )
 
+type Error struct {
+	Code    string
+	Status  int
+	Message string
+}
+
+func (e *Error) Error() string { return e.Message }
+
 var (
-	ErrOrganizationsQuotaExceeded = errors.New("organizations quota exceeded")
-	ErrMembersQuotaExceeded       = errors.New("members quota exceeded")
-	ErrInvitationsQuotaExceeded   = errors.New("invitations quota exceeded")
-	ErrInvitationEmailMismatch    = errors.New("this invitation was sent to a different email address")
+	ErrOrganizationsQuotaExceeded = &Error{
+		Code:    CodeOrganizationsQuotaExceeded,
+		Status:  http.StatusConflict,
+		Message: "organizations quota exceeded",
+	}
+	ErrMembersQuotaExceeded = &Error{
+		Code:    CodeMembersQuotaExceeded,
+		Status:  http.StatusConflict,
+		Message: "members quota exceeded",
+	}
+	ErrInvitationsQuotaExceeded = &Error{
+		Code:    CodeInvitationsQuotaExceeded,
+		Status:  http.StatusConflict,
+		Message: "invitations quota exceeded",
+	}
+	ErrInvitationEmailMismatch = &Error{
+		Code:    CodeInvitationEmailMismatch,
+		Status:  http.StatusForbidden,
+		Message: "this invitation was sent to a different email address",
+	}
+)
+
+const (
+	CodeOrganizationsQuotaExceeded = "organizations_quota_exceeded"
+	CodeMembersQuotaExceeded       = "members_quota_exceeded"
+	CodeInvitationsQuotaExceeded   = "invitations_quota_exceeded"
+	CodeInvitationEmailMismatch    = "invitation_email_mismatch"
 )
 
 func HandleError(err error, reqCtx *models.RequestContext) {
-	var status int
-
-	switch err {
-	case ErrOrganizationsQuotaExceeded, ErrMembersQuotaExceeded, ErrInvitationsQuotaExceeded:
-		status = http.StatusTooManyRequests
-	case ErrInvitationEmailMismatch:
-		status = http.StatusForbidden
-	}
-
-	if status != 0 {
-		reqCtx.SetJSONResponse(status, map[string]any{"message": err.Error()})
+	if pluginErr, ok := errors.AsType[*Error](err); ok {
+		reqCtx.SetJSONResponse(pluginErr.Status, map[string]any{
+			"code":    pluginErr.Code,
+			"message": pluginErr.Message,
+		})
 		reqCtx.Handled = true
 		return
 	}

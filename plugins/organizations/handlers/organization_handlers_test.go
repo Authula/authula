@@ -30,6 +30,7 @@ type organizationHandlerCase struct {
 	organizationID  string
 	prepare         func(*organizationHandlerFixture)
 	expectedStatus  int
+	expectedCode    string
 	expectedMessage string
 	checkResponse   func(t *testing.T, reqCtx *models.RequestContext)
 }
@@ -98,7 +99,8 @@ func TestCreateOrganizationHandler(t *testing.T) {
 					return request.Name == "Acme Inc" && request.Role == "member"
 				})).Return((*orgtypes.Organization)(nil), orgconstants.ErrOrganizationsQuotaExceeded).Once()
 			},
-			expectedStatus:  http.StatusTooManyRequests,
+			expectedStatus:  http.StatusConflict,
+			expectedCode:    orgconstants.CodeOrganizationsQuotaExceeded,
 			expectedMessage: "organizations quota exceeded",
 		},
 		{
@@ -164,7 +166,11 @@ func TestCreateOrganizationHandler(t *testing.T) {
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {
-				internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				if tt.expectedCode != "" {
+					internaltests.AssertErrorResponse(t, reqCtx, tt.expectedStatus, tt.expectedCode, tt.expectedMessage)
+				} else {
+					internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				}
 			}
 			if tt.checkResponse != nil {
 				tt.checkResponse(t, reqCtx)
@@ -235,7 +241,11 @@ func TestGetAllOrganizationsHandler(t *testing.T) {
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {
-				internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				if tt.expectedCode != "" {
+					internaltests.AssertErrorResponse(t, reqCtx, tt.expectedStatus, tt.expectedCode, tt.expectedMessage)
+				} else {
+					internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				}
 			}
 			if tt.checkResponse != nil {
 				tt.checkResponse(t, reqCtx)
@@ -329,7 +339,11 @@ func TestGetOrganizationByIDHandler(t *testing.T) {
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {
-				internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				if tt.expectedCode != "" {
+					internaltests.AssertErrorResponse(t, reqCtx, tt.expectedStatus, tt.expectedCode, tt.expectedMessage)
+				} else {
+					internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				}
 			}
 			if tt.checkResponse != nil {
 				tt.checkResponse(t, reqCtx)
@@ -478,7 +492,11 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {
-				internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				if tt.expectedCode != "" {
+					internaltests.AssertErrorResponse(t, reqCtx, tt.expectedStatus, tt.expectedCode, tt.expectedMessage)
+				} else {
+					internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				}
 			}
 			if tt.checkResponse != nil {
 				tt.checkResponse(t, reqCtx)
@@ -553,7 +571,11 @@ func TestDeleteOrganizationHandler(t *testing.T) {
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {
-				internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				if tt.expectedCode != "" {
+					internaltests.AssertErrorResponse(t, reqCtx, tt.expectedStatus, tt.expectedCode, tt.expectedMessage)
+				} else {
+					internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				}
 			}
 			if tt.checkResponse != nil {
 				tt.checkResponse(t, reqCtx)
