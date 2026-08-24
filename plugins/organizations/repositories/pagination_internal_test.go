@@ -19,8 +19,7 @@ func TestPageLimit(t *testing.T) {
 		{name: "positive limit is preserved", limit: 25, expected: 25},
 		{name: "zero limit falls back to the default", limit: 0, expected: pagination.DefaultLimit},
 		{name: "negative limit falls back to the default", limit: -1, expected: pagination.DefaultLimit},
-		{name: "limit at the maximum is preserved", limit: pagination.MaxLimit, expected: pagination.MaxLimit},
-		{name: "limit above the maximum is capped", limit: 100000, expected: pagination.MaxLimit},
+		{name: "large limit is preserved", limit: 100000, expected: 100000},
 	}
 
 	for _, tt := range tests {

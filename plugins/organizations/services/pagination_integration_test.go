@@ -58,10 +58,10 @@ func TestOrganizationMemberService_GetAllMembersEnforcesLimitsAgainstSQL(t *test
 			expectPagination: pagination.Pagination{Page: 1, Limit: 10, Total: memberCount, TotalPages: 2, HasMore: true},
 		},
 		{
-			name:             "an absurd limit is capped at the maximum",
+			name:             "a large limit is honoured",
 			params:           pagination.Params{Page: 1, Limit: 100000},
 			expectLen:        memberCount,
-			expectPagination: pagination.Pagination{Page: 1, Limit: pagination.MaxLimit, Total: memberCount, TotalPages: 1, HasMore: false},
+			expectPagination: pagination.Pagination{Page: 1, Limit: 100000, Total: memberCount, TotalPages: 1, HasMore: false},
 		},
 		{
 			name:             "a negative limit does not read the whole table",

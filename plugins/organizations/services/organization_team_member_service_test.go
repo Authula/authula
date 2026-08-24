@@ -152,7 +152,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 			expectCalled: true,
 		},
 		{
-			name:           "out of range params are clamped before reaching the repository",
+			name:           "a negative page is clamped before reaching the repository",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
 			teamID:         "team-1",
@@ -161,7 +161,7 @@ func TestOrganizationTeamService_GetAllTeamMembers(t *testing.T) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "owner-member-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Twice()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Twice()
-				teamMemberRepo.On("GetAllByTeamIDWithMemberAndUser", mock.Anything, "team-1", 1, pagination.MaxLimit).Return(([]types.OrganizationTeamMemberResponse)(nil), 0, nil).Once()
+				teamMemberRepo.On("GetAllByTeamIDWithMemberAndUser", mock.Anything, "team-1", 1, 5000).Return(([]types.OrganizationTeamMemberResponse)(nil), 0, nil).Once()
 			},
 			expectLen:    0,
 			expectCalled: true,

@@ -10,9 +10,6 @@ func pageLimit(limit int) int {
 	if limit <= 0 {
 		return pagination.DefaultLimit
 	}
-	if limit > pagination.MaxLimit {
-		return pagination.MaxLimit
-	}
 	return limit
 }
 
