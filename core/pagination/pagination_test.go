@@ -44,19 +44,9 @@ func TestClamp(t *testing.T) {
 			expected: pagination.Params{Page: 3, Limit: pagination.DefaultLimit},
 		},
 		{
-			name:     "limit exactly at the maximum is not clamped",
-			params:   pagination.Params{Page: 1, Limit: pagination.MaxLimit},
-			expected: pagination.Params{Page: 1, Limit: pagination.MaxLimit},
-		},
-		{
-			name:     "limit above the maximum is clamped",
-			params:   pagination.Params{Page: 1, Limit: pagination.MaxLimit + 1},
-			expected: pagination.Params{Page: 1, Limit: pagination.MaxLimit},
-		},
-		{
-			name:     "absurdly large limit is clamped",
+			name:     "large limits are left to the caller",
 			params:   pagination.Params{Page: 1, Limit: 1_000_000},
-			expected: pagination.Params{Page: 1, Limit: pagination.MaxLimit},
+			expected: pagination.Params{Page: 1, Limit: 1_000_000},
 		},
 		{
 			name:     "high page numbers are legal",

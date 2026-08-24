@@ -750,15 +750,15 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitationsByOrgIDWithO
 			expectPagination: pagination.Pagination{Page: 2, Limit: 2, Total: 5, TotalPages: 3, HasMore: true},
 		},
 		{
-			name:           "out of range params are clamped before reaching the repository",
+			name:           "a negative page is clamped before reaching the repository",
 			organizationID: "org-1",
 			params:         pagination.Params{Page: -4, Limit: 5000},
 			setup: func(invRepo *orgtests.MockOrganizationInvitationRepository) {
-				invRepo.On("GetAllByOrganizationIDWithOrg", mock.Anything, "org-1", 1, pagination.MaxLimit).
+				invRepo.On("GetAllByOrganizationIDWithOrg", mock.Anything, "org-1", 1, 5000).
 					Return([]types.GetOrganizationInvitationResponse{}, 0, nil).Once()
 			},
 			expectLen:        0,
-			expectPagination: pagination.Pagination{Page: 1, Limit: pagination.MaxLimit, Total: 0, TotalPages: 0, HasMore: false},
+			expectPagination: pagination.Pagination{Page: 1, Limit: 5000, Total: 0, TotalPages: 0, HasMore: false},
 		},
 		{
 			name:           "nil result is normalised to an empty slice",

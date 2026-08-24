@@ -9,7 +9,6 @@ import (
 const (
 	DefaultPage  = 1
 	DefaultLimit = 10
-	MaxLimit     = 100
 )
 
 type Params struct {
@@ -31,9 +30,6 @@ func Clamp(params Params) Params {
 	}
 	if params.Limit <= 0 {
 		params.Limit = DefaultLimit
-	}
-	if params.Limit > MaxLimit {
-		params.Limit = MaxLimit
 	}
 	return params
 }

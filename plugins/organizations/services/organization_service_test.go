@@ -258,15 +258,15 @@ func TestOrganizationService_GetAllOrganizations(t *testing.T) {
 			expectPagination: pagination.Pagination{Page: 1, Limit: 10, Total: 2, TotalPages: 1, HasMore: false},
 		},
 		{
-			name:        "out of range params are clamped before reaching the repository",
+			name:        "a negative page is clamped before reaching the repository",
 			actorUserID: "user-1",
 			params:      pagination.Params{Page: -4, Limit: 5000},
 			setup: func(repo *orgtests.MockOrganizationRepository) {
-				repo.On("GetAllAccessibleByUserID", mock.Anything, "user-1", 1, pagination.MaxLimit).
+				repo.On("GetAllAccessibleByUserID", mock.Anything, "user-1", 1, 5000).
 					Return([]types.Organization{}, 0, nil).Once()
 			},
 			expectLen:        0,
-			expectPagination: pagination.Pagination{Page: 1, Limit: pagination.MaxLimit, Total: 0, TotalPages: 0, HasMore: false},
+			expectPagination: pagination.Pagination{Page: 1, Limit: 5000, Total: 0, TotalPages: 0, HasMore: false},
 		},
 		{
 			name:        "nil result is normalised to an empty slice",
