@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	orgtests "github.com/Authula/authula/plugins/organizations/tests"
 	"github.com/Authula/authula/plugins/organizations/types"
 )
@@ -239,50 +240,66 @@ func TestOrganizationTeamService_GetAllTeams(t *testing.T) {
 	repoErr := errors.New("repository error")
 
 	tests := []struct {
-		name           string
-		actorUserID    string
-		organizationID string
-		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationTeamRepository, *orgtests.MockOrganizationMemberRepository)
-		expectErr      error
-		expectLen      int
+		name             string
+		actorUserID      string
+		organizationID   string
+		params           pagination.Params
+		setup            func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationTeamRepository, *orgtests.MockOrganizationMemberRepository)
+		expectErr        error
+		expectLen        int
+		expectPagination pagination.Pagination
 	}{
 		{
 			name:           "success",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
+			params:         pagination.Params{Page: 1, Limit: 10},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Once()
-				teamRepo.On("GetAllByOrganizationID", mock.Anything, "org-1").Return([]types.OrganizationTeam{{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"}}, nil).Once()
+				teamRepo.On("GetAllByOrganizationID", mock.Anything, "org-1", 1, 10).Return([]types.OrganizationTeam{{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"}}, 1, nil).Once()
 			},
-			expectLen: 1,
+			expectLen:        1,
+			expectPagination: pagination.Pagination{Page: 1, Limit: 10, Total: 1, TotalPages: 1, HasMore: false},
 		},
 		{
 			name:           "org member can list",
 			actorUserID:    "user-2",
 			organizationID: "org-1",
+			params:         pagination.Params{Page: 1, Limit: 10},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
-				teamRepo.On("GetAllByOrganizationID", mock.Anything, "org-1").Return([]types.OrganizationTeam{{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"}}, nil).Once()
+				teamRepo.On("GetAllByOrganizationID", mock.Anything, "org-1", 1, 10).Return([]types.OrganizationTeam{{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"}}, 1, nil).Once()
 			},
-			expectLen: 1,
+			expectLen:        1,
+			expectPagination: pagination.Pagination{Page: 1, Limit: 10, Total: 1, TotalPages: 1, HasMore: false},
 		},
-	}
-
-	tests = append(tests, []struct {
-		name           string
-		actorUserID    string
-		organizationID string
-		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationTeamRepository, *orgtests.MockOrganizationMemberRepository)
-		expectErr      error
-		expectLen      int
-	}{
-		{name: "unauthorized", actorUserID: "", organizationID: "org-1", expectErr: coreerrors.ErrUnauthorized},
+		{
+			name:           "out of range params are clamped before reaching the repository",
+			actorUserID:    "user-1",
+			organizationID: "org-1",
+			params:         pagination.Params{Page: -4, Limit: 5000},
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Once()
+				teamRepo.On("GetAllByOrganizationID", mock.Anything, "org-1", 1, pagination.MaxLimit).Return(([]types.OrganizationTeam)(nil), 0, nil).Once()
+			},
+			expectLen:        0,
+			expectPagination: pagination.Pagination{Page: 1, Limit: pagination.MaxLimit, Total: 0, TotalPages: 0, HasMore: false},
+		},
+		{
+			name:           "unauthorized",
+			actorUserID:    "",
+			organizationID: "org-1",
+			params:         pagination.Params{Page: 1, Limit: 10},
+			expectErr:      coreerrors.ErrUnauthorized,
+		},
 		{
 			name:           "organization not found",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
+			params:         pagination.Params{Page: 1, Limit: 10},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(nil, nil).Once()
 			},
@@ -292,6 +309,7 @@ func TestOrganizationTeamService_GetAllTeams(t *testing.T) {
 			name:           "organization lookup error",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
+			params:         pagination.Params{Page: 1, Limit: 10},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return((*types.Organization)(nil), repoErr).Once()
 			},
@@ -301,6 +319,7 @@ func TestOrganizationTeamService_GetAllTeams(t *testing.T) {
 			name:           "forbidden",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
+			params:         pagination.Params{Page: 1, Limit: 10},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 			},
@@ -310,14 +329,15 @@ func TestOrganizationTeamService_GetAllTeams(t *testing.T) {
 			name:           "repo error",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
+			params:         pagination.Params{Page: 1, Limit: 10},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Once()
-				teamRepo.On("GetAllByOrganizationID", mock.Anything, "org-1").Return(([]types.OrganizationTeam)(nil), repoErr).Once()
+				teamRepo.On("GetAllByOrganizationID", mock.Anything, "org-1", 1, 10).Return(([]types.OrganizationTeam)(nil), 0, repoErr).Once()
 			},
 			expectErr: repoErr,
 		},
-	}...)
+	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -331,14 +351,21 @@ func TestOrganizationTeamService_GetAllTeams(t *testing.T) {
 			}
 
 			svc := newTestOrganizationTeamService(orgRepo, memberRepo, teamRepo, &orgtests.MockOrganizationTeamMemberRepository{})
-			teams, err := svc.GetAllTeams(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID)
+			resp, err := svc.GetAllTeams(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.params)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
 				return
 			}
+
 			require.NoError(t, err)
-			require.Len(t, teams, tt.expectLen)
+			require.NotNil(t, resp)
+			require.NotNil(t, resp.Data)
+			require.Len(t, resp.Data, tt.expectLen)
+			require.Equal(t, tt.expectPagination, resp.Pagination)
+			require.True(t, orgRepo.AssertExpectations(t))
+			require.True(t, teamRepo.AssertExpectations(t))
+			require.True(t, memberRepo.AssertExpectations(t))
 		})
 	}
 }

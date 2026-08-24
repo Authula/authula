@@ -4,6 +4,7 @@ import (
 	"context"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"
@@ -96,7 +97,7 @@ func (s *organizationTeamMemberService) AddTeamMember(ctx context.Context, actor
 	return created, nil
 }
 
-func (s *organizationTeamMemberService) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMemberResponse, error) {
+func (s *organizationTeamMemberService) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, params pagination.Params) (*types.ListOrganizationTeamMembersResponse, error) {
 	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
@@ -113,7 +114,20 @@ func (s *organizationTeamMemberService) GetAllTeamMembers(ctx context.Context, a
 		return nil, coreerrors.ErrNotFound
 	}
 
-	return s.orgTeamMemberRepo.GetAllByTeamIDWithMemberAndUser(ctx, teamID, page, limit)
+	params = pagination.Clamp(params)
+
+	teamMembers, total, err := s.orgTeamMemberRepo.GetAllByTeamIDWithMemberAndUser(ctx, teamID, params.Page, params.Limit)
+	if err != nil {
+		return nil, err
+	}
+	if teamMembers == nil {
+		teamMembers = []types.OrganizationTeamMemberResponse{}
+	}
+
+	return &types.ListOrganizationTeamMembersResponse{
+		Data:       teamMembers,
+		Pagination: pagination.New(params.Page, params.Limit, total),
+	}, nil
 }
 
 func (s *organizationTeamMemberService) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMemberResponse, error) {

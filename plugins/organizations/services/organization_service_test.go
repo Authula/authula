@@ -2,12 +2,14 @@ package services
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/plugins/organizations/constants"
 	orgtests "github.com/Authula/authula/plugins/organizations/tests"
@@ -33,8 +35,7 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 	}
 
 	limitSuccessSetup := func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
-		repo.On("GetAllByOwnerID", mock.Anything, "user-1").Return([]types.Organization{{ID: "org-owned", OwnerID: "user-1", Name: "Owned Org"}}, nil).Once()
-		memberRepo.On("GetAllByUserID", mock.Anything, "user-1").Return([]types.OrganizationMember{{ID: "mem-owned", OrganizationID: "org-owned", UserID: "user-1", Role: "member"}, {ID: "mem-2", OrganizationID: "org-member", UserID: "user-1", Role: "member"}}, nil).Once()
+		repo.On("CountAccessibleByUserID", mock.Anything, "user-1").Return(2, nil).Once()
 		repo.On("Create", mock.Anything, mock.MatchedBy(func(org *types.Organization) bool {
 			return org != nil && org.OwnerID == "user-1" && org.Name == "Acme Labs" && org.Slug == "acme-labs" && string(internaltests.MarshalToJSON(t, org.Metadata)) == "{}"
 		})).Return(&types.Organization{ID: "org-2", OwnerID: "user-1", Name: "Acme Labs", Slug: "acme-labs", Metadata: map[string]any{}}, nil).Once()
@@ -44,8 +45,7 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 	}
 
 	quotaExceededSetup := func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
-		repo.On("GetAllByOwnerID", mock.Anything, "user-1").Return([]types.Organization{{ID: "org-owned", OwnerID: "user-1", Name: "Owned Org"}}, nil).Once()
-		memberRepo.On("GetAllByUserID", mock.Anything, "user-1").Return([]types.OrganizationMember{{ID: "mem-owned", OrganizationID: "org-owned", UserID: "user-1", Role: "member"}, {ID: "mem-2", OrganizationID: "org-member", UserID: "user-1", Role: "member"}}, nil).Once()
+		repo.On("CountAccessibleByUserID", mock.Anything, "user-1").Return(2, nil).Once()
 	}
 
 	tests := []struct {
@@ -223,30 +223,71 @@ func TestOrganizationService_CreateOrganizationRequiresPrivilegedRole(t *testing
 	}
 }
 
-func TestOrganizationService_GetAllOrganizationsByOwner(t *testing.T) {
+func TestOrganizationService_GetAllOrganizations(t *testing.T) {
 	t.Parallel()
 
+	repoErr := errors.New("repository error")
+
 	tests := []struct {
-		name        string
-		actorUserID string
-		setup       func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository)
-		expectErr   error
-		expectLen   int
+		name             string
+		actorUserID      string
+		params           pagination.Params
+		setup            func(*orgtests.MockOrganizationRepository)
+		expectErr        error
+		expectLen        int
+		expectPagination pagination.Pagination
 	}{
 		{
 			name:        "unauthorized",
 			actorUserID: "",
+			params:      pagination.Params{Page: 1, Limit: 10},
 			expectErr:   coreerrors.ErrUnauthorized,
 		},
 		{
-			name:        "success",
+			name:        "returns the requested page with its metadata",
 			actorUserID: "user-1",
-			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
-				repo.On("GetAllByOwnerID", mock.Anything, "user-1").Return([]types.Organization{{ID: "org-1", OwnerID: "user-1", Name: "Acme"}}, nil).Once()
-				memberRepo.On("GetAllByUserID", mock.Anything, "user-1").Return([]types.OrganizationMember{{ID: "mem-1", OrganizationID: "org-2", UserID: "user-1", Role: "member"}}, nil).Once()
-				repo.On("GetByID", mock.Anything, "org-2").Return(&types.Organization{ID: "org-2", OwnerID: "owner-2", Name: "Platform"}, nil).Once()
+			params:      pagination.Params{Page: 1, Limit: 10},
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("GetAllAccessibleByUserID", mock.Anything, "user-1", 1, 10).
+					Return([]types.Organization{
+						{ID: "org-1", OwnerID: "user-1", Name: "Acme"},
+						{ID: "org-2", OwnerID: "owner-2", Name: "Platform"},
+					}, 2, nil).Once()
 			},
-			expectLen: 2,
+			expectLen:        2,
+			expectPagination: pagination.Pagination{Page: 1, Limit: 10, Total: 2, TotalPages: 1, HasMore: false},
+		},
+		{
+			name:        "out of range params are clamped before reaching the repository",
+			actorUserID: "user-1",
+			params:      pagination.Params{Page: -4, Limit: 5000},
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("GetAllAccessibleByUserID", mock.Anything, "user-1", 1, pagination.MaxLimit).
+					Return([]types.Organization{}, 0, nil).Once()
+			},
+			expectLen:        0,
+			expectPagination: pagination.Pagination{Page: 1, Limit: pagination.MaxLimit, Total: 0, TotalPages: 0, HasMore: false},
+		},
+		{
+			name:        "nil result is normalised to an empty slice",
+			actorUserID: "user-1",
+			params:      pagination.Params{Page: 1, Limit: 10},
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("GetAllAccessibleByUserID", mock.Anything, "user-1", 1, 10).
+					Return(([]types.Organization)(nil), 0, nil).Once()
+			},
+			expectLen:        0,
+			expectPagination: pagination.Pagination{Page: 1, Limit: 10, Total: 0, TotalPages: 0, HasMore: false},
+		},
+		{
+			name:        "repository error is propagated",
+			actorUserID: "user-1",
+			params:      pagination.Params{Page: 1, Limit: 10},
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("GetAllAccessibleByUserID", mock.Anything, "user-1", 1, 10).
+					Return(([]types.Organization)(nil), 0, repoErr).Once()
+			},
+			expectErr: repoErr,
 		},
 	}
 
@@ -257,21 +298,110 @@ func TestOrganizationService_GetAllOrganizationsByOwner(t *testing.T) {
 			repo := &orgtests.MockOrganizationRepository{}
 			memberRepo := &orgtests.MockOrganizationMemberRepository{}
 			if tt.setup != nil {
-				tt.setup(repo, memberRepo)
+				tt.setup(repo)
 			}
 
 			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
 			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, nil, nil)
-			organizations, err := svc.GetAllOrganizationsByOwner(context.Background(), orgtests.Actor(tt.actorUserID))
+			resp, err := svc.GetAllOrganizations(context.Background(), orgtests.Actor(tt.actorUserID), tt.params)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
+				require.True(t, repo.AssertExpectations(t))
 				return
 			}
+
 			require.NoError(t, err)
-			require.Len(t, organizations, tt.expectLen)
+			require.NotNil(t, resp)
+			require.NotNil(t, resp.Data)
+			require.Len(t, resp.Data, tt.expectLen)
+			require.Equal(t, tt.expectPagination, resp.Pagination)
 			require.True(t, repo.AssertExpectations(t))
 			require.True(t, memberRepo.AssertExpectations(t))
+		})
+	}
+}
+
+// The organization quota must be enforced from a SQL count: the previous
+// implementation counted a fetched list, which a page size would silently cap.
+func TestOrganizationService_EnsureOrganizationLimit(t *testing.T) {
+	t.Parallel()
+
+	countErr := errors.New("count error")
+	limit := 3
+
+	tests := []struct {
+		name              string
+		actorUserID       string
+		organizationLimit *int
+		setup             func(*orgtests.MockOrganizationRepository)
+		expectErr         error
+		expectNoCount     bool
+	}{
+		{
+			name:              "unauthorized actor is rejected before counting",
+			actorUserID:       "",
+			organizationLimit: &limit,
+			expectErr:         coreerrors.ErrUnauthorized,
+			expectNoCount:     true,
+		},
+		{
+			name:          "no configured limit skips the count entirely",
+			actorUserID:   "user-1",
+			expectNoCount: true,
+		},
+		{
+			name:              "count one below the limit is allowed",
+			actorUserID:       "user-1",
+			organizationLimit: &limit,
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("CountAccessibleByUserID", mock.Anything, "user-1").Return(limit-1, nil).Once()
+			},
+		},
+		{
+			name:              "count at the limit is rejected",
+			actorUserID:       "user-1",
+			organizationLimit: &limit,
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("CountAccessibleByUserID", mock.Anything, "user-1").Return(limit, nil).Once()
+			},
+			expectErr: constants.ErrOrganizationsQuotaExceeded,
+		},
+		{
+			name:              "count error is propagated",
+			actorUserID:       "user-1",
+			organizationLimit: &limit,
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("CountAccessibleByUserID", mock.Anything, "user-1").Return(0, countErr).Once()
+			},
+			expectErr: countErr,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo := &orgtests.MockOrganizationRepository{}
+			memberRepo := &orgtests.MockOrganizationMemberRepository{}
+			if tt.setup != nil {
+				tt.setup(repo)
+			}
+
+			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
+			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, tt.organizationLimit, nil)
+
+			err := svc.ensureOrganizationLimit(context.Background(), orgtests.Actor(tt.actorUserID), repo)
+			if tt.expectErr != nil {
+				require.ErrorIs(t, err, tt.expectErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tt.expectNoCount {
+				repo.AssertNotCalled(t, "CountAccessibleByUserID", mock.Anything, mock.Anything)
+			}
+			require.True(t, repo.AssertExpectations(t))
 		})
 	}
 }

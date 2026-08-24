@@ -115,6 +115,28 @@ func AssertErrorMessage(t *testing.T, reqCtx *models.RequestContext, status int,
 	}
 }
 
+func AssertErrorResponse(t *testing.T, reqCtx *models.RequestContext, status int, code string, message string) {
+	t.Helper()
+
+	if !reqCtx.Handled {
+		t.Fatal("expected request to be marked as handled")
+	}
+	if reqCtx.ResponseStatus != status {
+		t.Fatalf("expected status %d, got %d", status, reqCtx.ResponseStatus)
+	}
+
+	payload := DecodeResponseJSON[struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}](t, reqCtx)
+	if payload.Code != code {
+		t.Fatalf("expected code %q, got %q", code, payload.Code)
+	}
+	if payload.Message != message {
+		t.Fatalf("expected message %q, got %q", message, payload.Message)
+	}
+}
+
 func DecodeResponseJSON[T any](t *testing.T, reqCtx *models.RequestContext) T {
 	t.Helper()
 

@@ -10,7 +10,7 @@ import (
 
 func Routes(plugin *OrganizationsPlugin) []models.Route {
 	createOrganizationHandler := &handlers.CreateOrganizationHandler{UseCases: plugin.useCases}
-	getAllOrganizationsByOwnerHandler := &handlers.GetAllOrganizationsByOwnerHandler{UseCases: plugin.useCases}
+	getAllOrganizationsHandler := &handlers.GetAllOrganizationsHandler{UseCases: plugin.useCases}
 	getOrganizationByIDHandler := &handlers.GetOrganizationByIDHandler{UseCases: plugin.useCases}
 	updateOrganizationHandler := &handlers.UpdateOrganizationHandler{UseCases: plugin.useCases}
 	deleteOrganizationHandler := &handlers.DeleteOrganizationHandler{UseCases: plugin.useCases}
@@ -56,7 +56,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireAuthenticated(),
 			},
-			Handler: getAllOrganizationsByOwnerHandler.Handle(),
+			Handler: getAllOrganizationsHandler.Handle(),
 		},
 		{
 			Method: http.MethodGet,

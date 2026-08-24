@@ -7,6 +7,7 @@ import (
 	"github.com/uptrace/bun"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"
@@ -150,12 +151,25 @@ func (s *organizationTeamService) CreateTeam(ctx context.Context, actor *models.
 	return created, nil
 }
 
-func (s *organizationTeamService) GetAllTeams(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationTeam, error) {
+func (s *organizationTeamService) GetAllTeams(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationTeamsResponse, error) {
 	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
-	return s.orgTeamRepo.GetAllByOrganizationID(ctx, organizationID)
+	params = pagination.Clamp(params)
+
+	teams, total, err := s.orgTeamRepo.GetAllByOrganizationID(ctx, organizationID, params.Page, params.Limit)
+	if err != nil {
+		return nil, err
+	}
+	if teams == nil {
+		teams = []types.OrganizationTeam{}
+	}
+
+	return &types.ListOrganizationTeamsResponse{
+		Data:       teams,
+		Pagination: pagination.New(params.Page, params.Limit, total),
+	}, nil
 }
 
 func (s *organizationTeamService) GetTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string) (*types.OrganizationTeam, error) {

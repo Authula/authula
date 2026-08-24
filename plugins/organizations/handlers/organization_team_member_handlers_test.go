@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgtests "github.com/Authula/authula/plugins/organizations/tests"
@@ -164,7 +165,8 @@ func TestGetAllOrganizationTeamMembersHandler(t *testing.T) {
 			organizationID: "org-1",
 			teamID:         "team-1",
 			prepare: func(fixture *organizationTeamMemberHandlerFixture) {
-				fixture.service.On("GetAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", 1, 10).Return(([]orgtypes.OrganizationTeamMemberResponse)(nil), errors.New("some error")).Once()
+				fixture.service.On("GetAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+					Return((*orgtypes.ListOrganizationTeamMembersResponse)(nil), errors.New("some error")).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "some error",
@@ -175,13 +177,18 @@ func TestGetAllOrganizationTeamMembersHandler(t *testing.T) {
 			organizationID: "org-1",
 			teamID:         "team-1",
 			prepare: func(fixture *organizationTeamMemberHandlerFixture) {
-				fixture.service.On("GetAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", 1, 10).Return([]orgtypes.OrganizationTeamMemberResponse{{ID: "team-mem-1", TeamID: "team-1"}}, nil).Once()
+				fixture.service.On("GetAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+					Return(&orgtypes.ListOrganizationTeamMembersResponse{
+						Data:       []orgtypes.OrganizationTeamMemberResponse{{ID: "team-mem-1", TeamID: "team-1"}},
+						Pagination: pagination.New(1, 10, 1),
+					}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
-				teamMembers := internaltests.DecodeResponseJSON[[]orgtypes.OrganizationTeamMemberResponse](t, reqCtx)
-				assert.Len(t, teamMembers, 1)
-				assert.Equal(t, "team-mem-1", teamMembers[0].ID)
+				resp := internaltests.DecodeResponseJSON[orgtypes.ListOrganizationTeamMembersResponse](t, reqCtx)
+				assert.Len(t, resp.Data, 1)
+				assert.Equal(t, "team-mem-1", resp.Data[0].ID)
+				assert.Equal(t, pagination.Pagination{Page: 1, Limit: 10, Total: 1, TotalPages: 1, HasMore: false}, resp.Pagination)
 			},
 		},
 	})

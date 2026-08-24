@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
@@ -309,23 +310,27 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 	repoErr := errors.New("repository error")
 
 	tests := []struct {
-		name           string
-		actorUserID    string
-		organizationID string
-		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository)
-		expectErr      error
-		expectLen      int
+		name             string
+		actorUserID      string
+		organizationID   string
+		params           pagination.Params
+		setup            func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository)
+		expectErr        error
+		expectLen        int
+		expectPagination pagination.Pagination
 	}{
 		{
 			name:           "unauthorized",
 			actorUserID:    "",
 			organizationID: "org-1",
+			params:         pagination.Params{Page: 1, Limit: 10},
 			expectErr:      coreerrors.ErrUnauthorized,
 		},
 		{
 			name:           "organization not found",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
+			params:         pagination.Params{Page: 1, Limit: 10},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(nil, nil).Once()
 			},
@@ -335,6 +340,7 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 			name:           "forbidden",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
+			params:         pagination.Params{Page: 1, Limit: 10},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(nil, nil).Once()
@@ -345,9 +351,10 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 			name:           "repository error",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
+			params:         pagination.Params{Page: 1, Limit: 10},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				memberRepo.On("GetAllByOrganizationIDWithUser", mock.Anything, "org-1", 1, 10).Return(nil, repoErr).Once()
+				memberRepo.On("GetAllByOrganizationIDWithUser", mock.Anything, "org-1", 1, 10).Return(nil, 0, repoErr).Once()
 			},
 			expectErr: repoErr,
 		},
@@ -355,11 +362,40 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 			name:           "success",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
+			params:         pagination.Params{Page: 1, Limit: 10},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				memberRepo.On("GetAllByOrganizationIDWithUser", mock.Anything, "org-1", 1, 10).Return([]types.OrganizationMemberResponse{{ID: "mem-1", OrganizationID: "org-1", Role: "member"}}, nil).Once()
+				memberRepo.On("GetAllByOrganizationIDWithUser", mock.Anything, "org-1", 1, 10).
+					Return([]types.OrganizationMemberResponse{{ID: "mem-1", OrganizationID: "org-1", Role: "member"}}, 25, nil).Once()
 			},
-			expectLen: 1,
+			expectLen:        1,
+			expectPagination: pagination.Pagination{Page: 1, Limit: 10, Total: 25, TotalPages: 3, HasMore: true},
+		},
+		{
+			name:           "out of range params are clamped before reaching the repository",
+			actorUserID:    "user-1",
+			organizationID: "org-1",
+			params:         pagination.Params{Page: -4, Limit: 5000},
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetAllByOrganizationIDWithUser", mock.Anything, "org-1", 1, pagination.MaxLimit).
+					Return([]types.OrganizationMemberResponse{}, 0, nil).Once()
+			},
+			expectLen:        0,
+			expectPagination: pagination.Pagination{Page: 1, Limit: pagination.MaxLimit, Total: 0, TotalPages: 0, HasMore: false},
+		},
+		{
+			name:           "nil result is normalised to an empty slice",
+			actorUserID:    "user-1",
+			organizationID: "org-1",
+			params:         pagination.Params{Page: 1, Limit: 10},
+			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				memberRepo.On("GetAllByOrganizationIDWithUser", mock.Anything, "org-1", 1, 10).
+					Return(([]types.OrganizationMemberResponse)(nil), 0, nil).Once()
+			},
+			expectLen:        0,
+			expectPagination: pagination.Pagination{Page: 1, Limit: 10, Total: 0, TotalPages: 0, HasMore: false},
 		},
 	}
 
@@ -376,7 +412,7 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 			expectActorMember(memberRepo, tt.organizationID, tt.actorUserID)
 
 			svc := newTestOrganizationMemberService(userService, orgtests.NewAccessControlServiceStub(), orgRepo, memberRepo, nil)
-			members, err := svc.GetAllMembers(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, 1, 10)
+			resp, err := svc.GetAllMembers(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID, tt.params)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -386,12 +422,14 @@ func TestOrganizationMemberService_GetAllMembers(t *testing.T) {
 				}
 				return
 			}
+
 			require.NoError(t, err)
-			require.Len(t, members, tt.expectLen)
-			if tt.setup != nil {
-				require.True(t, orgRepo.AssertExpectations(t))
-				require.True(t, memberRepo.AssertExpectations(t))
-			}
+			require.NotNil(t, resp)
+			require.NotNil(t, resp.Data)
+			require.Len(t, resp.Data, tt.expectLen)
+			require.Equal(t, tt.expectPagination, resp.Pagination)
+			require.True(t, orgRepo.AssertExpectations(t))
+			require.True(t, memberRepo.AssertExpectations(t))
 		})
 	}
 }

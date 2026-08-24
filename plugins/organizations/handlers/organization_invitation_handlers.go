@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/Authula/authula/core/pagination"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
 	"github.com/Authula/authula/plugins/organizations/types"
@@ -56,7 +57,8 @@ func (h *GetAllOrganizationInvitationsHandler) Handle() http.HandlerFunc {
 		actor := reqCtx.Actor
 
 		organizationID := r.PathValue("organization_id")
-		invitations, err := h.UseCases.GetAllOrganizationInvitations(ctx, actor, organizationID)
+		paginationParams := pagination.ParseFromRequest(r)
+		invitations, err := h.UseCases.GetAllOrganizationInvitations(ctx, actor, organizationID, paginationParams)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return

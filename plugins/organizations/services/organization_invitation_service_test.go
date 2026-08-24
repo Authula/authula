@@ -13,6 +13,7 @@ import (
 
 	emailtmpl "github.com/Authula/authula/core/email/template"
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
@@ -720,93 +721,75 @@ func TestOrganizationInvitationService_GetOrganizationInvitation(t *testing.T) {
 	}
 }
 
-func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.T) {
+func TestOrganizationInvitationService_GetAllOrganizationInvitationsByOrgIDWithOrg(t *testing.T) {
 	t.Parallel()
 
 	repoErr := errors.New("repository error")
 
 	tests := []struct {
-		name           string
-		actorUserID    string
-		organizationID string
-		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationInvitationRepository, *orgtests.MockOrganizationMemberRepository)
-		expectErr      error
-		expectLen      int
+		name             string
+		organizationID   string
+		params           pagination.Params
+		setup            func(*orgtests.MockOrganizationInvitationRepository)
+		expectErr        error
+		expectLen        int
+		expectPagination pagination.Pagination
 	}{
 		{
-			name:           "success",
-			actorUserID:    "user-1",
+			name:           "returns the requested page with its metadata",
 			organizationID: "org-1",
-			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
-				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				invRepo.On("GetAllByOrganizationID", mock.Anything, "org-1").Return([]types.OrganizationInvitation{{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)}}, nil).Once()
+			params:         pagination.Params{Page: 2, Limit: 2},
+			setup: func(invRepo *orgtests.MockOrganizationInvitationRepository) {
+				invRepo.On("GetAllByOrganizationIDWithOrg", mock.Anything, "org-1", 2, 2).
+					Return([]types.GetOrganizationInvitationResponse{
+						{Invitation: &types.OrganizationInvitation{ID: "inv-3", OrganizationID: "org-1"}},
+						{Invitation: &types.OrganizationInvitation{ID: "inv-4", OrganizationID: "org-1"}},
+					}, 5, nil).Once()
 			},
-			expectLen: 1,
+			expectLen:        2,
+			expectPagination: pagination.Pagination{Page: 2, Limit: 2, Total: 5, TotalPages: 3, HasMore: true},
 		},
 		{
-			name:           "rejected invitation is returned",
-			actorUserID:    "user-1",
+			name:           "out of range params are clamped before reaching the repository",
 			organizationID: "org-1",
-			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
-				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				invRepo.On("GetAllByOrganizationID", mock.Anything, "org-1").Return([]types.OrganizationInvitation{{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: types.OrganizationInvitationStatusRejected, ExpiresAt: time.Now().UTC().Add(time.Hour)}}, nil).Once()
+			params:         pagination.Params{Page: -4, Limit: 5000},
+			setup: func(invRepo *orgtests.MockOrganizationInvitationRepository) {
+				invRepo.On("GetAllByOrganizationIDWithOrg", mock.Anything, "org-1", 1, pagination.MaxLimit).
+					Return([]types.GetOrganizationInvitationResponse{}, 0, nil).Once()
 			},
-			expectLen: 1,
+			expectLen:        0,
+			expectPagination: pagination.Pagination{Page: 1, Limit: pagination.MaxLimit, Total: 0, TotalPages: 0, HasMore: false},
 		},
 		{
-			name:           "org member can list",
-			actorUserID:    "user-2",
+			name:           "nil result is normalised to an empty slice",
 			organizationID: "org-1",
-			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
-				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
-				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-2", Role: "member"}, nil).Once()
-				invRepo.On("GetAllByOrganizationID", mock.Anything, "org-1").Return([]types.OrganizationInvitation{{ID: "inv-1", OrganizationID: "org-1", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)}}, nil).Once()
+			params:         pagination.Params{Page: 1, Limit: 10},
+			setup: func(invRepo *orgtests.MockOrganizationInvitationRepository) {
+				invRepo.On("GetAllByOrganizationIDWithOrg", mock.Anything, "org-1", 1, 10).
+					Return(([]types.GetOrganizationInvitationResponse)(nil), 0, nil).Once()
 			},
-			expectLen: 1,
-		},
-		{name: "unauthorized", actorUserID: "", organizationID: "org-1", expectErr: coreerrors.ErrUnauthorized},
-		{
-			name:           "organization not found",
-			actorUserID:    "user-1",
-			organizationID: "org-1",
-			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
-				orgRepo.On("GetByID", mock.Anything, "org-1").Return(nil, nil).Once()
-			},
-			expectErr: coreerrors.ErrNotFound,
+			expectLen:        0,
+			expectPagination: pagination.Pagination{Page: 1, Limit: 10, Total: 0, TotalPages: 0, HasMore: false},
 		},
 		{
-			name:           "organization lookup error",
-			actorUserID:    "user-1",
-			organizationID: "org-1",
-			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
-				orgRepo.On("GetByID", mock.Anything, "org-1").Return((*types.Organization)(nil), repoErr).Once()
-			},
-			expectErr: repoErr,
+			name:           "missing organization id is not found",
+			organizationID: "",
+			params:         pagination.Params{Page: 1, Limit: 10},
+			expectErr:      coreerrors.ErrNotFound,
 		},
 		{
-			name:           "forbidden",
-			actorUserID:    "user-1",
+			name:           "repository error is propagated",
 			organizationID: "org-1",
-			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
-				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "owner-1"}, nil).Once()
-				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(nil, nil).Once()
-			},
-			expectErr: coreerrors.ErrForbidden,
-		},
-		{
-			name:           "repo error",
-			actorUserID:    "user-1",
-			organizationID: "org-1",
-			setup: func(orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
-				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				invRepo.On("GetAllByOrganizationID", mock.Anything, "org-1").Return(([]types.OrganizationInvitation)(nil), repoErr).Once()
+			params:         pagination.Params{Page: 1, Limit: 10},
+			setup: func(invRepo *orgtests.MockOrganizationInvitationRepository) {
+				invRepo.On("GetAllByOrganizationIDWithOrg", mock.Anything, "org-1", 1, 10).
+					Return(([]types.GetOrganizationInvitationResponse)(nil), 0, repoErr).Once()
 			},
 			expectErr: repoErr,
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -818,29 +801,27 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitations(t *testing.
 			invRepo := &orgtests.MockOrganizationInvitationRepository{}
 			memberRepo := &orgtests.MockOrganizationMemberRepository{}
 			if tt.setup != nil {
-				tt.setup(orgRepo, invRepo, memberRepo)
+				tt.setup(invRepo)
 			}
-			expectActorMember(memberRepo, tt.organizationID, tt.actorUserID)
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
-			invitations, err := svc.GetAllOrganizationInvitations(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID)
+			resp, err := svc.GetAllOrganizationInvitationsByOrgIDWithOrg(context.Background(), tt.organizationID, tt.params)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
-				require.True(t, orgRepo.AssertExpectations(t))
 				require.True(t, invRepo.AssertExpectations(t))
-				require.True(t, memberRepo.AssertExpectations(t))
 				return
 			}
+
 			require.NoError(t, err)
-			require.Len(t, invitations, tt.expectLen)
-			require.True(t, orgRepo.AssertExpectations(t))
+			require.NotNil(t, resp)
+			require.NotNil(t, resp.Data)
+			require.Len(t, resp.Data, tt.expectLen)
+			require.Equal(t, tt.expectPagination, resp.Pagination)
 			require.True(t, invRepo.AssertExpectations(t))
-			require.True(t, memberRepo.AssertExpectations(t))
 		})
 	}
 }
-
 func TestOrganizationInvitationService_RevokeOrganizationInvitation(t *testing.T) {
 	t.Parallel()
 
@@ -974,7 +955,7 @@ func TestOrganizationInvitationService_AcceptPendingOrganizationInvitationsForEm
 			userID: "user-2",
 			email:  "USER@EXAMPLE.COM",
 			setup: func(userSvc *internaltests.MockUserService, orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
-				invRepo.On("GetAllPendingByEmail", mock.Anything, "user@example.com").Return([]types.OrganizationInvitation{{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)}}, nil).Once()
+				invRepo.On("GetAllPendingByEmail", mock.Anything, "user@example.com", repositories.MaxPendingInvitationsPerBatch).Return([]types.OrganizationInvitation{{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)}}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(nil, nil).Once()
 				memberRepo.On("Create", mock.Anything, mock.MatchedBy(func(member *types.OrganizationMember) bool {
 					return member != nil && member.OrganizationID == "org-1" && member.UserID == "user-2" && member.Role == "member"

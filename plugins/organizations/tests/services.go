@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	"github.com/Authula/authula/core/pagination"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/types"
 )
@@ -29,12 +30,12 @@ func (m *MockOrganizationService) CreateOrganization(ctx context.Context, actor 
 	return args.Get(0).(*types.Organization), args.Error(1)
 }
 
-func (m *MockOrganizationService) GetAllOrganizationsByOwner(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
-	args := m.Called(ctx, actorID(actor))
+func (m *MockOrganizationService) GetAllOrganizations(ctx context.Context, actor *models.Actor, params pagination.Params) (*types.ListOrganizationsResponse, error) {
+	args := m.Called(ctx, actorID(actor), params)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]types.Organization), args.Error(1)
+	return args.Get(0).(*types.ListOrganizationsResponse), args.Error(1)
 }
 
 func (m *MockOrganizationService) GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {
@@ -99,20 +100,12 @@ func (m *MockOrganizationInvitationService) GetOrganizationInvitationByIDWithOrg
 	return args.Get(0).(*types.GetOrganizationInvitationResponse), args.Error(1)
 }
 
-func (m *MockOrganizationInvitationService) GetAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
-	args := m.Called(ctx, organizationID)
+func (m *MockOrganizationInvitationService) GetAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string, params pagination.Params) (*types.ListOrganizationInvitationsResponse, error) {
+	args := m.Called(ctx, organizationID, params)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]types.GetOrganizationInvitationResponse), args.Error(1)
-}
-
-func (m *MockOrganizationInvitationService) GetAllOrganizationInvitations(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationInvitation, error) {
-	args := m.Called(ctx, actorID(actor), organizationID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]types.OrganizationInvitation), args.Error(1)
+	return args.Get(0).(*types.ListOrganizationInvitationsResponse), args.Error(1)
 }
 
 func (m *MockOrganizationInvitationService) RevokeOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
@@ -151,12 +144,12 @@ func (m *MockOrganizationMemberService) AddMember(ctx context.Context, actor *mo
 	return args.Get(0).(*types.OrganizationMember), args.Error(1)
 }
 
-func (m *MockOrganizationMemberService) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, error) {
-	args := m.Called(ctx, actorID(actor), organizationID, page, limit)
+func (m *MockOrganizationMemberService) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationMembersResponse, error) {
+	args := m.Called(ctx, actorID(actor), organizationID, params)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]types.OrganizationMemberResponse), args.Error(1)
+	return args.Get(0).(*types.ListOrganizationMembersResponse), args.Error(1)
 }
 
 func (m *MockOrganizationMemberService) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMemberResponse, error) {
@@ -200,12 +193,12 @@ func (m *MockOrganizationTeamService) CreateTeam(ctx context.Context, actor *mod
 	return args.Get(0).(*types.OrganizationTeam), args.Error(1)
 }
 
-func (m *MockOrganizationTeamService) GetAllTeams(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationTeam, error) {
-	args := m.Called(ctx, actorID(actor), organizationID)
+func (m *MockOrganizationTeamService) GetAllTeams(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationTeamsResponse, error) {
+	args := m.Called(ctx, actorID(actor), organizationID, params)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]types.OrganizationTeam), args.Error(1)
+	return args.Get(0).(*types.ListOrganizationTeamsResponse), args.Error(1)
 }
 
 func (m *MockOrganizationTeamService) GetTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string) (*types.OrganizationTeam, error) {
@@ -241,12 +234,12 @@ func (m *MockOrganizationTeamMemberService) AddTeamMember(ctx context.Context, a
 	return args.Get(0).(*types.OrganizationTeamMember), args.Error(1)
 }
 
-func (m *MockOrganizationTeamMemberService) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, page int, limit int) ([]types.OrganizationTeamMemberResponse, error) {
-	args := m.Called(ctx, actorID(actor), organizationID, teamID, page, limit)
+func (m *MockOrganizationTeamMemberService) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, params pagination.Params) (*types.ListOrganizationTeamMembersResponse, error) {
+	args := m.Called(ctx, actorID(actor), organizationID, teamID, params)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]types.OrganizationTeamMemberResponse), args.Error(1)
+	return args.Get(0).(*types.ListOrganizationTeamMembersResponse), args.Error(1)
 }
 
 func (m *MockOrganizationTeamMemberService) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMemberResponse, error) {

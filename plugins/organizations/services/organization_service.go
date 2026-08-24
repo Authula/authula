@@ -3,14 +3,13 @@ package services
 import (
 	"context"
 	"database/sql"
-	"sort"
 	"strings"
-	"sync"
 	"unicode"
 
 	"github.com/uptrace/bun"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/constants"
 	"github.com/Authula/authula/plugins/organizations/repositories"
@@ -118,7 +117,7 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actor *mod
 
 	var created *types.Organization
 	createFn := func(ctx context.Context, orgRepo repositories.OrganizationRepository, memberRepo repositories.OrganizationMemberRepository) error {
-		if err := s.ensureOrganizationLimit(ctx, actor, orgRepo, memberRepo); err != nil {
+		if err := s.ensureOrganizationLimit(ctx, actor, orgRepo); err != nil {
 			return err
 		}
 
@@ -159,7 +158,7 @@ func (s *organizationService) CreateOrganization(ctx context.Context, actor *mod
 	return created, nil
 }
 
-func (s *organizationService) ensureOrganizationLimit(ctx context.Context, actor *models.Actor, orgRepo repositories.OrganizationRepository, memberRepo repositories.OrganizationMemberRepository) error {
+func (s *organizationService) ensureOrganizationLimit(ctx context.Context, actor *models.Actor, orgRepo repositories.OrganizationRepository) error {
 	if actor == nil || actor.ID == "" {
 		return coreerrors.ErrUnauthorized
 	}
@@ -168,104 +167,37 @@ func (s *organizationService) ensureOrganizationLimit(ctx context.Context, actor
 		return nil
 	}
 
-	var (
-		ownedOrganizations    []types.Organization
-		memberRecords         []types.OrganizationMember
-		ownedOrganizationsErr error
-		memberRecordsErr      error
-	)
-
-	wg := sync.WaitGroup{}
-
-	wg.Go(func() {
-		ownedOrganizations, ownedOrganizationsErr = orgRepo.GetAllByOwnerID(ctx, actor.ID)
-	})
-
-	wg.Go(func() {
-		memberRecords, memberRecordsErr = memberRepo.GetAllByUserID(ctx, actor.ID)
-	})
-
-	wg.Wait()
-
-	if ownedOrganizationsErr != nil {
-		return ownedOrganizationsErr
-	}
-	if memberRecordsErr != nil {
-		return memberRecordsErr
+	organizationCount, err := orgRepo.CountAccessibleByUserID(ctx, actor.ID)
+	if err != nil {
+		return err
 	}
 
-	organizationIDs := make(map[string]struct{}, len(ownedOrganizations)+len(memberRecords))
-	for _, organization := range ownedOrganizations {
-		if organization.ID == "" {
-			continue
-		}
-		organizationIDs[organization.ID] = struct{}{}
-	}
-	for _, member := range memberRecords {
-		if member.OrganizationID == "" {
-			continue
-		}
-		organizationIDs[member.OrganizationID] = struct{}{}
-	}
-
-	if len(organizationIDs) >= *s.organizationsLimit {
+	if organizationCount >= *s.organizationsLimit {
 		return constants.ErrOrganizationsQuotaExceeded
 	}
 
 	return nil
 }
 
-func (s *organizationService) GetAllOrganizationsByOwner(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
+func (s *organizationService) GetAllOrganizations(ctx context.Context, actor *models.Actor, params pagination.Params) (*types.ListOrganizationsResponse, error) {
 	if actor == nil || actor.ID == "" {
 		return nil, coreerrors.ErrUnauthorized
 	}
 
-	ownedOrganizations, err := s.orgRepo.GetAllByOwnerID(ctx, actor.ID)
+	params = pagination.Clamp(params)
+
+	organizations, total, err := s.orgRepo.GetAllAccessibleByUserID(ctx, actor.ID, params.Page, params.Limit)
 	if err != nil {
 		return nil, err
 	}
-
-	memberRecords, err := s.orgMemberRepo.GetAllByUserID(ctx, actor.ID)
-	if err != nil {
-		return nil, err
+	if organizations == nil {
+		organizations = []types.Organization{}
 	}
 
-	organizationMap := make(map[string]types.Organization, len(ownedOrganizations))
-	for _, organization := range ownedOrganizations {
-		organizationMap[organization.ID] = organization
-	}
-
-	for _, member := range memberRecords {
-		if member.OrganizationID == "" {
-			continue
-		}
-		if _, exists := organizationMap[member.OrganizationID]; exists {
-			continue
-		}
-
-		organization, err := s.orgRepo.GetByID(ctx, member.OrganizationID)
-		if err != nil {
-			return nil, err
-		}
-		if organization == nil {
-			continue
-		}
-
-		organizationMap[organization.ID] = *organization
-	}
-
-	organizationIDs := make([]string, 0, len(organizationMap))
-	for organizationID := range organizationMap {
-		organizationIDs = append(organizationIDs, organizationID)
-	}
-	sort.Strings(organizationIDs)
-
-	organizations := make([]types.Organization, 0, len(organizationIDs))
-	for _, organizationID := range organizationIDs {
-		organizations = append(organizations, organizationMap[organizationID])
-	}
-
-	return organizations, nil
+	return &types.ListOrganizationsResponse{
+		Data:       organizations,
+		Pagination: pagination.New(params.Page, params.Limit, total),
+	}, nil
 }
 
 func (s *organizationService) GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {

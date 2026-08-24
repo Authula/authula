@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
@@ -31,6 +32,7 @@ type organizationInvitationHandlerCase struct {
 	invitationID    string
 	prepare         func(*organizationInvitationHandlerFixture)
 	expectedStatus  int
+	expectedCode    string
 	expectedMessage string
 	checkResponse   func(*testing.T, *models.RequestContext)
 }
@@ -82,7 +84,11 @@ func runOrganizationInvitationHandlerCases(t *testing.T, method, path string, bu
 
 			assert.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			if tt.expectedMessage != "" {
-				internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				if tt.expectedCode != "" {
+					internaltests.AssertErrorResponse(t, reqCtx, tt.expectedStatus, tt.expectedCode, tt.expectedMessage)
+				} else {
+					internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
+				}
 			}
 			if tt.checkResponse != nil {
 				tt.checkResponse(t, reqCtx)
@@ -133,7 +139,8 @@ func TestCreateOrganizationInvitationHandler(t *testing.T) {
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
 				fixture.service.On("CreateOrganizationInvitation", mock.Anything, "user-1", "org-1", mock.Anything, mock.Anything).Return((*orgtypes.OrganizationInvitation)(nil), orgconstants.ErrInvitationsQuotaExceeded).Once()
 			},
-			expectedStatus:  http.StatusTooManyRequests,
+			expectedStatus:  http.StatusConflict,
+			expectedCode:    orgconstants.CodeInvitationsQuotaExceeded,
 			expectedMessage: orgconstants.ErrInvitationsQuotaExceeded.Error(),
 		},
 		{
@@ -173,7 +180,8 @@ func TestGetAllOrganizationInvitationsHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
-				fixture.service.On("GetAllOrganizationInvitationsByOrgIDWithOrg", mock.Anything, "org-1").Return(([]orgtypes.GetOrganizationInvitationResponse)(nil), errors.New("some error")).Once()
+				fixture.service.On("GetAllOrganizationInvitationsByOrgIDWithOrg", mock.Anything, "org-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+					Return((*orgtypes.ListOrganizationInvitationsResponse)(nil), errors.New("some error")).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
 			expectedMessage: "some error",
@@ -183,20 +191,25 @@ func TestGetAllOrganizationInvitationsHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
-				fixture.service.On("GetAllOrganizationInvitationsByOrgIDWithOrg", mock.Anything, "org-1").Return([]orgtypes.GetOrganizationInvitationResponse{
-					{
-						Invitation:   &orgtypes.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: orgtypes.OrganizationInvitationStatusPending},
-						Organization: orgtypes.OrganizationSummary{ID: "org-1", Name: "Acme Corp", Slug: "acme"},
-					},
-				}, nil).Once()
+				fixture.service.On("GetAllOrganizationInvitationsByOrgIDWithOrg", mock.Anything, "org-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+					Return(&orgtypes.ListOrganizationInvitationsResponse{
+						Data: []orgtypes.GetOrganizationInvitationResponse{
+							{
+								Invitation:   &orgtypes.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: orgtypes.OrganizationInvitationStatusPending},
+								Organization: orgtypes.OrganizationSummary{ID: "org-1", Name: "Acme Corp", Slug: "acme"},
+							},
+						},
+						Pagination: pagination.New(1, 10, 1),
+					}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
-				resp := internaltests.DecodeResponseJSON[[]orgtypes.GetOrganizationInvitationResponse](t, reqCtx)
-				require.Len(t, resp, 1)
-				assert.Equal(t, "inv-1", resp[0].Invitation.ID)
-				assert.Equal(t, "org-1", resp[0].Invitation.OrganizationID)
-				assert.Equal(t, "Acme Corp", resp[0].Organization.Name)
+				resp := internaltests.DecodeResponseJSON[orgtypes.ListOrganizationInvitationsResponse](t, reqCtx)
+				require.Len(t, resp.Data, 1)
+				assert.Equal(t, "inv-1", resp.Data[0].Invitation.ID)
+				assert.Equal(t, "org-1", resp.Data[0].Invitation.OrganizationID)
+				assert.Equal(t, "Acme Corp", resp.Data[0].Organization.Name)
+				assert.Equal(t, pagination.Pagination{Page: 1, Limit: 10, Total: 1, TotalPages: 1, HasMore: false}, resp.Pagination)
 			},
 		},
 	})

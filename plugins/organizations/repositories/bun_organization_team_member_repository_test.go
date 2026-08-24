@@ -2,6 +2,7 @@ package repositories_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -234,6 +235,45 @@ func TestBunOrganizationTeamMemberRepository_GetByTeamIDAndMemberID(t *testing.T
 	}
 }
 
+func seedTeamMembers(t *testing.T, count int) (repositories.OrganizationTeamMemberRepository, context.Context) {
+	t.Helper()
+
+	db := plugintests.SetupRepoDB(t)
+	plugintests.SeedUsers(t, db, count)
+	plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+	plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
+
+	repo := repositories.NewBunOrganizationTeamMemberRepository(db)
+	ctx := context.Background()
+	for i := 1; i <= count; i++ {
+		plugintests.SeedOrganizationMember(t, db, fmt.Sprintf("member-%d", i), "org-1", fmt.Sprintf("user-%d", i), "member")
+		_, err := repo.Create(ctx, &types.OrganizationTeamMember{
+			ID:       fmt.Sprintf("team-member-%d", i),
+			TeamID:   "team-1",
+			MemberID: fmt.Sprintf("member-%d", i),
+		})
+		require.NoError(t, err)
+	}
+
+	return repo, ctx
+}
+
+func teamMemberIDs(teamMembers []types.OrganizationTeamMember) []string {
+	ids := make([]string, 0, len(teamMembers))
+	for _, teamMember := range teamMembers {
+		ids = append(ids, teamMember.ID)
+	}
+	return ids
+}
+
+func teamMemberResponseIDs(teamMembers []types.OrganizationTeamMemberResponse) []string {
+	ids := make([]string, 0, len(teamMembers))
+	for _, teamMember := range teamMembers {
+		ids = append(ids, teamMember.ID)
+	}
+	return ids
+}
+
 func TestBunOrganizationTeamMemberRepository_GetAllByTeamID(t *testing.T) {
 	t.Parallel()
 
@@ -242,102 +282,102 @@ func TestBunOrganizationTeamMemberRepository_GetAllByTeamID(t *testing.T) {
 		teamID      string
 		page        int
 		limit       int
-		setup       func(*testing.T) (repositories.OrganizationTeamMemberRepository, context.Context)
 		expectCount int
+		expectTotal int
 	}{
-		{
-			name:        "first page",
-			teamID:      "team-1",
-			page:        1,
-			limit:       2,
-			expectCount: 2,
-			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
-				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedUser(t, db, "user-3")
-				plugintests.SeedOrganizationMember(t, db, "member-3", "org-1", "user-3", "member")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
-				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
-				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
-				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-2", TeamID: "team-1", MemberID: "member-2"})
-				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-3", TeamID: "team-1", MemberID: "member-3"})
-				require.NoError(t, err)
-				return repo, ctx
-			},
-		},
-		{
-			name:        "second page",
-			teamID:      "team-1",
-			page:        2,
-			limit:       2,
-			expectCount: 1,
-			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
-				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedUser(t, db, "user-3")
-				plugintests.SeedOrganizationMember(t, db, "member-3", "org-1", "user-3", "member")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
-				repo := repositories.NewBunOrganizationTeamMemberRepository(db)
-				ctx := context.Background()
-				_, err := repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-1", TeamID: "team-1", MemberID: "member-1"})
-				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-2", TeamID: "team-1", MemberID: "member-2"})
-				require.NoError(t, err)
-				_, err = repo.Create(ctx, &types.OrganizationTeamMember{ID: "team-member-3", TeamID: "team-1", MemberID: "member-3"})
-				require.NoError(t, err)
-				return repo, ctx
-			},
-		},
-		{
-			name:        "empty",
-			teamID:      "team-2",
-			page:        1,
-			limit:       10,
-			expectCount: 0,
-			setup: func(t *testing.T) (repositories.OrganizationTeamMemberRepository, context.Context) {
-				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
-				plugintests.SeedOrganizationMember(t, db, "member-1", "org-1", "user-1", "member")
-				plugintests.SeedOrganizationMember(t, db, "member-2", "org-1", "user-2", "admin")
-				plugintests.SeedUser(t, db, "user-3")
-				plugintests.SeedOrganizationMember(t, db, "member-3", "org-1", "user-3", "member")
-				plugintests.SeedOrganizationTeam(t, db, "team-1", "org-1", "Platform", "platform")
-				return repositories.NewBunOrganizationTeamMemberRepository(db), context.Background()
-			},
-		},
+		{name: "first page", teamID: "team-1", page: 1, limit: 2, expectCount: 2, expectTotal: 5},
+		{name: "last partial page", teamID: "team-1", page: 3, limit: 2, expectCount: 1, expectTotal: 5},
+		{name: "page past the end keeps the true total", teamID: "team-1", page: 4, limit: 2, expectCount: 0, expectTotal: 5},
+		{name: "page zero does not error", teamID: "team-1", page: 0, limit: 2, expectCount: 2, expectTotal: 5},
+		{name: "negative page does not error", teamID: "team-1", page: -1, limit: 2, expectCount: 2, expectTotal: 5},
+		{name: "zero limit falls back to a bounded page", teamID: "team-1", page: 1, limit: 0, expectCount: 5, expectTotal: 5},
+		{name: "unknown team is empty", teamID: "team-2", page: 1, limit: 10, expectCount: 0, expectTotal: 0},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			repo, ctx := tt.setup(t)
+			repo, ctx := seedTeamMembers(t, 5)
 
-			found, err := repo.GetAllByTeamID(ctx, tt.teamID, tt.page, tt.limit)
+			found, total, err := repo.GetAllByTeamID(ctx, tt.teamID, tt.page, tt.limit)
 			require.NoError(t, err)
 			require.Len(t, found, tt.expectCount)
+			require.Equal(t, tt.expectTotal, total)
 			for _, teamMember := range found {
-				require.Equal(t, "team-1", teamMember.TeamID)
-			}
-			if tt.page == 1 && len(found) > 1 {
-				require.Equal(t, "team-member-3", found[0].ID)
-				require.Equal(t, "team-member-2", found[1].ID)
-			}
-			if tt.page == 2 && len(found) > 0 {
-				require.Equal(t, "team-member-1", found[0].ID)
+				require.Equal(t, tt.teamID, teamMember.TeamID)
 			}
 		})
 	}
+}
+
+func TestBunOrganizationTeamMemberRepository_GetAllByTeamIDPagesPartitionCleanly(t *testing.T) {
+	t.Parallel()
+
+	repo, ctx := seedTeamMembers(t, 5)
+
+	seen := make([]string, 0, 5)
+	for page := 1; page <= 3; page++ {
+		found, total, err := repo.GetAllByTeamID(ctx, "team-1", page, 2)
+		require.NoError(t, err)
+		require.Equal(t, 5, total)
+		seen = append(seen, teamMemberIDs(found)...)
+	}
+
+	require.ElementsMatch(t, []string{"team-member-1", "team-member-2", "team-member-3", "team-member-4", "team-member-5"}, seen)
+}
+
+func TestBunOrganizationTeamMemberRepository_GetAllByTeamIDWithMemberAndUser(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		teamID      string
+		page        int
+		limit       int
+		expectCount int
+		expectTotal int
+	}{
+		{name: "first page", teamID: "team-1", page: 1, limit: 2, expectCount: 2, expectTotal: 5},
+		{name: "last partial page", teamID: "team-1", page: 3, limit: 2, expectCount: 1, expectTotal: 5},
+		{name: "page past the end keeps the true total", teamID: "team-1", page: 4, limit: 2, expectCount: 0, expectTotal: 5},
+		{name: "page zero does not error", teamID: "team-1", page: 0, limit: 2, expectCount: 2, expectTotal: 5},
+		{name: "zero limit falls back to a bounded page", teamID: "team-1", page: 1, limit: 0, expectCount: 5, expectTotal: 5},
+		{name: "limit beyond the maximum is capped", teamID: "team-1", page: 1, limit: 100000, expectCount: 5, expectTotal: 5},
+		{name: "unknown team is empty", teamID: "team-2", page: 1, limit: 10, expectCount: 0, expectTotal: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo, ctx := seedTeamMembers(t, 5)
+
+			found, total, err := repo.GetAllByTeamIDWithMemberAndUser(ctx, tt.teamID, tt.page, tt.limit)
+			require.NoError(t, err)
+			require.Len(t, found, tt.expectCount)
+			require.Equal(t, tt.expectTotal, total)
+			for _, teamMember := range found {
+				require.NotEmpty(t, teamMember.Member.User.ID, "joined user must be populated")
+			}
+		})
+	}
+}
+
+func TestBunOrganizationTeamMemberRepository_GetAllByTeamIDWithMemberAndUserPagesPartitionCleanly(t *testing.T) {
+	t.Parallel()
+
+	repo, ctx := seedTeamMembers(t, 5)
+
+	seen := make([]string, 0, 5)
+	for page := 1; page <= 3; page++ {
+		found, total, err := repo.GetAllByTeamIDWithMemberAndUser(ctx, "team-1", page, 2)
+		require.NoError(t, err)
+		require.Equal(t, 5, total)
+		seen = append(seen, teamMemberResponseIDs(found)...)
+	}
+
+	require.ElementsMatch(t, []string{"team-member-1", "team-member-2", "team-member-3", "team-member-4", "team-member-5"}, seen)
 }
 
 func TestBunOrganizationTeamMemberRepository_DeleteByTeamIDAndMemberID(t *testing.T) {
