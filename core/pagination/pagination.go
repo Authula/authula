@@ -7,10 +7,8 @@ import (
 )
 
 const (
-	DefaultPage  = 1
-	DefaultLimit = 10
-	// DefaultMaxLimit is the fallback ceiling on a page size. It exists to stop a
-	// caller-supplied limit from turning a paginated query into a full table scan.
+	DefaultPage     = 1
+	DefaultLimit    = 10
 	DefaultMaxLimit = 100
 )
 
@@ -27,13 +25,6 @@ type Pagination struct {
 	HasMore    bool `json:"has_more" required:"true" nullable:"false"`
 }
 
-// Clamp coerces params into a range that is safe to hand to a database: the page
-// starts at 1, and the limit is held between 1 and maxLimit. A maxLimit of zero or
-// less falls back to DefaultMaxLimit, so a caller that has nothing configured still
-// gets a bounded query rather than an unbounded one.
-//
-// The floor is applied before the ceiling, so a maxLimit below DefaultLimit also
-// caps the default: with maxLimit 5, an unset limit yields 5 rather than 10.
 func Clamp(params Params, maxLimit int) Params {
 	if maxLimit <= 0 {
 		maxLimit = DefaultMaxLimit

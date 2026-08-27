@@ -139,8 +139,6 @@ func TestOrganizationService_QuotaSurvivesPagination(t *testing.T) {
 	require.Len(t, seen, limit, "paging must yield every accessible organization exactly once")
 }
 
-// The unconstrained sibling of ListAllMembers must return the whole collection in
-// one call, against real SQL, where the paginated path needs two pages.
 func TestOrganizationMemberService_GetAllMembersReturnsEverythingInOneCallAgainstSQL(t *testing.T) {
 	t.Parallel()
 
@@ -188,8 +186,6 @@ func TestOrganizationMemberService_GetAllMembersReturnsEverythingInOneCallAgains
 	}
 }
 
-// The ceiling on a page size must survive all the way into the SQL LIMIT, and the
-// configured value — not the constant — must be the one that wins.
 func TestOrganizationMemberService_ListAllMembersRespectsTheConfiguredMaxPageLimitAgainstSQL(t *testing.T) {
 	t.Parallel()
 
@@ -273,8 +269,6 @@ func TestOrganizationMemberService_ListAllMembersRespectsTheConfiguredMaxPageLim
 	}
 }
 
-// The unpaginated sibling is the sanctioned escape hatch for whole collections and
-// must stay uncapped, however low the configured page-size ceiling is.
 func TestOrganizationMemberService_GetAllMembersIgnoresTheMaxPageLimitAgainstSQL(t *testing.T) {
 	t.Parallel()
 

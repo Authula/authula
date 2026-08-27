@@ -12,8 +12,6 @@ import (
 	rootservices "github.com/Authula/authula/services"
 )
 
-// ServiceUtils carries the policy every organization service shares: the
-// authorization checks below, and the configured ceiling on page sizes.
 type ServiceUtils struct {
 	orgRepo       repositories.OrganizationRepository
 	orgMemberRepo repositories.OrganizationMemberRepository
@@ -30,10 +28,6 @@ func NewServiceUtils(orgRepo repositories.OrganizationRepository, orgMemberRepo 
 	}
 }
 
-// ClampPagination bounds caller-supplied pagination against the configured
-// maximum page size. A zero or negative maximum falls back to
-// pagination.DefaultMaxLimit, so an unconfigured ServiceUtils still yields a
-// bounded query.
 func (s *ServiceUtils) ClampPagination(params pagination.Params) pagination.Params {
 	if s == nil {
 		return pagination.Clamp(params, 0)
