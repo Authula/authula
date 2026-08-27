@@ -58,10 +58,10 @@ func TestOrganizationMemberService_ListAllMembersEnforcesLimitsAgainstSQL(t *tes
 			expectPagination: pagination.Pagination{Page: 1, Limit: 10, Total: memberCount, TotalPages: 2, HasMore: true},
 		},
 		{
-			name:             "a large limit is honoured",
+			name:             "a large limit is capped at the maximum page size",
 			params:           pagination.Params{Page: 1, Limit: 100000},
 			expectLen:        memberCount,
-			expectPagination: pagination.Pagination{Page: 1, Limit: 100000, Total: memberCount, TotalPages: 1, HasMore: false},
+			expectPagination: pagination.Pagination{Page: 1, Limit: pagination.DefaultMaxLimit, Total: memberCount, TotalPages: 1, HasMore: false},
 		},
 		{
 			name:             "a negative limit does not read the whole table",
@@ -186,4 +186,121 @@ func TestOrganizationMemberService_GetAllMembersReturnsEverythingInOneCallAgains
 		require.NotEmpty(t, member.User.ID)
 		require.NotEmpty(t, member.User.Email)
 	}
+}
+
+// The ceiling on a page size must survive all the way into the SQL LIMIT, and the
+// configured value — not the constant — must be the one that wins.
+func TestOrganizationMemberService_ListAllMembersRespectsTheConfiguredMaxPageLimitAgainstSQL(t *testing.T) {
+	t.Parallel()
+
+	const memberCount = 120
+
+	setup := func(t *testing.T, maxPageLimit int) (*organizationMemberService, context.Context) {
+		t.Helper()
+
+		db := orgtests.SetupRepoDB(t)
+		orgtests.SeedUsers(t, db, memberCount)
+		orgtests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+		for i := 1; i <= memberCount; i++ {
+			orgtests.SeedOrganizationMember(t, db, fmt.Sprintf("mem-%03d", i), "org-1", fmt.Sprintf("user-%d", i), "member")
+		}
+
+		orgRepo := repositories.NewBunOrganizationRepository(db)
+		memberRepo := repositories.NewBunOrganizationMemberRepository(db)
+		serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, maxPageLimit: maxPageLimit}
+		svc := NewOrganizationMemberService(
+			&internaltests.MockUserService{},
+			orgtests.NewAccessControlServiceStub(),
+			orgRepo,
+			memberRepo,
+			nil,
+			&orgtests.MockTxRunner{},
+			serviceUtils,
+		)
+
+		return svc, context.Background()
+	}
+
+	tests := []struct {
+		name             string
+		maxPageLimit     int
+		params           pagination.Params
+		expectLen        int
+		expectPagination pagination.Pagination
+	}{
+		{
+			name:             "an unconfigured maximum truncates the page at the default maximum",
+			maxPageLimit:     0,
+			params:           pagination.Params{Page: 1, Limit: 1_000_000},
+			expectLen:        pagination.DefaultMaxLimit,
+			expectPagination: pagination.Pagination{Page: 1, Limit: 100, Total: memberCount, TotalPages: 2, HasMore: true},
+		},
+		{
+			name:             "a configured maximum below the default maximum wins",
+			maxPageLimit:     5,
+			params:           pagination.Params{Page: 1, Limit: 1_000_000},
+			expectLen:        5,
+			expectPagination: pagination.Pagination{Page: 1, Limit: 5, Total: memberCount, TotalPages: 24, HasMore: true},
+		},
+		{
+			name:             "a configured maximum above the default maximum wins",
+			maxPageLimit:     120,
+			params:           pagination.Params{Page: 1, Limit: 1_000_000},
+			expectLen:        memberCount,
+			expectPagination: pagination.Pagination{Page: 1, Limit: 120, Total: memberCount, TotalPages: 1, HasMore: false},
+		},
+		{
+			name:             "a limit within the configured maximum is untouched",
+			maxPageLimit:     120,
+			params:           pagination.Params{Page: 2, Limit: 30},
+			expectLen:        30,
+			expectPagination: pagination.Pagination{Page: 2, Limit: 30, Total: memberCount, TotalPages: 4, HasMore: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, ctx := setup(t, tt.maxPageLimit)
+
+			resp, err := svc.ListAllMembers(ctx, orgtests.Actor("user-1"), "org-1", tt.params)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.Len(t, resp.Data, tt.expectLen)
+			require.Equal(t, tt.expectPagination, resp.Pagination)
+		})
+	}
+}
+
+// The unpaginated sibling is the sanctioned escape hatch for whole collections and
+// must stay uncapped, however low the configured page-size ceiling is.
+func TestOrganizationMemberService_GetAllMembersIgnoresTheMaxPageLimitAgainstSQL(t *testing.T) {
+	t.Parallel()
+
+	const memberCount = 120
+
+	db := orgtests.SetupRepoDB(t)
+	orgtests.SeedUsers(t, db, memberCount)
+	orgtests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+	for i := 1; i <= memberCount; i++ {
+		orgtests.SeedOrganizationMember(t, db, fmt.Sprintf("mem-%03d", i), "org-1", fmt.Sprintf("user-%d", i), "member")
+	}
+
+	orgRepo := repositories.NewBunOrganizationRepository(db)
+	memberRepo := repositories.NewBunOrganizationMemberRepository(db)
+	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, maxPageLimit: 5}
+	svc := NewOrganizationMemberService(
+		&internaltests.MockUserService{},
+		orgtests.NewAccessControlServiceStub(),
+		orgRepo,
+		memberRepo,
+		nil,
+		&orgtests.MockTxRunner{},
+		serviceUtils,
+	)
+
+	members, err := svc.GetAllMembers(context.Background(), orgtests.Actor("user-1"), "org-1")
+	require.NoError(t, err)
+	require.Len(t, members, memberCount, "a max page limit of 5 must not truncate the unpaginated call")
 }

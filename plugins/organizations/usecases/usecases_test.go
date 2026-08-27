@@ -20,7 +20,7 @@ import (
 func newAuthorizeOrgAccessUseCases(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, accessControl *orgtests.AccessControlServiceStub) *UseCases {
 	return &UseCases{
 		authorizer:    rootservices.NewDefaultAuthorizer(),
-		serviceUtils:  orgservices.NewServiceUtils(orgRepo, memberRepo, nil),
+		serviceUtils:  orgservices.NewServiceUtils(orgRepo, memberRepo, nil, 0),
 		accessControl: accessControl,
 	}
 }
@@ -29,7 +29,7 @@ func newGetInvitationUseCases(invSvc orgservices.OrganizationInvitationService, 
 	return &UseCases{
 		invitationService: invSvc,
 		userService:       userSvc,
-		serviceUtils:      orgservices.NewServiceUtils(orgRepo, memberRepo, nil),
+		serviceUtils:      orgservices.NewServiceUtils(orgRepo, memberRepo, nil, 0),
 		authorizer:        rootservices.NewDefaultAuthorizer(),
 		accessControl:     accessControl,
 	}

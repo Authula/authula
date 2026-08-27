@@ -16,41 +16,91 @@ func TestClamp(t *testing.T) {
 	tests := []struct {
 		name     string
 		params   pagination.Params
+		maxLimit int
 		expected pagination.Params
 	}{
 		{
 			name:     "valid params are untouched",
 			params:   pagination.Params{Page: 1, Limit: 10},
+			maxLimit: pagination.DefaultMaxLimit,
 			expected: pagination.Params{Page: 1, Limit: 10},
 		},
 		{
 			name:     "page zero becomes the first page",
 			params:   pagination.Params{Page: 0, Limit: 10},
+			maxLimit: pagination.DefaultMaxLimit,
 			expected: pagination.Params{Page: 1, Limit: 10},
 		},
 		{
 			name:     "negative page becomes the first page",
 			params:   pagination.Params{Page: -5, Limit: 10},
+			maxLimit: pagination.DefaultMaxLimit,
 			expected: pagination.Params{Page: 1, Limit: 10},
 		},
 		{
 			name:     "zero limit falls back to the default limit",
 			params:   pagination.Params{Page: 3, Limit: 0},
+			maxLimit: pagination.DefaultMaxLimit,
 			expected: pagination.Params{Page: 3, Limit: pagination.DefaultLimit},
 		},
 		{
 			name:     "negative limit falls back to the default limit",
 			params:   pagination.Params{Page: 3, Limit: -1},
+			maxLimit: pagination.DefaultMaxLimit,
 			expected: pagination.Params{Page: 3, Limit: pagination.DefaultLimit},
 		},
 		{
-			name:     "large limits are left to the caller",
+			name:     "limit exactly at the maximum is not capped",
+			params:   pagination.Params{Page: 1, Limit: pagination.DefaultMaxLimit},
+			maxLimit: pagination.DefaultMaxLimit,
+			expected: pagination.Params{Page: 1, Limit: pagination.DefaultMaxLimit},
+		},
+		{
+			name:     "limit above the maximum is capped",
+			params:   pagination.Params{Page: 1, Limit: pagination.DefaultMaxLimit + 1},
+			maxLimit: pagination.DefaultMaxLimit,
+			expected: pagination.Params{Page: 1, Limit: pagination.DefaultMaxLimit},
+		},
+		{
+			name:     "an absurdly large limit is capped",
 			params:   pagination.Params{Page: 1, Limit: 1_000_000},
-			expected: pagination.Params{Page: 1, Limit: 1_000_000},
+			maxLimit: pagination.DefaultMaxLimit,
+			expected: pagination.Params{Page: 1, Limit: pagination.DefaultMaxLimit},
+		},
+		{
+			name:     "a zero maximum falls back to the default maximum",
+			params:   pagination.Params{Page: 1, Limit: 1_000_000},
+			maxLimit: 0,
+			expected: pagination.Params{Page: 1, Limit: pagination.DefaultMaxLimit},
+		},
+		{
+			name:     "a negative maximum falls back to the default maximum",
+			params:   pagination.Params{Page: 1, Limit: 1_000_000},
+			maxLimit: -1,
+			expected: pagination.Params{Page: 1, Limit: pagination.DefaultMaxLimit},
+		},
+		{
+			name:     "a configured maximum above the default is honoured",
+			params:   pagination.Params{Page: 1, Limit: 400},
+			maxLimit: 500,
+			expected: pagination.Params{Page: 1, Limit: 400},
+		},
+		{
+			name:     "a limit above a configured maximum is capped to it",
+			params:   pagination.Params{Page: 1, Limit: 501},
+			maxLimit: 500,
+			expected: pagination.Params{Page: 1, Limit: 500},
+		},
+		{
+			name:     "a maximum below the default limit also caps the default",
+			params:   pagination.Params{Page: 1, Limit: 0},
+			maxLimit: 5,
+			expected: pagination.Params{Page: 1, Limit: 5},
 		},
 		{
 			name:     "high page numbers are legal",
 			params:   pagination.Params{Page: 999999, Limit: 10},
+			maxLimit: pagination.DefaultMaxLimit,
 			expected: pagination.Params{Page: 999999, Limit: 10},
 		},
 	}
@@ -59,7 +109,7 @@ func TestClamp(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			require.Equal(t, tt.expected, pagination.Clamp(tt.params))
+			require.Equal(t, tt.expected, pagination.Clamp(tt.params, tt.maxLimit))
 		})
 	}
 }

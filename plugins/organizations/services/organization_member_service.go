@@ -120,7 +120,7 @@ func (s *organizationMemberService) ListAllMembers(ctx context.Context, actor *m
 		return nil, err
 	}
 
-	params = pagination.Clamp(params)
+	params = s.serviceUtils.ClampPagination(params)
 
 	members, total, err := s.orgMemberRepo.ListAllByOrganizationIDWithUser(ctx, organizationID, params.Page, params.Limit)
 	if err != nil {

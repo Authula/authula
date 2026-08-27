@@ -156,7 +156,7 @@ func (s *organizationTeamService) ListAllTeams(ctx context.Context, actor *model
 		return nil, err
 	}
 
-	params = pagination.Clamp(params)
+	params = s.serviceUtils.ClampPagination(params)
 
 	teams, total, err := s.orgTeamRepo.ListAllByOrganizationID(ctx, organizationID, params.Page, params.Limit)
 	if err != nil {

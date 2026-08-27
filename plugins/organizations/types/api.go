@@ -40,33 +40,33 @@ type TeamMemberID struct {
 }
 
 type ListOrganizationsRequest struct {
-	Page  int `query:"page" json:"page,omitempty" nullable:"false"`
-	Limit int `query:"limit" json:"limit,omitempty" nullable:"false"`
+	Page  int `query:"page" json:"page,omitempty" nullable:"false" default:"1"`
+	Limit int `query:"limit" json:"limit,omitempty" nullable:"false" default:"10"`
 }
 
 type ListOrganizationInvitationsRequest struct {
 	OrganizationID string `path:"organization_id"`
-	Page           int    `query:"page" json:"page,omitempty" nullable:"false"`
-	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false"`
+	Page           int    `query:"page" json:"page,omitempty" nullable:"false" default:"1"`
+	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false" default:"10"`
 }
 
 type ListOrganizationMembersRequest struct {
 	OrganizationID string `path:"organization_id"`
-	Page           int    `query:"page" json:"page,omitempty" nullable:"false"`
-	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false"`
+	Page           int    `query:"page" json:"page,omitempty" nullable:"false" default:"1"`
+	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false" default:"10"`
 }
 
 type ListOrganizationTeamsRequest struct {
 	OrganizationID string `path:"organization_id"`
-	Page           int    `query:"page" json:"page,omitempty" nullable:"false"`
-	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false"`
+	Page           int    `query:"page" json:"page,omitempty" nullable:"false" default:"1"`
+	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false" default:"10"`
 }
 
 type ListOrganizationTeamMembersRequest struct {
 	OrganizationID string `path:"organization_id"`
 	TeamID         string `path:"team_id"`
-	Page           int    `query:"page" json:"page,omitempty" nullable:"false"`
-	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false"`
+	Page           int    `query:"page" json:"page,omitempty" nullable:"false" default:"1"`
+	Limit          int    `query:"limit" json:"limit,omitempty" nullable:"false" default:"10"`
 }
 
 type ListOrganizationsResponse struct {

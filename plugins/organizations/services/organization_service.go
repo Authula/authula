@@ -184,7 +184,7 @@ func (s *organizationService) ListAllOrganizations(ctx context.Context, actor *m
 		return nil, coreerrors.ErrUnauthorized
 	}
 
-	params = pagination.Clamp(params)
+	params = s.serviceUtils.ClampPagination(params)
 
 	organizations, total, err := s.orgRepo.ListAllAccessibleByUserID(ctx, actor.ID, params.Page, params.Limit)
 	if err != nil {

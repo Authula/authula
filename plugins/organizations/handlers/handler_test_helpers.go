@@ -35,7 +35,7 @@ func defaultServiceUtils() *orgservices.ServiceUtils {
 	memberRepo := &orgtests.MockOrganizationMemberRepository{}
 	orgRepo.On("GetByID", mock.Anything, mock.Anything).Return(&orgtypes.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Maybe()
 	memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, mock.Anything, mock.Anything).Return(&orgtypes.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "admin"}, nil).Maybe()
-	return orgservices.NewServiceUtils(orgRepo, memberRepo, nil)
+	return orgservices.NewServiceUtils(orgRepo, memberRepo, nil, 0)
 }
 
 func defaultAccessControlService() *orgtests.AccessControlServiceStub {
