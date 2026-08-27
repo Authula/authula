@@ -146,11 +146,11 @@ func TestAddOrganizationTeamMemberHandler(t *testing.T) {
 	})
 }
 
-func TestGetAllOrganizationTeamMembersHandler(t *testing.T) {
+func TestListAllOrganizationTeamMembersHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationTeamMemberHandlerCases(t, http.MethodGet, "/organizations/org-1/teams/team-1/members", func(fixture *organizationTeamMemberHandlerFixture) http.HandlerFunc {
-		return (&GetAllOrganizationTeamMembersHandler{UseCases: newTeamMemberUseCases(fixture.service)}).Handle()
+		return (&ListAllOrganizationTeamMembersHandler{UseCases: newTeamMemberUseCases(fixture.service)}).Handle()
 	}, []organizationTeamMemberHandlerCase{
 		{
 			name:            "missing_user",
@@ -165,7 +165,7 @@ func TestGetAllOrganizationTeamMembersHandler(t *testing.T) {
 			organizationID: "org-1",
 			teamID:         "team-1",
 			prepare: func(fixture *organizationTeamMemberHandlerFixture) {
-				fixture.service.On("GetAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+				fixture.service.On("ListAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
 					Return((*orgtypes.ListOrganizationTeamMembersResponse)(nil), errors.New("some error")).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
@@ -177,7 +177,7 @@ func TestGetAllOrganizationTeamMembersHandler(t *testing.T) {
 			organizationID: "org-1",
 			teamID:         "team-1",
 			prepare: func(fixture *organizationTeamMemberHandlerFixture) {
-				fixture.service.On("GetAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+				fixture.service.On("ListAllTeamMembers", mock.Anything, "user-1", "org-1", "team-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
 					Return(&orgtypes.ListOrganizationTeamMembersResponse{
 						Data:       []orgtypes.OrganizationTeamMemberResponse{{ID: "team-mem-1", TeamID: "team-1"}},
 						Pagination: pagination.New(1, 10, 1),

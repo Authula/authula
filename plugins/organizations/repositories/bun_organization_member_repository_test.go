@@ -34,7 +34,7 @@ func TestBunOrganizationMemberRepository_CreateGetUpdateDelete(t *testing.T) {
 			name: "list by organization returns created member",
 			run: func(t *testing.T, orgMemberRepo repositories.OrganizationMemberRepository, ctx context.Context, created *types.OrganizationMember) {
 				t.Helper()
-				members, total, err := orgMemberRepo.GetAllByOrganizationID(ctx, "org-1", 1, 10)
+				members, total, err := orgMemberRepo.ListAllByOrganizationID(ctx, "org-1", 1, 10)
 				require.NoError(t, err)
 				require.Len(t, members, 1)
 				require.Equal(t, 1, total)
@@ -183,7 +183,7 @@ func memberResponseIDs(members []types.OrganizationMemberResponse) []string {
 	return ids
 }
 
-func TestBunOrganizationMemberRepository_GetAllByOrganizationID(t *testing.T) {
+func TestBunOrganizationMemberRepository_ListAllByOrganizationID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -210,7 +210,7 @@ func TestBunOrganizationMemberRepository_GetAllByOrganizationID(t *testing.T) {
 
 			repo, ctx := seedMembers(t, 5)
 
-			members, total, err := repo.GetAllByOrganizationID(ctx, tt.organizationID, tt.page, tt.limit)
+			members, total, err := repo.ListAllByOrganizationID(ctx, tt.organizationID, tt.page, tt.limit)
 			require.NoError(t, err)
 			require.Len(t, members, tt.expectCount)
 			require.Equal(t, tt.expectTotal, total)
@@ -218,14 +218,14 @@ func TestBunOrganizationMemberRepository_GetAllByOrganizationID(t *testing.T) {
 	}
 }
 
-func TestBunOrganizationMemberRepository_GetAllByOrganizationIDPagesPartitionCleanly(t *testing.T) {
+func TestBunOrganizationMemberRepository_ListAllByOrganizationIDPagesPartitionCleanly(t *testing.T) {
 	t.Parallel()
 
 	repo, ctx := seedMembers(t, 5)
 
 	seen := make([]string, 0, 5)
 	for page := 1; page <= 3; page++ {
-		members, total, err := repo.GetAllByOrganizationID(ctx, "org-1", page, 2)
+		members, total, err := repo.ListAllByOrganizationID(ctx, "org-1", page, 2)
 		require.NoError(t, err)
 		require.Equal(t, 5, total)
 		seen = append(seen, memberIDs(members)...)
@@ -234,7 +234,7 @@ func TestBunOrganizationMemberRepository_GetAllByOrganizationIDPagesPartitionCle
 	require.ElementsMatch(t, []string{"mem-1", "mem-2", "mem-3", "mem-4", "mem-5"}, seen)
 }
 
-func TestBunOrganizationMemberRepository_GetAllByOrganizationIDWithUser(t *testing.T) {
+func TestBunOrganizationMemberRepository_ListAllByOrganizationIDWithUser(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -261,7 +261,7 @@ func TestBunOrganizationMemberRepository_GetAllByOrganizationIDWithUser(t *testi
 
 			repo, ctx := seedMembers(t, 5)
 
-			members, total, err := repo.GetAllByOrganizationIDWithUser(ctx, tt.organizationID, tt.page, tt.limit)
+			members, total, err := repo.ListAllByOrganizationIDWithUser(ctx, tt.organizationID, tt.page, tt.limit)
 			require.NoError(t, err)
 			require.Len(t, members, tt.expectCount)
 			require.Equal(t, tt.expectTotal, total)
@@ -272,14 +272,14 @@ func TestBunOrganizationMemberRepository_GetAllByOrganizationIDWithUser(t *testi
 	}
 }
 
-func TestBunOrganizationMemberRepository_GetAllByOrganizationIDWithUserPagesPartitionCleanly(t *testing.T) {
+func TestBunOrganizationMemberRepository_ListAllByOrganizationIDWithUserPagesPartitionCleanly(t *testing.T) {
 	t.Parallel()
 
 	repo, ctx := seedMembers(t, 5)
 
 	seen := make([]string, 0, 5)
 	for page := 1; page <= 3; page++ {
-		members, total, err := repo.GetAllByOrganizationIDWithUser(ctx, "org-1", page, 2)
+		members, total, err := repo.ListAllByOrganizationIDWithUser(ctx, "org-1", page, 2)
 		require.NoError(t, err)
 		require.Equal(t, 5, total)
 		seen = append(seen, memberResponseIDs(members)...)
@@ -538,4 +538,121 @@ func TestBunOrganizationMemberRepository_WithTx(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBunOrganizationMemberRepository_GetAllByOrganizationID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		seedCount      int
+		organizationID string
+		expectIDs      []string
+	}{
+		{name: "returns every member newest first", seedCount: 5, organizationID: "org-1", expectIDs: []string{"mem-5", "mem-4", "mem-3", "mem-2", "mem-1"}},
+		{name: "unknown organization is empty", seedCount: 5, organizationID: "org-2", expectIDs: []string{}},
+		{name: "organization with no members is empty", seedCount: 0, organizationID: "org-1", expectIDs: []string{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo, ctx := seedMembers(t, tt.seedCount)
+
+			members, err := repo.GetAllByOrganizationID(ctx, tt.organizationID)
+			require.NoError(t, err)
+			require.NotNil(t, members, "an empty result must be an empty slice, not nil")
+			require.Equal(t, tt.expectIDs, memberIDs(members))
+		})
+	}
+}
+
+// The unconstrained fetch must ignore pagination.DefaultLimit entirely.
+func TestBunOrganizationMemberRepository_GetAllByOrganizationIDIgnoresTheDefaultLimit(t *testing.T) {
+	t.Parallel()
+
+	const memberCount = 25
+
+	repo, ctx := seedMembers(t, memberCount)
+
+	members, err := repo.GetAllByOrganizationID(ctx, "org-1")
+	require.NoError(t, err)
+	require.Len(t, members, memberCount)
+
+	withUser, err := repo.GetAllByOrganizationIDWithUser(ctx, "org-1")
+	require.NoError(t, err)
+	require.Len(t, withUser, memberCount)
+}
+
+func TestBunOrganizationMemberRepository_GetAllByOrganizationIDWithUser(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		seedCount      int
+		organizationID string
+		expectIDs      []string
+	}{
+		{name: "returns every member newest first", seedCount: 5, organizationID: "org-1", expectIDs: []string{"mem-5", "mem-4", "mem-3", "mem-2", "mem-1"}},
+		{name: "unknown organization is empty", seedCount: 5, organizationID: "org-2", expectIDs: []string{}},
+		{name: "organization with no members is empty", seedCount: 0, organizationID: "org-1", expectIDs: []string{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo, ctx := seedMembers(t, tt.seedCount)
+
+			members, err := repo.GetAllByOrganizationIDWithUser(ctx, tt.organizationID)
+			require.NoError(t, err)
+			require.NotNil(t, members, "an empty result must be an empty slice, not nil")
+			require.Equal(t, tt.expectIDs, memberResponseIDs(members))
+		})
+	}
+}
+
+// The joined variant must hydrate the user, not just the membership row.
+func TestBunOrganizationMemberRepository_GetAllByOrganizationIDWithUserHydratesTheUser(t *testing.T) {
+	t.Parallel()
+
+	repo, ctx := seedMembers(t, 3)
+
+	members, err := repo.GetAllByOrganizationIDWithUser(ctx, "org-1")
+	require.NoError(t, err)
+	require.Len(t, members, 3)
+	for _, member := range members {
+		require.NotEmpty(t, member.User.ID)
+		require.NotEmpty(t, member.User.Email)
+		require.Equal(t, "org-1", member.OrganizationID)
+	}
+}
+
+// Members of one organization must never leak into another organization's fetch.
+func TestBunOrganizationMemberRepository_GetAllByOrganizationIDScopesToTheOrganization(t *testing.T) {
+	t.Parallel()
+
+	db := plugintests.SetupRepoDB(t)
+	plugintests.SeedUsers(t, db, 4)
+	plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+	plugintests.SeedOrganization(t, db, "org-2", "user-3", "Beta Inc", "beta-inc")
+
+	repo := repositories.NewBunOrganizationMemberRepository(db)
+	ctx := context.Background()
+	plugintests.SeedOrganizationMember(t, db, "mem-a1", "org-1", "user-1", "owner")
+	plugintests.SeedOrganizationMember(t, db, "mem-a2", "org-1", "user-2", "member")
+	plugintests.SeedOrganizationMember(t, db, "mem-b1", "org-2", "user-3", "owner")
+
+	first, err := repo.GetAllByOrganizationID(ctx, "org-1")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"mem-a1", "mem-a2"}, memberIDs(first))
+
+	second, err := repo.GetAllByOrganizationID(ctx, "org-2")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"mem-b1"}, memberIDs(second))
+
+	joined, err := repo.GetAllByOrganizationIDWithUser(ctx, "org-2")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"mem-b1"}, memberResponseIDs(joined))
 }

@@ -179,14 +179,14 @@ func (s *organizationService) ensureOrganizationLimit(ctx context.Context, actor
 	return nil
 }
 
-func (s *organizationService) GetAllOrganizations(ctx context.Context, actor *models.Actor, params pagination.Params) (*types.ListOrganizationsResponse, error) {
+func (s *organizationService) ListAllOrganizations(ctx context.Context, actor *models.Actor, params pagination.Params) (*types.ListOrganizationsResponse, error) {
 	if actor == nil || actor.ID == "" {
 		return nil, coreerrors.ErrUnauthorized
 	}
 
 	params = pagination.Clamp(params)
 
-	organizations, total, err := s.orgRepo.GetAllAccessibleByUserID(ctx, actor.ID, params.Page, params.Limit)
+	organizations, total, err := s.orgRepo.ListAllAccessibleByUserID(ctx, actor.ID, params.Page, params.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -198,6 +198,36 @@ func (s *organizationService) GetAllOrganizations(ctx context.Context, actor *mo
 		Data:       organizations,
 		Pagination: pagination.New(params.Page, params.Limit, total),
 	}, nil
+}
+
+func (s *organizationService) GetAllOrganizations(ctx context.Context, actor *models.Actor) ([]types.Organization, error) {
+	if actor == nil || actor.ID == "" {
+		return nil, coreerrors.ErrUnauthorized
+	}
+
+	organizations, err := s.orgRepo.GetAllAccessibleByUserID(ctx, actor.ID)
+	if err != nil {
+		return nil, err
+	}
+	if organizations == nil {
+		organizations = []types.Organization{}
+	}
+
+	return organizations, nil
+}
+
+// GetAllOrganizationsUnscoped bypasses actor scoping entirely. See the interface
+// documentation before adding a caller.
+func (s *organizationService) GetAllOrganizationsUnscoped(ctx context.Context) ([]types.Organization, error) {
+	organizations, err := s.orgRepo.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if organizations == nil {
+		organizations = []types.Organization{}
+	}
+
+	return organizations, nil
 }
 
 func (s *organizationService) GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {

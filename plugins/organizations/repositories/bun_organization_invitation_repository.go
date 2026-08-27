@@ -69,16 +69,30 @@ func (r *BunOrganizationInvitationRepository) GetByOrganizationIDAndEmail(ctx co
 	return invitation, err
 }
 
-func (r *BunOrganizationInvitationRepository) GetAllPendingByEmail(ctx context.Context, email string, limit int) ([]types.OrganizationInvitation, error) {
-	if limit <= 0 || limit > MaxPendingInvitationsPerBatch {
-		limit = MaxPendingInvitationsPerBatch
-	}
+// pendingByEmailWhere matches invitations that are still awaiting a decision and
+// have not expired. Both pending lookups order oldest first, because acceptance
+// resolves role conflicts in favour of the earliest invitation.
+const pendingByEmailWhere = "email = ? AND status = ? AND expires_at > ?"
 
+func (r *BunOrganizationInvitationRepository) ListAllPendingByEmail(ctx context.Context, email string, page int, limit int) ([]types.OrganizationInvitation, int, error) {
+	invites := make([]types.OrganizationInvitation, 0)
+	limit = pageLimit(limit)
+	total, err := r.db.NewSelect().Model(&invites).
+		Where(pendingByEmailWhere, email, types.OrganizationInvitationStatusPending, time.Now().UTC()).
+		OrderExpr("created_at ASC, id ASC").
+		Offset(pageOffset(page, limit)).Limit(limit).
+		ScanAndCount(ctx)
+	if err == sql.ErrNoRows {
+		return []types.OrganizationInvitation{}, total, nil
+	}
+	return invites, total, err
+}
+
+func (r *BunOrganizationInvitationRepository) GetAllPendingByEmail(ctx context.Context, email string) ([]types.OrganizationInvitation, error) {
 	invites := make([]types.OrganizationInvitation, 0)
 	err := r.db.NewSelect().Model(&invites).
-		Where("email = ? AND status = ? AND expires_at > ?", email, types.OrganizationInvitationStatusPending, time.Now().UTC()).
+		Where(pendingByEmailWhere, email, types.OrganizationInvitationStatusPending, time.Now().UTC()).
 		OrderExpr("created_at ASC, id ASC").
-		Limit(limit).
 		Scan(ctx)
 	if err == sql.ErrNoRows {
 		return []types.OrganizationInvitation{}, nil
@@ -181,7 +195,7 @@ func (r *BunOrganizationInvitationRepository) GetByIDWithOrg(ctx context.Context
 	return &result, nil
 }
 
-func (r *BunOrganizationInvitationRepository) GetAllByOrganizationIDWithOrg(ctx context.Context, organizationID string, page int, limit int) ([]types.GetOrganizationInvitationResponse, int, error) {
+func (r *BunOrganizationInvitationRepository) ListAllByOrganizationIDWithOrg(ctx context.Context, organizationID string, page int, limit int) ([]types.GetOrganizationInvitationResponse, int, error) {
 	limit = pageLimit(limit)
 
 	var total int
@@ -205,4 +219,19 @@ func (r *BunOrganizationInvitationRepository) GetAllByOrganizationIDWithOrg(ctx 
 		results[i] = mapToInvitationWithOrgResponse(row)
 	}
 	return results, total, nil
+}
+
+func (r *BunOrganizationInvitationRepository) GetAllByOrganizationIDWithOrg(ctx context.Context, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
+	var rows []invitationOrgRow
+	err := r.db.NewRaw(`SELECT `+invitationWithOrgColumns+invitationWithOrgByOrganizationFrom+`
+		ORDER BY i.created_at DESC, i.id DESC
+	`, organizationID).Scan(ctx, &rows)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+	results := make([]types.GetOrganizationInvitationResponse, len(rows))
+	for i, row := range rows {
+		results[i] = mapToInvitationWithOrgResponse(row)
+	}
+	return results, nil
 }

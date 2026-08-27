@@ -10,33 +10,33 @@ import (
 
 func Routes(plugin *OrganizationsPlugin) []models.Route {
 	createOrganizationHandler := &handlers.CreateOrganizationHandler{UseCases: plugin.useCases}
-	getAllOrganizationsHandler := &handlers.GetAllOrganizationsHandler{UseCases: plugin.useCases}
+	listAllOrganizationsHandler := &handlers.ListAllOrganizationsHandler{UseCases: plugin.useCases}
 	getOrganizationByIDHandler := &handlers.GetOrganizationByIDHandler{UseCases: plugin.useCases}
 	updateOrganizationHandler := &handlers.UpdateOrganizationHandler{UseCases: plugin.useCases}
 	deleteOrganizationHandler := &handlers.DeleteOrganizationHandler{UseCases: plugin.useCases}
 
 	createInvitationHandler := &handlers.CreateOrganizationInvitationHandler{UseCases: plugin.useCases}
 	getInvitationHandler := &handlers.GetOrganizationInvitationHandler{UseCases: plugin.useCases}
-	getAllInvitationsHandler := &handlers.GetAllOrganizationInvitationsHandler{UseCases: plugin.useCases}
+	listAllInvitationsHandler := &handlers.ListAllOrganizationInvitationsHandler{UseCases: plugin.useCases}
 	revokeInvitationHandler := &handlers.RevokeOrganizationInvitationHandler{UseCases: plugin.useCases}
 	acceptInvitationHandler := &handlers.AcceptOrganizationInvitationHandler{UseCases: plugin.useCases, TrustedOrigins: plugin.globalConfig.Security.TrustedOrigins}
 	rejectInvitationHandler := &handlers.RejectOrganizationInvitationHandler{UseCases: plugin.useCases}
 
 	addMemberHandler := &handlers.AddOrganizationMemberHandler{UseCases: plugin.useCases}
-	getAllMembersHandler := &handlers.GetAllOrganizationMembersHandler{UseCases: plugin.useCases}
+	listAllMembersHandler := &handlers.ListAllOrganizationMembersHandler{UseCases: plugin.useCases}
 	getMemberHandler := &handlers.GetOrganizationMemberHandler{UseCases: plugin.useCases}
 	getMemberByUserIDHandler := &handlers.GetOrganizationMemberByUserIDHandler{UseCases: plugin.useCases}
 	updateMemberHandler := &handlers.UpdateOrganizationMemberHandler{UseCases: plugin.useCases}
 	deleteMemberHandler := &handlers.DeleteOrganizationMemberHandler{UseCases: plugin.useCases}
 
 	createTeamHandler := &handlers.CreateOrganizationTeamHandler{UseCases: plugin.useCases}
-	getAllTeamsHandler := &handlers.GetAllOrganizationTeamsHandler{UseCases: plugin.useCases}
+	listAllTeamsHandler := &handlers.ListAllOrganizationTeamsHandler{UseCases: plugin.useCases}
 	getTeamHandler := &handlers.GetOrganizationTeamHandler{UseCases: plugin.useCases}
 	updateTeamHandler := &handlers.UpdateOrganizationTeamHandler{UseCases: plugin.useCases}
 	deleteTeamHandler := &handlers.DeleteOrganizationTeamHandler{UseCases: plugin.useCases}
 
 	addTeamMemberHandler := &handlers.AddOrganizationTeamMemberHandler{UseCases: plugin.useCases}
-	getAllTeamMembersHandler := &handlers.GetAllOrganizationTeamMembersHandler{UseCases: plugin.useCases}
+	listAllTeamMembersHandler := &handlers.ListAllOrganizationTeamMembersHandler{UseCases: plugin.useCases}
 	getTeamMemberHandler := &handlers.GetOrganizationTeamMemberHandler{UseCases: plugin.useCases}
 	deleteTeamMemberHandler := &handlers.DeleteOrganizationTeamMemberHandler{UseCases: plugin.useCases}
 
@@ -56,7 +56,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireAuthenticated(),
 			},
-			Handler: getAllOrganizationsHandler.Handle(),
+			Handler: listAllOrganizationsHandler.Handle(),
 		},
 		{
 			Method: http.MethodGet,
@@ -97,7 +97,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireAuthenticated(),
 			},
-			Handler: getAllInvitationsHandler.Handle(),
+			Handler: listAllInvitationsHandler.Handle(),
 		},
 		{
 			Method: http.MethodGet,
@@ -146,7 +146,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireAuthenticated(),
 			},
-			Handler: getAllMembersHandler.Handle(),
+			Handler: listAllMembersHandler.Handle(),
 		},
 		{
 			Method: http.MethodGet,
@@ -195,7 +195,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireAuthenticated(),
 			},
-			Handler: getAllTeamsHandler.Handle(),
+			Handler: listAllTeamsHandler.Handle(),
 		},
 		{
 			Method: http.MethodGet,
@@ -236,7 +236,7 @@ func Routes(plugin *OrganizationsPlugin) []models.Route {
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequireAuthenticated(),
 			},
-			Handler: getAllTeamMembersHandler.Handle(),
+			Handler: listAllTeamMembersHandler.Handle(),
 		},
 		{
 			Method: http.MethodGet,

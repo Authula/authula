@@ -97,26 +97,52 @@ func (s *organizationTeamMemberService) AddTeamMember(ctx context.Context, actor
 	return created, nil
 }
 
-func (s *organizationTeamMemberService) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, params pagination.Params) (*types.ListOrganizationTeamMembersResponse, error) {
+// authorizeTeamListing checks that the actor may read the team's members and
+// that the team actually belongs to the organization in the request path.
+func (s *organizationTeamMemberService) authorizeTeamListing(ctx context.Context, actor *models.Actor, organizationID string, teamID string) error {
 	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := s.serviceUtils.authorizeTeamAccess(ctx, actor, organizationID, teamID); err != nil {
-		return nil, err
+		return err
 	}
 
 	team, err := s.orgTeamRepo.GetByID(ctx, teamID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if team == nil || team.OrganizationID != organizationID {
-		return nil, coreerrors.ErrNotFound
+		return coreerrors.ErrNotFound
+	}
+
+	return nil
+}
+
+func (s *organizationTeamMemberService) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string) ([]types.OrganizationTeamMemberResponse, error) {
+	if err := s.authorizeTeamListing(ctx, actor, organizationID, teamID); err != nil {
+		return nil, err
+	}
+
+	teamMembers, err := s.orgTeamMemberRepo.GetAllByTeamIDWithMemberAndUser(ctx, teamID)
+	if err != nil {
+		return nil, err
+	}
+	if teamMembers == nil {
+		teamMembers = []types.OrganizationTeamMemberResponse{}
+	}
+
+	return teamMembers, nil
+}
+
+func (s *organizationTeamMemberService) ListAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, params pagination.Params) (*types.ListOrganizationTeamMembersResponse, error) {
+	if err := s.authorizeTeamListing(ctx, actor, organizationID, teamID); err != nil {
+		return nil, err
 	}
 
 	params = pagination.Clamp(params)
 
-	teamMembers, total, err := s.orgTeamMemberRepo.GetAllByTeamIDWithMemberAndUser(ctx, teamID, params.Page, params.Limit)
+	teamMembers, total, err := s.orgTeamMemberRepo.ListAllByTeamIDWithMemberAndUser(ctx, teamID, params.Page, params.Limit)
 	if err != nil {
 		return nil, err
 	}

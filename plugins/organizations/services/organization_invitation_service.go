@@ -309,14 +309,14 @@ func (s *organizationInvitationService) GetOrganizationInvitationByIDWithOrg(ctx
 	return resp, nil
 }
 
-func (s *organizationInvitationService) GetAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string, params pagination.Params) (*types.ListOrganizationInvitationsResponse, error) {
+func (s *organizationInvitationService) ListAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string, params pagination.Params) (*types.ListOrganizationInvitationsResponse, error) {
 	if organizationID == "" {
 		return nil, coreerrors.ErrNotFound
 	}
 
 	params = pagination.Clamp(params)
 
-	invitations, total, err := s.orgInvitationRepo.GetAllByOrganizationIDWithOrg(ctx, organizationID, params.Page, params.Limit)
+	invitations, total, err := s.orgInvitationRepo.ListAllByOrganizationIDWithOrg(ctx, organizationID, params.Page, params.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -328,6 +328,22 @@ func (s *organizationInvitationService) GetAllOrganizationInvitationsByOrgIDWith
 		Data:       invitations,
 		Pagination: pagination.New(params.Page, params.Limit, total),
 	}, nil
+}
+
+func (s *organizationInvitationService) GetAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string) ([]types.GetOrganizationInvitationResponse, error) {
+	if organizationID == "" {
+		return nil, coreerrors.ErrNotFound
+	}
+
+	invitations, err := s.orgInvitationRepo.GetAllByOrganizationIDWithOrg(ctx, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	if invitations == nil {
+		invitations = []types.GetOrganizationInvitationResponse{}
+	}
+
+	return invitations, nil
 }
 
 func (s *organizationInvitationService) RevokeOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error) {
@@ -494,19 +510,12 @@ func (s *organizationInvitationService) AcceptPendingOrganizationInvitationsForE
 		}
 	}
 
-	pendingInvitations, err := s.orgInvitationRepo.GetAllPendingByEmail(ctx, email, repositories.MaxPendingInvitationsPerBatch)
+	pendingInvitations, err := s.orgInvitationRepo.GetAllPendingByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
 	if len(pendingInvitations) == 0 {
 		return []types.OrganizationInvitation{}, nil
-	}
-	if len(pendingInvitations) == repositories.MaxPendingInvitationsPerBatch {
-		s.logger.Warn(
-			"pending organization invitation batch hit the per-call cap; remaining invitations will be accepted on the next call",
-			"email", email,
-			"limit", repositories.MaxPendingInvitationsPerBatch,
-		)
 	}
 
 	return s.acceptOrganizationInvitations(ctx, userID, pendingInvitations)

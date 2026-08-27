@@ -118,7 +118,7 @@ func (r *BunOrganizationTeamMemberRepository) GetByTeamIDAndMemberID(ctx context
 	return teamMember, err
 }
 
-func (r *BunOrganizationTeamMemberRepository) GetAllByTeamID(ctx context.Context, teamID string, page int, limit int) ([]types.OrganizationTeamMember, int, error) {
+func (r *BunOrganizationTeamMemberRepository) ListAllByTeamID(ctx context.Context, teamID string, page int, limit int) ([]types.OrganizationTeamMember, int, error) {
 	teamMembers := make([]types.OrganizationTeamMember, 0)
 	limit = pageLimit(limit)
 	total, err := r.db.NewSelect().Model(&teamMembers).
@@ -132,7 +132,19 @@ func (r *BunOrganizationTeamMemberRepository) GetAllByTeamID(ctx context.Context
 	return teamMembers, total, err
 }
 
-func (r *BunOrganizationTeamMemberRepository) GetAllByTeamIDWithMemberAndUser(ctx context.Context, teamID string, page int, limit int) ([]types.OrganizationTeamMemberResponse, int, error) {
+func (r *BunOrganizationTeamMemberRepository) GetAllByTeamID(ctx context.Context, teamID string) ([]types.OrganizationTeamMember, error) {
+	teamMembers := make([]types.OrganizationTeamMember, 0)
+	err := r.db.NewSelect().Model(&teamMembers).
+		Where("team_id = ?", teamID).
+		OrderExpr("created_at DESC, id DESC").
+		Scan(ctx)
+	if err == sql.ErrNoRows {
+		return []types.OrganizationTeamMember{}, nil
+	}
+	return teamMembers, err
+}
+
+func (r *BunOrganizationTeamMemberRepository) ListAllByTeamIDWithMemberAndUser(ctx context.Context, teamID string, page int, limit int) ([]types.OrganizationTeamMemberResponse, int, error) {
 	limit = pageLimit(limit)
 
 	var total int
@@ -153,6 +165,21 @@ func (r *BunOrganizationTeamMemberRepository) GetAllByTeamIDWithMemberAndUser(ct
 		results[i] = mapToTeamMemberResponse(row)
 	}
 	return results, total, nil
+}
+
+func (r *BunOrganizationTeamMemberRepository) GetAllByTeamIDWithMemberAndUser(ctx context.Context, teamID string) ([]types.OrganizationTeamMemberResponse, error) {
+	var rows []teamMemberMemberUserRow
+	err := r.db.NewRaw(`SELECT `+teamMemberWithMemberAndUserColumns+teamMemberWithMemberAndUserByTeamFrom+`
+		ORDER BY tm.created_at DESC, tm.id DESC
+	`, teamID).Scan(ctx, &rows)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+	results := make([]types.OrganizationTeamMemberResponse, len(rows))
+	for i, row := range rows {
+		results[i] = mapToTeamMemberResponse(row)
+	}
+	return results, nil
 }
 
 func (r *BunOrganizationTeamMemberRepository) GetByIDWithMemberAndUser(ctx context.Context, teamMemberID string) (*types.OrganizationTeamMemberResponse, error) {

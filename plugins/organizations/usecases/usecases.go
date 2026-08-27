@@ -99,8 +99,8 @@ func (u *UseCases) CreateOrganization(ctx context.Context, actor *models.Actor, 
 	return u.orgService.CreateOrganization(ctx, actor, request)
 }
 
-func (u *UseCases) GetAllOrganizations(ctx context.Context, actor *models.Actor, params pagination.Params) (*types.ListOrganizationsResponse, error) {
-	return u.orgService.GetAllOrganizations(ctx, actor, params)
+func (u *UseCases) ListAllOrganizations(ctx context.Context, actor *models.Actor, params pagination.Params) (*types.ListOrganizationsResponse, error) {
+	return u.orgService.ListAllOrganizations(ctx, actor, params)
 }
 
 func (u *UseCases) GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {
@@ -131,12 +131,12 @@ func (u *UseCases) CreateOrganizationInvitation(ctx context.Context, actor *mode
 	return u.invitationService.CreateOrganizationInvitation(ctx, actor, organizationID, request, redirectURL)
 }
 
-func (u *UseCases) GetAllOrganizationInvitations(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationInvitationsResponse, error) {
+func (u *UseCases) ListAllOrganizationInvitations(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationInvitationsResponse, error) {
 	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsInvitationsListPermission); err != nil {
 		return nil, err
 	}
 
-	resp, err := u.invitationService.GetAllOrganizationInvitationsByOrgIDWithOrg(ctx, organizationID, params)
+	resp, err := u.invitationService.ListAllOrganizationInvitationsByOrgIDWithOrg(ctx, organizationID, params)
 	if err != nil {
 		return nil, err
 	}
@@ -194,11 +194,11 @@ func (u *UseCases) AddMember(ctx context.Context, actor *models.Actor, organizat
 	return u.memberService.AddMember(ctx, actor, organizationID, request)
 }
 
-func (u *UseCases) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationMembersResponse, error) {
+func (u *UseCases) ListAllMembers(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationMembersResponse, error) {
 	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsMembersListPermission); err != nil {
 		return nil, err
 	}
-	return u.memberService.GetAllMembers(ctx, actor, organizationID, params)
+	return u.memberService.ListAllMembers(ctx, actor, organizationID, params)
 }
 
 func (u *UseCases) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMemberResponse, error) {
@@ -238,11 +238,11 @@ func (u *UseCases) CreateTeam(ctx context.Context, actor *models.Actor, organiza
 	return u.teamService.CreateTeam(ctx, actor, organizationID, request)
 }
 
-func (u *UseCases) GetAllTeams(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationTeamsResponse, error) {
+func (u *UseCases) ListAllTeams(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationTeamsResponse, error) {
 	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsTeamsListPermission); err != nil {
 		return nil, err
 	}
-	return u.teamService.GetAllTeams(ctx, actor, organizationID, params)
+	return u.teamService.ListAllTeams(ctx, actor, organizationID, params)
 }
 
 func (u *UseCases) GetTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string) (*types.OrganizationTeam, error) {
@@ -275,11 +275,11 @@ func (u *UseCases) AddTeamMember(ctx context.Context, actor *models.Actor, organ
 	return u.teamMemberService.AddTeamMember(ctx, actor, organizationID, teamID, request)
 }
 
-func (u *UseCases) GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, params pagination.Params) (*types.ListOrganizationTeamMembersResponse, error) {
+func (u *UseCases) ListAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, params pagination.Params) (*types.ListOrganizationTeamMembersResponse, error) {
 	if err := u.authorizeOrgAccess(ctx, actor, organizationID, orgconstants.OrganizationsTeamMembersListPermission); err != nil {
 		return nil, err
 	}
-	return u.teamMemberService.GetAllTeamMembers(ctx, actor, organizationID, teamID, params)
+	return u.teamMemberService.ListAllTeamMembers(ctx, actor, organizationID, teamID, params)
 }
 
 func (u *UseCases) GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMemberResponse, error) {

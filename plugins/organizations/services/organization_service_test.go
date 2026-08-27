@@ -223,7 +223,7 @@ func TestOrganizationService_CreateOrganizationRequiresPrivilegedRole(t *testing
 	}
 }
 
-func TestOrganizationService_GetAllOrganizations(t *testing.T) {
+func TestOrganizationService_ListAllOrganizations(t *testing.T) {
 	t.Parallel()
 
 	repoErr := errors.New("repository error")
@@ -248,7 +248,7 @@ func TestOrganizationService_GetAllOrganizations(t *testing.T) {
 			actorUserID: "user-1",
 			params:      pagination.Params{Page: 1, Limit: 10},
 			setup: func(repo *orgtests.MockOrganizationRepository) {
-				repo.On("GetAllAccessibleByUserID", mock.Anything, "user-1", 1, 10).
+				repo.On("ListAllAccessibleByUserID", mock.Anything, "user-1", 1, 10).
 					Return([]types.Organization{
 						{ID: "org-1", OwnerID: "user-1", Name: "Acme"},
 						{ID: "org-2", OwnerID: "owner-2", Name: "Platform"},
@@ -262,7 +262,7 @@ func TestOrganizationService_GetAllOrganizations(t *testing.T) {
 			actorUserID: "user-1",
 			params:      pagination.Params{Page: -4, Limit: 5000},
 			setup: func(repo *orgtests.MockOrganizationRepository) {
-				repo.On("GetAllAccessibleByUserID", mock.Anything, "user-1", 1, 5000).
+				repo.On("ListAllAccessibleByUserID", mock.Anything, "user-1", 1, 5000).
 					Return([]types.Organization{}, 0, nil).Once()
 			},
 			expectLen:        0,
@@ -273,7 +273,7 @@ func TestOrganizationService_GetAllOrganizations(t *testing.T) {
 			actorUserID: "user-1",
 			params:      pagination.Params{Page: 1, Limit: 10},
 			setup: func(repo *orgtests.MockOrganizationRepository) {
-				repo.On("GetAllAccessibleByUserID", mock.Anything, "user-1", 1, 10).
+				repo.On("ListAllAccessibleByUserID", mock.Anything, "user-1", 1, 10).
 					Return(([]types.Organization)(nil), 0, nil).Once()
 			},
 			expectLen:        0,
@@ -284,7 +284,7 @@ func TestOrganizationService_GetAllOrganizations(t *testing.T) {
 			actorUserID: "user-1",
 			params:      pagination.Params{Page: 1, Limit: 10},
 			setup: func(repo *orgtests.MockOrganizationRepository) {
-				repo.On("GetAllAccessibleByUserID", mock.Anything, "user-1", 1, 10).
+				repo.On("ListAllAccessibleByUserID", mock.Anything, "user-1", 1, 10).
 					Return(([]types.Organization)(nil), 0, repoErr).Once()
 			},
 			expectErr: repoErr,
@@ -303,7 +303,7 @@ func TestOrganizationService_GetAllOrganizations(t *testing.T) {
 
 			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
 			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, nil, nil)
-			resp, err := svc.GetAllOrganizations(context.Background(), orgtests.Actor(tt.actorUserID), tt.params)
+			resp, err := svc.ListAllOrganizations(context.Background(), orgtests.Actor(tt.actorUserID), tt.params)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -597,6 +597,157 @@ func TestOrganizationService_DeleteOrganization(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestOrganizationService_GetAllOrganizations(t *testing.T) {
+	t.Parallel()
+
+	repoErr := errors.New("repository error")
+
+	tests := []struct {
+		name        string
+		actorUserID string
+		setup       func(*orgtests.MockOrganizationRepository)
+		expectErr   error
+		expectIDs   []string
+	}{
+		{
+			name:        "unauthorized without an actor",
+			actorUserID: "",
+			expectErr:   coreerrors.ErrUnauthorized,
+		},
+		{
+			name:        "repository error",
+			actorUserID: "user-1",
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("GetAllAccessibleByUserID", mock.Anything, "user-1").Return(nil, repoErr).Once()
+			},
+			expectErr: repoErr,
+		},
+		{
+			name:        "success returns every accessible organization",
+			actorUserID: "user-1",
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("GetAllAccessibleByUserID", mock.Anything, "user-1").Return([]types.Organization{
+					{ID: "org-1", OwnerID: "user-1"},
+					{ID: "org-2", OwnerID: "user-2"},
+				}, nil).Once()
+			},
+			expectIDs: []string{"org-1", "org-2"},
+		},
+		{
+			name:        "nil result is normalised to an empty slice",
+			actorUserID: "user-1",
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("GetAllAccessibleByUserID", mock.Anything, "user-1").Return(([]types.Organization)(nil), nil).Once()
+			},
+			expectIDs: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo := &orgtests.MockOrganizationRepository{}
+			memberRepo := &orgtests.MockOrganizationMemberRepository{}
+			if tt.setup != nil {
+				tt.setup(repo)
+			}
+
+			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
+			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, nil, nil)
+			organizations, err := svc.GetAllOrganizations(context.Background(), orgtests.Actor(tt.actorUserID))
+			if tt.expectErr != nil {
+				require.Error(t, err)
+				require.ErrorIs(t, err, tt.expectErr)
+				require.Nil(t, organizations)
+				require.True(t, repo.AssertExpectations(t))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, organizations)
+			ids := make([]string, 0, len(organizations))
+			for _, organization := range organizations {
+				ids = append(ids, organization.ID)
+			}
+			require.Equal(t, tt.expectIDs, ids)
+			require.True(t, repo.AssertExpectations(t))
+		})
+	}
+}
+
+// GetAllOrganizationsUnscoped deliberately ignores the caller, so it must never
+// consult the accessible-by-user predicate.
+func TestOrganizationService_GetAllOrganizationsUnscoped(t *testing.T) {
+	t.Parallel()
+
+	repoErr := errors.New("repository error")
+
+	tests := []struct {
+		name      string
+		setup     func(*orgtests.MockOrganizationRepository)
+		expectErr error
+		expectIDs []string
+	}{
+		{
+			name: "repository error",
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("GetAll", mock.Anything).Return(nil, repoErr).Once()
+			},
+			expectErr: repoErr,
+		},
+		{
+			name: "success returns every organization in the system",
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("GetAll", mock.Anything).Return([]types.Organization{
+					{ID: "org-1", OwnerID: "user-1"},
+					{ID: "org-2", OwnerID: "user-2"},
+					{ID: "org-3", OwnerID: "user-3"},
+				}, nil).Once()
+			},
+			expectIDs: []string{"org-1", "org-2", "org-3"},
+		},
+		{
+			name: "nil result is normalised to an empty slice",
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("GetAll", mock.Anything).Return(([]types.Organization)(nil), nil).Once()
+			},
+			expectIDs: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo := &orgtests.MockOrganizationRepository{}
+			memberRepo := &orgtests.MockOrganizationMemberRepository{}
+			tt.setup(repo)
+
+			serviceUtils := &ServiceUtils{orgRepo: repo, orgMemberRepo: memberRepo}
+			svc := NewOrganizationService(repo, memberRepo, serviceUtils, nil, nil, nil)
+			organizations, err := svc.GetAllOrganizationsUnscoped(context.Background())
+			if tt.expectErr != nil {
+				require.Error(t, err)
+				require.ErrorIs(t, err, tt.expectErr)
+				require.Nil(t, organizations)
+				require.True(t, repo.AssertExpectations(t))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, organizations)
+			ids := make([]string, 0, len(organizations))
+			for _, organization := range organizations {
+				ids = append(ids, organization.ID)
+			}
+			require.Equal(t, tt.expectIDs, ids)
+			require.True(t, repo.AssertExpectations(t))
+			require.True(t, memberRepo.AssertExpectations(t))
 		})
 	}
 }

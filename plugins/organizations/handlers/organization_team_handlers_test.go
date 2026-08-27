@@ -138,11 +138,11 @@ func TestCreateOrganizationTeamHandler(t *testing.T) {
 	})
 }
 
-func TestGetAllOrganizationTeamsHandler(t *testing.T) {
+func TestListAllOrganizationTeamsHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationTeamHandlerCases(t, http.MethodGet, "/organizations/org-1/teams", func(fixture *organizationTeamHandlerFixture) http.HandlerFunc {
-		return (&GetAllOrganizationTeamsHandler{UseCases: newTeamUseCases(fixture.service)}).Handle()
+		return (&ListAllOrganizationTeamsHandler{UseCases: newTeamUseCases(fixture.service)}).Handle()
 	}, []organizationTeamHandlerCase{
 		{
 			name:            "missing_user",
@@ -155,7 +155,7 @@ func TestGetAllOrganizationTeamsHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(fixture *organizationTeamHandlerFixture) {
-				fixture.service.On("GetAllTeams", mock.Anything, "user-1", "org-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+				fixture.service.On("ListAllTeams", mock.Anything, "user-1", "org-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
 					Return((*orgtypes.ListOrganizationTeamsResponse)(nil), errors.New("some error")).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
@@ -166,7 +166,7 @@ func TestGetAllOrganizationTeamsHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(fixture *organizationTeamHandlerFixture) {
-				fixture.service.On("GetAllTeams", mock.Anything, "user-1", "org-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+				fixture.service.On("ListAllTeams", mock.Anything, "user-1", "org-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
 					Return(&orgtypes.ListOrganizationTeamsResponse{
 						Data:       []orgtypes.OrganizationTeam{{ID: "team-1", OrganizationID: "org-1", Name: "Platform", Slug: "platform"}},
 						Pagination: pagination.New(1, 10, 1),

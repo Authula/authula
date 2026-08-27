@@ -99,7 +99,7 @@ func (r *BunOrganizationMemberRepository) GetByID(ctx context.Context, memberID 
 	return member, err
 }
 
-func (r *BunOrganizationMemberRepository) GetAllByOrganizationID(ctx context.Context, organizationID string, page int, limit int) ([]types.OrganizationMember, int, error) {
+func (r *BunOrganizationMemberRepository) ListAllByOrganizationID(ctx context.Context, organizationID string, page int, limit int) ([]types.OrganizationMember, int, error) {
 	members := make([]types.OrganizationMember, 0)
 	limit = pageLimit(limit)
 	total, err := r.db.NewSelect().Model(&members).
@@ -113,7 +113,19 @@ func (r *BunOrganizationMemberRepository) GetAllByOrganizationID(ctx context.Con
 	return members, total, err
 }
 
-func (r *BunOrganizationMemberRepository) GetAllByOrganizationIDWithUser(ctx context.Context, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, int, error) {
+func (r *BunOrganizationMemberRepository) GetAllByOrganizationID(ctx context.Context, organizationID string) ([]types.OrganizationMember, error) {
+	members := make([]types.OrganizationMember, 0)
+	err := r.db.NewSelect().Model(&members).
+		Where("organization_id = ?", organizationID).
+		OrderExpr("created_at DESC, id DESC").
+		Scan(ctx)
+	if err == sql.ErrNoRows {
+		return []types.OrganizationMember{}, nil
+	}
+	return members, err
+}
+
+func (r *BunOrganizationMemberRepository) ListAllByOrganizationIDWithUser(ctx context.Context, organizationID string, page int, limit int) ([]types.OrganizationMemberResponse, int, error) {
 	limit = pageLimit(limit)
 
 	var total int
@@ -134,6 +146,21 @@ func (r *BunOrganizationMemberRepository) GetAllByOrganizationIDWithUser(ctx con
 		results[i] = mapToMemberResponse(row)
 	}
 	return results, total, nil
+}
+
+func (r *BunOrganizationMemberRepository) GetAllByOrganizationIDWithUser(ctx context.Context, organizationID string) ([]types.OrganizationMemberResponse, error) {
+	var rows []memberUserRow
+	err := r.db.NewRaw(`SELECT `+memberWithUserColumns+memberWithUserByOrganizationFrom+`
+		ORDER BY m.created_at DESC, m.id DESC
+	`, organizationID).Scan(ctx, &rows)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+	results := make([]types.OrganizationMemberResponse, len(rows))
+	for i, row := range rows {
+		results[i] = mapToMemberResponse(row)
+	}
+	return results, nil
 }
 
 func (r *BunOrganizationMemberRepository) GetByIDWithUser(ctx context.Context, memberID string) (*types.OrganizationMemberResponse, error) {

@@ -180,7 +180,7 @@ func TestCreateOrganizationHandler(t *testing.T) {
 	}
 }
 
-func TestGetAllOrganizationsHandler(t *testing.T) {
+func TestListAllOrganizationsHandler(t *testing.T) {
 	t.Parallel()
 
 	tests := []organizationHandlerCase{
@@ -193,7 +193,7 @@ func TestGetAllOrganizationsHandler(t *testing.T) {
 			name:   "service_error",
 			userID: new("user-1"),
 			prepare: func(f *organizationHandlerFixture) {
-				f.service.On("GetAllOrganizations", mock.Anything, "user-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+				f.service.On("ListAllOrganizations", mock.Anything, "user-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
 					Return((*orgtypes.ListOrganizationsResponse)(nil), errors.New("some error")).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
@@ -203,7 +203,7 @@ func TestGetAllOrganizationsHandler(t *testing.T) {
 			name:   "success",
 			userID: new("user-1"),
 			prepare: func(f *organizationHandlerFixture) {
-				f.service.On("GetAllOrganizations", mock.Anything, "user-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+				f.service.On("ListAllOrganizations", mock.Anything, "user-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
 					Return(&orgtypes.ListOrganizationsResponse{
 						Data:       []orgtypes.Organization{{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc"}},
 						Pagination: pagination.New(1, 10, 1),
@@ -230,7 +230,7 @@ func TestGetAllOrganizationsHandler(t *testing.T) {
 				tt.prepare(fixture)
 			}
 
-			handler := &GetAllOrganizationsHandler{UseCases: newOrgUseCases(fixture.service)}
+			handler := &ListAllOrganizationsHandler{UseCases: newOrgUseCases(fixture.service)}
 			req, w, reqCtx := fixture.newRequest(t, http.MethodGet, "/organizations", nil, tt.userID, "")
 			if tt.name == "missing_user" {
 				reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{"message": "Unauthorized"})

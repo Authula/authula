@@ -14,7 +14,7 @@ import (
 	"github.com/Authula/authula/plugins/organizations/types"
 )
 
-func TestOrganizationMemberService_GetAllMembersEnforcesLimitsAgainstSQL(t *testing.T) {
+func TestOrganizationMemberService_ListAllMembersEnforcesLimitsAgainstSQL(t *testing.T) {
 	t.Parallel()
 
 	const memberCount = 12
@@ -89,7 +89,7 @@ func TestOrganizationMemberService_GetAllMembersEnforcesLimitsAgainstSQL(t *test
 
 			svc, ctx := setup(t)
 
-			resp, err := svc.GetAllMembers(ctx, orgtests.Actor("user-1"), "org-1", tt.params)
+			resp, err := svc.ListAllMembers(ctx, orgtests.Actor("user-1"), "org-1", tt.params)
 			require.NoError(t, err)
 			require.NotNil(t, resp)
 			require.Len(t, resp.Data, tt.expectLen)
@@ -125,16 +125,65 @@ func TestOrganizationService_QuotaSurvivesPagination(t *testing.T) {
 	require.Error(t, svc.ensureOrganizationLimit(ctx, orgtests.Actor("user-1"), orgRepo), "the quota must reject at the boundary")
 
 	// The quota counts the same set the list endpoint returns, deduped.
-	resp, err := svc.GetAllOrganizations(ctx, orgtests.Actor("user-1"), pagination.Params{Page: 1, Limit: 1})
+	resp, err := svc.ListAllOrganizations(ctx, orgtests.Actor("user-1"), pagination.Params{Page: 1, Limit: 1})
 	require.NoError(t, err)
 	require.Len(t, resp.Data, 1, "a single-row page")
 	require.Equal(t, limit, resp.Pagination.Total, "the total must not be capped by the page size")
 
 	var seen []types.Organization
 	for page := 1; page <= limit; page++ {
-		pageResp, err := svc.GetAllOrganizations(ctx, orgtests.Actor("user-1"), pagination.Params{Page: page, Limit: 1})
+		pageResp, err := svc.ListAllOrganizations(ctx, orgtests.Actor("user-1"), pagination.Params{Page: page, Limit: 1})
 		require.NoError(t, err)
 		seen = append(seen, pageResp.Data...)
 	}
 	require.Len(t, seen, limit, "paging must yield every accessible organization exactly once")
+}
+
+// The unconstrained sibling of ListAllMembers must return the whole collection in
+// one call, against real SQL, where the paginated path needs two pages.
+func TestOrganizationMemberService_GetAllMembersReturnsEverythingInOneCallAgainstSQL(t *testing.T) {
+	t.Parallel()
+
+	const memberCount = 12
+
+	db := orgtests.SetupRepoDB(t)
+	orgtests.SeedUsers(t, db, memberCount)
+	orgtests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+	orgtests.SeedOrganization(t, db, "org-2", "user-1", "Beta Inc", "beta-inc")
+	for i := 1; i <= memberCount; i++ {
+		orgtests.SeedOrganizationMember(t, db, fmt.Sprintf("mem-%02d", i), "org-1", fmt.Sprintf("user-%d", i), "member")
+	}
+	orgtests.SeedOrganizationMember(t, db, "mem-other", "org-2", "user-1", "owner")
+
+	orgRepo := repositories.NewBunOrganizationRepository(db)
+	memberRepo := repositories.NewBunOrganizationMemberRepository(db)
+	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}
+	svc := NewOrganizationMemberService(
+		&internaltests.MockUserService{},
+		orgtests.NewAccessControlServiceStub(),
+		orgRepo,
+		memberRepo,
+		nil,
+		&orgtests.MockTxRunner{},
+		serviceUtils,
+	)
+	ctx := context.Background()
+	actor := orgtests.Actor("user-1")
+
+	// The paginated path only reaches the whole set by walking pages.
+	page, err := svc.ListAllMembers(ctx, actor, "org-1", pagination.Params{})
+	require.NoError(t, err)
+	require.Len(t, page.Data, pagination.DefaultLimit)
+	require.True(t, page.Pagination.HasMore, "the default page must not cover the whole collection")
+
+	members, err := svc.GetAllMembers(ctx, actor, "org-1")
+	require.NoError(t, err)
+	require.Len(t, members, memberCount, "one call must return every member")
+
+	// Members of another organization must not leak in, and each row is hydrated.
+	for _, member := range members {
+		require.Equal(t, "org-1", member.OrganizationID)
+		require.NotEmpty(t, member.User.ID)
+		require.NotEmpty(t, member.User.Email)
+	}
 }

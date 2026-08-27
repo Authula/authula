@@ -188,7 +188,7 @@ func teamIDs(teams []types.OrganizationTeam) []string {
 	return ids
 }
 
-func TestBunOrganizationTeamRepository_GetAllByOrganizationID(t *testing.T) {
+func TestBunOrganizationTeamRepository_ListAllByOrganizationID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -214,7 +214,7 @@ func TestBunOrganizationTeamRepository_GetAllByOrganizationID(t *testing.T) {
 
 			repo, ctx := seedTeams(t, 5)
 
-			found, total, err := repo.GetAllByOrganizationID(ctx, tt.organizationID, tt.page, tt.limit)
+			found, total, err := repo.ListAllByOrganizationID(ctx, tt.organizationID, tt.page, tt.limit)
 			require.NoError(t, err)
 			require.Len(t, found, tt.expectCount)
 			require.Equal(t, tt.expectTotal, total)
@@ -222,14 +222,14 @@ func TestBunOrganizationTeamRepository_GetAllByOrganizationID(t *testing.T) {
 	}
 }
 
-func TestBunOrganizationTeamRepository_GetAllByOrganizationIDPagesPartitionCleanly(t *testing.T) {
+func TestBunOrganizationTeamRepository_ListAllByOrganizationIDPagesPartitionCleanly(t *testing.T) {
 	t.Parallel()
 
 	repo, ctx := seedTeams(t, 5)
 
 	seen := make([]string, 0, 5)
 	for page := 1; page <= 3; page++ {
-		found, total, err := repo.GetAllByOrganizationID(ctx, "org-1", page, 2)
+		found, total, err := repo.ListAllByOrganizationID(ctx, "org-1", page, 2)
 		require.NoError(t, err)
 		require.Equal(t, 5, total)
 		seen = append(seen, teamIDs(found)...)
@@ -382,4 +382,44 @@ func TestBunOrganizationTeamRepository_WithTx(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBunOrganizationTeamRepository_GetAllByOrganizationID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		seedCount      int
+		organizationID string
+		expectIDs      []string
+	}{
+		{name: "returns every team newest first", seedCount: 5, organizationID: "org-1", expectIDs: []string{"team-5", "team-4", "team-3", "team-2", "team-1"}},
+		{name: "unknown organization is empty", seedCount: 5, organizationID: "org-2", expectIDs: []string{}},
+		{name: "organization with no teams is empty", seedCount: 0, organizationID: "org-1", expectIDs: []string{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo, ctx := seedTeams(t, tt.seedCount)
+
+			teams, err := repo.GetAllByOrganizationID(ctx, tt.organizationID)
+			require.NoError(t, err)
+			require.NotNil(t, teams, "an empty result must be an empty slice, not nil")
+			require.Equal(t, tt.expectIDs, teamIDs(teams))
+		})
+	}
+}
+
+func TestBunOrganizationTeamRepository_GetAllByOrganizationIDIgnoresTheDefaultLimit(t *testing.T) {
+	t.Parallel()
+
+	const teamCount = 25
+
+	repo, ctx := seedTeams(t, teamCount)
+
+	teams, err := repo.GetAllByOrganizationID(ctx, "org-1")
+	require.NoError(t, err)
+	require.Len(t, teams, teamCount)
 }
