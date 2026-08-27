@@ -91,7 +91,11 @@ func (p *OrganizationsPlugin) Init(ctx *models.PluginContext) error {
 	p.teamRepo = repositories.NewBunOrganizationTeamRepository(ctx.DB)
 	p.teamMemberRepo = repositories.NewBunOrganizationTeamMemberRepository(ctx.DB)
 
-	p.serviceUtils = services.NewServiceUtils(p.organizationRepo, p.memberRepo, p.teamRepo)
+	maxPageLimit := 0
+	if p.pluginConfig.MaxPageLimit != nil {
+		maxPageLimit = *p.pluginConfig.MaxPageLimit
+	}
+	p.serviceUtils = services.NewServiceUtils(p.organizationRepo, p.memberRepo, p.teamRepo, maxPageLimit)
 	p.organizationService = services.NewOrganizationService(p.organizationRepo, p.memberRepo, p.serviceUtils, accessControlService, p.pluginConfig.OrganizationsLimit, ctx.DB, p.hooksExecutor)
 	emailTemplateManager, err := newOrganizationEmailTemplateManager()
 	if err != nil {

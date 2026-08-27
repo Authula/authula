@@ -152,7 +152,7 @@ func TestOrganizationTeamService_ListAllTeamMembers(t *testing.T) {
 			expectCalled: true,
 		},
 		{
-			name:           "a negative page is clamped before reaching the repository",
+			name:           "a negative page and an oversized limit are clamped before reaching the repository",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
 			teamID:         "team-1",
@@ -161,7 +161,7 @@ func TestOrganizationTeamService_ListAllTeamMembers(t *testing.T) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "owner-member-1", OrganizationID: "org-1", UserID: "user-1", Role: "owner"}, nil).Twice()
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Twice()
-				teamMemberRepo.On("ListAllByTeamIDWithMemberAndUser", mock.Anything, "team-1", 1, 5000).Return(([]types.OrganizationTeamMemberResponse)(nil), 0, nil).Once()
+				teamMemberRepo.On("ListAllByTeamIDWithMemberAndUser", mock.Anything, "team-1", 1, pagination.DefaultMaxLimit).Return(([]types.OrganizationTeamMemberResponse)(nil), 0, nil).Once()
 			},
 			expectLen:    0,
 			expectCalled: true,
@@ -200,8 +200,8 @@ func TestOrganizationTeamService_ListAllTeamMembers(t *testing.T) {
 			require.NotNil(t, resp)
 			require.NotNil(t, resp.Data)
 			require.Len(t, resp.Data, tt.expectLen)
-			require.Equal(t, pagination.Clamp(params).Page, resp.Pagination.Page)
-			require.Equal(t, pagination.Clamp(params).Limit, resp.Pagination.Limit)
+			require.Equal(t, svc.serviceUtils.ClampPagination(params).Page, resp.Pagination.Page)
+			require.Equal(t, svc.serviceUtils.ClampPagination(params).Limit, resp.Pagination.Limit)
 			require.True(t, orgRepo.AssertExpectations(t))
 			require.True(t, memberRepo.AssertExpectations(t))
 			require.True(t, teamRepo.AssertExpectations(t))

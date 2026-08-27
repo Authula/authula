@@ -7,8 +7,9 @@ import (
 )
 
 const (
-	DefaultPage  = 1
-	DefaultLimit = 10
+	DefaultPage     = 1
+	DefaultLimit    = 10
+	DefaultMaxLimit = 100
 )
 
 type Params struct {
@@ -24,12 +25,18 @@ type Pagination struct {
 	HasMore    bool `json:"has_more" required:"true" nullable:"false"`
 }
 
-func Clamp(params Params) Params {
+func Clamp(params Params, maxLimit int) Params {
+	if maxLimit <= 0 {
+		maxLimit = DefaultMaxLimit
+	}
 	if params.Page < DefaultPage {
 		params.Page = DefaultPage
 	}
 	if params.Limit <= 0 {
 		params.Limit = DefaultLimit
+	}
+	if params.Limit > maxLimit {
+		params.Limit = maxLimit
 	}
 	return params
 }

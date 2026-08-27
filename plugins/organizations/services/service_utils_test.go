@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
@@ -604,4 +605,78 @@ func TestServiceUtils_authorizeTeamAccess(t *testing.T) {
 			memberRepo.AssertExpectations(t)
 		})
 	}
+}
+
+func TestServiceUtils_ClampPagination(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		maxPageLimit int
+		params       pagination.Params
+		expected     pagination.Params
+	}{
+		{
+			name:         "an unconfigured maximum falls back to the default maximum",
+			maxPageLimit: 0,
+			params:       pagination.Params{Page: 1, Limit: 1_000_000},
+			expected:     pagination.Params{Page: 1, Limit: pagination.DefaultMaxLimit},
+		},
+		{
+			name:         "a negative maximum falls back to the default maximum",
+			maxPageLimit: -25,
+			params:       pagination.Params{Page: 1, Limit: 1_000_000},
+			expected:     pagination.Params{Page: 1, Limit: pagination.DefaultMaxLimit},
+		},
+		{
+			name:         "a configured maximum caps the limit",
+			maxPageLimit: 25,
+			params:       pagination.Params{Page: 2, Limit: 500},
+			expected:     pagination.Params{Page: 2, Limit: 25},
+		},
+		{
+			name:         "a configured maximum above the default is honoured",
+			maxPageLimit: 500,
+			params:       pagination.Params{Page: 1, Limit: 400},
+			expected:     pagination.Params{Page: 1, Limit: 400},
+		},
+		{
+			name:         "a limit within the maximum is untouched",
+			maxPageLimit: 25,
+			params:       pagination.Params{Page: 1, Limit: 20},
+			expected:     pagination.Params{Page: 1, Limit: 20},
+		},
+		{
+			name:         "the page and limit floors are still applied",
+			maxPageLimit: 25,
+			params:       pagination.Params{Page: -3, Limit: 0},
+			expected:     pagination.Params{Page: 1, Limit: pagination.DefaultLimit},
+		},
+		{
+			name:         "a maximum below the default limit also caps the default",
+			maxPageLimit: 5,
+			params:       pagination.Params{Page: 1, Limit: 0},
+			expected:     pagination.Params{Page: 1, Limit: 5},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, tt.expected, (&ServiceUtils{maxPageLimit: tt.maxPageLimit}).ClampPagination(tt.params))
+		})
+	}
+}
+
+func TestServiceUtils_ClampPaginationOnANilReceiver(t *testing.T) {
+	t.Parallel()
+
+	var utils *ServiceUtils
+
+	require.Equal(
+		t,
+		pagination.Params{Page: 1, Limit: pagination.DefaultMaxLimit},
+		utils.ClampPagination(pagination.Params{Page: 0, Limit: 1_000_000}),
+	)
 }

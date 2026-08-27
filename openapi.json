@@ -2404,13 +2404,14 @@
           "Organizations"
         ],
         "summary": "List organizations",
-        "description": "Lists every organization the authenticated user can access, both the ones they own and the ones they are a member of, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. There is no upper bound on `limit`, so a sufficiently large value returns the whole collection in a single request. Values below the minimum fall back to the defaults rather than being rejected.",
+        "description": "Lists every organization the authenticated user can access, both the ones they own and the ones they are a member of, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. `limit` is capped by the server's configured maximum page size, which defaults to 100; a larger value is silently reduced to the cap rather than rejected, and values below the minimum fall back to the defaults. The `pagination` object in the response always reports the values actually applied.",
         "operationId": "listOrganizations",
         "parameters": [
           {
             "name": "page",
             "in": "query",
             "schema": {
+              "default": 1,
               "type": "integer"
             }
           },
@@ -2418,6 +2419,7 @@
             "name": "limit",
             "in": "query",
             "schema": {
+              "default": 10,
               "type": "integer"
             }
           }
@@ -2572,13 +2574,14 @@
           "Organization Invitations"
         ],
         "summary": "List invitations",
-        "description": "Lists the invitations for an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. There is no upper bound on `limit`, so a sufficiently large value returns the whole collection in a single request. Values below the minimum fall back to the defaults rather than being rejected.",
+        "description": "Lists the invitations for an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. `limit` is capped by the server's configured maximum page size, which defaults to 100; a larger value is silently reduced to the cap rather than rejected, and values below the minimum fall back to the defaults. The `pagination` object in the response always reports the values actually applied.",
         "operationId": "listOrganizationInvitations",
         "parameters": [
           {
             "name": "page",
             "in": "query",
             "schema": {
+              "default": 1,
               "type": "integer"
             }
           },
@@ -2586,6 +2589,7 @@
             "name": "limit",
             "in": "query",
             "schema": {
+              "default": 10,
               "type": "integer"
             }
           },
@@ -2840,13 +2844,14 @@
           "Organization Members"
         ],
         "summary": "List members",
-        "description": "Lists the members of an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. There is no upper bound on `limit`, so a sufficiently large value returns the whole collection in a single request. Values below the minimum fall back to the defaults rather than being rejected.",
+        "description": "Lists the members of an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. `limit` is capped by the server's configured maximum page size, which defaults to 100; a larger value is silently reduced to the cap rather than rejected, and values below the minimum fall back to the defaults. The `pagination` object in the response always reports the values actually applied.",
         "operationId": "listOrganizationMembers",
         "parameters": [
           {
             "name": "page",
             "in": "query",
             "schema": {
+              "default": 1,
               "type": "integer"
             }
           },
@@ -2854,6 +2859,7 @@
             "name": "limit",
             "in": "query",
             "schema": {
+              "default": 10,
               "type": "integer"
             }
           },
@@ -3090,13 +3096,14 @@
           "Organization Teams"
         ],
         "summary": "List teams",
-        "description": "Lists the teams within an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. There is no upper bound on `limit`, so a sufficiently large value returns the whole collection in a single request. Values below the minimum fall back to the defaults rather than being rejected.",
+        "description": "Lists the teams within an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. `limit` is capped by the server's configured maximum page size, which defaults to 100; a larger value is silently reduced to the cap rather than rejected, and values below the minimum fall back to the defaults. The `pagination` object in the response always reports the values actually applied.",
         "operationId": "listOrganizationTeams",
         "parameters": [
           {
             "name": "page",
             "in": "query",
             "schema": {
+              "default": 1,
               "type": "integer"
             }
           },
@@ -3104,6 +3111,7 @@
             "name": "limit",
             "in": "query",
             "schema": {
+              "default": 10,
               "type": "integer"
             }
           },
@@ -3300,13 +3308,14 @@
           "Organization Team Members"
         ],
         "summary": "List team members",
-        "description": "Lists the members of a team, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. There is no upper bound on `limit`, so a sufficiently large value returns the whole collection in a single request. Values below the minimum fall back to the defaults rather than being rejected.",
+        "description": "Lists the members of a team, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. `limit` is capped by the server's configured maximum page size, which defaults to 100; a larger value is silently reduced to the cap rather than rejected, and values below the minimum fall back to the defaults. The `pagination` object in the response always reports the values actually applied.",
         "operationId": "listOrganizationTeamMembers",
         "parameters": [
           {
             "name": "page",
             "in": "query",
             "schema": {
+              "default": 1,
               "type": "integer"
             }
           },
@@ -3314,6 +3323,7 @@
             "name": "limit",
             "in": "query",
             "schema": {
+              "default": 10,
               "type": "integer"
             }
           },

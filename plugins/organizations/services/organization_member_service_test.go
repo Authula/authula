@@ -372,17 +372,17 @@ func TestOrganizationMemberService_ListAllMembers(t *testing.T) {
 			expectPagination: pagination.Pagination{Page: 1, Limit: 10, Total: 25, TotalPages: 3, HasMore: true},
 		},
 		{
-			name:           "a negative page is clamped before reaching the repository",
+			name:           "a negative page and an oversized limit are clamped before reaching the repository",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
 			params:         pagination.Params{Page: -4, Limit: 5000},
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-				memberRepo.On("ListAllByOrganizationIDWithUser", mock.Anything, "org-1", 1, 5000).
+				memberRepo.On("ListAllByOrganizationIDWithUser", mock.Anything, "org-1", 1, pagination.DefaultMaxLimit).
 					Return([]types.OrganizationMemberResponse{}, 0, nil).Once()
 			},
 			expectLen:        0,
-			expectPagination: pagination.Pagination{Page: 1, Limit: 5000, Total: 0, TotalPages: 0, HasMore: false},
+			expectPagination: pagination.Pagination{Page: 1, Limit: pagination.DefaultMaxLimit, Total: 0, TotalPages: 0, HasMore: false},
 		},
 		{
 			name:           "nil result is normalised to an empty slice",

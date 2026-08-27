@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/Authula/authula/core/pagination"
 	"github.com/Authula/authula/models"
 )
 
@@ -12,6 +13,7 @@ type OrganizationsPluginConfig struct {
 	OrganizationsLimit               *int          `json:"organizations_limit" toml:"organizations_limit"`
 	MembersLimit                     *int          `json:"members_limit" toml:"members_limit"`
 	InvitationsLimit                 *int          `json:"invitations_limit" toml:"invitations_limit"`
+	MaxPageLimit                     *int          `json:"max_page_limit" toml:"max_page_limit"`
 	InvitationExpiresIn              time.Duration `json:"invitation_expires_in" toml:"invitation_expires_in"`
 	RequireEmailVerifiedOnInvitation bool          `json:"require_email_verified_on_invitation" toml:"require_email_verified_on_invitation"`
 
@@ -25,6 +27,9 @@ func (config *OrganizationsPluginConfig) ApplyDefaults() {
 	}
 	if config.InvitationsLimit == nil || *config.InvitationsLimit <= 0 {
 		config.InvitationsLimit = new(100)
+	}
+	if config.MaxPageLimit == nil || *config.MaxPageLimit <= 0 {
+		config.MaxPageLimit = new(pagination.DefaultMaxLimit)
 	}
 	if config.InvitationExpiresIn == 0 {
 		config.InvitationExpiresIn = 24 * time.Hour

@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	coreerrors "github.com/Authula/authula/core/errors"
+	"github.com/Authula/authula/core/pagination"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"
@@ -15,14 +16,23 @@ type ServiceUtils struct {
 	orgRepo       repositories.OrganizationRepository
 	orgMemberRepo repositories.OrganizationMemberRepository
 	orgTeamRepo   repositories.OrganizationTeamRepository
+	maxPageLimit  int
 }
 
-func NewServiceUtils(orgRepo repositories.OrganizationRepository, orgMemberRepo repositories.OrganizationMemberRepository, orgTeamRepo repositories.OrganizationTeamRepository) *ServiceUtils {
+func NewServiceUtils(orgRepo repositories.OrganizationRepository, orgMemberRepo repositories.OrganizationMemberRepository, orgTeamRepo repositories.OrganizationTeamRepository, maxPageLimit int) *ServiceUtils {
 	return &ServiceUtils{
 		orgRepo:       orgRepo,
 		orgMemberRepo: orgMemberRepo,
 		orgTeamRepo:   orgTeamRepo,
+		maxPageLimit:  maxPageLimit,
 	}
+}
+
+func (s *ServiceUtils) ClampPagination(params pagination.Params) pagination.Params {
+	if s == nil {
+		return pagination.Clamp(params, 0)
+	}
+	return pagination.Clamp(params, s.maxPageLimit)
 }
 
 func (s *ServiceUtils) authorizeOwner(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error) {

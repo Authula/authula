@@ -314,7 +314,7 @@ func (s *organizationInvitationService) ListAllOrganizationInvitationsByOrgIDWit
 		return nil, coreerrors.ErrNotFound
 	}
 
-	params = pagination.Clamp(params)
+	params = s.serviceUtils.ClampPagination(params)
 
 	invitations, total, err := s.orgInvitationRepo.ListAllByOrganizationIDWithOrg(ctx, organizationID, params.Page, params.Limit)
 	if err != nil {
