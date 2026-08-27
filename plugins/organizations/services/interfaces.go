@@ -10,7 +10,13 @@ import (
 
 type OrganizationService interface {
 	CreateOrganization(ctx context.Context, actor *models.Actor, request types.CreateOrganizationRequest) (*types.Organization, error)
-	GetAllOrganizations(ctx context.Context, actor *models.Actor, params pagination.Params) (*types.ListOrganizationsResponse, error)
+	ListAllOrganizations(ctx context.Context, actor *models.Actor, params pagination.Params) (*types.ListOrganizationsResponse, error)
+	GetAllOrganizations(ctx context.Context, actor *models.Actor) ([]types.Organization, error)
+	// GetAllOrganizationsUnscoped returns every organization in the system,
+	// ignoring the caller entirely. It is intended for administrative and
+	// system callers and must never be wired to an HTTP route without a
+	// permission check in front of it.
+	GetAllOrganizationsUnscoped(ctx context.Context) ([]types.Organization, error)
 	GetOrganizationByID(ctx context.Context, actor *models.Actor, organizationID string) (*types.Organization, error)
 	UpdateOrganization(ctx context.Context, actor *models.Actor, organizationID string, request types.UpdateOrganizationRequest) (*types.Organization, error)
 	DeleteOrganization(ctx context.Context, actor *models.Actor, organizationID string) error
@@ -22,7 +28,8 @@ type OrganizationInvitationService interface {
 	GetOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error)
 	GetOrganizationInvitationByID(ctx context.Context, invitationID string) (*types.OrganizationInvitation, error)
 	GetOrganizationInvitationByIDWithOrg(ctx context.Context, invitationID string) (*types.GetOrganizationInvitationResponse, error)
-	GetAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string, params pagination.Params) (*types.ListOrganizationInvitationsResponse, error)
+	ListAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string, params pagination.Params) (*types.ListOrganizationInvitationsResponse, error)
+	GetAllOrganizationInvitationsByOrgIDWithOrg(ctx context.Context, organizationID string) ([]types.GetOrganizationInvitationResponse, error)
 	RevokeOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error)
 	AcceptOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error)
 	RejectOrganizationInvitation(ctx context.Context, actor *models.Actor, organizationID string, invitationID string) (*types.OrganizationInvitation, error)
@@ -30,7 +37,8 @@ type OrganizationInvitationService interface {
 
 type OrganizationMemberService interface {
 	AddMember(ctx context.Context, actor *models.Actor, organizationID string, request types.AddOrganizationMemberRequest) (*types.OrganizationMember, error)
-	GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationMembersResponse, error)
+	ListAllMembers(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationMembersResponse, error)
+	GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationMemberResponse, error)
 	GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMemberResponse, error)
 	GetMemberByUserID(ctx context.Context, actor *models.Actor, organizationID string, userID string) (*types.OrganizationMemberResponse, error)
 	UpdateMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string, request types.UpdateOrganizationMemberRequest) (*types.OrganizationMember, error)
@@ -39,7 +47,8 @@ type OrganizationMemberService interface {
 
 type OrganizationTeamService interface {
 	CreateTeam(ctx context.Context, actor *models.Actor, organizationID string, request types.CreateOrganizationTeamRequest) (*types.OrganizationTeam, error)
-	GetAllTeams(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationTeamsResponse, error)
+	ListAllTeams(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationTeamsResponse, error)
+	GetAllTeams(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationTeam, error)
 	GetTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string) (*types.OrganizationTeam, error)
 	UpdateTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string, request types.UpdateOrganizationTeamRequest) (*types.OrganizationTeam, error)
 	DeleteTeam(ctx context.Context, actor *models.Actor, organizationID string, teamID string) error
@@ -47,7 +56,8 @@ type OrganizationTeamService interface {
 
 type OrganizationTeamMemberService interface {
 	AddTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, request types.AddOrganizationTeamMemberRequest) (*types.OrganizationTeamMember, error)
-	GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, params pagination.Params) (*types.ListOrganizationTeamMembersResponse, error)
+	ListAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string, params pagination.Params) (*types.ListOrganizationTeamMembersResponse, error)
+	GetAllTeamMembers(ctx context.Context, actor *models.Actor, organizationID string, teamID string) ([]types.OrganizationTeamMemberResponse, error)
 	GetTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) (*types.OrganizationTeamMemberResponse, error)
 	RemoveTeamMember(ctx context.Context, actor *models.Actor, organizationID string, teamID string, memberID string) error
 }

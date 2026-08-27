@@ -2404,7 +2404,7 @@
           "Organizations"
         ],
         "summary": "List organizations",
-        "description": "Lists every organization the authenticated user can access, both the ones they own and the ones they are a member of, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10, with a hard maximum of 100. Out-of-range values are clamped silently rather than rejected.",
+        "description": "Lists every organization the authenticated user can access, both the ones they own and the ones they are a member of, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. There is no upper bound on `limit`, so a sufficiently large value returns the whole collection in a single request. Values below the minimum fall back to the defaults rather than being rejected.",
         "operationId": "listOrganizations",
         "parameters": [
           {
@@ -2572,7 +2572,7 @@
           "Organization Invitations"
         ],
         "summary": "List invitations",
-        "description": "Lists the invitations for an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10, with a hard maximum of 100. Out-of-range values are clamped silently rather than rejected.",
+        "description": "Lists the invitations for an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. There is no upper bound on `limit`, so a sufficiently large value returns the whole collection in a single request. Values below the minimum fall back to the defaults rather than being rejected.",
         "operationId": "listOrganizationInvitations",
         "parameters": [
           {
@@ -2840,7 +2840,7 @@
           "Organization Members"
         ],
         "summary": "List members",
-        "description": "Lists the members of an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10, with a hard maximum of 100. Out-of-range values are clamped silently rather than rejected.",
+        "description": "Lists the members of an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. There is no upper bound on `limit`, so a sufficiently large value returns the whole collection in a single request. Values below the minimum fall back to the defaults rather than being rejected.",
         "operationId": "listOrganizationMembers",
         "parameters": [
           {
@@ -3090,7 +3090,7 @@
           "Organization Teams"
         ],
         "summary": "List teams",
-        "description": "Lists the teams within an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10, with a hard maximum of 100. Out-of-range values are clamped silently rather than rejected.",
+        "description": "Lists the teams within an organization, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. There is no upper bound on `limit`, so a sufficiently large value returns the whole collection in a single request. Values below the minimum fall back to the defaults rather than being rejected.",
         "operationId": "listOrganizationTeams",
         "parameters": [
           {
@@ -3300,7 +3300,7 @@
           "Organization Team Members"
         ],
         "summary": "List team members",
-        "description": "Lists the members of a team, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10, with a hard maximum of 100. Out-of-range values are clamped silently rather than rejected.",
+        "description": "Lists the members of a team, newest first. Results are paginated: `page` defaults to 1 and `limit` defaults to 10. There is no upper bound on `limit`, so a sufficiently large value returns the whole collection in a single request. Values below the minimum fall back to the defaults rather than being rejected.",
         "operationId": "listOrganizationTeamMembers",
         "parameters": [
           {

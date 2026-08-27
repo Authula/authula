@@ -115,14 +115,14 @@ func (s *organizationMemberService) AddMember(ctx context.Context, actor *models
 	return created, nil
 }
 
-func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationMembersResponse, error) {
+func (s *organizationMemberService) ListAllMembers(ctx context.Context, actor *models.Actor, organizationID string, params pagination.Params) (*types.ListOrganizationMembersResponse, error) {
 	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
 		return nil, err
 	}
 
 	params = pagination.Clamp(params)
 
-	members, total, err := s.orgMemberRepo.GetAllByOrganizationIDWithUser(ctx, organizationID, params.Page, params.Limit)
+	members, total, err := s.orgMemberRepo.ListAllByOrganizationIDWithUser(ctx, organizationID, params.Page, params.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -134,6 +134,22 @@ func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor *mo
 		Data:       members,
 		Pagination: pagination.New(params.Page, params.Limit, total),
 	}, nil
+}
+
+func (s *organizationMemberService) GetAllMembers(ctx context.Context, actor *models.Actor, organizationID string) ([]types.OrganizationMemberResponse, error) {
+	if _, _, err := s.serviceUtils.AuthorizeOrganizationAccess(ctx, actor, organizationID); err != nil {
+		return nil, err
+	}
+
+	members, err := s.orgMemberRepo.GetAllByOrganizationIDWithUser(ctx, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	if members == nil {
+		members = []types.OrganizationMemberResponse{}
+	}
+
+	return members, nil
 }
 
 func (s *organizationMemberService) GetMember(ctx context.Context, actor *models.Actor, organizationID string, memberID string) (*types.OrganizationMemberResponse, error) {

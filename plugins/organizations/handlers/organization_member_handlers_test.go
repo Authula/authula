@@ -160,13 +160,13 @@ func TestAddOrganizationMemberHandler(t *testing.T) {
 	})
 }
 
-func TestGetAllOrganizationMembersHandler(t *testing.T) {
+func TestListAllOrganizationMembersHandler(t *testing.T) {
 	t.Parallel()
 
 	defaultParams := pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}
 
 	runOrganizationMemberHandlerCases(t, http.MethodGet, "/organizations/org-1/members", func(fixture *organizationMemberHandlerFixture) http.HandlerFunc {
-		return (&GetAllOrganizationMembersHandler{UseCases: newMemberUseCases(fixture.service)}).Handle()
+		return (&ListAllOrganizationMembersHandler{UseCases: newMemberUseCases(fixture.service)}).Handle()
 	}, []organizationMemberHandlerCase{
 		{
 			name:            "missing_user",
@@ -179,7 +179,7 @@ func TestGetAllOrganizationMembersHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(fixture *organizationMemberHandlerFixture) {
-				fixture.service.On("GetAllMembers", mock.Anything, "user-1", "org-1", defaultParams).
+				fixture.service.On("ListAllMembers", mock.Anything, "user-1", "org-1", defaultParams).
 					Return((*orgtypes.ListOrganizationMembersResponse)(nil), errors.New("some error")).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
@@ -190,7 +190,7 @@ func TestGetAllOrganizationMembersHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(fixture *organizationMemberHandlerFixture) {
-				fixture.service.On("GetAllMembers", mock.Anything, "user-1", "org-1", defaultParams).
+				fixture.service.On("ListAllMembers", mock.Anything, "user-1", "org-1", defaultParams).
 					Return(&orgtypes.ListOrganizationMembersResponse{
 						Data:       []orgtypes.OrganizationMemberResponse{{ID: "mem-1", OrganizationID: "org-1", Role: "member"}},
 						Pagination: pagination.New(1, 10, 25),
@@ -207,7 +207,7 @@ func TestGetAllOrganizationMembersHandler(t *testing.T) {
 	})
 }
 
-func TestGetAllOrganizationMembersHandlerParsesPagination(t *testing.T) {
+func TestListAllOrganizationMembersHandlerParsesPagination(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -227,14 +227,14 @@ func TestGetAllOrganizationMembersHandlerParsesPagination(t *testing.T) {
 			t.Parallel()
 
 			runOrganizationMemberHandlerCases(t, http.MethodGet, "/organizations/org-1/members"+tt.query, func(fixture *organizationMemberHandlerFixture) http.HandlerFunc {
-				return (&GetAllOrganizationMembersHandler{UseCases: newMemberUseCases(fixture.service)}).Handle()
+				return (&ListAllOrganizationMembersHandler{UseCases: newMemberUseCases(fixture.service)}).Handle()
 			}, []organizationMemberHandlerCase{
 				{
 					name:           "forwards_parsed_params",
 					userID:         new("user-1"),
 					organizationID: "org-1",
 					prepare: func(fixture *organizationMemberHandlerFixture) {
-						fixture.service.On("GetAllMembers", mock.Anything, "user-1", "org-1", tt.expectedParams).
+						fixture.service.On("ListAllMembers", mock.Anything, "user-1", "org-1", tt.expectedParams).
 							Return(&orgtypes.ListOrganizationMembersResponse{
 								Data:       []orgtypes.OrganizationMemberResponse{},
 								Pagination: pagination.New(1, 10, 0),

@@ -46,11 +46,11 @@ func (h *CreateOrganizationInvitationHandler) Handle() http.HandlerFunc {
 	}
 }
 
-type GetAllOrganizationInvitationsHandler struct {
+type ListAllOrganizationInvitationsHandler struct {
 	UseCases *orgusecases.UseCases
 }
 
-func (h *GetAllOrganizationInvitationsHandler) Handle() http.HandlerFunc {
+func (h *ListAllOrganizationInvitationsHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
@@ -58,7 +58,7 @@ func (h *GetAllOrganizationInvitationsHandler) Handle() http.HandlerFunc {
 
 		organizationID := r.PathValue("organization_id")
 		paginationParams := pagination.ParseFromRequest(r)
-		invitations, err := h.UseCases.GetAllOrganizationInvitations(ctx, actor, organizationID, paginationParams)
+		invitations, err := h.UseCases.ListAllOrganizationInvitations(ctx, actor, organizationID, paginationParams)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return

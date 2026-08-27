@@ -49,17 +49,17 @@ func (h *CreateOrganizationHandler) Handle() http.HandlerFunc {
 	}
 }
 
-type GetAllOrganizationsHandler struct {
+type ListAllOrganizationsHandler struct {
 	UseCases *orgusecases.UseCases
 }
 
-func (h *GetAllOrganizationsHandler) Handle() http.HandlerFunc {
+func (h *ListAllOrganizationsHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 		actor := reqCtx.Actor
 		paginationParams := pagination.ParseFromRequest(r)
-		organizations, err := h.UseCases.GetAllOrganizations(ctx, actor, paginationParams)
+		organizations, err := h.UseCases.ListAllOrganizations(ctx, actor, paginationParams)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return

@@ -198,7 +198,7 @@ func TestBunOrganizationInvitationRepository_GetByOrganizationIDAndEmail(t *test
 	}
 }
 
-func TestBunOrganizationInvitationRepository_GetAllPendingByEmail(t *testing.T) {
+func TestBunOrganizationInvitationRepository_ListAllPendingByEmail(t *testing.T) {
 	t.Parallel()
 
 	setup := func(t *testing.T) (repositories.OrganizationInvitationRepository, context.Context) {
@@ -232,14 +232,17 @@ func TestBunOrganizationInvitationRepository_GetAllPendingByEmail(t *testing.T) 
 	}
 
 	tests := []struct {
-		name        string
-		email       string
-		limit       int
-		expectedIDs []string
+		name          string
+		email         string
+		page          int
+		limit         int
+		expectedIDs   []string
+		expectedTotal int
 	}{
-		{name: "returns every pending invitation", email: "user@example.com", limit: 10, expectedIDs: []string{"inv-1", "inv-2", "inv-3"}},
-		{name: "capped batch returns the oldest pending invitations", email: "user@example.com", limit: 2, expectedIDs: []string{"inv-1", "inv-2"}},
-		{name: "unknown email has nothing pending", email: "missing@example.com", limit: 10, expectedIDs: []string{}},
+		{name: "first page returns the oldest pending invitations", email: "user@example.com", page: 1, limit: 10, expectedIDs: []string{"inv-1", "inv-2", "inv-3"}, expectedTotal: 3},
+		{name: "page size splits the pending invitations", email: "user@example.com", page: 1, limit: 2, expectedIDs: []string{"inv-1", "inv-2"}, expectedTotal: 3},
+		{name: "second page returns the remainder", email: "user@example.com", page: 2, limit: 2, expectedIDs: []string{"inv-3"}, expectedTotal: 3},
+		{name: "unknown email has nothing pending", email: "missing@example.com", page: 1, limit: 10, expectedIDs: []string{}, expectedTotal: 0},
 	}
 
 	for _, tt := range tests {
@@ -248,7 +251,66 @@ func TestBunOrganizationInvitationRepository_GetAllPendingByEmail(t *testing.T) 
 
 			repo, ctx := setup(t)
 
-			pending, err := repo.GetAllPendingByEmail(ctx, tt.email, tt.limit)
+			pending, total, err := repo.ListAllPendingByEmail(ctx, tt.email, tt.page, tt.limit)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedTotal, total)
+
+			ids := make([]string, 0, len(pending))
+			for _, invitation := range pending {
+				ids = append(ids, invitation.ID)
+			}
+			require.Equal(t, tt.expectedIDs, ids)
+		})
+	}
+}
+
+func TestBunOrganizationInvitationRepository_GetAllPendingByEmail(t *testing.T) {
+	t.Parallel()
+
+	setup := func(t *testing.T) (repositories.OrganizationInvitationRepository, context.Context) {
+		t.Helper()
+
+		db := plugintests.SetupRepoDB(t)
+		plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+
+		repo := repositories.NewBunOrganizationInvitationRepository(db)
+		ctx := context.Background()
+
+		for i, invitation := range []*types.OrganizationInvitation{
+			{ID: "inv-1", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)},
+			{ID: "inv-2", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)},
+			{ID: "inv-3", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)},
+			{ID: "inv-4", Status: types.OrganizationInvitationStatusAccepted, ExpiresAt: time.Now().UTC().Add(time.Hour)},
+			{ID: "inv-5", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(-time.Hour)},
+		} {
+			invitation.OrganizationID = "org-1"
+			invitation.Email = "user@example.com"
+			invitation.InviterID = "user-1"
+			invitation.Role = "member"
+			_, err := repo.Create(ctx, invitation)
+			require.NoError(t, err, "seeding invitation %d", i)
+		}
+
+		return repo, ctx
+	}
+
+	tests := []struct {
+		name        string
+		email       string
+		expectedIDs []string
+	}{
+		{name: "returns every pending invitation oldest first", email: "user@example.com", expectedIDs: []string{"inv-1", "inv-2", "inv-3"}},
+		{name: "accepted and expired invitations are excluded", email: "user@example.com", expectedIDs: []string{"inv-1", "inv-2", "inv-3"}},
+		{name: "unknown email has nothing pending", email: "missing@example.com", expectedIDs: []string{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo, ctx := setup(t)
+
+			pending, err := repo.GetAllPendingByEmail(ctx, tt.email)
 			require.NoError(t, err)
 
 			ids := make([]string, 0, len(pending))
@@ -260,7 +322,40 @@ func TestBunOrganizationInvitationRepository_GetAllPendingByEmail(t *testing.T) 
 	}
 }
 
-func TestBunOrganizationInvitationRepository_GetAllByOrganizationIDWithOrg(t *testing.T) {
+// GetAllPendingByEmail must not silently truncate. Its paginated sibling stops at
+// the requested limit; this one is expected to return the whole set in one query,
+// well past the 500-row batch cap that used to apply here.
+func TestBunOrganizationInvitationRepository_GetAllPendingByEmailIsNotCapped(t *testing.T) {
+	t.Parallel()
+
+	const pendingCount = 600
+
+	db := plugintests.SetupRepoDB(t)
+	plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+	repo := repositories.NewBunOrganizationInvitationRepository(db)
+	ctx := context.Background()
+
+	for i := 1; i <= pendingCount; i++ {
+		_, err := repo.Create(ctx, &types.OrganizationInvitation{
+			ID:             fmt.Sprintf("inv-%04d", i),
+			OrganizationID: "org-1",
+			Email:          "user@example.com",
+			InviterID:      "user-1",
+			Role:           "member",
+			Status:         types.OrganizationInvitationStatusPending,
+			ExpiresAt:      time.Now().UTC().Add(time.Hour),
+		})
+		require.NoError(t, err, "seeding invitation %d", i)
+	}
+
+	pending, err := repo.GetAllPendingByEmail(ctx, "user@example.com")
+	require.NoError(t, err)
+	require.Len(t, pending, pendingCount)
+	require.Equal(t, "inv-0001", pending[0].ID, "oldest invitation must come first")
+	require.Equal(t, fmt.Sprintf("inv-%04d", pendingCount), pending[len(pending)-1].ID)
+}
+
+func TestBunOrganizationInvitationRepository_ListAllByOrganizationIDWithOrg(t *testing.T) {
 	t.Parallel()
 
 	setup := func(t *testing.T) (repositories.OrganizationInvitationRepository, context.Context) {
@@ -311,7 +406,7 @@ func TestBunOrganizationInvitationRepository_GetAllByOrganizationIDWithOrg(t *te
 
 			repo, ctx := setup(t)
 
-			invitations, total, err := repo.GetAllByOrganizationIDWithOrg(ctx, tt.organizationID, tt.page, tt.limit)
+			invitations, total, err := repo.ListAllByOrganizationIDWithOrg(ctx, tt.organizationID, tt.page, tt.limit)
 			require.NoError(t, err)
 			require.Len(t, invitations, tt.expectCount)
 			require.Equal(t, tt.expectTotal, total)
@@ -322,7 +417,7 @@ func TestBunOrganizationInvitationRepository_GetAllByOrganizationIDWithOrg(t *te
 	}
 }
 
-func TestBunOrganizationInvitationRepository_GetAllByOrganizationIDWithOrgPagesPartitionCleanly(t *testing.T) {
+func TestBunOrganizationInvitationRepository_ListAllByOrganizationIDWithOrgPagesPartitionCleanly(t *testing.T) {
 	t.Parallel()
 
 	db := plugintests.SetupRepoDB(t)
@@ -345,7 +440,7 @@ func TestBunOrganizationInvitationRepository_GetAllByOrganizationIDWithOrgPagesP
 
 	seen := make([]string, 0, 5)
 	for page := 1; page <= 3; page++ {
-		invitations, total, err := repo.GetAllByOrganizationIDWithOrg(ctx, "org-1", page, 2)
+		invitations, total, err := repo.ListAllByOrganizationIDWithOrg(ctx, "org-1", page, 2)
 		require.NoError(t, err)
 		require.Equal(t, 5, total)
 		for _, invitation := range invitations {
@@ -599,4 +694,92 @@ func TestBunOrganizationInvitationRepository_WithTx(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBunOrganizationInvitationRepository_GetAllByOrganizationIDWithOrg(t *testing.T) {
+	t.Parallel()
+
+	setup := func(t *testing.T, count int) (repositories.OrganizationInvitationRepository, context.Context) {
+		t.Helper()
+
+		db := plugintests.SetupRepoDB(t)
+		plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+		plugintests.SeedOrganization(t, db, "org-2", "user-2", "Beta Inc", "beta-inc")
+
+		repo := repositories.NewBunOrganizationInvitationRepository(db)
+		ctx := context.Background()
+
+		for i := 1; i <= count; i++ {
+			_, err := repo.Create(ctx, &types.OrganizationInvitation{
+				ID:             fmt.Sprintf("inv-%d", i),
+				Email:          fmt.Sprintf("user%d@example.com", i),
+				InviterID:      "user-1",
+				OrganizationID: "org-1",
+				Role:           "member",
+				Status:         types.OrganizationInvitationStatusPending,
+				ExpiresAt:      time.Now().UTC().Add(time.Hour),
+			})
+			require.NoError(t, err)
+		}
+
+		return repo, ctx
+	}
+
+	tests := []struct {
+		name           string
+		seedCount      int
+		organizationID string
+		expectCount    int
+	}{
+		{name: "returns every invitation for the organization", seedCount: 5, organizationID: "org-1", expectCount: 5},
+		{name: "organization without invitations is empty", seedCount: 5, organizationID: "org-2", expectCount: 0},
+		{name: "unknown organization is empty", seedCount: 5, organizationID: "org-99", expectCount: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo, ctx := setup(t, tt.seedCount)
+
+			invitations, err := repo.GetAllByOrganizationIDWithOrg(ctx, tt.organizationID)
+			require.NoError(t, err)
+			require.NotNil(t, invitations, "an empty result must be an empty slice, not nil")
+			require.Len(t, invitations, tt.expectCount)
+			for _, invitation := range invitations {
+				require.NotNil(t, invitation.Invitation)
+				require.Equal(t, tt.organizationID, invitation.Invitation.OrganizationID)
+				require.Equal(t, tt.organizationID, invitation.Organization.ID, "the organization must be hydrated by the join")
+				require.NotEmpty(t, invitation.Organization.Name)
+			}
+		})
+	}
+}
+
+func TestBunOrganizationInvitationRepository_GetAllByOrganizationIDWithOrgIgnoresTheDefaultLimit(t *testing.T) {
+	t.Parallel()
+
+	const invitationCount = 25
+
+	db := plugintests.SetupRepoDB(t)
+	plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+	repo := repositories.NewBunOrganizationInvitationRepository(db)
+	ctx := context.Background()
+
+	for i := 1; i <= invitationCount; i++ {
+		_, err := repo.Create(ctx, &types.OrganizationInvitation{
+			ID:             fmt.Sprintf("inv-%02d", i),
+			Email:          fmt.Sprintf("user%d@example.com", i),
+			InviterID:      "user-1",
+			OrganizationID: "org-1",
+			Role:           "member",
+			Status:         types.OrganizationInvitationStatusPending,
+			ExpiresAt:      time.Now().UTC().Add(time.Hour),
+		})
+		require.NoError(t, err)
+	}
+
+	invitations, err := repo.GetAllByOrganizationIDWithOrg(ctx, "org-1")
+	require.NoError(t, err)
+	require.Len(t, invitations, invitationCount)
 }

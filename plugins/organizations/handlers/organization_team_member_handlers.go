@@ -46,11 +46,11 @@ func (h *AddOrganizationTeamMemberHandler) Handle() http.HandlerFunc {
 	}
 }
 
-type GetAllOrganizationTeamMembersHandler struct {
+type ListAllOrganizationTeamMembersHandler struct {
 	UseCases *orgusecases.UseCases
 }
 
-func (h *GetAllOrganizationTeamMembersHandler) Handle() http.HandlerFunc {
+func (h *ListAllOrganizationTeamMembersHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
@@ -59,7 +59,7 @@ func (h *GetAllOrganizationTeamMembersHandler) Handle() http.HandlerFunc {
 		organizationID := r.PathValue("organization_id")
 		teamID := r.PathValue("team_id")
 		paginationParams := pagination.ParseFromRequest(r)
-		teamMembers, err := h.UseCases.GetAllTeamMembers(ctx, actor, organizationID, teamID, paginationParams)
+		teamMembers, err := h.UseCases.ListAllTeamMembers(ctx, actor, organizationID, teamID, paginationParams)
 		if err != nil {
 			orgconstants.HandleError(err, reqCtx)
 			return

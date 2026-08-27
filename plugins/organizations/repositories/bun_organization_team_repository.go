@@ -57,7 +57,7 @@ func (r *BunOrganizationTeamRepository) GetByOrganizationIDAndSlug(ctx context.C
 	return team, err
 }
 
-func (r *BunOrganizationTeamRepository) GetAllByOrganizationID(ctx context.Context, organizationID string, page int, limit int) ([]types.OrganizationTeam, int, error) {
+func (r *BunOrganizationTeamRepository) ListAllByOrganizationID(ctx context.Context, organizationID string, page int, limit int) ([]types.OrganizationTeam, int, error) {
 	teams := make([]types.OrganizationTeam, 0)
 	limit = pageLimit(limit)
 	total, err := r.db.NewSelect().Model(&teams).
@@ -69,6 +69,18 @@ func (r *BunOrganizationTeamRepository) GetAllByOrganizationID(ctx context.Conte
 		return []types.OrganizationTeam{}, total, nil
 	}
 	return teams, total, err
+}
+
+func (r *BunOrganizationTeamRepository) GetAllByOrganizationID(ctx context.Context, organizationID string) ([]types.OrganizationTeam, error) {
+	teams := make([]types.OrganizationTeam, 0)
+	err := r.db.NewSelect().Model(&teams).
+		Where("organization_id = ?", organizationID).
+		OrderExpr("created_at DESC, id DESC").
+		Scan(ctx)
+	if err == sql.ErrNoRows {
+		return []types.OrganizationTeam{}, nil
+	}
+	return teams, err
 }
 
 func (r *BunOrganizationTeamRepository) Update(ctx context.Context, team *types.OrganizationTeam) (*types.OrganizationTeam, error) {

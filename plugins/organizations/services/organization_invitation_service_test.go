@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -721,7 +722,7 @@ func TestOrganizationInvitationService_GetOrganizationInvitation(t *testing.T) {
 	}
 }
 
-func TestOrganizationInvitationService_GetAllOrganizationInvitationsByOrgIDWithOrg(t *testing.T) {
+func TestOrganizationInvitationService_ListAllOrganizationInvitationsByOrgIDWithOrg(t *testing.T) {
 	t.Parallel()
 
 	repoErr := errors.New("repository error")
@@ -740,7 +741,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitationsByOrgIDWithO
 			organizationID: "org-1",
 			params:         pagination.Params{Page: 2, Limit: 2},
 			setup: func(invRepo *orgtests.MockOrganizationInvitationRepository) {
-				invRepo.On("GetAllByOrganizationIDWithOrg", mock.Anything, "org-1", 2, 2).
+				invRepo.On("ListAllByOrganizationIDWithOrg", mock.Anything, "org-1", 2, 2).
 					Return([]types.GetOrganizationInvitationResponse{
 						{Invitation: &types.OrganizationInvitation{ID: "inv-3", OrganizationID: "org-1"}},
 						{Invitation: &types.OrganizationInvitation{ID: "inv-4", OrganizationID: "org-1"}},
@@ -754,7 +755,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitationsByOrgIDWithO
 			organizationID: "org-1",
 			params:         pagination.Params{Page: -4, Limit: 5000},
 			setup: func(invRepo *orgtests.MockOrganizationInvitationRepository) {
-				invRepo.On("GetAllByOrganizationIDWithOrg", mock.Anything, "org-1", 1, 5000).
+				invRepo.On("ListAllByOrganizationIDWithOrg", mock.Anything, "org-1", 1, 5000).
 					Return([]types.GetOrganizationInvitationResponse{}, 0, nil).Once()
 			},
 			expectLen:        0,
@@ -765,7 +766,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitationsByOrgIDWithO
 			organizationID: "org-1",
 			params:         pagination.Params{Page: 1, Limit: 10},
 			setup: func(invRepo *orgtests.MockOrganizationInvitationRepository) {
-				invRepo.On("GetAllByOrganizationIDWithOrg", mock.Anything, "org-1", 1, 10).
+				invRepo.On("ListAllByOrganizationIDWithOrg", mock.Anything, "org-1", 1, 10).
 					Return(([]types.GetOrganizationInvitationResponse)(nil), 0, nil).Once()
 			},
 			expectLen:        0,
@@ -782,7 +783,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitationsByOrgIDWithO
 			organizationID: "org-1",
 			params:         pagination.Params{Page: 1, Limit: 10},
 			setup: func(invRepo *orgtests.MockOrganizationInvitationRepository) {
-				invRepo.On("GetAllByOrganizationIDWithOrg", mock.Anything, "org-1", 1, 10).
+				invRepo.On("ListAllByOrganizationIDWithOrg", mock.Anything, "org-1", 1, 10).
 					Return(([]types.GetOrganizationInvitationResponse)(nil), 0, repoErr).Once()
 			},
 			expectErr: repoErr,
@@ -805,7 +806,7 @@ func TestOrganizationInvitationService_GetAllOrganizationInvitationsByOrgIDWithO
 			}
 
 			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
-			resp, err := svc.GetAllOrganizationInvitationsByOrgIDWithOrg(context.Background(), tt.organizationID, tt.params)
+			resp, err := svc.ListAllOrganizationInvitationsByOrgIDWithOrg(context.Background(), tt.organizationID, tt.params)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.expectErr)
@@ -955,7 +956,7 @@ func TestOrganizationInvitationService_AcceptPendingOrganizationInvitationsForEm
 			userID: "user-2",
 			email:  "USER@EXAMPLE.COM",
 			setup: func(userSvc *internaltests.MockUserService, orgRepo *orgtests.MockOrganizationRepository, invRepo *orgtests.MockOrganizationInvitationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationInvitationHooks, memberHooks *orgtests.MockOrganizationMemberHooks) {
-				invRepo.On("GetAllPendingByEmail", mock.Anything, "user@example.com", repositories.MaxPendingInvitationsPerBatch).Return([]types.OrganizationInvitation{{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)}}, nil).Once()
+				invRepo.On("GetAllPendingByEmail", mock.Anything, "user@example.com").Return([]types.OrganizationInvitation{{ID: "inv-1", OrganizationID: "org-1", Email: "user@example.com", Role: "member", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)}}, nil).Once()
 				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-2").Return(nil, nil).Once()
 				memberRepo.On("Create", mock.Anything, mock.MatchedBy(func(member *types.OrganizationMember) bool {
 					return member != nil && member.OrganizationID == "org-1" && member.UserID == "user-2" && member.Role == "member"
@@ -1424,4 +1425,137 @@ func TestOrganizationInvitationService_RejectOrganizationInvitation(t *testing.T
 			require.Equal(t, tt.expectStatus, invitation.Status)
 		})
 	}
+}
+
+func TestOrganizationInvitationService_GetAllOrganizationInvitationsByOrgIDWithOrg(t *testing.T) {
+	t.Parallel()
+
+	repoErr := errors.New("repository error")
+
+	tests := []struct {
+		name           string
+		organizationID string
+		setup          func(*orgtests.MockOrganizationInvitationRepository)
+		expectErr      error
+		expectIDs      []string
+	}{
+		{
+			name:           "returns every invitation for the organization",
+			organizationID: "org-1",
+			setup: func(invRepo *orgtests.MockOrganizationInvitationRepository) {
+				invRepo.On("GetAllByOrganizationIDWithOrg", mock.Anything, "org-1").
+					Return([]types.GetOrganizationInvitationResponse{
+						{Invitation: &types.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1"}},
+						{Invitation: &types.OrganizationInvitation{ID: "inv-2", OrganizationID: "org-1"}},
+						{Invitation: &types.OrganizationInvitation{ID: "inv-3", OrganizationID: "org-1"}},
+					}, nil).Once()
+			},
+			expectIDs: []string{"inv-1", "inv-2", "inv-3"},
+		},
+		{
+			name:           "missing organization id is not found",
+			organizationID: "",
+			expectErr:      coreerrors.ErrNotFound,
+		},
+		{
+			name:           "repository error is propagated",
+			organizationID: "org-1",
+			setup: func(invRepo *orgtests.MockOrganizationInvitationRepository) {
+				invRepo.On("GetAllByOrganizationIDWithOrg", mock.Anything, "org-1").
+					Return(([]types.GetOrganizationInvitationResponse)(nil), repoErr).Once()
+			},
+			expectErr: repoErr,
+		},
+		{
+			name:           "nil result is normalised to an empty slice",
+			organizationID: "org-1",
+			setup: func(invRepo *orgtests.MockOrganizationInvitationRepository) {
+				invRepo.On("GetAllByOrganizationIDWithOrg", mock.Anything, "org-1").
+					Return(([]types.GetOrganizationInvitationResponse)(nil), nil).Once()
+			},
+			expectIDs: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			pluginConfig := &types.OrganizationsPluginConfig{
+				Enabled:             true,
+				InvitationExpiresIn: 24 * time.Hour,
+			}
+			orgRepo := &orgtests.MockOrganizationRepository{}
+			invRepo := &orgtests.MockOrganizationInvitationRepository{}
+			memberRepo := &orgtests.MockOrganizationMemberRepository{}
+			if tt.setup != nil {
+				tt.setup(invRepo)
+			}
+
+			svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
+			invitations, err := svc.GetAllOrganizationInvitationsByOrgIDWithOrg(context.Background(), tt.organizationID)
+			if tt.expectErr != nil {
+				require.Error(t, err)
+				require.ErrorIs(t, err, tt.expectErr)
+				require.Nil(t, invitations)
+				require.True(t, invRepo.AssertExpectations(t))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, invitations)
+			ids := make([]string, 0, len(invitations))
+			for _, invitation := range invitations {
+				ids = append(ids, invitation.Invitation.ID)
+			}
+			require.Equal(t, tt.expectIDs, ids)
+			require.True(t, invRepo.AssertExpectations(t))
+		})
+	}
+}
+
+// The 500-row batch cap used to silently drop pending invitations past the limit;
+// the unconstrained fetch must hand every one of them to the acceptance loop.
+func TestOrganizationInvitationService_AcceptPendingOrganizationInvitationsForEmailIsNotCapped(t *testing.T) {
+	t.Parallel()
+
+	const pendingCount = 600
+
+	pluginConfig := &types.OrganizationsPluginConfig{
+		Enabled:             true,
+		InvitationExpiresIn: 24 * time.Hour,
+	}
+	orgRepo := &orgtests.MockOrganizationRepository{}
+	invRepo := &orgtests.MockOrganizationInvitationRepository{}
+	memberRepo := &orgtests.MockOrganizationMemberRepository{}
+
+	pending := make([]types.OrganizationInvitation, 0, pendingCount)
+	for i := 1; i <= pendingCount; i++ {
+		pending = append(pending, types.OrganizationInvitation{
+			ID:             fmt.Sprintf("inv-%04d", i),
+			OrganizationID: fmt.Sprintf("org-%04d", i),
+			Email:          "user@example.com",
+			Role:           "member",
+			Status:         types.OrganizationInvitationStatusPending,
+			ExpiresAt:      time.Now().UTC().Add(time.Hour),
+		})
+	}
+
+	invRepo.On("GetAllPendingByEmail", mock.Anything, "user@example.com").Return(pending, nil).Once()
+	// One expectation per repository call rather than per invitation: testify
+	// matches arguments linearly, so 3 x pendingCount expectations is quadratic.
+	memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, mock.Anything, "user-2").Return(nil, nil).Times(pendingCount)
+	memberRepo.On("Create", mock.Anything, mock.Anything).Return(&types.OrganizationMember{ID: "mem-1", UserID: "user-2", Role: "member"}, nil).Times(pendingCount)
+	invRepo.On("Update", mock.Anything, mock.MatchedBy(func(invitation *types.OrganizationInvitation) bool {
+		return invitation != nil && invitation.Status == types.OrganizationInvitationStatusAccepted
+	})).Return(&types.OrganizationInvitation{ID: "inv-accepted", Status: types.OrganizationInvitationStatusAccepted}, nil).Times(pendingCount)
+
+	svc := newTestOrganizationInvitationService(&orgtests.MockOrganizationInvitationTxRunner{}, pluginConfig, &internaltests.MockUserService{}, orgtests.NewAccessControlServiceStub(), orgRepo, invRepo, memberRepo)
+	accepted, err := svc.AcceptPendingOrganizationInvitationsForEmail(context.Background(), "user-2", "user@example.com")
+	require.NoError(t, err)
+	require.Len(t, accepted, pendingCount, "every pending invitation must be accepted, not just the first 500")
+	// AssertExpectations enforces the exact call count, so each of the 600
+	// invitations reached Update rather than being dropped past a batch cap.
+	require.True(t, invRepo.AssertExpectations(t))
+	require.True(t, memberRepo.AssertExpectations(t))
 }

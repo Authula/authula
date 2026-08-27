@@ -163,11 +163,11 @@ func TestCreateOrganizationInvitationHandler(t *testing.T) {
 	})
 }
 
-func TestGetAllOrganizationInvitationsHandler(t *testing.T) {
+func TestListAllOrganizationInvitationsHandler(t *testing.T) {
 	t.Parallel()
 
 	runOrganizationInvitationHandlerCases(t, http.MethodGet, "/organizations/org-1/invitations", func(fixture *organizationInvitationHandlerFixture) http.HandlerFunc {
-		return (&GetAllOrganizationInvitationsHandler{UseCases: newInvitationUseCases(fixture.orgSvc, fixture.service)}).Handle()
+		return (&ListAllOrganizationInvitationsHandler{UseCases: newInvitationUseCases(fixture.orgSvc, fixture.service)}).Handle()
 	}, []organizationInvitationHandlerCase{
 		{
 			name:            "missing_user",
@@ -180,7 +180,7 @@ func TestGetAllOrganizationInvitationsHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
-				fixture.service.On("GetAllOrganizationInvitationsByOrgIDWithOrg", mock.Anything, "org-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+				fixture.service.On("ListAllOrganizationInvitationsByOrgIDWithOrg", mock.Anything, "org-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
 					Return((*orgtypes.ListOrganizationInvitationsResponse)(nil), errors.New("some error")).Once()
 			},
 			expectedStatus:  http.StatusBadRequest,
@@ -191,7 +191,7 @@ func TestGetAllOrganizationInvitationsHandler(t *testing.T) {
 			userID:         new("user-1"),
 			organizationID: "org-1",
 			prepare: func(fixture *organizationInvitationHandlerFixture) {
-				fixture.service.On("GetAllOrganizationInvitationsByOrgIDWithOrg", mock.Anything, "org-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
+				fixture.service.On("ListAllOrganizationInvitationsByOrgIDWithOrg", mock.Anything, "org-1", pagination.Params{Page: pagination.DefaultPage, Limit: pagination.DefaultLimit}).
 					Return(&orgtypes.ListOrganizationInvitationsResponse{
 						Data: []orgtypes.GetOrganizationInvitationResponse{
 							{

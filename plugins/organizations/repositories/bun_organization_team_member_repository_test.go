@@ -274,7 +274,7 @@ func teamMemberResponseIDs(teamMembers []types.OrganizationTeamMemberResponse) [
 	return ids
 }
 
-func TestBunOrganizationTeamMemberRepository_GetAllByTeamID(t *testing.T) {
+func TestBunOrganizationTeamMemberRepository_ListAllByTeamID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -300,7 +300,7 @@ func TestBunOrganizationTeamMemberRepository_GetAllByTeamID(t *testing.T) {
 
 			repo, ctx := seedTeamMembers(t, 5)
 
-			found, total, err := repo.GetAllByTeamID(ctx, tt.teamID, tt.page, tt.limit)
+			found, total, err := repo.ListAllByTeamID(ctx, tt.teamID, tt.page, tt.limit)
 			require.NoError(t, err)
 			require.Len(t, found, tt.expectCount)
 			require.Equal(t, tt.expectTotal, total)
@@ -311,14 +311,14 @@ func TestBunOrganizationTeamMemberRepository_GetAllByTeamID(t *testing.T) {
 	}
 }
 
-func TestBunOrganizationTeamMemberRepository_GetAllByTeamIDPagesPartitionCleanly(t *testing.T) {
+func TestBunOrganizationTeamMemberRepository_ListAllByTeamIDPagesPartitionCleanly(t *testing.T) {
 	t.Parallel()
 
 	repo, ctx := seedTeamMembers(t, 5)
 
 	seen := make([]string, 0, 5)
 	for page := 1; page <= 3; page++ {
-		found, total, err := repo.GetAllByTeamID(ctx, "team-1", page, 2)
+		found, total, err := repo.ListAllByTeamID(ctx, "team-1", page, 2)
 		require.NoError(t, err)
 		require.Equal(t, 5, total)
 		seen = append(seen, teamMemberIDs(found)...)
@@ -327,7 +327,7 @@ func TestBunOrganizationTeamMemberRepository_GetAllByTeamIDPagesPartitionCleanly
 	require.ElementsMatch(t, []string{"team-member-1", "team-member-2", "team-member-3", "team-member-4", "team-member-5"}, seen)
 }
 
-func TestBunOrganizationTeamMemberRepository_GetAllByTeamIDWithMemberAndUser(t *testing.T) {
+func TestBunOrganizationTeamMemberRepository_ListAllByTeamIDWithMemberAndUser(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -353,7 +353,7 @@ func TestBunOrganizationTeamMemberRepository_GetAllByTeamIDWithMemberAndUser(t *
 
 			repo, ctx := seedTeamMembers(t, 5)
 
-			found, total, err := repo.GetAllByTeamIDWithMemberAndUser(ctx, tt.teamID, tt.page, tt.limit)
+			found, total, err := repo.ListAllByTeamIDWithMemberAndUser(ctx, tt.teamID, tt.page, tt.limit)
 			require.NoError(t, err)
 			require.Len(t, found, tt.expectCount)
 			require.Equal(t, tt.expectTotal, total)
@@ -364,14 +364,14 @@ func TestBunOrganizationTeamMemberRepository_GetAllByTeamIDWithMemberAndUser(t *
 	}
 }
 
-func TestBunOrganizationTeamMemberRepository_GetAllByTeamIDWithMemberAndUserPagesPartitionCleanly(t *testing.T) {
+func TestBunOrganizationTeamMemberRepository_ListAllByTeamIDWithMemberAndUserPagesPartitionCleanly(t *testing.T) {
 	t.Parallel()
 
 	repo, ctx := seedTeamMembers(t, 5)
 
 	seen := make([]string, 0, 5)
 	for page := 1; page <= 3; page++ {
-		found, total, err := repo.GetAllByTeamIDWithMemberAndUser(ctx, "team-1", page, 2)
+		found, total, err := repo.ListAllByTeamIDWithMemberAndUser(ctx, "team-1", page, 2)
 		require.NoError(t, err)
 		require.Equal(t, 5, total)
 		seen = append(seen, teamMemberResponseIDs(found)...)
@@ -513,4 +513,93 @@ func TestBunOrganizationTeamMemberRepository_WithTx(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBunOrganizationTeamMemberRepository_GetAllByTeamID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		seedCount int
+		teamID    string
+		expectIDs []string
+	}{
+		{name: "returns every team member newest first", seedCount: 4, teamID: "team-1", expectIDs: []string{"team-member-4", "team-member-3", "team-member-2", "team-member-1"}},
+		{name: "unknown team is empty", seedCount: 4, teamID: "team-2", expectIDs: []string{}},
+		{name: "team with no members is empty", seedCount: 0, teamID: "team-1", expectIDs: []string{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo, ctx := seedTeamMembers(t, tt.seedCount)
+
+			teamMembers, err := repo.GetAllByTeamID(ctx, tt.teamID)
+			require.NoError(t, err)
+			require.NotNil(t, teamMembers, "an empty result must be an empty slice, not nil")
+			require.Equal(t, tt.expectIDs, teamMemberIDs(teamMembers))
+		})
+	}
+}
+
+func TestBunOrganizationTeamMemberRepository_GetAllByTeamIDWithMemberAndUser(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		seedCount int
+		teamID    string
+		expectIDs []string
+	}{
+		{name: "returns every team member newest first", seedCount: 4, teamID: "team-1", expectIDs: []string{"team-member-4", "team-member-3", "team-member-2", "team-member-1"}},
+		{name: "unknown team is empty", seedCount: 4, teamID: "team-2", expectIDs: []string{}},
+		{name: "team with no members is empty", seedCount: 0, teamID: "team-1", expectIDs: []string{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo, ctx := seedTeamMembers(t, tt.seedCount)
+
+			teamMembers, err := repo.GetAllByTeamIDWithMemberAndUser(ctx, tt.teamID)
+			require.NoError(t, err)
+			require.NotNil(t, teamMembers, "an empty result must be an empty slice, not nil")
+			require.Equal(t, tt.expectIDs, teamMemberResponseIDs(teamMembers))
+		})
+	}
+}
+
+// The joined variant must hydrate both the membership and its user.
+func TestBunOrganizationTeamMemberRepository_GetAllByTeamIDWithMemberAndUserHydratesRelations(t *testing.T) {
+	t.Parallel()
+
+	repo, ctx := seedTeamMembers(t, 3)
+
+	teamMembers, err := repo.GetAllByTeamIDWithMemberAndUser(ctx, "team-1")
+	require.NoError(t, err)
+	require.Len(t, teamMembers, 3)
+	for _, teamMember := range teamMembers {
+		require.Equal(t, "team-1", teamMember.TeamID)
+		require.NotEmpty(t, teamMember.Member.ID)
+		require.NotEmpty(t, teamMember.Member.User.ID)
+		require.NotEmpty(t, teamMember.Member.User.Email)
+	}
+}
+
+func TestBunOrganizationTeamMemberRepository_GetAllByTeamIDIgnoresTheDefaultLimit(t *testing.T) {
+	t.Parallel()
+
+	const teamMemberCount = 25
+
+	repo, ctx := seedTeamMembers(t, teamMemberCount)
+
+	teamMembers, err := repo.GetAllByTeamID(ctx, "team-1")
+	require.NoError(t, err)
+	require.Len(t, teamMembers, teamMemberCount)
+
+	joined, err := repo.GetAllByTeamIDWithMemberAndUser(ctx, "team-1")
+	require.NoError(t, err)
+	require.Len(t, joined, teamMemberCount)
 }

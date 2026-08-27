@@ -2,6 +2,7 @@ package repositories_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -178,7 +179,7 @@ func organizationIDs(organizations []types.Organization) []string {
 	return ids
 }
 
-func TestBunOrganizationRepository_GetAllAccessibleByUserID(t *testing.T) {
+func TestBunOrganizationRepository_ListAllAccessibleByUserID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -229,7 +230,7 @@ func TestBunOrganizationRepository_GetAllAccessibleByUserID(t *testing.T) {
 
 			repo, ctx := seedAccessibleOrganizations(t)
 
-			found, total, err := repo.GetAllAccessibleByUserID(ctx, tt.userID, tt.page, tt.limit)
+			found, total, err := repo.ListAllAccessibleByUserID(ctx, tt.userID, tt.page, tt.limit)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectTotal, total)
 			require.ElementsMatch(t, tt.expectedIDs, organizationIDs(found))
@@ -237,14 +238,14 @@ func TestBunOrganizationRepository_GetAllAccessibleByUserID(t *testing.T) {
 	}
 }
 
-func TestBunOrganizationRepository_GetAllAccessibleByUserIDPagesWithoutLoss(t *testing.T) {
+func TestBunOrganizationRepository_ListAllAccessibleByUserIDPagesWithoutLoss(t *testing.T) {
 	t.Parallel()
 
 	repo, ctx := seedAccessibleOrganizations(t)
 
 	seen := make([]string, 0, 3)
 	for page := 1; page <= 3; page++ {
-		found, total, err := repo.GetAllAccessibleByUserID(ctx, "user-1", page, 1)
+		found, total, err := repo.ListAllAccessibleByUserID(ctx, "user-1", page, 1)
 		require.NoError(t, err)
 		require.Equal(t, 3, total)
 		require.Len(t, found, 1)
@@ -277,7 +278,7 @@ func TestBunOrganizationRepository_CountAccessibleByUserID(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tt.expected, count)
 
-			_, total, err := repo.GetAllAccessibleByUserID(ctx, tt.userID, 1, 10)
+			_, total, err := repo.ListAllAccessibleByUserID(ctx, tt.userID, 1, 10)
 			require.NoError(t, err)
 			require.Equal(t, count, total, "count must agree with the list total")
 		})
@@ -427,4 +428,76 @@ func TestBunOrganizationRepository_WithTx(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBunOrganizationRepository_GetAllAccessibleByUserID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		userID      string
+		expectedIDs []string
+	}{
+		{name: "returns owned and joined organizations without duplicates", userID: "user-1", expectedIDs: []string{"org-a", "org-b", "org-c"}},
+		{name: "returns only what the other user can reach", userID: "user-2", expectedIDs: []string{"org-b", "org-d"}},
+		{name: "unknown user reaches nothing", userID: "user-99", expectedIDs: []string{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo, ctx := seedAccessibleOrganizations(t)
+
+			organizations, err := repo.GetAllAccessibleByUserID(ctx, tt.userID)
+			require.NoError(t, err)
+			require.NotNil(t, organizations, "an empty result must be an empty slice, not nil")
+			require.ElementsMatch(t, tt.expectedIDs, organizationIDs(organizations))
+		})
+	}
+}
+
+// GetAll applies no access filtering at all, unlike GetAllAccessibleByUserID.
+func TestBunOrganizationRepository_GetAll(t *testing.T) {
+	t.Parallel()
+
+	repo, ctx := seedAccessibleOrganizations(t)
+
+	organizations, err := repo.GetAll(ctx)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"org-a", "org-b", "org-c", "org-d"}, organizationIDs(organizations))
+}
+
+func TestBunOrganizationRepository_GetAllOnAnEmptyTable(t *testing.T) {
+	t.Parallel()
+
+	db := plugintests.SetupRepoDB(t)
+	repo := repositories.NewBunOrganizationRepository(db)
+
+	organizations, err := repo.GetAll(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, organizations, "an empty result must be an empty slice, not nil")
+	require.Empty(t, organizations)
+}
+
+// Neither unconstrained fetch may stop at pagination.DefaultLimit.
+func TestBunOrganizationRepository_GetAllIgnoresTheDefaultLimit(t *testing.T) {
+	t.Parallel()
+
+	const organizationCount = 25
+
+	db := plugintests.SetupRepoDB(t)
+	for i := 1; i <= organizationCount; i++ {
+		plugintests.SeedOrganization(t, db, fmt.Sprintf("org-%02d", i), "user-1", fmt.Sprintf("Org %d", i), fmt.Sprintf("org-%02d", i))
+	}
+	repo := repositories.NewBunOrganizationRepository(db)
+	ctx := context.Background()
+
+	all, err := repo.GetAll(ctx)
+	require.NoError(t, err)
+	require.Len(t, all, organizationCount)
+
+	accessible, err := repo.GetAllAccessibleByUserID(ctx, "user-1")
+	require.NoError(t, err)
+	require.Len(t, accessible, organizationCount)
 }
