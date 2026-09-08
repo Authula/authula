@@ -5,9 +5,9 @@ go 1.26.4
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/IBM/sarama v1.60.2
-	github.com/ThreeDotsLabs/watermill v1.5.2
+	github.com/ThreeDotsLabs/watermill v1.5.3
 	github.com/ThreeDotsLabs/watermill-amqp/v3 v3.1.0
-	github.com/ThreeDotsLabs/watermill-kafka/v3 v3.1.2
+	github.com/ThreeDotsLabs/watermill-kafka/v3 v3.1.4
 	github.com/ThreeDotsLabs/watermill-nats/v2 v2.2.0
 	github.com/ThreeDotsLabs/watermill-redisstream v1.4.5
 	github.com/ThreeDotsLabs/watermill-sql/v3 v3.1.0

@@ -16,12 +16,12 @@ github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERo
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/Rican7/retry v0.3.1 h1:scY4IbO8swckzoA/11HgBwaZRJEyY9vaNJshcdhp1Mc=
 github.com/Rican7/retry v0.3.1/go.mod h1:CxSDrhAyXmTMeEuRAnArMu1FHu48vtfjLREWqVl7Vw0=
-github.com/ThreeDotsLabs/watermill v1.5.2 h1:0ES33Eq1jEsP/pWvtE4n8bE0bs+9Jq7boT7wGBCVY6Q=
-github.com/ThreeDotsLabs/watermill v1.5.2/go.mod h1:i9/968UriGphWfEbfMuYSD1qFbYRjb0mE0r+rV0FPp4=
+github.com/ThreeDotsLabs/watermill v1.5.3 h1:GoTR7fW1ZT+itzUv/w3VB6Um1B7oTBrOWjJ8sOA9XqU=
+github.com/ThreeDotsLabs/watermill v1.5.3/go.mod h1:i9/968UriGphWfEbfMuYSD1qFbYRjb0mE0r+rV0FPp4=
 github.com/ThreeDotsLabs/watermill-amqp/v3 v3.1.0 h1:2EhCSlRZyZZUpLMh7PvhaTKJus0Ui7FypZxYkojI3cw=
 github.com/ThreeDotsLabs/watermill-amqp/v3 v3.1.0/go.mod h1:eYO5aoQNezSBHuuiW69vj8iyH90bJSld1+zUvhhfJsQ=
-github.com/ThreeDotsLabs/watermill-kafka/v3 v3.1.2 h1:lLmrzZnl8o8U5uLVhMLSFHGSuWLcsqhW1MOtltx2CbQ=
-github.com/ThreeDotsLabs/watermill-kafka/v3 v3.1.2/go.mod h1:o1GcoF/1CSJ9JSmQzUkULvpZeO635pZe+WWrYNFlJNk=
+github.com/ThreeDotsLabs/watermill-kafka/v3 v3.1.4 h1:h/2QWDS61NlehSozBd+40AXHEFRS+I2egKUi609eVXc=
+github.com/ThreeDotsLabs/watermill-kafka/v3 v3.1.4/go.mod h1:igGdQHgSf87Le2WYBIc3aOpU+3q7NGRHMjySeGxzCic=
 github.com/ThreeDotsLabs/watermill-nats/v2 v2.2.0 h1:sKol3kuTnpWdrKeCNVKTxh/tciyz35hFzM8OGiZjxFY=
 github.com/ThreeDotsLabs/watermill-nats/v2 v2.2.0/go.mod h1:+RcILy/DVrLq3DFVzzRtCmKBViBBn0R/3SgA+3ZP88U=
 github.com/ThreeDotsLabs/watermill-redisstream v1.4.5 h1:SCETqsAYo/CRBb7H3+zWCcSqhMpDrQA4I6dCqC7UPR4=
