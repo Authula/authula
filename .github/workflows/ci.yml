@@ -71,12 +71,10 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
 
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.5.0
-
-      - name: Lint
-        run: golangci-lint run --timeout=5m
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.13
 
   format:
     name: Format Check
