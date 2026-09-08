@@ -12,27 +12,26 @@ import (
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
-	roottests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	apiKeyTests "github.com/Authula/authula/plugins/api-key/tests"
 	"github.com/Authula/authula/plugins/api-key/types"
 )
 
 type apiKeyServiceFixture struct {
-	mockUserService          *roottests.MockUserService
-	mockTokenService         *roottests.MockTokenService
+	mockUserService          *internaltests.MockUserService
+	mockTokenService         *internaltests.MockTokenService
 	mockOrgService           *internaltests.MockOrganizationService
 	mockAccessControlService *apiKeyTests.MockAccessControlService
-	mockRateLimiterService   *roottests.MockRateLimitService
+	mockRateLimiterService   *internaltests.MockRateLimitService
 	mockApiKeyService        *apiKeyService
 	mockApiKeyRepo           *apiKeyTests.MockApiKeyRepository
 }
 
 func newApiKeyServiceFixture(pluginConfig types.ApiKeyPluginConfig) *apiKeyServiceFixture {
 	mockOrgService := &internaltests.MockOrganizationService{}
-	mockUserService := &roottests.MockUserService{}
-	mockTokenService := &roottests.MockTokenService{}
-	mockRateLimiterService := &roottests.MockRateLimitService{}
+	mockUserService := &internaltests.MockUserService{}
+	mockTokenService := &internaltests.MockTokenService{}
+	mockRateLimiterService := &internaltests.MockRateLimitService{}
 	mockAccessControlService := &apiKeyTests.MockAccessControlService{}
 
 	mockApiKeyRepo := &apiKeyTests.MockApiKeyRepository{}

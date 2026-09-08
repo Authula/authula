@@ -29,8 +29,8 @@ func setupRepo(t *testing.T) (*repositories.BunUserStateRepository, func()) {
 	repo := repositories.NewBunUserStateRepository(db)
 
 	cleanup := func() {
-		db.Close()
-		sqldb.Close()
+		_ = db.Close()
+		_ = sqldb.Close()
 	}
 	return repo, cleanup
 }

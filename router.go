@@ -605,7 +605,9 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodOptions {
 		r.applyCORS(req, wrappedWriter)
 		wrappedWriter.WriteHeader(http.StatusOK)
-		wrappedWriter.Flush()
+		if err := wrappedWriter.Flush(); err != nil {
+			r.logger.Error("Failed to flush response", "error", err)
+		}
 		return
 	}
 

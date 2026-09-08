@@ -626,7 +626,11 @@ func TestDatabaseStorage_Close_StopsCleanup(t *testing.T) {
 func TestDatabaseStorage_ContextDeadline(t *testing.T) {
 	db := newTestDB(t)
 	storage := newTestDatabaseStorage(t, db)
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	// Create a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -655,7 +659,11 @@ func TestDatabaseStorage_ContextDeadline(t *testing.T) {
 func TestDatabaseStorage_DifferentValueTypes(t *testing.T) {
 	db := newTestDB(t)
 	storage := newTestDatabaseStorage(t, db)
-	defer storage.Close()
+	defer func() {
+		if err := storage.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -710,11 +718,17 @@ func TestDatabaseStorage_PersistenceAcrossInstances(t *testing.T) {
 	if err := storage1.Set(ctx, "key2", "value2", nil); err != nil {
 		t.Fatalf("failed to set key2: %v", err)
 	}
-	storage1.Close()
+	if err := storage1.Close(); err != nil {
+		t.Fatalf("expected no error on Close, got %v", err)
+	}
 
 	// Create second storage instance and verify values persist
 	storage2 := newTestDatabaseStorage(t, db)
-	defer storage2.Close()
+	defer func() {
+		if err := storage2.Close(); err != nil {
+			t.Fatalf("expected no error on Close, got %v", err)
+		}
+	}()
 
 	retrieved1, err := storage2.Get(ctx, "key1")
 	if err != nil {

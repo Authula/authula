@@ -182,11 +182,11 @@ func (s *openapiService) AddOperation(method, pathPattern string, opts ...Operat
 }
 
 func (s *openapiService) SpecJSON() ([]byte, error) {
-	return s.specMarshaller.MarshalJSON()
+	return s.MarshalJSON()
 }
 
 func (s *openapiService) SpecYAML() ([]byte, error) {
-	return s.specMarshaller.MarshalYAML()
+	return s.MarshalYAML()
 }
 
 func (s *openapiService) RegisterSchema(name string, typ any) error {
