@@ -23,7 +23,7 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/lmittmann/tint v1.1.3
 	github.com/mattn/go-sqlite3 v1.14.44
-	github.com/redis/go-redis/v9 v9.20.0
+	github.com/redis/go-redis/v9 v9.22.0
 	github.com/resend/resend-go/v3 v3.7.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
