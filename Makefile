@@ -98,7 +98,7 @@ vet: # Run go vet
 # All-in-one commands
 all: clean install build check # Clean, install deps, build, and run all checks
 
-check: format vet lint test # Run all checks (format, vet, lint, test)
+check: build test format lint vet # Run all checks
 
 quick-check: format vet test # Run quick checks (format, vet, fast tests)
 
