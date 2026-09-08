@@ -3,7 +3,7 @@ APP_NAME=authula
 BINARY_PATH=./tmp/$(APP_NAME)
 MIGRATE_CONFIG?=./config.toml
 MIGRATE_ARGS?=
-MIGRATE_CMD=CGO_ENABLED=1 go run ./cmd/migrate
+MIGRATE_CMD=CGO_ENABLED=0 go run ./cmd/migrate
 OPENAPI_EXPORT_BINARY=./tmp/openapi-export
 
 .PHONY: help build build-exe run dev test clean install setup
@@ -19,30 +19,31 @@ help: # Display this help screen
 # Build commands`
 build: # Build the package (library)
 	@echo "Building $(APP_NAME) package..."
-	@go build ./...
+	@CGO_ENABLED=0 go build ./...
 	@echo "Build complete!"
 
 build-exe: # Build the binary executable
 	@echo "Building $(APP_NAME) binary..."
 	@mkdir -p ./tmp
 	@rm -rf ./tmp/$(APP_NAME)
-	@go build -o $(BINARY_PATH) ./cmd/main.go
+	@CGO_ENABLED=0 go build -o $(BINARY_PATH) ./cmd/main.go
 	@echo "Binary built: $(BINARY_PATH)"
 
 run: # Run the application
 	@rm -f ./tmp/$(APP_NAME)
-	@CGO_ENABLED=1 go run ./cmd/main.go
+	@CGO_ENABLED=0 go run ./cmd/main.go
 
 dev: # Run the application with live reloading using air
 	@rm -f ./tmp/$(APP_NAME)
-	@CGO_ENABLED=1 ./bin/air --build.cmd "go build -o ./tmp/$(APP_NAME) ./cmd/main.go" --build.entrypoint "./tmp/$(APP_NAME)"
+	@CGO_ENABLED=0 ./bin/air --build.cmd "go build -o ./tmp/$(APP_NAME) ./cmd/main.go" --build.entrypoint "./tmp/$(APP_NAME)"
 
 openapi-export:
 	@echo "Exporting OpenAPI spec..."
-	@go run ./cmd/openapi/ $(ARGS)
+	@CGO_ENABLED=0 go run ./cmd/openapi/ $(ARGS)
 	@echo "Done!"
 
 # Test commands
+# CGO_ENABLED=1 is required by the race detector, not by any dependency of the build.
 test: # Run all tests
 	@echo "Running tests..."
 	@CGO_ENABLED=1 go test -race -v ./...

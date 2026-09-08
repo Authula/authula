@@ -25,11 +25,6 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
 
-      - name: Install C dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential
-
       - name: Build
         run: make build
 
@@ -47,11 +42,6 @@ jobs:
           go-version-file: go.mod
           cache: true
           cache-dependency-path: go.sum
-
-      - name: Install C dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential
 
       - name: Run tests
         run: make test
@@ -111,11 +101,6 @@ jobs:
           go-version-file: go.mod
           cache: true
           cache-dependency-path: go.sum
-
-      - name: Install C dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential
 
       - name: Run go vet
         run: make vet

@@ -22,7 +22,6 @@ require (
 	github.com/lestrrat-go/jwx/v3 v3.1.1
 	github.com/lib/pq v1.12.3
 	github.com/lmittmann/tint v1.2.0
-	github.com/mattn/go-sqlite3 v1.14.44
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/resend/resend-go/v4 v4.3.0
 	github.com/spf13/cobra v1.10.2
@@ -40,7 +39,7 @@ require (
 	github.com/wneessen/go-mail v0.8.1
 	golang.org/x/crypto v0.57.0
 	golang.org/x/oauth2 v0.37.0
-	modernc.org/sqlite v1.51.0
+	modernc.org/sqlite v1.58.0
 	zombiezen.com/go/sqlite v1.4.2
 )
 
@@ -161,7 +160,7 @@ require (
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	modernc.org/libc v1.72.5 // indirect
+	modernc.org/libc v1.75.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
-	modernc.org/memory v1.11.0 // indirect
+	modernc.org/memory v1.12.1 // indirect
 )

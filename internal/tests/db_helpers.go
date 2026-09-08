@@ -11,7 +11,6 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/testcontainers/testcontainers-go"
 	tcmysql "github.com/testcontainers/testcontainers-go/modules/mysql"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -20,6 +19,8 @@ import (
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
 	_ "modernc.org/sqlite"
+
+	"github.com/Authula/authula/internal/sqlitedsn"
 )
 
 func NewSQLiteIntegrationDB(t *testing.T) *bun.DB {
@@ -134,14 +135,7 @@ func NewIntegrationTestDBFromEnv(t *testing.T) (*bun.DB, string) {
 }
 
 func openSQLiteForTests(dsn string) (*sql.DB, error) {
-	if sqlite3DB, err := sql.Open("sqlite3", dsn); err == nil {
-		if pingErr := sqlite3DB.PingContext(context.Background()); pingErr == nil {
-			return sqlite3DB, nil
-		}
-		_ = sqlite3DB.Close()
-	}
-
-	sqliteDB, err := sql.Open("sqlite", dsn)
+	sqliteDB, err := sql.Open("sqlite", sqlitedsn.Build(dsn))
 	if err != nil {
 		return nil, err
 	}

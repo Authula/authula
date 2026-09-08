@@ -10,8 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
+	_ "modernc.org/sqlite"
 
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/Authula/authula/internal/sqlitedsn"
 )
 
 type testLogger struct {
@@ -27,7 +28,7 @@ func newTestDB(t *testing.T) *bun.DB {
 	t.Helper()
 
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
-	sqlDB, err := sql.Open("sqlite3", dsn)
+	sqlDB, err := sql.Open("sqlite", sqlitedsn.Build(dsn))
 	assert.NoError(t, err)
 	t.Cleanup(func() {
 		_ = sqlDB.Close()

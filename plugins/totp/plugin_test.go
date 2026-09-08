@@ -8,13 +8,14 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
+	_ "modernc.org/sqlite"
 
+	"github.com/Authula/authula/internal/sqlitedsn"
 	"github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
@@ -76,7 +77,7 @@ func buildTestPlugin(t *testing.T) (*TOTPPlugin, *tests.MockUserService, *tests.
 func newHookTestDB(t *testing.T) *bun.DB {
 	t.Helper()
 
-	sqlDB, err := sql.Open("sqlite3", ":memory:")
+	sqlDB, err := sql.Open("sqlite", sqlitedsn.Build(":memory:"))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = sqlDB.Close() })
 

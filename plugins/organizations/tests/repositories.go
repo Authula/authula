@@ -4,9 +4,9 @@ import (
 	"context"
 	"reflect"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/mock"
 	"github.com/uptrace/bun"
+	_ "modernc.org/sqlite"
 
 	"github.com/Authula/authula/plugins/organizations/repositories"
 	"github.com/Authula/authula/plugins/organizations/types"

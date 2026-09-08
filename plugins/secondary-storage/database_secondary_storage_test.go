@@ -8,14 +8,16 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
+	_ "modernc.org/sqlite"
+
+	"github.com/Authula/authula/internal/sqlitedsn"
 )
 
 // Helper function to create an in-memory SQLite database for testing
 func newTestDB(t *testing.T) bun.IDB {
-	sqldb, err := sql.Open("sqlite3", ":memory:")
+	sqldb, err := sql.Open("sqlite", sqlitedsn.Build(":memory:"))
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
@@ -403,7 +405,7 @@ func TestDatabaseStorage_MultipleKeys(t *testing.T) {
 
 func TestDatabaseStorage_ConcurrentReads(t *testing.T) {
 	// Use file-based SQLite for concurrent tests as :memory: doesn't handle concurrency well
-	sqldb, err := sql.Open("sqlite3", "file::memory:?cache=shared")
+	sqldb, err := sql.Open("sqlite", sqlitedsn.Build("file::memory:?cache=shared"))
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
@@ -696,7 +698,7 @@ func TestDatabaseStorage_DifferentValueTypes(t *testing.T) {
 
 func TestDatabaseStorage_PersistenceAcrossInstances(t *testing.T) {
 	// Create a persistent DB (not in-memory)
-	sqldb, err := sql.Open("sqlite3", ":memory:")
+	sqldb, err := sql.Open("sqlite", sqlitedsn.Build(":memory:"))
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
