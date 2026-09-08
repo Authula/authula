@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/resend/resend-go/v3"
+	"github.com/resend/resend-go/v4"
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email/constants"
