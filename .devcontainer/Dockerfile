@@ -35,8 +35,7 @@ ENV SHELL=/bin/zsh
 # Go tools
 # --------------------------------------
 # Install Go tools useful for dev
-RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
-&& go install github.com/go-delve/delve/cmd/dlv@latest \
+RUN go install github.com/go-delve/delve/cmd/dlv@latest \
 && go install golang.org/x/tools/gopls@latest
 # --------------------------------------
 
