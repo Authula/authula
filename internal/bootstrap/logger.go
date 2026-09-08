@@ -38,7 +38,7 @@ func InitLogger(opts LoggerOptions) models.Logger {
 	}
 
 	if environment != "production" {
-		logger = slog.New(tint.NewHandler(os.Stderr, &tint.Options{
+		logger = slog.New(tint.NewTextHandler(os.Stderr, &tint.Options{
 			Level:      slog.LevelDebug,
 			TimeFormat: time.Kitchen,
 		}))
