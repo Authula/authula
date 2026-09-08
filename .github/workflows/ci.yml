@@ -74,7 +74,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.13
+          version: v2.13.2
 
   format:
     name: Format Check
