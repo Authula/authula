@@ -85,7 +85,7 @@ clean: # Clean build artifacts
 # Code quality
 lint: # Run linter
 	@echo "Running linter..."
-	@golangci-lint run
+	@./bin/golangci-lint run
 
 format: # Format code
 	@echo "Formatting code..."
