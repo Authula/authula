@@ -4,14 +4,13 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 USER root
 WORKDIR /root
-
-RUN apt update && apt install -y \
-  apt-transport-https ca-certificates gnupg lsb-release iputils-ping net-tools \
-  curl wget git zip unzip less zsh jq lsof ripgrep
-
 ENV HOME="/root"
-# Required for some cgo operations such as using certain database drivers like SQLite
+# TODO: Remove after GitHub issue #113 is done. Also remove build-essential from the apt-get install command below too.
 ENV CGO_ENABLED=1
+
+RUN apt-get update && apt-get install -y \
+    apt-transport-https ca-certificates gnupg lsb-release iputils-ping net-tools \
+    curl wget git zip unzip less zsh jq lsof ripgrep
 
 # --------------------------------------
 # Git
@@ -36,26 +35,26 @@ ENV SHELL=/bin/zsh
 # --------------------------------------
 # Install Go tools useful for dev
 RUN go install github.com/go-delve/delve/cmd/dlv@latest \
-&& go install golang.org/x/tools/gopls@latest
+    && go install golang.org/x/tools/gopls@latest
 # --------------------------------------
 
 # --------------------------------------
 # Ngrok
 # --------------------------------------
 RUN curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
-  | tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null \
-  && echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
-  | tee /etc/apt/sources.list.d/ngrok.list \
-  && apt update \
-  && apt install -y ngrok
+    | tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null \
+    && echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
+    | tee /etc/apt/sources.list.d/ngrok.list \
+    && apt update \
+    && apt install -y ngrok
 # --------------------------------------
 
 # --------------------------------------
-# SSH 
+# SSH
 # --------------------------------------
 RUN mkdir -p ~/.ssh
 RUN touch ~/.ssh/config
 RUN echo "Host github.com" >> ~/.ssh/config \
-  && echo "    IdentityFile ~/.ssh/id_ed25519" >> ~/.ssh/config
+    && echo "    IdentityFile ~/.ssh/id_ed25519" >> ~/.ssh/config
 RUN touch ~/.ssh/id_ed25519
 # --------------------------------------
