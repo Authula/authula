@@ -5,7 +5,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 USER root
 WORKDIR /root
 ENV HOME="/root"
-# TODO: Remove after GitHub issue #113 is done. Also remove build-essential from the apt-get install command below too.
+# Need to set CGO_ENABLED=1 to enable race detection in the tests. This is required for the tests to run correctly.
 ENV CGO_ENABLED=1
 
 RUN apt-get update && apt-get install -y \

@@ -7,16 +7,17 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
+	_ "modernc.org/sqlite"
 
+	"github.com/Authula/authula/internal/sqlitedsn"
 	"github.com/Authula/authula/models"
 )
 
 // Helper function to create an in-memory SQLite database for testing
 func newTestSessionDB(t *testing.T) bun.IDB {
-	sqldb, err := sql.Open("sqlite3", ":memory:")
+	sqldb, err := sql.Open("sqlite", sqlitedsn.Build(":memory:"))
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}

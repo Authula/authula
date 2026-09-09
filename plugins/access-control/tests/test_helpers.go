@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/mock"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
+	_ "modernc.org/sqlite"
 
+	"github.com/Authula/authula/internal/sqlitedsn"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
@@ -188,7 +189,7 @@ func (m *MockUserPermissionsRepository) HasPermissions(ctx context.Context, user
 func SetupRepoDB(t *testing.T) *bun.DB {
 	t.Helper()
 
-	sqldb, err := sql.Open("sqlite3", ":memory:")
+	sqldb, err := sql.Open("sqlite", sqlitedsn.Build(":memory:"))
 	if err != nil {
 		t.Fatalf("failed to open sqlite: %v", err)
 	}

@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
+	_ "modernc.org/sqlite"
 
+	"github.com/Authula/authula/internal/sqlitedsn"
 	"github.com/Authula/authula/plugins/api-key/types"
 )
 
@@ -19,7 +20,7 @@ func newTestApiKeyDB(t *testing.T) *bun.DB {
 	t.Helper()
 
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
-	sqlDB, err := sql.Open("sqlite3", dsn)
+	sqlDB, err := sql.Open("sqlite", sqlitedsn.Build(dsn))
 	if err != nil {
 		t.Fatalf("failed to open sqlite db: %v", err)
 	}

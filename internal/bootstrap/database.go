@@ -10,7 +10,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/mysqldialect"
@@ -19,6 +19,7 @@ import (
 	"github.com/uptrace/bun/extra/bundebug"
 
 	"github.com/Authula/authula/env"
+	"github.com/Authula/authula/internal/sqlitedsn"
 	"github.com/Authula/authula/models"
 )
 
@@ -65,7 +66,7 @@ func InitDatabase(opts DatabaseOptions, logger models.Logger, logLevel string) (
 			}
 		}
 
-		sqlDB, err = sql.Open("sqlite3", databaseURL)
+		sqlDB, err = sql.Open("sqlite", sqlitedsn.Build(databaseURL))
 		if err != nil {
 			return nil, err
 		}

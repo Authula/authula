@@ -5,17 +5,18 @@ import (
 	"database/sql"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
+	_ "modernc.org/sqlite"
 
+	"github.com/Authula/authula/internal/sqlitedsn"
 	"github.com/Authula/authula/plugins/admin/repositories"
 	"github.com/Authula/authula/plugins/admin/types"
 )
 
 func setupRepo(t *testing.T) (*repositories.BunUserStateRepository, func()) {
 	t.Helper()
-	sqldb, err := sql.Open("sqlite3", ":memory:")
+	sqldb, err := sql.Open("sqlite", sqlitedsn.Build(":memory:"))
 	if err != nil {
 		t.Fatalf("failed to open sqlite: %v", err)
 	}
