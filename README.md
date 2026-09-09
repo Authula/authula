@@ -16,7 +16,7 @@
 
 <div align="center">
 
-### [Become a Sponsor!](https://buy.polar.sh/polar_cl_Q8rpefucf3fmnRTTeIvPCiE6ZvfMKclwxlyOz283ZC7)
+### [Become a Sponsor!](https://dub.sh/PrJb7W9)
 
 </div>
 
