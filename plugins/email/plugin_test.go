@@ -18,8 +18,6 @@ func newTestPluginContext() *models.PluginContext {
 	}
 }
 
-// setProviderCredentials makes both providers initialisable so the tests can
-// focus purely on which provider gets selected.
 func setProviderCredentials(t *testing.T) {
 	t.Helper()
 	t.Setenv(constants.EnvSMTPHost, "smtp.example.com")
