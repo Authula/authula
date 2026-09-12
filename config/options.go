@@ -77,6 +77,15 @@ func NewConfig(options ...ConfigOption) *models.Config {
 		option(config)
 	}
 
+	// Validate BaseURL
+	if os.Getenv(env.EnvBaseURL) != "" {
+		config.BaseURL = os.Getenv(env.EnvBaseURL)
+	} else {
+		if config.BaseURL == "" {
+			panic(fmt.Errorf("BaseURL must not be empty"))
+		}
+	}
+
 	// Validate BasePath format
 	if config.BasePath != "" && config.BasePath[0] != '/' {
 		panic(fmt.Errorf("BasePath must start with '/', got: %q", config.BasePath))
