@@ -1,7 +1,8 @@
 package constants
 
 const (
-	EnvEmailFrom = "FROM_ADDRESS"
+	EnvEmailFrom     = "FROM_ADDRESS"
+	EnvEmailProvider = "EMAIL_PROVIDER"
 
 	EnvSMTPHost = "SMTP_HOST"
 	EnvSMTPPort = "SMTP_PORT"
