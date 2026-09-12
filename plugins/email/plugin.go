@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email/constants"
@@ -57,14 +58,18 @@ func (p *EmailPlugin) Init(ctx *models.PluginContext) error {
 		return fmt.Errorf("email plugin requires 'from_address' to be configured in %s env var or config", constants.EnvEmailFrom)
 	}
 
-	primaryProvider, err := p.initializeProvider(p.PluginConfig.Provider, true)
+	if err := p.resolveProviders(); err != nil {
+		return err
+	}
+
+	primaryProvider, err := p.initializeProvider(p.PluginConfig.Provider)
 	if err != nil {
 		return err
 	}
 
 	var fallbackProvider rootservices.MailerService
 	if p.PluginConfig.FallbackProvider != "" && p.PluginConfig.FallbackProvider != p.PluginConfig.Provider {
-		fallbackProvider, _ = p.initializeProvider(p.PluginConfig.FallbackProvider, false)
+		fallbackProvider, _ = p.initializeProvider(p.PluginConfig.FallbackProvider)
 	}
 
 	emailService, err := NewEmailService(p.Logger, p.PluginConfig, primaryProvider, fallbackProvider)
@@ -78,9 +83,42 @@ func (p *EmailPlugin) Init(ctx *models.PluginContext) error {
 	return nil
 }
 
-// initializeProvider creates a provider instance based on the provider type
-// isPrimary indicates whether this is a primary provider (returns error) or fallback (logs warning)
-func (p *EmailPlugin) initializeProvider(providerType emailtypes.EmailProviderType, isPrimary bool) (rootservices.MailerService, error) {
+func (p *EmailPlugin) resolveProviders() error {
+	rawProvider := strings.TrimSpace(os.Getenv(constants.EnvEmailProvider))
+	fromEnv := rawProvider != ""
+	if !fromEnv {
+		rawProvider = strings.TrimSpace(p.PluginConfig.Provider.String())
+	}
+
+	if rawProvider == "" {
+		return fmt.Errorf(
+			"email plugin requires 'provider' to be configured in %s env var or config, supported providers are: %s",
+			constants.EnvEmailProvider,
+			emailtypes.SupportedEmailProvidersLabel(),
+		)
+	}
+
+	provider, err := emailtypes.ParseEmailProviderType(rawProvider)
+	if err != nil {
+		if fromEnv {
+			return fmt.Errorf("invalid %s env var: %w", constants.EnvEmailProvider, err)
+		}
+		return err
+	}
+	p.PluginConfig.Provider = provider
+
+	if rawFallback := strings.TrimSpace(p.PluginConfig.FallbackProvider.String()); rawFallback != "" {
+		fallback, err := emailtypes.ParseEmailProviderType(rawFallback)
+		if err != nil {
+			return fmt.Errorf("invalid fallback email provider: %w", err)
+		}
+		p.PluginConfig.FallbackProvider = fallback
+	}
+
+	return nil
+}
+
+func (p *EmailPlugin) initializeProvider(providerType emailtypes.EmailProviderType) (rootservices.MailerService, error) {
 	var provider rootservices.MailerService
 	var err error
 
