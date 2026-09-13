@@ -86,7 +86,6 @@ func (p *SessionPlugin) Hooks() []models.Hook {
 	return p.buildHooks()
 }
 
-// AuthMiddleware validates session cookie and extracts user ID
 func (p *SessionPlugin) AuthMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +108,6 @@ func (p *SessionPlugin) AuthMiddleware() func(http.Handler) http.Handler {
 	}
 }
 
-// OptionalAuthMiddleware validates session if present but doesn't require it
 func (p *SessionPlugin) OptionalAuthMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -172,9 +170,6 @@ func (p *SessionPlugin) getSameSiteMode() http.SameSite {
 	}
 }
 
-// SetSessionCookie writes the session cookie. Its Max-Age is capped by both the configured
-// CookieMaxAge and the remaining lifetime of the session so the browser never keeps a
-// cookie whose server-side session has already expired.
 func (p *SessionPlugin) SetSessionCookie(w http.ResponseWriter, sessionToken string, expiresAt time.Time) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     p.globalConfig.Session.CookieName,

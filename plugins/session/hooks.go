@@ -147,8 +147,6 @@ func (p *SessionPlugin) issueSessionCookieHook(reqCtx *models.RequestContext) er
 		return nil
 	}
 
-	// Sessions issued by the auth flows are always created with Session.ExpiresIn,
-	// so the cookie lifetime is derived from that rather than a separate context value.
 	expiresAt := time.Now().UTC().Add(p.globalConfig.Session.ExpiresIn)
 	p.SetSessionCookie(reqCtx.ResponseWriter, sessionToken, expiresAt)
 
