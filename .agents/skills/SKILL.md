@@ -10,4 +10,4 @@ Index of all skills and playbooks in this folder. Read the relevant skill(s) bel
 - [tdd-unit-testing](./tdd-unit-testing/SKILL.md) — Write unit tests in Go following Red-Green-Refactor TDD principles.
 - [plugin-architecture](./plugin-architecture/SKILL.md) — Build pluggable authentication features using the plugin system with initialization, migrations, routes, and service registration.
 - [services-and-interfaces](./services-and-interfaces/SKILL.md) — Define and implement services that encapsulate business logic with proper constructor-based dependency injection.
-- [productivity](./productivity/README.md) — General, non-code-specific workflow tools (grilling a plan with questions, handing off a conversation to another agent).
+- [productivity](./productivity/README.md) — General, non-code-specific workflow tools (grilling a plan with questions, handing off a conversation to another agent and more).
