@@ -1,7 +1,5 @@
 # Authula Project Guidelines
 
-**Authula** is an open-source authentication solution that scales with you. Embed it as a library in your Go app, or run it as a standalone auth server with any tech stack. It simplifies adding robust authentication to backend services, empowering developers to build secure applications faster.
-
 ## Code Style Guide
 
 - Always write clean code that is easy to read and maintain.
@@ -71,3 +69,7 @@ This is now supported in Go 1.26+ which the project is using. This makes the cod
 ## Agent Skills
 
 Always follow the Agent Skills located in the folder `.agents/skills/` as it contains all the skills and playbooks you need to follow to make sure you are adhering to the project guidelines and best practices.
+
+## Extra notes
+
+Always use the `don't waffle` skill in every chat/session by default.
