@@ -29,6 +29,7 @@ func TestGetMeUseCase(t *testing.T) {
 
 	tests := []struct {
 		name       string
+		sessionID  *string
 		user       *models.User
 		userErr    error
 		session    *models.Session
@@ -37,13 +38,30 @@ func TestGetMeUseCase(t *testing.T) {
 		wantErr    string
 	}{
 		{
-			name:    "returns user and session when both lookups succeed",
+			name:    "returns user and most recent session when no session id is known",
 			user:    expectedUser,
 			session: expectedSession,
 			want: &types.GetMeResult{
 				User:    expectedUser,
 				Session: expectedSession,
 			},
+		},
+		{
+			name:      "returns the authenticating session when its id is known",
+			sessionID: new("session-123"),
+			user:      expectedUser,
+			session:   expectedSession,
+			want: &types.GetMeResult{
+				User:    expectedUser,
+				Session: expectedSession,
+			},
+		},
+		{
+			name:       "returns session lookup error for a known session id",
+			sessionID:  new("session-123"),
+			user:       expectedUser,
+			sessionErr: errors.New("session lookup failed"),
+			wantErr:    "session lookup failed",
 		},
 		{
 			name:    "returns user lookup error",
@@ -73,7 +91,11 @@ func TestGetMeUseCase(t *testing.T) {
 			sessionService := &inttests.MockSessionService{}
 
 			userService.On("GetByID", ctx, userID).Return(tt.user, tt.userErr).Once()
-			sessionService.On("GetByUserID", ctx, userID).Return(tt.session, tt.sessionErr).Once()
+			if tt.sessionID != nil {
+				sessionService.On("GetByID", ctx, *tt.sessionID).Return(tt.session, tt.sessionErr).Once()
+			} else {
+				sessionService.On("GetByUserID", ctx, userID).Return(tt.session, tt.sessionErr).Once()
+			}
 
 			uc := &GetMeUseCase{
 				Logger:         &inttests.MockLogger{},
@@ -81,7 +103,7 @@ func TestGetMeUseCase(t *testing.T) {
 				SessionService: sessionService,
 			}
 
-			result, err := uc.GetMe(ctx, userID)
+			result, err := uc.GetMe(ctx, userID, tt.sessionID)
 
 			if tt.wantErr != "" {
 				if err == nil {

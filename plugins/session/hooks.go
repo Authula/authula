@@ -92,7 +92,7 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 	reqCtx.Values[models.ContextSessionID.String()] = session.ID
 
 	if p.shouldRenewSession(session) {
-		p.renewSession(reqCtx.ResponseWriter, reqCtx.Request, session)
+		p.renewSession(reqCtx.ResponseWriter, reqCtx.Request, session, sessionToken)
 	}
 
 	return nil
@@ -129,9 +129,9 @@ func (p *SessionPlugin) validateSessionHookOptional(reqCtx *models.RequestContex
 	})
 	reqCtx.Values[models.ContextSessionID.String()] = session.ID
 
-	// Optionally renew session if it's past 50% of its max age
+	// Slide the expiry forward once the session enters its update window
 	if p.shouldRenewSession(session) {
-		p.renewSession(reqCtx.ResponseWriter, reqCtx.Request, session)
+		p.renewSession(reqCtx.ResponseWriter, reqCtx.Request, session, sessionToken)
 	}
 
 	return nil
@@ -147,7 +147,10 @@ func (p *SessionPlugin) issueSessionCookieHook(reqCtx *models.RequestContext) er
 		return nil
 	}
 
-	p.SetSessionCookie(reqCtx.ResponseWriter, sessionToken)
+	// Sessions issued by the auth flows are always created with Session.ExpiresIn,
+	// so the cookie lifetime is derived from that rather than a separate context value.
+	expiresAt := time.Now().UTC().Add(p.globalConfig.Session.ExpiresIn)
+	p.SetSessionCookie(reqCtx.ResponseWriter, sessionToken, expiresAt)
 
 	return nil
 }

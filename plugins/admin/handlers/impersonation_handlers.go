@@ -226,6 +226,7 @@ func (h *StopImpersonationHandler) Handler() http.HandlerFunc {
 			HttpOnly: sessionConfig.HttpOnly,
 			Secure:   sessionConfig.Secure,
 			SameSite: sameSite,
+			MaxAge:   int(sessionConfig.CookieMaxAge.Seconds()),
 		})
 
 		http.SetCookie(w, &http.Cookie{

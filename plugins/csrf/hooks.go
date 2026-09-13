@@ -65,7 +65,11 @@ func (p *CSRFPlugin) generateCSRFTokenHook(reqCtx *models.RequestContext) error 
 		return nil
 	}
 
-	_, err := reqCtx.Request.Cookie(p.pluginConfig.CookieName)
+	cookie, err := reqCtx.Request.Cookie(p.pluginConfig.CookieName)
+	if err == nil {
+		p.exposeCSRFToken(reqCtx, cookie.Value)
+		return nil
+	}
 	if err != http.ErrNoCookie {
 		return nil
 	}

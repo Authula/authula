@@ -15,7 +15,7 @@ type GetMeUseCase struct {
 	SessionService services.SessionService
 }
 
-func (uc *GetMeUseCase) GetMe(ctx context.Context, userID string) (*types.GetMeResult, error) {
+func (uc *GetMeUseCase) GetMe(ctx context.Context, userID string, sessionID *string) (*types.GetMeResult, error) {
 	var (
 		wg      sync.WaitGroup
 		user    *models.User
@@ -32,9 +32,13 @@ func (uc *GetMeUseCase) GetMe(ctx context.Context, userID string) (*types.GetMeR
 	})
 
 	wg.Go(func() {
-		session, sessErr = uc.SessionService.GetByUserID(ctx, userID)
+		if sessionID != nil && *sessionID != "" {
+			session, sessErr = uc.SessionService.GetByID(ctx, *sessionID)
+		} else {
+			session, sessErr = uc.SessionService.GetByUserID(ctx, userID)
+		}
 		if sessErr != nil {
-			uc.Logger.Error("failed to get session by user ID: %v", sessErr)
+			uc.Logger.Error("failed to get session: %v", sessErr)
 		}
 	})
 

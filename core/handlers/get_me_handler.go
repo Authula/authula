@@ -17,7 +17,12 @@ func (h *GetMeHandler) Handle() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
-		result, err := h.UseCase.GetMe(ctx, reqCtx.Actor.ID)
+		var sessionID *string
+		if id, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && id != "" {
+			sessionID = &id
+		}
+
+		result, err := h.UseCase.GetMe(ctx, reqCtx.Actor.ID, sessionID)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
 				"message": err.Error(),

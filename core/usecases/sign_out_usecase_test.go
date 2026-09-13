@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/core/types"
 	inttests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
@@ -17,85 +18,119 @@ func TestSignOutUseCase(t *testing.T) {
 	userID := "user-123"
 
 	const (
-		sessionIDValue  = "session-123"
-		recentSessionID = "session-456"
+		currentSessionID   = "session-current"
+		requestedSessionID = "session-requested"
 	)
 
 	tests := []struct {
 		name               string
-		sessionID          string
-		sessionIDProvided  bool
-		signOutAll         bool
-		signOutAllProvided bool
+		currentSessionID   *string
+		requestedSessionID *string
+		signOutAll         *bool
 		configure          func(*inttests.MockSessionService)
 		want               *types.SignOutResult
-		wantErr            string
+		wantErr            error
 	}{
 		{
-			name:              "deletes a specific session when session id is provided",
-			sessionID:         sessionIDValue,
-			sessionIDProvided: true,
-			configure: func(sessionService *inttests.MockSessionService) {
-				sessionService.On("Delete", ctx, sessionIDValue).Return(nil).Once()
-			},
-			want: &types.SignOutResult{Message: "signed out"},
-		},
-		{
-			name:              "returns delete session error when deleting a specific session fails",
-			sessionID:         sessionIDValue,
-			sessionIDProvided: true,
-			configure: func(sessionService *inttests.MockSessionService) {
-				sessionService.On("Delete", ctx, sessionIDValue).Return(errors.New("delete failed")).Once()
-			},
-			wantErr: "delete failed",
-		},
-		{
-			name:               "deletes all sessions when sign out all is requested",
-			signOutAll:         true,
-			signOutAllProvided: true,
+			name:       "deletes all sessions when sign out all is requested",
+			signOutAll: new(true),
 			configure: func(sessionService *inttests.MockSessionService) {
 				sessionService.On("DeleteAllByUserID", ctx, userID).Return(nil).Once()
 			},
-			want: &types.SignOutResult{Message: "signed out from all sessions"},
+			want: &types.SignOutResult{Message: "signed out from all sessions", ClearedCurrentSession: true},
 		},
 		{
-			name:               "returns delete all error when deleting all sessions fails",
-			signOutAll:         true,
-			signOutAllProvided: true,
+			name:       "returns delete all error when deleting all sessions fails",
+			signOutAll: new(true),
 			configure: func(sessionService *inttests.MockSessionService) {
 				sessionService.On("DeleteAllByUserID", ctx, userID).Return(errors.New("delete all failed")).Once()
 			},
-			wantErr: "delete all failed",
+			wantErr: errors.New("delete all failed"),
 		},
 		{
-			name: "deletes the most recent session when no explicit sign out target is provided",
+			name:               "sign out all takes precedence over a requested session id",
+			currentSessionID:   new(currentSessionID),
+			requestedSessionID: new(requestedSessionID),
+			signOutAll:         new(true),
 			configure: func(sessionService *inttests.MockSessionService) {
-				sessionService.On("GetByUserID", ctx, userID).Return(&models.Session{ID: recentSessionID, UserID: userID}, nil).Once()
-				sessionService.On("Delete", ctx, recentSessionID).Return(nil).Once()
+				sessionService.On("DeleteAllByUserID", ctx, userID).Return(nil).Once()
 			},
-			want: &types.SignOutResult{Message: "signed out"},
+			want: &types.SignOutResult{Message: "signed out from all sessions", ClearedCurrentSession: true},
 		},
 		{
-			name: "returns get session error when loading the most recent session fails",
+			name:               "deletes a requested session owned by the user without clearing the current session",
+			currentSessionID:   new(currentSessionID),
+			requestedSessionID: new(requestedSessionID),
 			configure: func(sessionService *inttests.MockSessionService) {
-				sessionService.On("GetByUserID", ctx, userID).Return((*models.Session)(nil), errors.New("get failed")).Once()
+				sessionService.On("GetByID", ctx, requestedSessionID).Return(&models.Session{ID: requestedSessionID, UserID: userID}, nil).Once()
+				sessionService.On("Delete", ctx, requestedSessionID).Return(nil).Once()
 			},
-			wantErr: "get failed",
+			want: &types.SignOutResult{Message: "signed out", ClearedCurrentSession: false},
 		},
 		{
-			name: "returns no active session message when the user has no session",
+			name:               "clears the current session when the requested session id is the current session",
+			currentSessionID:   new(currentSessionID),
+			requestedSessionID: new(currentSessionID),
 			configure: func(sessionService *inttests.MockSessionService) {
-				sessionService.On("GetByUserID", ctx, userID).Return((*models.Session)(nil), nil).Once()
+				sessionService.On("GetByID", ctx, currentSessionID).Return(&models.Session{ID: currentSessionID, UserID: userID}, nil).Once()
+				sessionService.On("Delete", ctx, currentSessionID).Return(nil).Once()
 			},
-			want: &types.SignOutResult{Message: "no active session found"},
+			want: &types.SignOutResult{Message: "signed out", ClearedCurrentSession: true},
 		},
 		{
-			name: "returns delete error when deleting the most recent session fails",
+			name:               "returns not found when the requested session does not exist",
+			currentSessionID:   new(currentSessionID),
+			requestedSessionID: new(requestedSessionID),
 			configure: func(sessionService *inttests.MockSessionService) {
-				sessionService.On("GetByUserID", ctx, userID).Return(&models.Session{ID: recentSessionID, UserID: userID}, nil).Once()
-				sessionService.On("Delete", ctx, recentSessionID).Return(errors.New("delete recent failed")).Once()
+				sessionService.On("GetByID", ctx, requestedSessionID).Return((*models.Session)(nil), nil).Once()
 			},
-			wantErr: "delete recent failed",
+			wantErr: coreerrors.ErrNotFound,
+		},
+		{
+			name:               "returns forbidden when the requested session belongs to another user",
+			currentSessionID:   new(currentSessionID),
+			requestedSessionID: new(requestedSessionID),
+			configure: func(sessionService *inttests.MockSessionService) {
+				sessionService.On("GetByID", ctx, requestedSessionID).Return(&models.Session{ID: requestedSessionID, UserID: "other-user"}, nil).Once()
+			},
+			wantErr: coreerrors.ErrForbidden,
+		},
+		{
+			name:               "returns get by id error when loading the requested session fails",
+			requestedSessionID: new(requestedSessionID),
+			configure: func(sessionService *inttests.MockSessionService) {
+				sessionService.On("GetByID", ctx, requestedSessionID).Return((*models.Session)(nil), errors.New("get by id failed")).Once()
+			},
+			wantErr: errors.New("get by id failed"),
+		},
+		{
+			name:               "returns delete error when deleting the requested session fails",
+			requestedSessionID: new(requestedSessionID),
+			configure: func(sessionService *inttests.MockSessionService) {
+				sessionService.On("GetByID", ctx, requestedSessionID).Return(&models.Session{ID: requestedSessionID, UserID: userID}, nil).Once()
+				sessionService.On("Delete", ctx, requestedSessionID).Return(errors.New("delete failed")).Once()
+			},
+			wantErr: errors.New("delete failed"),
+		},
+		{
+			name:             "deletes the current session when no explicit sign out target is provided",
+			currentSessionID: new(currentSessionID),
+			configure: func(sessionService *inttests.MockSessionService) {
+				sessionService.On("Delete", ctx, currentSessionID).Return(nil).Once()
+			},
+			want: &types.SignOutResult{Message: "signed out", ClearedCurrentSession: true},
+		},
+		{
+			name:             "returns delete error when deleting the current session fails",
+			currentSessionID: new(currentSessionID),
+			configure: func(sessionService *inttests.MockSessionService) {
+				sessionService.On("Delete", ctx, currentSessionID).Return(errors.New("delete current failed")).Once()
+			},
+			wantErr: errors.New("delete current failed"),
+		},
+		{
+			name:    "returns an error when there is no current session and no sign out target",
+			wantErr: coreerrors.ErrNoSessionToSignOut,
 		},
 	}
 
@@ -113,26 +148,14 @@ func TestSignOutUseCase(t *testing.T) {
 				SessionService: sessionService,
 			}
 
-			var sessionID *string
-			if tt.sessionIDProvided {
-				value := tt.sessionID
-				sessionID = &value
-			}
+			result, err := uc.SignOut(ctx, userID, tt.currentSessionID, tt.requestedSessionID, tt.signOutAll)
 
-			var signOutAll *bool
-			if tt.signOutAllProvided {
-				value := tt.signOutAll
-				signOutAll = &value
-			}
-
-			result, err := uc.SignOut(ctx, userID, sessionID, signOutAll)
-
-			if tt.wantErr != "" {
+			if tt.wantErr != nil {
 				if err == nil {
 					t.Fatalf("expected error %q, got nil", tt.wantErr)
 				}
-				if err.Error() != tt.wantErr {
-					t.Fatalf("expected error %q, got %q", tt.wantErr, err.Error())
+				if err.Error() != tt.wantErr.Error() {
+					t.Fatalf("expected error %q, got %q", tt.wantErr, err)
 				}
 				if result != nil {
 					t.Fatalf("expected nil result on error, got %#v", result)
@@ -143,11 +166,9 @@ func TestSignOutUseCase(t *testing.T) {
 				}
 				if result == nil {
 					t.Fatal("expected result, got nil")
-				} else {
-					got := *result
-					if got.Message != tt.want.Message {
-						t.Fatalf("expected message %q, got %q", tt.want.Message, got.Message)
-					}
+				}
+				if *result != *tt.want {
+					t.Fatalf("expected result %#v, got %#v", *tt.want, *result)
 				}
 			}
 
