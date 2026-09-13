@@ -22,6 +22,9 @@ var (
 
 	// Token Errors
 	ErrTokenRequired = errors.New("token is required")
+
+	// Session Errors
+	ErrNoSessionToSignOut = errors.New("no session to sign out: provide session_id or sign_out_all")
 )
 
 func HandleError(err error, reqCtx *models.RequestContext) {

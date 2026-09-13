@@ -206,6 +206,7 @@ func TestCSRFPlugin_TokenGeneration(t *testing.T) {
 		method         string
 		existingCookie bool
 		wantToken      bool
+		wantHeader     string
 	}{
 		{
 			name:      "first GET generates token",
@@ -213,9 +214,10 @@ func TestCSRFPlugin_TokenGeneration(t *testing.T) {
 			wantToken: true,
 		},
 		{
-			name:           "second GET with cookie skips generation",
+			name:           "second GET with cookie skips generation but echoes token header",
 			method:         http.MethodGet,
 			existingCookie: true,
+			wantHeader:     "existing",
 		},
 		{
 			name:      "unauthenticated GET generates token",
@@ -223,9 +225,10 @@ func TestCSRFPlugin_TokenGeneration(t *testing.T) {
 			wantToken: true,
 		},
 		{
-			name:           "unauthenticated GET with existing cookie skips",
+			name:           "unauthenticated GET with existing cookie skips but echoes token header",
 			method:         http.MethodGet,
 			existingCookie: true,
+			wantHeader:     "existing",
 		},
 		{
 			name:      "POST does not generate token",
@@ -265,6 +268,16 @@ func TestCSRFPlugin_TokenGeneration(t *testing.T) {
 			}
 			if !tt.wantToken && len(cookies) > 0 {
 				t.Error("expected no CSRF cookie to be set")
+			}
+
+			// Cross-origin clients cannot read the cookie, so the token must always be
+			// discoverable from the response header on safe requests.
+			gotHeader := w.Header().Get("X-AUTHULA-CSRF-TOKEN")
+			if tt.wantToken && gotHeader == "" {
+				t.Error("expected CSRF token header on generation")
+			}
+			if tt.wantHeader != "" && gotHeader != tt.wantHeader {
+				t.Errorf("CSRF token header = %q, want %q", gotHeader, tt.wantHeader)
 			}
 		})
 	}
@@ -509,6 +522,7 @@ func TestCSRFPlugin_Middleware(t *testing.T) {
 		expectedStatus   int
 		handlerShouldRun bool
 		expectCookie     bool
+		expectHeader     string
 	}{
 		{
 			name:             "unauthenticated POST passes through",
@@ -552,13 +566,14 @@ func TestCSRFPlugin_Middleware(t *testing.T) {
 			expectCookie:     true,
 		},
 		{
-			name:             "authenticated GET with existing cookie does not regenerate",
+			name:             "authenticated GET with existing cookie does not regenerate but echoes token header",
 			method:           http.MethodGet,
 			userID:           "user-123",
 			hasCookie:        true,
 			cookieValue:      "existing",
 			expectedStatus:   http.StatusOK,
 			handlerShouldRun: true,
+			expectHeader:     "existing",
 		},
 	}
 
@@ -613,6 +628,11 @@ func TestCSRFPlugin_Middleware(t *testing.T) {
 				cookies := w.Result().Cookies()
 				if len(cookies) == 0 {
 					t.Error("expected CSRF cookie to be set")
+				}
+			}
+			if tt.expectHeader != "" {
+				if got := w.Header().Get("X-AUTHULA-CSRF-TOKEN"); got != tt.expectHeader {
+					t.Errorf("CSRF token header = %q, want %q", got, tt.expectHeader)
 				}
 			}
 		})

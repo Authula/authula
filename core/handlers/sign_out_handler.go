@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/core/types"
 	"github.com/Authula/authula/core/usecases"
 	"github.com/Authula/authula/models"
@@ -20,7 +22,6 @@ func (h *SignOutHandler) Handle() http.HandlerFunc {
 
 		var request types.SignOutRequest
 		if err := util.ParseJSON(r, &request); err != nil {
-			// If no body is provided, we'll default to using an empty request.
 			request = types.SignOutRequest{}
 		}
 		if err := request.Validate(); err != nil {
@@ -29,8 +30,17 @@ func (h *SignOutHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		result, err := h.UseCase.SignOut(ctx, reqCtx.Actor.ID, request.SessionID, request.SignOutAll)
+		var currentSessionID *string
+		if id, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && id != "" {
+			currentSessionID = &id
+		}
+
+		result, err := h.UseCase.SignOut(ctx, reqCtx.Actor.ID, currentSessionID, request.SessionID, request.SignOutAll)
 		if err != nil {
+			if errors.Is(err, coreerrors.ErrNotFound) || errors.Is(err, coreerrors.ErrForbidden) || errors.Is(err, coreerrors.ErrNoSessionToSignOut) {
+				coreerrors.HandleError(err, reqCtx)
+				return
+			}
 			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
 				"message": "failed to sign out",
 			})
@@ -38,7 +48,9 @@ func (h *SignOutHandler) Handle() http.HandlerFunc {
 			return
 		}
 
-		reqCtx.Values[models.ContextAuthSignOut.String()] = true
+		if result.ClearedCurrentSession {
+			reqCtx.Values[models.ContextAuthSignOut.String()] = true
+		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, &types.SignOutResponse{
 			Message: result.Message,

@@ -27,12 +27,12 @@ func NewConfig(options ...ConfigOption) *models.Config {
 		DisabledPaths: []string{},
 		Session: models.SessionConfig{
 			CookieName:         "authula.session_token",
-			ExpiresIn:          time.Hour * 24 * 7, // 7 days by default
-			UpdateAge:          time.Hour * 24,     // 24 hours update interval
+			ExpiresIn:          time.Hour * 24 * 7,
+			UpdateAge:          time.Hour * 24,
 			Secure:             false,
 			HttpOnly:           true,
 			SameSite:           "lax",
-			CookieMaxAge:       24 * time.Hour,
+			CookieMaxAge:       time.Hour * 24 * 7,
 			AutoCleanup:        false,
 			CleanupInterval:    time.Minute,
 			MaxSessionsPerUser: 5,
@@ -184,8 +184,11 @@ func WithSession(config models.SessionConfig) ConfigOption {
 		if config.UpdateAge != 0 {
 			c.Session.UpdateAge = config.UpdateAge
 		}
-		if config.CookieMaxAge != 0 {
+		switch {
+		case config.CookieMaxAge != 0:
 			c.Session.CookieMaxAge = config.CookieMaxAge
+		case config.ExpiresIn != 0:
+			c.Session.CookieMaxAge = config.ExpiresIn
 		}
 		c.Session.Secure = config.Secure
 		c.Session.HttpOnly = config.HttpOnly

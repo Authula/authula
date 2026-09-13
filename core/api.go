@@ -10,8 +10,8 @@ import (
 )
 
 type CoreAPI interface {
-	GetMe(ctx context.Context, userID string) (*types.GetMeResult, error)
-	SignOut(ctx context.Context, userID string, sessionID *string, signOutAll *bool) (*types.SignOutResult, error)
+	GetMe(ctx context.Context, userID string, sessionID *string) (*types.GetMeResult, error)
+	SignOut(ctx context.Context, userID string, currentSessionID *string, requestedSessionID *string, signOutAll *bool) (*types.SignOutResult, error)
 }
 
 type coreAPI struct {
@@ -25,12 +25,12 @@ func NewCoreAPI(logger models.Logger, userService services.UserService, sessionS
 	}
 }
 
-func (api *coreAPI) GetMe(ctx context.Context, userID string) (*types.GetMeResult, error) {
-	return api.useCases.GetMeUseCase.GetMe(ctx, userID)
+func (api *coreAPI) GetMe(ctx context.Context, userID string, sessionID *string) (*types.GetMeResult, error) {
+	return api.useCases.GetMeUseCase.GetMe(ctx, userID, sessionID)
 }
 
-func (api *coreAPI) SignOut(ctx context.Context, userID string, sessionID *string, signOutAll *bool) (*types.SignOutResult, error) {
-	return api.useCases.SignOutUseCase.SignOut(ctx, userID, sessionID, signOutAll)
+func (api *coreAPI) SignOut(ctx context.Context, userID string, currentSessionID *string, requestedSessionID *string, signOutAll *bool) (*types.SignOutResult, error) {
+	return api.useCases.SignOutUseCase.SignOut(ctx, userID, currentSessionID, requestedSessionID, signOutAll)
 }
 
 func BuildUseCases(logger models.Logger, userService services.UserService, sessionService services.SessionService) *usecases.UseCases {

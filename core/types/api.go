@@ -30,7 +30,8 @@ func (req *SignOutRequest) Validate() error {
 }
 
 type SignOutResult struct {
-	Message string
+	Message               string
+	ClearedCurrentSession bool
 }
 
 type SignOutResponse struct {

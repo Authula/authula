@@ -20,10 +20,11 @@ import (
 func testGlobalConfig() *models.Config {
 	return &models.Config{
 		Session: models.SessionConfig{
-			CookieName: "authula.session_token",
-			HttpOnly:   true,
-			Secure:     false,
-			SameSite:   "lax",
+			CookieName:   "authula.session_token",
+			CookieMaxAge: time.Hour,
+			HttpOnly:     true,
+			Secure:       false,
+			SameSite:     "lax",
 		},
 	}
 }
@@ -339,6 +340,9 @@ func TestStopImpersonationHandler(t *testing.T) {
 			if tt.expectedMessage != "" {
 				internaltests.AssertErrorMessage(t, reqCtx, tt.expectedStatus, tt.expectedMessage)
 			}
+			if tt.expectedStatus == http.StatusOK {
+				assertRestoredSessionCookie(t, w.Result().Cookies(), originalSessionToken)
+			}
 
 			impRepo.AssertExpectations(t)
 			sessionStateRepo.AssertExpectations(t)
@@ -346,4 +350,22 @@ func TestStopImpersonationHandler(t *testing.T) {
 			tokenSvc.AssertExpectations(t)
 		})
 	}
+}
+
+func assertRestoredSessionCookie(t *testing.T, cookies []*http.Cookie, wantToken string) {
+	t.Helper()
+	cookieName := testGlobalConfig().Session.CookieName
+	for _, c := range cookies {
+		if c.Name != cookieName {
+			continue
+		}
+		if c.Value != wantToken {
+			t.Fatalf("expected restored cookie value %q, got %q", wantToken, c.Value)
+		}
+		if c.MaxAge != int(time.Hour.Seconds()) {
+			t.Fatalf("expected restored cookie max age %d, got %d", int(time.Hour.Seconds()), c.MaxAge)
+		}
+		return
+	}
+	t.Fatalf("expected restored session cookie %q to be set", cookieName)
 }

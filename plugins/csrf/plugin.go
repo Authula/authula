@@ -1,6 +1,7 @@
 package csrf
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 
@@ -148,13 +149,18 @@ func (p *CSRFPlugin) validateCSRFToken(reqCtx *models.RequestContext) error {
 		return nil
 	}
 
-	if headerToken != cookie.Value {
+	if !tokensMatch(headerToken, cookie.Value) {
 		reqCtx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "invalid csrf token"})
 		reqCtx.Handled = true
 		return nil
 	}
 
 	return nil
+}
+
+// tokensMatch compares the header and cookie tokens in constant time.
+func tokensMatch(headerToken, cookieToken string) bool {
+	return subtle.ConstantTimeCompare([]byte(headerToken), []byte(cookieToken)) == 1
 }
 
 // Middleware returns a CSRF protection middleware that users can add to custom routes.
@@ -170,8 +176,11 @@ func (p *CSRFPlugin) Middleware() func(http.Handler) http.Handler {
 			}
 
 			if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
-				_, err := r.Cookie(p.pluginConfig.CookieName)
-				if err == http.ErrNoCookie {
+				cookie, err := r.Cookie(p.pluginConfig.CookieName)
+				switch err {
+				case nil:
+					p.exposeCSRFToken(reqCtx, cookie.Value)
+				case http.ErrNoCookie:
 					token, err := p.tokenService.Generate()
 					if err != nil {
 						reqCtx.SetJSONResponse(
@@ -201,7 +210,7 @@ func (p *CSRFPlugin) Middleware() func(http.Handler) http.Handler {
 				return
 			}
 
-			if headerToken != cookie.Value {
+			if !tokensMatch(headerToken, cookie.Value) {
 				reqCtx.SetJSONResponse(http.StatusForbidden, map[string]string{"message": "invalid csrf token"})
 				reqCtx.Handled = true
 				return
@@ -243,6 +252,13 @@ func (p *CSRFPlugin) setCSRFCookie(reqCtx *models.RequestContext, token string) 
 		MaxAge:   int(p.pluginConfig.MaxAge.Seconds()),
 	})
 
-	// Set token in response header so client can read it
+	p.exposeCSRFToken(reqCtx, token)
+}
+
+// exposeCSRFToken places the token in the response header. Clients on another origin
+// (for example an SPA on app.example.com talking to api.example.com) cannot read the
+// cookie through document.cookie, so the header is their only way to obtain the token
+// after a page reload. CORS restricts who can read it, so echoing an existing token is safe.
+func (p *CSRFPlugin) exposeCSRFToken(reqCtx *models.RequestContext, token string) {
 	reqCtx.ResponseWriter.Header().Set(p.pluginConfig.HeaderName, token)
 }
