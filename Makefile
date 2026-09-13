@@ -5,8 +5,11 @@ MIGRATE_CONFIG?=./config.toml
 MIGRATE_ARGS?=
 MIGRATE_CMD=CGO_ENABLED=0 go run ./cmd/migrate
 OPENAPI_EXPORT_BINARY=./tmp/openapi-export
+BIN_DIR=$(CURDIR)/bin
+GOLANGCI_LINT_VERSION?=v2.13.2
+AIR_VERSION?=latest
 
-.PHONY: help build build-exe run dev test clean install setup
+.PHONY: help build build-exe run dev test clean install setup tools hooks hooks-uninstall
 .PHONY: test-coverage
 .PHONY: lint format vet deps-update all check quick-check ci
 .PHONY: migrate-core-up migrate-core-down migrate-plugins-up migrate-plugins-down migrate-status
@@ -70,11 +73,26 @@ deps-update: # Update dependencies
 library-test: test # Run library mode tests
 
 # Development setup
-setup: install # Setup development environment
-	@echo "Setting up development environment..."
-	@curl -sSfL https://golangci-lint.run/install.sh | sh -s v2.13.2
-	@go install github.com/air-verse/air@latest
+setup: install tools hooks # Setup development environment (deps, tools in ./bin, git hooks)
 	@echo "Development environment setup complete!"
+
+tools: # Install development tools (golangci-lint, air) into ./bin
+	@echo "Installing development tools into $(BIN_DIR)..."
+	@mkdir -p $(BIN_DIR)
+	@curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(BIN_DIR) $(GOLANGCI_LINT_VERSION)
+	@GOBIN=$(BIN_DIR) go install github.com/air-verse/air@$(AIR_VERSION)
+	@echo "Tools installed: $(BIN_DIR)/golangci-lint, $(BIN_DIR)/air"
+
+# Git hooks
+hooks: # Install git hooks (pre-commit runs format, vet, lint, build and test)
+	@echo "Installing git hooks..."
+	@chmod +x .githooks/* scripts/pre-commit-checks.sh
+	@git config core.hooksPath .githooks
+	@echo "Git hooks installed (core.hooksPath=.githooks)"
+
+hooks-uninstall: # Remove the git hooks configuration
+	@git config --unset core.hooksPath || true
+	@echo "Git hooks uninstalled"
 
 # Clean commands
 clean: # Clean build artifacts

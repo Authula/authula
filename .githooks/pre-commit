@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#
+# Pre-commit hook for Authula. The actual checks live in
+# scripts/pre-commit-checks.sh so they can be run and maintained outside git.
+set -euo pipefail
+
+exec "$(git rev-parse --show-toplevel)/scripts/pre-commit-checks.sh" "$@"

@@ -65,18 +65,23 @@ This will automatically select the workspace folder. But if you need to find the
 
 #### Development:
 
-1. **Install Dependencies**
+1. **Set Up the Environment**
 
-- Once you have your environment set up and you are within the project, run `go mod download && go mod tidy` to install Go dependencies.
-
-- Then as a test run `make build` to ensure the project builds successfully, this could take a few seconds to a minute.
-
-- Now install air for hot reloading of your server:
+- Once you have your environment set up and you are within the project, run the setup target. It is the single place that installs everything you need:
 
   ```bash
-  # install it into ./bin/
-  $ curl -sSfL https://raw.githubusercontent.com/air-verse/air/master/install.sh | sh -s
+  $ make setup
   ```
+
+  This does three things:
+
+  - `make install` – downloads Go module dependencies (`go mod download && go mod tidy`).
+  - `make tools` – installs `golangci-lint` and `air` (hot reloading) into the project's `./bin/` directory, which is where the other make targets expect them.
+  - `make hooks` – points `core.hooksPath` at the repo's `.githooks/` directory so the pre-commit hook runs for you.
+
+  Each of these can also be run on its own if you only need to redo one step.
+
+- Then as a test run `make build` to ensure the project builds successfully, this could take a few seconds to a minute.
 
 - Make a copy of the `config.example.toml` and rename it to `config.toml`. Replace any of the necessary properties.
 
@@ -84,19 +89,39 @@ This will automatically select the workspace folder. But if you need to find the
 
   ```bash
   $ make run
+
+  # or, with hot reloading
+  $ make dev
   ```
+
+- About the pre-commit hook: it calls `scripts/pre-commit-checks.sh`, which runs `make format`, `make vet`, `make lint`, `make build` and `make test` in that order and rejects the commit if any step fails. If `make format` changes a staged file, the commit is stopped so you can review and re-stage it. The hook only runs when Go files, `go.mod` or `go.sum` are staged. Use `git commit --no-verify` to skip it for a WIP commit, and `make hooks-uninstall` to remove it.
 
 2. **Project Structure**
 
-- Code is organised as follows:
-  - `cmd/` - standalone mode to run the auth server
-  - `config/` - configuration loading and management
-  - `events/` - event bus and event handling
-  - `internal/` - internal packages not exposed outside the module
-  - `migrations/` - database migration files
-  - `models/` - database models, interfaces etc.
-  - `providers/` - social auth providers
-  - `storage/` - database and secondary storage adapters
+Authula can be used in two ways, and the layout reflects that:
+
+- **As a library.** The module root is the public Go API. Packages such as `config/`, `models/`, `events/` and `middleware/` are what an application imports when it embeds Authula.
+- **As a standalone server.** `cmd/` holds the entry points (the auth server, the migration CLI, the OpenAPI exporter). These are thin wrappers that wire the library together and run it.
+
+Inside the module, the code is split into three main areas:
+
+- **`core/`** – the base behaviour every setup gets: users, sessions, error types, the event system, security helpers and the core HTTP routes.
+- **`plugins/`** – every authentication feature lives in its own plugin folder (email/password, TOTP, OAuth2, rate limiting, organizations and so on). A plugin is self-contained: it registers its own routes, services, migrations and hooks, and declares the capabilities it provides. Most new features are added as a plugin, or as an extension to an existing one.
+- **`internal/`** – plumbing that is not part of the public API, such as bootstrapping, the router, the plugin registry and the migration manager. Anything here can change without a versioned release.
+
+Both `core/` and each plugin follow the same layered structure, from the outside in:
+
+- **handlers** – parse the HTTP request, call a use case, write the response. No business logic.
+- **usecases** – orchestrate a single application workflow (for example "register a user") by combining services.
+- **services** – reusable business logic behind an interface, so implementations can be swapped and mocked.
+- **repositories** – data access. All database work goes through a repository interface; nothing above this layer talks to the database directly.
+- **types / constants** – request and response shapes, errors and shared values used by the layers above.
+
+Dependencies always point inwards (handlers → use cases → services → repositories) and are passed in through constructors, never reached for globally.
+
+Supporting folders around these hold cross-cutting pieces: database and storage `adapters/`, versioned `migrations/`, OpenAPI generation, and `scripts/` used by the Makefile and git hooks. Tests live next to the code they cover.
+
+The `.agents/skills/` folder contains short playbooks for each of these layers (handlers, use cases, services, repositories, plugins, testing). Read the matching one before working on that part of the code – they document the conventions the project expects.
 
 3. **Testing**
 
