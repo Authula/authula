@@ -24,6 +24,7 @@ func Routes(p *TOTPPlugin) []models.Route {
 		UseCase:      uc.GetTOTPURI,
 	}
 	verifyTOTPHandler := &handlers.VerifyTOTPHandler{
+		GlobalConfig: p.globalConfig,
 		PluginConfig: p.pluginConfig,
 		UseCase:      uc.VerifyTOTP,
 	}
@@ -31,6 +32,7 @@ func Routes(p *TOTPPlugin) []models.Route {
 		UseCase: uc.GenerateBackupCodes,
 	}
 	verifyBackupCodeHandler := &handlers.VerifyBackupCodeHandler{
+		GlobalConfig: p.globalConfig,
 		PluginConfig: p.pluginConfig,
 		UseCase:      uc.VerifyBackupCode,
 	}

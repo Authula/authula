@@ -113,13 +113,6 @@ func (p *CSRFPlugin) validateCSRFTokenHook(reqCtx *models.RequestContext) error 
 }
 
 func (p *CSRFPlugin) clearCSRFTokenHook(reqCtx *models.RequestContext) error {
-	http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
-		Name:     p.pluginConfig.CookieName,
-		Value:    "",
-		Path:     "/",
-		HttpOnly: false,
-		Secure:   p.pluginConfig.Secure,
-		MaxAge:   -1,
-	})
+	p.clearCSRFCookie(reqCtx)
 	return nil
 }

@@ -60,6 +60,9 @@ type VerifyTOTPHandlerSuite struct {
 	suite.Suite
 }
 
+// testCookieDomain is the session cookie domain the TOTP cookies must inherit.
+const testCookieDomain = "example.com"
+
 type verifyTOTPFixture struct {
 	pluginCfg   *types.TOTPPluginConfig
 	tokenSvc    *internaltests.MockTokenService
@@ -185,6 +188,7 @@ func (s *VerifyTOTPHandlerSuite) TestVerifyTOTPHandler_Table() {
 				cleared := totptests.CookieFromRecorder(w, constants.CookieTOTPPending)
 				require.NotNil(t, cleared)
 				assert.Equal(t, -1, cleared.MaxAge)
+				assert.Equal(t, testCookieDomain, cleared.Domain)
 				assert.Nil(t, totptests.CookieFromRecorder(w, constants.CookieTOTPTrusted))
 
 				var resp types.VerifyTOTPResponse
@@ -219,10 +223,12 @@ func (s *VerifyTOTPHandlerSuite) TestVerifyTOTPHandler_Table() {
 				trusted := totptests.CookieFromRecorder(w, constants.CookieTOTPTrusted)
 				require.NotNil(t, trusted, "trusted device cookie should be set")
 				assert.Equal(t, "trusted-token", trusted.Value)
+				assert.Equal(t, testCookieDomain, trusted.Domain)
 
 				pending := totptests.CookieFromRecorder(w, constants.CookieTOTPPending)
 				require.NotNil(t, pending)
 				assert.Equal(t, -1, pending.MaxAge)
+				assert.Equal(t, testCookieDomain, pending.Domain)
 			},
 		},
 	}
@@ -236,7 +242,11 @@ func (s *VerifyTOTPHandlerSuite) TestVerifyTOTPHandler_Table() {
 				tt.prepare(m)
 			}
 
-			h := &VerifyTOTPHandler{UseCase: buildVerifyTOTPUseCase(m.pluginCfg, m.tokenSvc, m.verifSvc, m.sessionSvc, m.userSvc, m.repo), PluginConfig: m.pluginCfg}
+			h := &VerifyTOTPHandler{
+				GlobalConfig: &models.Config{Session: models.SessionConfig{Domain: testCookieDomain}},
+				PluginConfig: m.pluginCfg,
+				UseCase:      buildVerifyTOTPUseCase(m.pluginCfg, m.tokenSvc, m.verifSvc, m.sessionSvc, m.userSvc, m.repo),
+			}
 			req, w, reqCtx := m.newRequest(t)
 			h.Handler().ServeHTTP(w, req)
 

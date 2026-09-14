@@ -1,8 +1,6 @@
 package types
 
 import (
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/Authula/authula/models"
@@ -36,19 +34,6 @@ func (c *TOTPPluginConfig) ApplyDefaults() {
 	}
 	if c.SameSite == "" {
 		c.SameSite = "lax"
-	}
-}
-
-func ParseSameSite(s string) http.SameSite {
-	switch strings.ToLower(s) {
-	case "strict":
-		return http.SameSiteStrictMode
-	case "none":
-		return http.SameSiteNoneMode
-	case "lax":
-		return http.SameSiteLaxMode
-	default:
-		return http.SameSiteLaxMode
 	}
 }
 

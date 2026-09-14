@@ -48,7 +48,12 @@ type LoggerConfig struct {
 }
 
 type SessionConfig struct {
-	CookieName         string        `json:"cookie_name" toml:"cookie_name"`
+	CookieName string `json:"cookie_name" toml:"cookie_name"`
+	// Domain is the Domain attribute applied to every auth cookie Authula issues (session, CSRF,
+	// TOTP, impersonation). Empty means host-only: the cookie is bound to the exact host that set
+	// it. Set it to the parent domain (e.g. "example.com") to share cookies between subdomains such
+	// as api.example.com and app.example.com. BaseURL must be that domain or one of its subdomains.
+	Domain             string        `json:"domain" toml:"domain"`
 	ExpiresIn          time.Duration `json:"expires_in" toml:"expires_in"`         // Sliding window per activity
 	UpdateAge          time.Duration `json:"update_age" toml:"update_age"`         // How often to check/update
 	CookieMaxAge       time.Duration `json:"cookie_max_age" toml:"cookie_max_age"` // Absolute max age of the cookie

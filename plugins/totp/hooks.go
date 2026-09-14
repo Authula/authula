@@ -8,6 +8,7 @@ import (
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/totp/constants"
 	"github.com/Authula/authula/plugins/totp/types"
+	"github.com/Authula/authula/util"
 )
 
 type TOTPHookID string
@@ -101,10 +102,11 @@ func (p *TOTPPlugin) interceptSignInHook(reqCtx *models.RequestContext) error {
 		Name:     constants.CookieTOTPPending,
 		Value:    token,
 		Path:     "/",
+		Domain:   p.globalConfig.Session.Domain,
 		MaxAge:   int(p.pluginConfig.PendingTokenExpiry.Seconds()),
 		HttpOnly: true,
 		Secure:   p.pluginConfig.SecureCookie,
-		SameSite: types.ParseSameSite(p.pluginConfig.SameSite),
+		SameSite: util.ParseSameSite(p.pluginConfig.SameSite),
 	})
 
 	// Clear session values — prevent session creation

@@ -12,6 +12,7 @@ import (
 )
 
 type VerifyBackupCodeHandler struct {
+	GlobalConfig *models.Config
 	PluginConfig *types.TOTPPluginConfig
 	UseCase      *usecases.VerifyBackupCodeUseCase
 }
@@ -83,10 +84,11 @@ func (h *VerifyBackupCodeHandler) Handler() http.HandlerFunc {
 				Name:     constants.CookieTOTPTrusted,
 				Value:    result.TrustedDeviceToken,
 				Path:     "/",
+				Domain:   h.GlobalConfig.Session.Domain,
 				MaxAge:   int(h.PluginConfig.TrustedDeviceDuration.Seconds()),
 				HttpOnly: true,
 				Secure:   h.PluginConfig.SecureCookie,
-				SameSite: types.ParseSameSite(h.PluginConfig.SameSite),
+				SameSite: util.ParseSameSite(h.PluginConfig.SameSite),
 			})
 		}
 
@@ -94,10 +96,11 @@ func (h *VerifyBackupCodeHandler) Handler() http.HandlerFunc {
 			Name:     constants.CookieTOTPPending,
 			Value:    "",
 			Path:     "/",
+			Domain:   h.GlobalConfig.Session.Domain,
 			MaxAge:   -1,
 			HttpOnly: true,
 			Secure:   h.PluginConfig.SecureCookie,
-			SameSite: types.ParseSameSite(h.PluginConfig.SameSite),
+			SameSite: util.ParseSameSite(h.PluginConfig.SameSite),
 		})
 
 		reqCtx.SetJSONResponse(http.StatusOK, &types.VerifyBackupCodeResponse{

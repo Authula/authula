@@ -21,6 +21,7 @@ func testGlobalConfig() *models.Config {
 	return &models.Config{
 		Session: models.SessionConfig{
 			CookieName:   "authula.session_token",
+			Domain:       "example.com",
 			CookieMaxAge: time.Hour,
 			HttpOnly:     true,
 			Secure:       false,
@@ -354,18 +355,40 @@ func TestStopImpersonationHandler(t *testing.T) {
 
 func assertRestoredSessionCookie(t *testing.T, cookies []*http.Cookie, wantToken string) {
 	t.Helper()
-	cookieName := testGlobalConfig().Session.CookieName
+	sessionConfig := testGlobalConfig().Session
+	cookieName := sessionConfig.CookieName
+	originalCookieName := cookieName + adminconstants.OriginalSessionCookieSuffix
+
+	var restored, cleared *http.Cookie
 	for _, c := range cookies {
-		if c.Name != cookieName {
-			continue
+		switch c.Name {
+		case cookieName:
+			restored = c
+		case originalCookieName:
+			cleared = c
 		}
-		if c.Value != wantToken {
-			t.Fatalf("expected restored cookie value %q, got %q", wantToken, c.Value)
-		}
-		if c.MaxAge != int(time.Hour.Seconds()) {
-			t.Fatalf("expected restored cookie max age %d, got %d", int(time.Hour.Seconds()), c.MaxAge)
-		}
-		return
 	}
-	t.Fatalf("expected restored session cookie %q to be set", cookieName)
+
+	if restored == nil {
+		t.Fatalf("expected restored session cookie %q to be set", cookieName)
+	}
+	if restored.Value != wantToken {
+		t.Fatalf("expected restored cookie value %q, got %q", wantToken, restored.Value)
+	}
+	if restored.MaxAge != int(time.Hour.Seconds()) {
+		t.Fatalf("expected restored cookie max age %d, got %d", int(time.Hour.Seconds()), restored.MaxAge)
+	}
+	if restored.Domain != sessionConfig.Domain {
+		t.Fatalf("expected restored cookie domain %q, got %q", sessionConfig.Domain, restored.Domain)
+	}
+
+	if cleared == nil {
+		t.Fatalf("expected original session cookie %q to be cleared", originalCookieName)
+	}
+	if cleared.MaxAge != -1 || cleared.Value != "" {
+		t.Fatalf("expected original cookie to be expired, got value %q max age %d", cleared.Value, cleared.MaxAge)
+	}
+	if cleared.Domain != sessionConfig.Domain {
+		t.Fatalf("expected cleared original cookie domain %q, got %q", sessionConfig.Domain, cleared.Domain)
+	}
 }

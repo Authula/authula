@@ -2,8 +2,11 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Authula/authula/env"
@@ -91,6 +94,16 @@ func NewConfig(options ...ConfigOption) *models.Config {
 		panic(fmt.Errorf("BasePath must start with '/', got: %q", config.BasePath))
 	}
 
+	// Validate cookie domain.
+	if envValue := os.Getenv(env.EnvCookieDomain); envValue != "" {
+		config.Session.Domain = envValue
+	}
+	domain, err := normalizeCookieDomain(config.Session.Domain, config.BaseURL)
+	if err != nil {
+		panic(fmt.Errorf("invalid session cookie domain: %w", err))
+	}
+	config.Session.Domain = domain
+
 	// Validate event bus configuration
 	if err := validateEventBusConfig(&config.EventBus); err != nil {
 		panic(fmt.Errorf("invalid event bus configuration: %w", err))
@@ -177,6 +190,11 @@ func WithSession(config models.SessionConfig) ConfigOption {
 	return func(c *models.Config) {
 		if config.CookieName != "" {
 			c.Session.CookieName = config.CookieName
+		}
+		if envValue := os.Getenv(env.EnvCookieDomain); envValue != "" {
+			c.Session.Domain = envValue
+		} else if config.Domain != "" {
+			c.Session.Domain = config.Domain
 		}
 		if config.ExpiresIn != 0 {
 			c.Session.ExpiresIn = config.ExpiresIn
@@ -306,6 +324,41 @@ func WithCoreServiceHooks(config *models.CoreServiceHooksConfig) ConfigOption {
 	return func(c *models.Config) {
 		c.CoreServiceHooks = config
 	}
+}
+
+// normalizeCookieDomain strips a leading dot from the cookie domain and checks that a browser
+// would accept it for cookies set by baseURL: the domain must be a bare hostname (no scheme,
+// port or path) and the BaseURL host must be that domain or one of its subdomains. Go's
+// net/http silently drops an invalid Domain attribute, so this fails at startup instead.
+func normalizeCookieDomain(domain, baseURL string) (string, error) {
+	if domain == "" {
+		return "", nil
+	}
+
+	domain = strings.ToLower(strings.TrimPrefix(domain, "."))
+	if domain == "" {
+		return "", fmt.Errorf("domain must not be empty after trimming the leading dot")
+	}
+	if strings.ContainsAny(domain, ":/?#@ \t") {
+		return "", fmt.Errorf("domain %q must be a bare hostname without scheme, port or path", domain)
+	}
+
+	// Browsers reject cookies with explicit Domain attributes set to IP addresses.
+	// For IP-based local dev (e.g. 127.0.0.1), domain must remain empty (host-only).
+	if ip := net.ParseIP(domain); ip != nil {
+		return "", fmt.Errorf("domain %q cannot be an IP address; browsers require IP cookies to be host-only (leave domain empty)", domain)
+	}
+
+	parsedBaseURL, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("could not parse BaseURL %q: %w", baseURL, err)
+	}
+	host := strings.ToLower(parsedBaseURL.Hostname())
+	if host != domain && !strings.HasSuffix(host, "."+domain) {
+		return "", fmt.Errorf("BaseURL host %q is not %q or one of its subdomains; browsers would reject the cookie", host, domain)
+	}
+
+	return domain, nil
 }
 
 // validateEventBusConfig validates that the event bus provider has the correct configuration

@@ -379,6 +379,7 @@ func TestCSRFPlugin_CSRFValidation(t *testing.T) {
 func TestCSRFPlugin_TokenRotation(t *testing.T) {
 	p := New(CSRFPluginConfig{})
 	p.logger = &MockLogger{}
+	p.globalConfig = &models.Config{}
 	hooks := p.Hooks()
 	afterHook := hooks[2]
 
@@ -473,6 +474,7 @@ func TestCSRFPlugin_SetCSRFCookie(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := New(CSRFPluginConfig{SameSite: tt.sameSite})
+			p.globalConfig = &models.Config{}
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest("GET", tt.scheme+"://example.com/test", nil)
 			ctx := &models.RequestContext{Request: r, ResponseWriter: w}
@@ -502,6 +504,101 @@ func TestCSRFPlugin_SetCSRFCookie(t *testing.T) {
 			}
 			if c.Secure != tt.wantSecure {
 				t.Errorf("Secure = %v, want %v", c.Secure, tt.wantSecure)
+			}
+		})
+	}
+}
+
+func TestCSRFPlugin_CookieDomain(t *testing.T) {
+	tests := []struct {
+		name       string
+		domain     string
+		wantDomain string
+	}{
+		{name: "host-only when no domain is configured", domain: "", wantDomain: ""},
+		{name: "follows the session cookie domain", domain: "example.com", wantDomain: "example.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := New(CSRFPluginConfig{})
+			p.globalConfig = &models.Config{Session: models.SessionConfig{Domain: tt.domain}}
+
+			setRecorder := httptest.NewRecorder()
+			p.setCSRFCookie(&models.RequestContext{
+				Request:        httptest.NewRequest("GET", "https://api.example.com/test", nil),
+				ResponseWriter: setRecorder,
+			}, "test_token")
+			setCookies := setRecorder.Result().Cookies()
+			if len(setCookies) != 1 {
+				t.Fatalf("expected 1 cookie on set, got %d", len(setCookies))
+			}
+			if setCookies[0].Domain != tt.wantDomain {
+				t.Errorf("set Domain = %q, want %q", setCookies[0].Domain, tt.wantDomain)
+			}
+
+			clearRecorder := httptest.NewRecorder()
+			p.clearCSRFCookie(&models.RequestContext{
+				Request:        httptest.NewRequest("POST", "https://api.example.com/sign-out", nil),
+				ResponseWriter: clearRecorder,
+			})
+			clearCookies := clearRecorder.Result().Cookies()
+			if len(clearCookies) != 1 {
+				t.Fatalf("expected 1 cookie on clear, got %d", len(clearCookies))
+			}
+			if clearCookies[0].Domain != tt.wantDomain {
+				t.Errorf("clear Domain = %q, want %q", clearCookies[0].Domain, tt.wantDomain)
+			}
+		})
+	}
+}
+
+// The browser only deletes a cookie when the clear carries the same scoping attributes as the set.
+func TestCSRFPlugin_ClearCookieMatchesSetAttributes(t *testing.T) {
+	tests := []struct {
+		name     string
+		sameSite string
+		secure   bool
+		scheme   string
+	}{
+		{name: "lax over http", sameSite: "lax", scheme: "http"},
+		{name: "strict with secure flag over http", sameSite: "strict", secure: true, scheme: "http"},
+		{name: "none over https", sameSite: "none", scheme: "https"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := New(CSRFPluginConfig{SameSite: tt.sameSite, Secure: tt.secure})
+			p.globalConfig = &models.Config{Session: models.SessionConfig{Domain: "example.com"}}
+
+			setRecorder := httptest.NewRecorder()
+			p.setCSRFCookie(&models.RequestContext{
+				Request:        httptest.NewRequest("GET", tt.scheme+"://api.example.com/test", nil),
+				ResponseWriter: setRecorder,
+			}, "test_token")
+			set := setRecorder.Result().Cookies()[0]
+
+			clearRecorder := httptest.NewRecorder()
+			p.clearCSRFCookie(&models.RequestContext{
+				Request:        httptest.NewRequest("POST", tt.scheme+"://api.example.com/sign-out", nil),
+				ResponseWriter: clearRecorder,
+			})
+			clear := clearRecorder.Result().Cookies()[0]
+
+			if clear.Value != "" || clear.MaxAge != -1 {
+				t.Errorf("clear must expire the cookie, got Value=%q MaxAge=%d", clear.Value, clear.MaxAge)
+			}
+			if clear.Name != set.Name || clear.Path != set.Path || clear.Domain != set.Domain {
+				t.Errorf("clear scope (%s %s %s) != set scope (%s %s %s)", clear.Name, clear.Path, clear.Domain, set.Name, set.Path, set.Domain)
+			}
+			if clear.Secure != set.Secure {
+				t.Errorf("clear Secure = %v, set Secure = %v", clear.Secure, set.Secure)
+			}
+			if clear.SameSite != set.SameSite {
+				t.Errorf("clear SameSite = %v, set SameSite = %v", clear.SameSite, set.SameSite)
+			}
+			if clear.HttpOnly != set.HttpOnly {
+				t.Errorf("clear HttpOnly = %v, set HttpOnly = %v", clear.HttpOnly, set.HttpOnly)
 			}
 		})
 	}

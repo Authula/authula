@@ -6,6 +6,7 @@ import (
 
 	"github.com/Authula/authula/models"
 	adminconstants "github.com/Authula/authula/plugins/admin/constants"
+	"github.com/Authula/authula/util"
 )
 
 func (p *AdminPlugin) Hooks() []models.Hook {
@@ -162,11 +163,19 @@ func (p *AdminPlugin) addImpersonationWhitelistScopes(reqCtx *models.RequestCont
 	return nil
 }
 
+// clearOriginalCookie expires the stashed original-session cookie. It mirrors the attributes the
+// cookie was issued with (see StartImpersonationHandler); a clear with a different Domain, Path
+// or Secure flag is ignored by the browser and the cookie would linger.
 func (p *AdminPlugin) clearOriginalCookie(w http.ResponseWriter, cookieName string) {
+	sessionConfig := p.pluginCtx.GetConfig().Session
 	http.SetCookie(w, &http.Cookie{
-		Name:   cookieName + adminconstants.OriginalSessionCookieSuffix,
-		Value:  "",
-		Path:   "/",
-		MaxAge: -1,
+		Name:     cookieName + adminconstants.OriginalSessionCookieSuffix,
+		Value:    "",
+		Path:     "/",
+		Domain:   sessionConfig.Domain,
+		HttpOnly: sessionConfig.HttpOnly,
+		Secure:   sessionConfig.Secure,
+		SameSite: util.ParseSameSite(sessionConfig.SameSite),
+		MaxAge:   -1,
 	})
 }

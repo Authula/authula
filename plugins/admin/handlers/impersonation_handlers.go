@@ -123,13 +123,14 @@ func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 		}
 
 		sessionConfig := h.globalConfig.Session
-		sameSite := sameSiteFromSessionConfig(&sessionConfig)
+		sameSite := util.ParseSameSite(sessionConfig.SameSite)
 
 		if result.OriginalCookieToken != "" {
 			http.SetCookie(w, &http.Cookie{
 				Name:     sessionConfig.CookieName + constants.OriginalSessionCookieSuffix,
 				Value:    result.OriginalCookieToken,
 				Path:     "/",
+				Domain:   sessionConfig.Domain,
 				HttpOnly: sessionConfig.HttpOnly,
 				Secure:   sessionConfig.Secure,
 				SameSite: sameSite,
@@ -217,12 +218,13 @@ func (h *StopImpersonationHandler) Handler() http.HandlerFunc {
 		}
 
 		sessionConfig := h.globalConfig.Session
-		sameSite := sameSiteFromSessionConfig(&sessionConfig)
+		sameSite := util.ParseSameSite(sessionConfig.SameSite)
 
 		http.SetCookie(w, &http.Cookie{
 			Name:     sessionConfig.CookieName,
 			Value:    result.OriginalSessionToken,
 			Path:     "/",
+			Domain:   sessionConfig.Domain,
 			HttpOnly: sessionConfig.HttpOnly,
 			Secure:   sessionConfig.Secure,
 			SameSite: sameSite,
@@ -233,6 +235,7 @@ func (h *StopImpersonationHandler) Handler() http.HandlerFunc {
 			Name:     sessionConfig.CookieName + constants.OriginalSessionCookieSuffix,
 			Value:    "",
 			Path:     "/",
+			Domain:   sessionConfig.Domain,
 			HttpOnly: sessionConfig.HttpOnly,
 			Secure:   sessionConfig.Secure,
 			SameSite: sameSite,
@@ -269,17 +272,4 @@ func respondImpersonationError(reqCtx *models.RequestContext, err error) {
 
 func mapImpersonationErrorStatus(err error) int {
 	return mapAdminHttpErrorStatus(err)
-}
-
-func sameSiteFromSessionConfig(sessionConfig *models.SessionConfig) http.SameSite {
-	switch sessionConfig.SameSite {
-	case "strict":
-		return http.SameSiteStrictMode
-	case "none":
-		return http.SameSiteNoneMode
-	case "lax":
-		return http.SameSiteLaxMode
-	default:
-		return http.SameSiteLaxMode
-	}
 }
