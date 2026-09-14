@@ -7,6 +7,7 @@ import (
 	"github.com/Authula/authula/plugins/totp/constants"
 	"github.com/Authula/authula/plugins/totp/types"
 	"github.com/Authula/authula/plugins/totp/usecases"
+	"github.com/Authula/authula/util"
 )
 
 type EnableHandler struct {
@@ -34,10 +35,11 @@ func (h *EnableHandler) Handler() http.HandlerFunc {
 				Name:     constants.CookieTOTPPending,
 				Value:    result.PendingToken,
 				Path:     "/",
+				Domain:   h.GlobalConfig.Session.Domain,
 				MaxAge:   int(h.PluginConfig.PendingTokenExpiry.Seconds()),
 				HttpOnly: true,
 				Secure:   h.PluginConfig.SecureCookie,
-				SameSite: types.ParseSameSite(h.PluginConfig.SameSite),
+				SameSite: util.ParseSameSite(h.PluginConfig.SameSite),
 			})
 		}
 

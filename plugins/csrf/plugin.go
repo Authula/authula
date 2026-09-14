@@ -221,38 +221,39 @@ func (p *CSRFPlugin) Middleware() func(http.Handler) http.Handler {
 	}
 }
 
-// setCSRFCookie sets the CSRF token cookie with hardcoded security settings.
-// Both HttpOnly and Secure are hardcoded to ensure the Double-Submit Cookie pattern works correctly:
-// - HttpOnly=false: Allows JavaScript to read the cookie value
-// - Secure: Set to true only for HTTPS requests (allows development over HTTP on localhost)
-// Also sets the token in a response header so the client can read and use it.
+// setCSRFCookie issues the CSRF token cookie and echoes the token in the response header
+// so the client can read and use it.
 func (p *CSRFPlugin) setCSRFCookie(reqCtx *models.RequestContext, token string) {
-	var samesite http.SameSite
-	switch p.pluginConfig.SameSite {
-	case "strict":
-		samesite = http.SameSiteStrictMode
-	case "none":
-		samesite = http.SameSiteNoneMode
-	case "lax":
-		samesite = http.SameSiteLaxMode
-	default:
-		samesite = http.SameSiteLaxMode
-	}
-
-	// Secure must be true for HTTPS requests or when SameSite=None
-	secure := reqCtx.Request.URL.Scheme == "https" || samesite == http.SameSiteNoneMode || p.pluginConfig.Secure
-
-	http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
-		Name:     p.pluginConfig.CookieName,
-		Value:    token,
-		Path:     "/",
-		HttpOnly: false, // Hardcoded: Required for Double-Submit Cookie pattern
-		Secure:   secure,
-		SameSite: samesite,
-		MaxAge:   int(p.pluginConfig.MaxAge.Seconds()),
-	})
-
+	http.SetCookie(reqCtx.ResponseWriter, p.csrfCookie(reqCtx, token, int(p.pluginConfig.MaxAge.Seconds())))
 	p.exposeCSRFToken(reqCtx, token)
+}
+
+// clearCSRFCookie expires the CSRF cookie. It reuses csrfCookie so the clear carries exactly the
+// same Domain, Path, Secure and SameSite attributes as the set; browsers only delete a cookie
+// when those match.
+func (p *CSRFPlugin) clearCSRFCookie(reqCtx *models.RequestContext) {
+	http.SetCookie(reqCtx.ResponseWriter, p.csrfCookie(reqCtx, "", -1))
+}
+
+// csrfCookie builds the CSRF cookie with the attributes shared by set and clear.
+// HttpOnly is always false because the Double-Submit Cookie pattern requires JavaScript to read the value.
+// Secure is forced on for HTTPS requests and for SameSite=None (which browsers reject without Secure),
+// and is otherwise taken from config so development over plain HTTP keeps working.
+// Domain follows the session cookie so both are scoped to the same hosts.
+func (p *CSRFPlugin) csrfCookie(reqCtx *models.RequestContext, value string, maxAge int) *http.Cookie {
+	sameSite := util.ParseSameSite(p.pluginConfig.SameSite)
+	secure := reqCtx.Request.URL.Scheme == "https" || sameSite == http.SameSiteNoneMode || p.pluginConfig.Secure
+
+	return &http.Cookie{
+		Name:     p.pluginConfig.CookieName,
+		Value:    value,
+		Path:     "/",
+		Domain:   p.globalConfig.Session.Domain,
+		HttpOnly: false,
+		Secure:   secure,
+		SameSite: sameSite,
+		MaxAge:   maxAge,
+	}
 }
 
 // exposeCSRFToken places the token in the response header. Clients on another origin

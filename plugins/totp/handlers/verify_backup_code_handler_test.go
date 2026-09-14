@@ -151,6 +151,7 @@ func (s *VerifyBackupCodeHandlerSuite) TestVerifyBackupCodeHandler_Table() {
 				cleared := totptests.CookieFromRecorder(w, constants.CookieTOTPPending)
 				require.NotNil(t, cleared)
 				assert.Equal(t, -1, cleared.MaxAge)
+				assert.Equal(t, testCookieDomain, cleared.Domain)
 				assert.Nil(t, totptests.CookieFromRecorder(w, constants.CookieTOTPTrusted))
 			},
 		},
@@ -185,6 +186,7 @@ func (s *VerifyBackupCodeHandlerSuite) TestVerifyBackupCodeHandler_Table() {
 				trusted := totptests.CookieFromRecorder(w, constants.CookieTOTPTrusted)
 				require.NotNil(t, trusted, "trusted device cookie should be set")
 				assert.Equal(t, "trusted-tok", trusted.Value)
+				assert.Equal(t, testCookieDomain, trusted.Domain)
 			},
 		},
 	}
@@ -199,7 +201,11 @@ func (s *VerifyBackupCodeHandlerSuite) TestVerifyBackupCodeHandler_Table() {
 			}
 
 			uc := buildVerifyBackupCodeUseCase(m.tokenSvc, m.verifSvc, m.sessionSvc, m.userSvc, m.repo, m.passwordSvc, m.pluginCfg)
-			h := &VerifyBackupCodeHandler{UseCase: uc, PluginConfig: m.pluginCfg}
+			h := &VerifyBackupCodeHandler{
+				GlobalConfig: &models.Config{Session: models.SessionConfig{Domain: testCookieDomain}},
+				PluginConfig: m.pluginCfg,
+				UseCase:      uc,
+			}
 			req, w, reqCtx := m.newRequest(t)
 			h.Handler().ServeHTTP(w, req)
 

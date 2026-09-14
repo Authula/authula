@@ -233,6 +233,40 @@ func TestSessionPlugin_ClearSessionCookie(t *testing.T) {
 	assert.Equal(t, -1, cookie.MaxAge)
 }
 
+func TestSessionPlugin_CookieDomain(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		domain     string
+		wantDomain string
+	}{
+		{name: "host-only when no domain is configured", domain: "", wantDomain: ""},
+		{name: "shares the configured parent domain", domain: "example.com", wantDomain: "example.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := newTestPlugin(new(internaltests.MockSessionService), new(internaltests.MockTokenService))
+			plugin.globalConfig.Session.Domain = tt.domain
+
+			setRecorder := httptest.NewRecorder()
+			plugin.SetSessionCookie(setRecorder, "plaintext-token", time.Now().UTC().Add(time.Hour))
+			setCookies := setRecorder.Result().Cookies()
+			require.Len(t, setCookies, 1)
+			assert.Equal(t, tt.wantDomain, setCookies[0].Domain)
+
+			clearRecorder := httptest.NewRecorder()
+			plugin.ClearSessionCookie(clearRecorder)
+			clearCookies := clearRecorder.Result().Cookies()
+			require.Len(t, clearCookies, 1)
+			assert.Equal(t, tt.wantDomain, clearCookies[0].Domain, "clear must carry the same Domain as the set or the browser keeps the cookie")
+		})
+	}
+}
+
 func TestSessionPlugin_ValidateSessionHook(t *testing.T) {
 	t.Parallel()
 

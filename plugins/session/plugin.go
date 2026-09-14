@@ -157,27 +157,15 @@ func (p *SessionPlugin) writeErrorResponse(w http.ResponseWriter, statusCode int
 	})
 }
 
-func (p *SessionPlugin) getSameSiteMode() http.SameSite {
-	switch p.globalConfig.Session.SameSite {
-	case "strict":
-		return http.SameSiteStrictMode
-	case "none":
-		return http.SameSiteNoneMode
-	case "lax":
-		return http.SameSiteLaxMode
-	default:
-		return http.SameSiteLaxMode
-	}
-}
-
 func (p *SessionPlugin) SetSessionCookie(w http.ResponseWriter, sessionToken string, expiresAt time.Time) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     p.globalConfig.Session.CookieName,
 		Value:    sessionToken,
 		Path:     "/",
+		Domain:   p.globalConfig.Session.Domain,
 		HttpOnly: p.globalConfig.Session.HttpOnly,
 		Secure:   p.globalConfig.Session.Secure,
-		SameSite: p.getSameSiteMode(),
+		SameSite: util.ParseSameSite(p.globalConfig.Session.SameSite),
 		MaxAge:   p.cookieMaxAge(expiresAt),
 	})
 }
@@ -187,9 +175,10 @@ func (p *SessionPlugin) ClearSessionCookie(w http.ResponseWriter) {
 		Name:     p.globalConfig.Session.CookieName,
 		Value:    "",
 		Path:     "/",
+		Domain:   p.globalConfig.Session.Domain,
 		HttpOnly: p.globalConfig.Session.HttpOnly,
 		Secure:   p.globalConfig.Session.Secure,
-		SameSite: p.getSameSiteMode(),
+		SameSite: util.ParseSameSite(p.globalConfig.Session.SameSite),
 		MaxAge:   -1,
 	})
 }
