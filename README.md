@@ -20,11 +20,9 @@
 
 </div>
 
----
+## Authula
 
-### Overview
-
-**Authula** is an open-source authentication solution that scales with you. Embed it as a library in your Go app, or run it as a standalone auth server with any tech stack. It simplifies adding robust authentication to backend services, empowering developers to build secure applications faster.
+An open-source authentication solution that scales with you. Embed it as a library in your Go app, or run it as a standalone auth server with any tech stack. It simplifies adding robust authentication to backend services, empowering developers to build secure applications faster.
 
 All functionality is delivered through a powerful plugin system, allowing you to compose exactly the authentication stack you need — no more, no less, all built with clean architecture. **Authula** is flexible enough to integrate with any technology stack. It streamlines the implementation of essential security features through a clean, modular architecture, allowing developers to concentrate on building their applications without the overhead of managing authentication complexities.
 
@@ -142,23 +140,5 @@ Your contributions are welcome! Here's how you can get involved:
 Join our growing community for support, discussions, and updates:
 
 - [Discord Server](https://discord.gg/nThBksdr2Z)
-
-If you'd like to support the ongoing development of this project, consider subscribing on Polar!
-
-[![Subscribe on Polar](https://img.shields.io/badge/Subscribe-on%20Polar-00d1ff?style=for-the-badge&logo=polar&logoColor=white)](https://buy.polar.sh/polar_cl_Q8rpefucf3fmnRTTeIvPCiE6ZvfMKclwxlyOz283ZC7)
-
----
-
-### Our Sponsors
-
-#### 🏢 Corporate Sponsors
-
-#### 🥇 Gold Sponsors
-
-#### 🥈 Silver Sponsors
-
-#### 🥉 Bronze Sponsors
-
-<a href="https://github.com/libanj"><img src="https://wsrv.nl/?url=github.com/libanj.png?w=64&h=64&mask=circle" width="32" height="32"></a>
 
 ---
