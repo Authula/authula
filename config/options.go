@@ -18,11 +18,11 @@ const defaultSecret = "authula-secret-0123456789"
 
 type ConfigOption func(*models.Config)
 
-// NewConfig builds a Config using functional options with sensible defaults.
-// Panics if event bus configuration is invalid or if required secrets are missing in production.
-func NewConfig(options ...ConfigOption) *models.Config {
-	// Define sensible defaults first
-	config := &models.Config{
+// DefaultConfig returns the defaults NewConfig starts from, without applying
+// options or validating. A config file is decoded on top of it, so a key the
+// file leaves out keeps its default instead of becoming the zero value.
+func DefaultConfig() *models.Config {
+	return &models.Config{
 		AppName:       "Authula",
 		BaseURL:       "http://localhost:8080",
 		BasePath:      "/auth",
@@ -74,6 +74,12 @@ func NewConfig(options ...ConfigOption) *models.Config {
 		PreParsedConfigs: make(map[string]any),
 		CoreServiceHooks: nil,
 	}
+}
+
+// NewConfig builds a Config using functional options with sensible defaults.
+// Panics if event bus configuration is invalid or if required secrets are missing in production.
+func NewConfig(options ...ConfigOption) *models.Config {
+	config := DefaultConfig()
 
 	// Apply the options - they override defaults only if non-zero/non-empty
 	for _, option := range options {

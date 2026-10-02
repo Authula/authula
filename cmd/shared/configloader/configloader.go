@@ -23,8 +23,11 @@ func Load(path string) (*authulamodels.Config, bool, error) {
 		return nil, false, fmt.Errorf("read config file: %w", err)
 	}
 
-	var loaded authulamodels.Config
-	if err := toml.Unmarshal(data, &loaded); err != nil {
+	// Decode on top of the defaults: the With* options below copy booleans
+	// such as session.http_only as given, so a key the file omits would
+	// otherwise arrive as false and replace a default of true.
+	loaded := authulaconfig.DefaultConfig()
+	if err := toml.Unmarshal(data, loaded); err != nil {
 		return nil, true, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
