@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Authula/authula/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,24 +20,37 @@ func TestLoadKeepsDefaultsForOmittedKeys(t *testing.T) {
 		wantAllowedOrigins   []string
 	}{
 		{
-			name:                 "file without a session or security section",
-			file:                 "app_name = \"demo\"\n",
+			name: "file without a session or security section",
+			file: util.Dedent(`
+				app_name = "demo"
+			`),
 			wantHttpOnly:         true,
 			wantMaxSessions:      5,
 			wantAllowCredentials: true,
 			wantAllowedOrigins:   []string{"*"},
 		},
 		{
-			name:                 "session section that sets only the cookie name",
-			file:                 "[session]\ncookie_name = \"sid\"\n",
+			name: "session section that sets only the cookie name",
+			file: util.Dedent(`
+				[session]
+				cookie_name = "sid"
+			`),
 			wantHttpOnly:         true,
 			wantMaxSessions:      5,
 			wantAllowCredentials: true,
 			wantAllowedOrigins:   []string{"*"},
 		},
 		{
-			name:                 "explicit values still win",
-			file:                 "[session]\nhttp_only = false\nmax_sessions_per_user = 2\n[security.cors]\nallow_credentials = false\nallowed_origins = [\"https://example.com\"]\n",
+			name: "explicit values still win",
+			file: util.Dedent(`
+				[session]
+				http_only = false
+				max_sessions_per_user = 2
+
+				[security.cors]
+				allow_credentials = false
+				allowed_origins = ["https://example.com"]
+			`),
 			wantHttpOnly:         false,
 			wantMaxSessions:      2,
 			wantAllowCredentials: false,

@@ -241,3 +241,31 @@ func NormalizeRoutePattern(pattern string) string {
 	}
 	return strings.ReplaceAll(trimmed, "//", "/")
 }
+
+// Dedent removes common leading whitespace from each line in a multi-line string.
+func Dedent(s string) string {
+	lines := strings.Split(strings.Trim(s, "\n"), "\n")
+
+	min := -1
+	for _, line := range lines {
+		trimmed := strings.TrimLeft(line, " \t")
+		if trimmed == "" {
+			continue
+		}
+		indent := len(line) - len(trimmed)
+		if min < 0 || indent < min {
+			min = indent
+		}
+	}
+	if min > 0 {
+		for i, line := range lines {
+			if strings.TrimLeft(line, " \t") == "" {
+				lines[i] = ""
+				continue
+			}
+			lines[i] = line[min:]
+		}
+	}
+
+	return strings.Join(lines, "\n") + "\n"
+}
