@@ -23,10 +23,9 @@ func Load(path string) (*authulamodels.Config, bool, error) {
 		return nil, false, fmt.Errorf("read config file: %w", err)
 	}
 
-	// Decode on top of the defaults: the With* options below copy booleans
-	// such as session.http_only as given, so a key the file omits would
-	// otherwise arrive as false and replace a default of true.
-	loaded := authulaconfig.DefaultConfig()
+	// Decode on top of the default config to ensure that all fields
+	// are populated with defaults if not specified in the file.
+	loaded := authulaconfig.NewDefaultConfig()
 	if err := toml.Unmarshal(data, loaded); err != nil {
 		return nil, true, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
