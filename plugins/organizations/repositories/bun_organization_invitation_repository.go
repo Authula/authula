@@ -69,10 +69,8 @@ func (r *BunOrganizationInvitationRepository) GetByOrganizationIDAndEmail(ctx co
 	return invitation, err
 }
 
-// pendingByEmailWhere matches invitations that are still awaiting a decision and
-// have not expired. Both pending lookups order oldest first, because acceptance
-// resolves role conflicts in favour of the earliest invitation.
-const pendingByEmailWhere = "email = ? AND status = ? AND expires_at > ?"
+const pendingByEmailWhere = "email = ? AND status = ? AND expires_at > ?" +
+	" AND organization_id IN (SELECT id FROM organizations WHERE deleted_at IS NULL)"
 
 func (r *BunOrganizationInvitationRepository) ListAllPendingByEmail(ctx context.Context, email string, page int, limit int) ([]types.OrganizationInvitation, int, error) {
 	invites := make([]types.OrganizationInvitation, 0)
@@ -152,7 +150,7 @@ const invitationWithOrgColumns = `i.id, i.email, i.inviter_id, i.organization_id
 
 const invitationWithOrgByOrganizationFrom = ` FROM organization_invitations i` +
 	` INNER JOIN organizations o ON o.id = i.organization_id` +
-	` WHERE i.organization_id = ?`
+	` WHERE i.organization_id = ? AND o.deleted_at IS NULL`
 
 func mapToInvitationWithOrgResponse(row invitationOrgRow) types.GetOrganizationInvitationResponse {
 	return types.GetOrganizationInvitationResponse{
@@ -183,7 +181,7 @@ func (r *BunOrganizationInvitationRepository) GetByIDWithOrg(ctx context.Context
 		SELECT `+invitationWithOrgColumns+`
 		FROM organization_invitations i
 		INNER JOIN organizations o ON o.id = i.organization_id
-		WHERE i.id = ?
+		WHERE i.id = ? AND o.deleted_at IS NULL
 	`, invitationID).Scan(ctx, &row)
 	if err == sql.ErrNoRows {
 		return nil, nil

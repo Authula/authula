@@ -32,11 +32,13 @@ func organizationsSQLiteInitial() migrations.Migration {
 					slug VARCHAR(255) NOT NULL UNIQUE,
 					logo TEXT,
 					metadata TEXT,
+					deleted_at TIMESTAMP,
 					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 					updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-					FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+					FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE RESTRICT
 				);`,
 				`CREATE INDEX IF NOT EXISTS idx_organizations_owner_id ON organizations(owner_id);`,
+				`CREATE INDEX IF NOT EXISTS idx_organizations_deleted_at ON organizations(deleted_at);`,
 				`CREATE INDEX IF NOT EXISTS idx_organizations_owner_created_id ON organizations(owner_id, created_at, id);`,
 				`DROP TRIGGER IF EXISTS update_organizations_updated_at_trigger;`,
 				`CREATE TRIGGER update_organizations_updated_at_trigger 
@@ -56,7 +58,7 @@ func organizationsSQLiteInitial() migrations.Migration {
 					status VARCHAR(32) NOT NULL DEFAULT 'pending',
 					expires_at TIMESTAMP NOT NULL,
 					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-					FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+					FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE RESTRICT,
 					FOREIGN KEY (inviter_id) REFERENCES users(id) ON DELETE CASCADE
 				);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_invitations_email ON organization_invitations(email);`,
@@ -73,7 +75,7 @@ func organizationsSQLiteInitial() migrations.Migration {
 					role VARCHAR(255) NOT NULL,
 					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 					updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-					FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+					FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE RESTRICT,
 					FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 					UNIQUE (organization_id, user_id)
 				);`,
@@ -97,7 +99,7 @@ func organizationsSQLiteInitial() migrations.Migration {
 					metadata TEXT,
 					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 					updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-					FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+					FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE RESTRICT,
 					UNIQUE (organization_id, slug)
 				);`,
 				`CREATE INDEX IF NOT EXISTS idx_organization_teams_organization_id ON organization_teams(organization_id);`,
@@ -161,9 +163,10 @@ func organizationsPostgresInitial() migrations.Migration {
 					slug VARCHAR(255) NOT NULL UNIQUE,
 					logo TEXT,
 					metadata JSONB,
+					deleted_at TIMESTAMP WITH TIME ZONE,
 					created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 					updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-					CONSTRAINT fk_organizations_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+					CONSTRAINT fk_organizations_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE RESTRICT
 				);`,
 				`DROP TRIGGER IF EXISTS update_organizations_updated_at_trigger ON organizations;`,
 				`CREATE TRIGGER update_organizations_updated_at_trigger
@@ -172,6 +175,7 @@ func organizationsPostgresInitial() migrations.Migration {
 				EXECUTE FUNCTION organizations_set_updated_at_fn();`,
 				`CREATE INDEX IF NOT EXISTS idx_organizations_owner_id ON organizations(owner_id);`,
 				`CREATE INDEX IF NOT EXISTS idx_organizations_owner_created_id ON organizations(owner_id, created_at, id);`,
+				`CREATE INDEX IF NOT EXISTS idx_organizations_deleted_at ON organizations(deleted_at) WHERE deleted_at IS NULL;`,
 				// -----------------------------------
 				`CREATE TABLE IF NOT EXISTS organization_invitations (
 					id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -183,7 +187,7 @@ func organizationsPostgresInitial() migrations.Migration {
 					expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
 					created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 					updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-					CONSTRAINT fk_organization_invitations_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+					CONSTRAINT fk_organization_invitations_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE RESTRICT,
 					CONSTRAINT fk_organization_invitations_inviter FOREIGN KEY (inviter_id) REFERENCES users(id) ON DELETE CASCADE,
 					CONSTRAINT chk_organization_invitations_status CHECK (status IN ('pending', 'accepted', 'rejected', 'revoked', 'expired'))
 				);`,
@@ -206,7 +210,7 @@ func organizationsPostgresInitial() migrations.Migration {
 					role VARCHAR(255) NOT NULL,
 					created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 					updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-					CONSTRAINT fk_organization_members_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+					CONSTRAINT fk_organization_members_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE RESTRICT,
 					CONSTRAINT fk_organization_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 					CONSTRAINT uq_organization_members_organization_user UNIQUE (organization_id, user_id)
 				);`,
@@ -229,7 +233,7 @@ func organizationsPostgresInitial() migrations.Migration {
 					metadata JSONB,
 					created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 					updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-					CONSTRAINT fk_organization_teams_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+					CONSTRAINT fk_organization_teams_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE RESTRICT,
 					CONSTRAINT uq_organization_teams_organization_slug UNIQUE (organization_id, slug)
 				);`,
 				`DROP TRIGGER IF EXISTS update_organization_teams_updated_at_trigger ON organization_teams;`,
@@ -290,11 +294,13 @@ func organizationsMySQLInitial() migrations.Migration {
 					slug VARCHAR(255) NOT NULL UNIQUE,
 					logo TEXT NULL,
 					metadata JSON NULL,
+					deleted_at TIMESTAMP NULL DEFAULT NULL,
 					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 					updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-					CONSTRAINT fk_organizations_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+					CONSTRAINT fk_organizations_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE RESTRICT,
 					INDEX idx_organizations_owner_id (owner_id),
-					INDEX idx_organizations_owner_created_id (owner_id, created_at, id)
+					INDEX idx_organizations_deleted_at (deleted_at)
+					INDEX idx_organizations_owner_created_id (owner_id, created_at, id),
 				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 				// -----------------------------------
 				`CREATE TABLE IF NOT EXISTS organization_invitations (
@@ -307,7 +313,7 @@ func organizationsMySQLInitial() migrations.Migration {
 					expires_at TIMESTAMP NOT NULL,
 					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 					updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-					CONSTRAINT fk_organization_invitations_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+					CONSTRAINT fk_organization_invitations_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE RESTRICT,
 					CONSTRAINT fk_organization_invitations_inviter FOREIGN KEY (inviter_id) REFERENCES users(id) ON DELETE CASCADE,
 					CONSTRAINT chk_organization_invitations_status CHECK (status IN ('pending', 'accepted', 'rejected', 'revoked', 'expired')),
 					INDEX idx_organization_invitations_organization_id (organization_id),
@@ -325,7 +331,7 @@ func organizationsMySQLInitial() migrations.Migration {
 					role VARCHAR(255) NOT NULL,
 					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 					updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-					CONSTRAINT fk_organization_members_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+					CONSTRAINT fk_organization_members_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE RESTRICT,
 					CONSTRAINT fk_organization_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 					CONSTRAINT uq_organization_members_organization_user UNIQUE (organization_id, user_id),
 					INDEX idx_organization_members_organization_id (organization_id),
@@ -343,7 +349,7 @@ func organizationsMySQLInitial() migrations.Migration {
 					metadata JSON NULL,
 					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 					updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-					CONSTRAINT fk_organization_teams_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+					CONSTRAINT fk_organization_teams_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE RESTRICT,
 					CONSTRAINT uq_organization_teams_organization_slug UNIQUE (organization_id, slug),
 					INDEX idx_organization_teams_organization_id (organization_id),
 					INDEX idx_organization_teams_slug (slug),

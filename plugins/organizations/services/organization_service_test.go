@@ -11,6 +11,7 @@ import (
 	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/core/pagination"
 	internaltests "github.com/Authula/authula/internal/tests"
+	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/constants"
 	orgtests "github.com/Authula/authula/plugins/organizations/tests"
 	"github.com/Authula/authula/plugins/organizations/types"
@@ -564,14 +565,14 @@ func TestOrganizationService_DeleteOrganization(t *testing.T) {
 		name           string
 		actorUserID    string
 		organizationID string
-		setup          func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationHooks, *ServiceUtils)
+		setup          func(*orgtests.MockOrganizationRepository)
 		expectErr      error
 	}{
 		{
 			name:           "success",
 			actorUserID:    "user-1",
 			organizationID: "org-1",
-			setup: func(repo *orgtests.MockOrganizationRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
+			setup: func(repo *orgtests.MockOrganizationRepository) {
 				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 				repo.On("Delete", mock.Anything, "org-1").Return(nil).Once()
 			},
@@ -583,13 +584,25 @@ func TestOrganizationService_DeleteOrganization(t *testing.T) {
 			t.Parallel()
 
 			repo := &orgtests.MockOrganizationRepository{}
-			hooks := &orgtests.MockOrganizationHooks{}
 			serviceUtils := &ServiceUtils{orgRepo: repo}
 			if tt.setup != nil {
-				tt.setup(repo, hooks, serviceUtils)
+				tt.setup(repo)
 			}
 
-			svc := NewOrganizationService(repo, nil, serviceUtils, nil, nil, nil)
+			beforeCalled := false
+			afterCalled := false
+			orgHooks := &types.OrganizationServiceHooks{}
+			orgHooks.RegisterBeforeDelete(func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
+				beforeCalled = true
+				return nil
+			})
+			orgHooks.RegisterAfterDelete(func(ctx context.Context, actor *models.Actor, organization *types.Organization) error {
+				afterCalled = true
+				return nil
+			})
+			hooksExecutor := NewServiceHookExecutor(&types.OrganizationsServiceHooksConfig{Organizations: orgHooks}, nil, nil)
+
+			svc := NewOrganizationService(repo, nil, serviceUtils, nil, nil, nil, hooksExecutor)
 			err := svc.DeleteOrganization(context.Background(), orgtests.Actor(tt.actorUserID), tt.organizationID)
 			if tt.expectErr != nil {
 				require.Error(t, err)
@@ -597,6 +610,66 @@ func TestOrganizationService_DeleteOrganization(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+			require.True(t, beforeCalled, "BeforeDeleteOrganization must fire")
+			require.True(t, afterCalled, "AfterDeleteOrganization must fire")
+			repo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestOrganizationService_ExistsByID(t *testing.T) {
+	t.Parallel()
+
+	repoErr := errors.New("repository error")
+
+	tests := []struct {
+		name        string
+		setup       func(*orgtests.MockOrganizationRepository)
+		expectExist bool
+		expectErr   error
+	}{
+		{
+			name: "found live organization",
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+			},
+			expectExist: true,
+		},
+		{
+			name: "soft-deleted organization reads as absent",
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("GetByID", mock.Anything, "org-1").Return(nil, nil).Once()
+			},
+			expectExist: false,
+		},
+		{
+			name: "repository error is propagated",
+			setup: func(repo *orgtests.MockOrganizationRepository) {
+				repo.On("GetByID", mock.Anything, "org-1").Return(nil, repoErr).Once()
+			},
+			expectErr: repoErr,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repo := &orgtests.MockOrganizationRepository{}
+			if tt.setup != nil {
+				tt.setup(repo)
+			}
+
+			svc := NewOrganizationService(repo, nil, &ServiceUtils{orgRepo: repo}, nil, nil, nil)
+			exists, err := svc.ExistsByID(context.Background(), "org-1")
+			if tt.expectErr != nil {
+				require.Error(t, err)
+				require.ErrorIs(t, err, tt.expectErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.expectExist, exists)
+			repo.AssertExpectations(t)
 		})
 	}
 }
