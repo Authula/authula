@@ -756,6 +756,111 @@ func TestBunOrganizationInvitationRepository_GetAllByOrganizationIDWithOrg(t *te
 	}
 }
 
+func TestBunOrganizationInvitationRepository_GetByIDWithOrg(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		invitationID  string
+		softDeleteOrg bool
+		expectFound   bool
+	}{
+		{name: "found", invitationID: "inv-1", expectFound: true},
+		{name: "not found", invitationID: "missing"},
+		{name: "soft-deleted organization is not found", invitationID: "inv-1", softDeleteOrg: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := plugintests.SetupRepoDB(t)
+			plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+			repo := repositories.NewBunOrganizationInvitationRepository(db)
+			ctx := context.Background()
+
+			_, err := repo.Create(ctx, &types.OrganizationInvitation{ID: "inv-1", Email: "user@example.com", InviterID: "user-1", OrganizationID: "org-1", Role: "member", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)})
+			require.NoError(t, err)
+			if tt.softDeleteOrg {
+				softDeleteOrganization(t, db, "org-1")
+			}
+
+			found, err := repo.GetByIDWithOrg(ctx, tt.invitationID)
+			require.NoError(t, err)
+			if tt.expectFound {
+				require.NotNil(t, found)
+				require.Equal(t, "inv-1", found.Invitation.ID)
+				require.Equal(t, "org-1", found.Organization.ID)
+				return
+			}
+			require.Nil(t, found)
+		})
+	}
+}
+
+func TestBunOrganizationInvitationRepository_ListAllByOrganizationIDWithOrgExcludesSoftDeletedOrganization(t *testing.T) {
+	t.Parallel()
+
+	db := plugintests.SetupRepoDB(t)
+	plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+	repo := repositories.NewBunOrganizationInvitationRepository(db)
+	ctx := context.Background()
+
+	for i := 1; i <= 3; i++ {
+		_, err := repo.Create(ctx, &types.OrganizationInvitation{
+			ID:             fmt.Sprintf("inv-%d", i),
+			Email:          fmt.Sprintf("user%d@example.com", i),
+			InviterID:      "user-1",
+			OrganizationID: "org-1",
+			Role:           "member",
+			Status:         types.OrganizationInvitationStatusPending,
+			ExpiresAt:      time.Now().UTC().Add(time.Hour),
+		})
+		require.NoError(t, err)
+	}
+
+	softDeleteOrganization(t, db, "org-1")
+
+	invitations, total, err := repo.ListAllByOrganizationIDWithOrg(ctx, "org-1", 1, 10)
+	require.NoError(t, err)
+	require.Empty(t, invitations)
+	require.Equal(t, 0, total)
+}
+
+func TestBunOrganizationInvitationRepository_PendingByEmailExcludesSoftDeletedOrganization(t *testing.T) {
+	t.Parallel()
+
+	db := plugintests.SetupRepoDB(t)
+	plugintests.SeedOrganization(t, db, "org-1", "user-1", "Acme Inc", "acme-inc")
+	plugintests.SeedOrganization(t, db, "org-2", "user-2", "Beta Inc", "beta-inc")
+	repo := repositories.NewBunOrganizationInvitationRepository(db)
+	ctx := context.Background()
+
+	for _, invitation := range []*types.OrganizationInvitation{
+		{ID: "inv-1", OrganizationID: "org-1", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)},
+		{ID: "inv-2", OrganizationID: "org-2", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(time.Hour)},
+	} {
+		invitation.Email = "user@example.com"
+		invitation.InviterID = "user-1"
+		invitation.Role = "member"
+		_, err := repo.Create(ctx, invitation)
+		require.NoError(t, err)
+	}
+
+	softDeleteOrganization(t, db, "org-1")
+
+	all, err := repo.GetAllPendingByEmail(ctx, "user@example.com")
+	require.NoError(t, err)
+	require.Len(t, all, 1)
+	require.Equal(t, "inv-2", all[0].ID)
+
+	paged, total, err := repo.ListAllPendingByEmail(ctx, "user@example.com", 1, 10)
+	require.NoError(t, err)
+	require.Len(t, paged, 1)
+	require.Equal(t, 1, total)
+	require.Equal(t, "inv-2", paged[0].ID)
+}
+
 func TestBunOrganizationInvitationRepository_GetAllByOrganizationIDWithOrgIgnoresTheDefaultLimit(t *testing.T) {
 	t.Parallel()
 

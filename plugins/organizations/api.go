@@ -45,6 +45,14 @@ func (a *API) GetUserPermissionsInOrganization(ctx context.Context, userID strin
 		return nil, coreerrors.ErrUnauthorized
 	}
 
+	exists, err := a.organizationService.ExistsByID(ctx, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, coreerrors.ErrForbidden
+	}
+
 	member, err := a.memberRepo.GetByOrganizationIDAndUserID(ctx, organizationID, userID)
 	if err != nil {
 		return nil, err
@@ -69,7 +77,8 @@ func (a *API) GetAllOrganizations(ctx context.Context, actor *models.Actor) ([]t
 }
 
 // GetAllOrganizationsUnscoped returns every organization in the system with no
-// access filtering. Authorize the caller before using it.
+// access filtering, excluding soft-deleted organizations. Authorize the caller
+// before using it.
 func (a *API) GetAllOrganizationsUnscoped(ctx context.Context) ([]types.Organization, error) {
 	return a.organizationService.GetAllOrganizationsUnscoped(ctx)
 }

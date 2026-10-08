@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -39,7 +40,7 @@ func (r *BunOrganizationRepository) Create(ctx context.Context, organization *ty
 
 func (r *BunOrganizationRepository) GetByID(ctx context.Context, organizationID string) (*types.Organization, error) {
 	organization := new(types.Organization)
-	err := r.db.NewSelect().Model(organization).Where("id = ?", organizationID).Scan(ctx)
+	err := r.db.NewSelect().Model(organization).Where("id = ? AND deleted_at IS NULL", organizationID).Scan(ctx)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -48,15 +49,16 @@ func (r *BunOrganizationRepository) GetByID(ctx context.Context, organizationID 
 
 func (r *BunOrganizationRepository) GetBySlug(ctx context.Context, slug string) (*types.Organization, error) {
 	organization := new(types.Organization)
-	err := r.db.NewSelect().Model(organization).Where("slug = ?", slug).Scan(ctx)
+	err := r.db.NewSelect().Model(organization).Where("slug = ? AND deleted_at IS NULL", slug).Scan(ctx)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	return organization, err
 }
 
-const organizationAccessibleWhere = `o.owner_id = ? OR EXISTS (` +
-	`SELECT 1 FROM organization_members m WHERE m.organization_id = o.id AND m.user_id = ?)`
+const organizationAccessibleWhere = `(o.owner_id = ? OR EXISTS (` +
+	`SELECT 1 FROM organization_members m WHERE m.organization_id = o.id AND m.user_id = ?))` +
+	` AND o.deleted_at IS NULL`
 
 func (r *BunOrganizationRepository) ListAllAccessibleByUserID(ctx context.Context, userID string, page int, limit int) ([]types.Organization, int, error) {
 	organizations := make([]types.Organization, 0)
@@ -91,6 +93,7 @@ func (r *BunOrganizationRepository) GetAllAccessibleByUserID(ctx context.Context
 func (r *BunOrganizationRepository) GetAll(ctx context.Context) ([]types.Organization, error) {
 	organizations := make([]types.Organization, 0)
 	err := r.db.NewSelect().Model(&organizations).
+		Where("deleted_at IS NULL").
 		OrderExpr("created_at DESC, id DESC").
 		Scan(ctx)
 	if err == sql.ErrNoRows {
@@ -129,11 +132,11 @@ func (r *BunOrganizationRepository) Update(ctx context.Context, organization *ty
 
 func (r *BunOrganizationRepository) Delete(ctx context.Context, organizationID string) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if _, err := tx.NewDelete().Model(&types.Organization{}).Where("id = ?", organizationID).Exec(ctx); err != nil {
-			return err
-		}
-
-		return nil
+		_, err := tx.NewUpdate().Model(&types.Organization{}).
+			Set("deleted_at = ?", time.Now().UTC()).
+			Where("id = ? AND deleted_at IS NULL", organizationID).
+			Exec(ctx)
+		return err
 	})
 }
 

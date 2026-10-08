@@ -72,6 +72,22 @@ func TestBunOrganizationRepository_GetByID(t *testing.T) {
 			},
 		},
 		{
+			name:           "soft deleted is not found",
+			organizationID: "org-1",
+			setup: func(t *testing.T) (repositories.OrganizationRepository, context.Context) {
+				t.Helper()
+				db := plugintests.SetupRepoDB(t)
+				repo := repositories.NewBunOrganizationRepository(db)
+				ctx := context.Background()
+
+				_, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc"})
+				require.NoError(t, err)
+				require.NoError(t, repo.Delete(ctx, "org-1"))
+
+				return repo, ctx
+			},
+		},
+		{
 			name:           "not found",
 			organizationID: "missing",
 			setup: func(t *testing.T) (repositories.OrganizationRepository, context.Context) {
@@ -126,6 +142,22 @@ func TestBunOrganizationRepository_GetBySlug(t *testing.T) {
 			},
 		},
 		{
+			name: "soft deleted is not found",
+			slug: "acme-inc",
+			setup: func(t *testing.T) (repositories.OrganizationRepository, context.Context) {
+				t.Helper()
+				db := plugintests.SetupRepoDB(t)
+				repo := repositories.NewBunOrganizationRepository(db)
+				ctx := context.Background()
+
+				_, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc"})
+				require.NoError(t, err)
+				require.NoError(t, repo.Delete(ctx, "org-1"))
+
+				return repo, ctx
+			},
+		},
+		{
 			name: "not found",
 			slug: "missing",
 			setup: func(t *testing.T) (repositories.OrganizationRepository, context.Context) {
@@ -153,7 +185,7 @@ func TestBunOrganizationRepository_GetBySlug(t *testing.T) {
 	}
 }
 
-func seedAccessibleOrganizations(t *testing.T) (repositories.OrganizationRepository, context.Context) {
+func seedAccessibleOrganizationsDB(t *testing.T) (*bun.DB, repositories.OrganizationRepository, context.Context) {
 	t.Helper()
 
 	db := plugintests.SetupRepoDB(t)
@@ -168,7 +200,21 @@ func seedAccessibleOrganizations(t *testing.T) (repositories.OrganizationReposit
 	plugintests.SeedOrganizationMember(t, db, "mem-c", "org-c", "user-1", "owner")
 	plugintests.SeedOrganizationMember(t, db, "mem-d", "org-d", "user-2", "owner")
 
-	return repositories.NewBunOrganizationRepository(db), ctx
+	return db, repositories.NewBunOrganizationRepository(db), ctx
+}
+
+func seedAccessibleOrganizations(t *testing.T) (repositories.OrganizationRepository, context.Context) {
+	t.Helper()
+
+	_, repo, ctx := seedAccessibleOrganizationsDB(t)
+	return repo, ctx
+}
+
+func softDeleteOrganization(t *testing.T, db *bun.DB, organizationID string) {
+	t.Helper()
+
+	_, err := db.ExecContext(context.Background(), `UPDATE organizations SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`, organizationID)
+	require.NoError(t, err)
 }
 
 func organizationIDs(organizations []types.Organization) []string {
@@ -328,40 +374,73 @@ func TestBunOrganizationRepository_Update(t *testing.T) {
 func TestBunOrganizationRepository_Delete(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name           string
-		organizationID string
-		setup          func(*testing.T) (repositories.OrganizationRepository, context.Context)
-	}{
-		{
-			name:           "delete existing",
-			organizationID: "org-1",
-			setup: func(t *testing.T) (repositories.OrganizationRepository, context.Context) {
-				t.Helper()
-				db := plugintests.SetupRepoDB(t)
-				repo := repositories.NewBunOrganizationRepository(db)
-				ctx := context.Background()
+	db := plugintests.SetupRepoDB(t)
+	repo := repositories.NewBunOrganizationRepository(db)
+	ctx := context.Background()
 
-				_, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc"})
-				require.NoError(t, err)
+	_, err := repo.Create(ctx, &types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Inc", Slug: "acme-inc"})
+	require.NoError(t, err)
 
-				return repo, ctx
-			},
-		},
-	}
+	require.NoError(t, repo.Delete(ctx, "org-1"))
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	found, err := repo.GetByID(ctx, "org-1")
+	require.NoError(t, err)
+	require.Nil(t, found, "a soft-deleted organization must not be readable")
 
-			repo, ctx := tt.setup(t)
+	var retained types.Organization
+	err = db.NewSelect().Model(&retained).
+		Where("id = ?", "org-1").
+		Where("deleted_at IS NOT NULL").
+		Scan(ctx)
+	require.NoError(t, err, "the row must still exist with deleted_at set")
+	require.NotNil(t, retained.DeletedAt)
+	require.Equal(t, "acme-inc", retained.Slug, "the slug stays reserved after a soft delete")
+}
 
-			require.NoError(t, repo.Delete(ctx, tt.organizationID))
-			found, err := repo.GetByID(ctx, tt.organizationID)
-			require.NoError(t, err)
-			require.Nil(t, found)
-		})
-	}
+func TestBunOrganizationRepository_SoftDeletedOrganizationsAreHidden(t *testing.T) {
+	t.Parallel()
+
+	db, repo, ctx := seedAccessibleOrganizationsDB(t)
+	softDeleteOrganization(t, db, "org-a")
+	softDeleteOrganization(t, db, "org-c")
+
+	found, err := repo.GetByID(ctx, "org-a")
+	require.NoError(t, err)
+	require.Nil(t, found)
+
+	bySlug, err := repo.GetBySlug(ctx, "owned")
+	require.NoError(t, err)
+	require.Nil(t, bySlug, "a soft-deleted organization must not be found by its reserved slug")
+
+	accessible, _, err := repo.ListAllAccessibleByUserID(ctx, "user-1", 1, 10)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"org-b"}, organizationIDs(accessible))
+
+	allAccessible, err := repo.GetAllAccessibleByUserID(ctx, "user-1")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"org-b"}, organizationIDs(allAccessible))
+
+	all, err := repo.GetAll(ctx)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"org-b", "org-d"}, organizationIDs(all))
+
+	count, err := repo.CountAccessibleByUserID(ctx, "user-1")
+	require.NoError(t, err)
+	require.Equal(t, 1, count, "soft-deleted organizations must not count toward the quota")
+}
+
+func TestBunOrganizationRepository_HardDeleteBlockedByChildren(t *testing.T) {
+	t.Parallel()
+
+	db, _, ctx := seedAccessibleOrganizationsDB(t)
+
+	// SQLite disables foreign key enforcement by default and the PRAGMA is a
+	// no-op inside the migrator's transaction, so enable it on this connection.
+	_, err := db.ExecContext(ctx, `PRAGMA foreign_keys = ON;`)
+	require.NoError(t, err)
+
+	_, err = db.ExecContext(ctx, `DELETE FROM organizations WHERE id = ?`, "org-b")
+	require.Error(t, err, "FK RESTRICT must block hard-deleting an organization with members")
 }
 
 func TestBunOrganizationRepository_WithTx(t *testing.T) {

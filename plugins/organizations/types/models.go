@@ -16,6 +16,7 @@ type Organization struct {
 	Slug      string         `json:"slug" required:"true" nullable:"false" bun:"column:slug"`
 	Logo      *string        `json:"logo" nullable:"true" bun:"column:logo"`
 	Metadata  map[string]any `json:"metadata" nullable:"true" bun:"column:metadata"`
+	DeletedAt *time.Time     `json:"deleted_at,omitempty" nullable:"true" bun:"column:deleted_at,nullzero"`
 	CreatedAt time.Time      `json:"created_at" required:"true" nullable:"false" bun:"column:created_at,default:current_timestamp"`
 	UpdatedAt time.Time      `json:"updated_at" required:"true" nullable:"false" bun:"column:updated_at,default:current_timestamp"`
 }

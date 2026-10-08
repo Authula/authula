@@ -216,8 +216,6 @@ func (s *organizationService) GetAllOrganizations(ctx context.Context, actor *mo
 	return organizations, nil
 }
 
-// GetAllOrganizationsUnscoped bypasses actor scoping entirely. See the interface
-// documentation before adding a caller.
 func (s *organizationService) GetAllOrganizationsUnscoped(ctx context.Context) ([]types.Organization, error) {
 	organizations, err := s.orgRepo.GetAll(ctx)
 	if err != nil {
