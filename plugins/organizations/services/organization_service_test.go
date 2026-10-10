@@ -10,6 +10,7 @@ import (
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/core/pagination"
+	coretypes "github.com/Authula/authula/core/types"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/organizations/constants"
@@ -528,6 +529,32 @@ func TestOrganizationService_UpdateOrganization(t *testing.T) {
 				repo.On("Update", mock.Anything, mock.MatchedBy(func(org *types.Organization) bool {
 					return org != nil && org.ID == "org-1" && org.Name == "Acme Platform" && org.Slug == "acme"
 				})).Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme Platform", Slug: "acme"}, nil).Once()
+			},
+		},
+		{
+			name:           "explicit null logo clears it",
+			actorUserID:    "user-1",
+			organizationID: "org-1",
+			request:        types.UpdateOrganizationRequest{Logo: coretypes.Optional[*string]{Present: true, Value: nil}},
+			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
+				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme", Slug: "acme", Logo: new("http://old/logo.svg")}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "member"}, nil).Once()
+				repo.On("Update", mock.Anything, mock.MatchedBy(func(org *types.Organization) bool {
+					return org != nil && org.ID == "org-1" && org.Logo == nil
+				})).Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme", Slug: "acme", Logo: nil}, nil).Once()
+			},
+		},
+		{
+			name:           "empty string logo clears it",
+			actorUserID:    "user-1",
+			organizationID: "org-1",
+			request:        types.UpdateOrganizationRequest{Logo: coretypes.Optional[*string]{Present: true, Value: new("")}},
+			setup: func(repo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, hooks *orgtests.MockOrganizationHooks, serviceUtils *ServiceUtils) {
+				repo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme", Slug: "acme", Logo: new("http://old/logo.svg")}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-1").Return(&types.OrganizationMember{ID: "mem-1", OrganizationID: "org-1", UserID: "user-1", Role: "member"}, nil).Once()
+				repo.On("Update", mock.Anything, mock.MatchedBy(func(org *types.Organization) bool {
+					return org != nil && org.ID == "org-1" && org.Logo == nil
+				})).Return(&types.Organization{ID: "org-1", OwnerID: "user-1", Name: "Acme", Slug: "acme", Logo: nil}, nil).Once()
 			},
 		},
 	}

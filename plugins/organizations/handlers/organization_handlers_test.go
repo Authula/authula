@@ -12,6 +12,7 @@ import (
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/core/pagination"
+	coretypes "github.com/Authula/authula/core/types"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
@@ -410,7 +411,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 			organizationID: "org-1",
 			body: internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{
 				Name:     new("Acme Platform"),
-				Logo:     new("http://some/url/logo.svg"),
+				Logo:     coretypes.Optional[*string]{Present: true, Value: new("http://some/url/logo.svg")},
 				Metadata: map[string]any{"tier": "pro"},
 			}),
 			prepare: func(f *organizationHandlerFixture) {
@@ -443,7 +444,7 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 			organizationID: "org-1",
 			body: internaltests.MarshalToJSON(t, orgtypes.UpdateOrganizationRequest{
 				Name:     new("Acme Platform"),
-				Logo:     new("http://some/url/logo.svg"),
+				Logo:     coretypes.Optional[*string]{Present: true, Value: new("http://some/url/logo.svg")},
 				Metadata: map[string]any{"tier": "pro"},
 			}),
 			prepare: func(f *organizationHandlerFixture) {
@@ -468,6 +469,28 @@ func TestUpdateOrganizationHandler(t *testing.T) {
 				require.NotNil(t, org.Logo)
 				assert.Equal(t, "http://some/url/logo.svg", *org.Logo)
 				assert.JSONEq(t, "{\"tier\":\"pro\"}", string(internaltests.MarshalToJSON(t, org.Metadata)))
+			},
+		},
+		{
+			name:           "explicit null logo is treated as logo provided but resets the logo to nil",
+			userID:         new("user-1"),
+			organizationID: "org-1",
+			body:           []byte(`{"logo":null}`),
+			prepare: func(f *organizationHandlerFixture) {
+				f.service.On("UpdateOrganization", mock.Anything, "user-1", "org-1", mock.MatchedBy(func(request orgtypes.UpdateOrganizationRequest) bool {
+					return request.Logo.Present && request.Logo.Value == nil
+				})).Return(&orgtypes.Organization{
+					ID:      "org-1",
+					OwnerID: "user-1",
+					Name:    "Acme",
+					Slug:    "acme",
+					Logo:    nil,
+				}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, reqCtx *models.RequestContext) {
+				org := internaltests.DecodeResponseJSON[orgtypes.Organization](t, reqCtx)
+				assert.Nil(t, org.Logo)
 			},
 		},
 	}

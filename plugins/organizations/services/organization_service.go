@@ -263,8 +263,12 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, actor *mod
 		organization.Name = *name
 	}
 	organization.Slug = slug
-	if request.Logo != nil {
-		organization.Logo = request.Logo
+	if request.Logo.Present {
+		if request.Logo.Value == nil || *request.Logo.Value == "" {
+			organization.Logo = nil
+		} else {
+			organization.Logo = request.Logo.Value
+		}
 	}
 	if request.Metadata != nil {
 		organization.Metadata = request.Metadata

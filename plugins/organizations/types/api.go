@@ -6,6 +6,7 @@ import (
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/core/pagination"
+	coretypes "github.com/Authula/authula/core/types"
 	"github.com/Authula/authula/models"
 )
 
@@ -141,10 +142,10 @@ func (r *CreateOrganizationRequest) Validate() error {
 }
 
 type UpdateOrganizationRequest struct {
-	Name     *string        `json:"name,omitempty" nullable:"true"`
-	Slug     *string        `json:"slug,omitempty" nullable:"true"`
-	Logo     *string        `json:"logo,omitempty" nullable:"true"`
-	Metadata map[string]any `json:"metadata,omitempty" nullable:"true"`
+	Name     *string                     `json:"name,omitempty" nullable:"true"`
+	Slug     *string                     `json:"slug,omitempty" nullable:"true"`
+	Logo     coretypes.Optional[*string] `json:"logo,omitzero" nullable:"true"`
+	Metadata map[string]any              `json:"metadata,omitempty" nullable:"true"`
 }
 
 func (r *UpdateOrganizationRequest) Validate() error {
@@ -159,9 +160,9 @@ func (r *UpdateOrganizationRequest) Validate() error {
 		value := strings.TrimSpace(*r.Slug)
 		r.Slug = &value
 	}
-	if r.Logo != nil {
-		value := strings.TrimSpace(*r.Logo)
-		r.Logo = &value
+	if r.Logo.Present && r.Logo.Value != nil {
+		value := strings.TrimSpace(*r.Logo.Value)
+		r.Logo.Value = &value
 	}
 	return nil
 }
