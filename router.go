@@ -399,6 +399,26 @@ func (r *Router) runHooks(stage models.HookStage, ctx *models.RequestContext) {
 	}
 }
 
+// runCompletionHooks runs HookOnComplete hooks regardless of ctx.Handled.
+// Completion hooks must always run, even after an early short-circuit, so they
+// are handled separately from the normal runHooks loop.
+func (r *Router) runCompletionHooks(ctx *models.RequestContext) {
+	for _, hook := range r.hooks {
+		if hook.Stage != models.HookOnComplete {
+			continue
+		}
+		if hook.Matcher != nil && !hook.Matcher(ctx) {
+			continue
+		}
+		func() {
+			defer r.recoverFromPanic(string(HookTypeSync), hook.PluginID, models.HookOnComplete)
+			if err := hook.Handler(ctx); err != nil {
+				r.handleHookError(hook.PluginID, models.HookOnComplete, err, false)
+			}
+		}()
+	}
+}
+
 func (r *Router) recoverFromPanic(hookType, pluginID string, stage models.HookStage) {
 	if err := recover(); err != nil {
 		// Capture stack trace
@@ -599,8 +619,10 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	// Store context in request
+	// Store context in request and make it the single source of truth so that
+	// hook-injected context reaches handlers.
 	reqWithCtx := req.WithContext(models.NewContextWithRequestContext(req.Context(), reqCtx))
+	reqCtx.Request = reqWithCtx
 
 	if req.Method == http.MethodOptions {
 		r.applyCORS(req, wrappedWriter)
@@ -615,6 +637,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.runHooks(models.HookOnRequest, reqCtx)
 	if reqCtx.Handled {
 		r.applyRedirectIfSet(reqCtx)
+		r.runCompletionHooks(reqCtx)
 		r.finalizeResponse(reqCtx, wrappedWriter)
 		return
 	}
@@ -623,17 +646,23 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.runHooks(models.HookBefore, reqCtx)
 	if reqCtx.Handled {
 		r.applyRedirectIfSet(reqCtx)
+		r.runCompletionHooks(reqCtx)
 		r.finalizeResponse(reqCtx, wrappedWriter)
 		return
 	}
 
 	// Stage 3: Route handler (via Chi)
+	// Re-derive the request so mutations made by hooks are honored by handlers.
+	if reqCtx.Request != nil {
+		reqWithCtx = reqCtx.Request
+	}
 	r.router.ServeHTTP(wrappedWriter, reqWithCtx)
 
 	// Stage 4: After hooks
 	r.runHooks(models.HookAfter, reqCtx)
 	if reqCtx.Handled {
 		r.applyRedirectIfSet(reqCtx)
+		r.runCompletionHooks(reqCtx)
 		r.finalizeResponse(reqCtx, wrappedWriter)
 		return
 	}
@@ -644,6 +673,9 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// Stage 5: OnResponse hooks
 	r.runHooks(models.HookOnResponse, reqCtx)
+
+	// Completion hooks run on every exit path, after all other stages.
+	r.runCompletionHooks(reqCtx)
 
 	// Flush deferred writes or captured response
 	r.finalizeResponse(reqCtx, wrappedWriter)

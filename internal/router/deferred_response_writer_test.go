@@ -71,6 +71,53 @@ func TestFlushPreservesCookies(t *testing.T) {
 	}
 }
 
+func TestDeferredResponseWriterStatusCode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		write      func(w *DeferredResponseWriter)
+		wantStatus int
+	}{
+		{
+			name: "reports status after WriteHeader",
+			write: func(w *DeferredResponseWriter) {
+				w.WriteHeader(http.StatusCreated)
+			},
+			wantStatus: http.StatusCreated,
+		},
+		{
+			name: "reports implicit 200 after Write",
+			write: func(w *DeferredResponseWriter) {
+				_, _ = w.Write([]byte("ok"))
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "reports zero before any write",
+			write:      func(w *DeferredResponseWriter) {},
+			wantStatus: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			drw := &DeferredResponseWriter{
+				Wrapped: httptest.NewRecorder(),
+				Logger:  &internaltests.MockLogger{},
+			}
+
+			tc.write(drw)
+
+			if got := drw.StatusCode(); got != tc.wantStatus {
+				t.Fatalf("expected status %d, got %d", tc.wantStatus, got)
+			}
+		})
+	}
+}
+
 func TestFlushPreservesMultipleCookies(t *testing.T) {
 	// Create a mock ResponseWriter
 	originalWriter := httptest.NewRecorder()

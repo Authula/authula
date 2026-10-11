@@ -108,6 +108,11 @@ const (
 	HookAfter
 	// HookOnResponse is executed after the response has been written
 	HookOnResponse
+	// HookOnComplete is executed exactly once for every request, after all other
+	// stages (or after an early short-circuit), immediately before the response is
+	// flushed. Handlers do not see this stage. Use it for finalization that must
+	// run even when an earlier hook set Handled.
+	HookOnComplete
 )
 
 // HookMatcher is a function that determines whether a hook should execute

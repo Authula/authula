@@ -26,6 +26,12 @@ func (w *DeferredResponseWriter) SetRequestContext(ctx *models.RequestContext) {
 	w.ctx = ctx
 }
 
+// StatusCode returns the HTTP status code written by the handler.
+// It returns 0 if no status has been written yet.
+func (w *DeferredResponseWriter) StatusCode() int {
+	return w.statusCode
+}
+
 func (w *DeferredResponseWriter) GetRequestContext() *models.RequestContext {
 	return w.ctx
 }

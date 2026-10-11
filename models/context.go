@@ -66,6 +66,12 @@ type RequestContext struct {
 	RedirectURL string // URL to redirect to (empty = no redirect)
 }
 
+// ResponseStatusProvider is implemented by response writers that expose the
+// HTTP status code written by handlers.
+type ResponseStatusProvider interface {
+	StatusCode() int
+}
+
 // NewContextWithRequestContext returns a new context with the RequestContext attached
 func NewContextWithRequestContext(ctx context.Context, rc *RequestContext) context.Context {
 	return context.WithValue(ctx, ContextRequestContext, rc)
