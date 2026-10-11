@@ -40,6 +40,28 @@ func performRequest(router *Router, method, path string) *httptest.ResponseRecor
 	return w
 }
 
+func performRequestWithHeaders(router *Router, method, path string, headers map[string]string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, nil)
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	return w
+}
+
+// resolveStatus returns the response status at completion time,
+// preferring the captured ResponseStatus and falling back to the response writer.
+func resolveStatus(ctx *models.RequestContext) int {
+	if ctx.ResponseStatus != 0 {
+		return ctx.ResponseStatus
+	}
+	if provider, ok := ctx.ResponseWriter.(models.ResponseStatusProvider); ok {
+		return provider.StatusCode()
+	}
+	return 0
+}
+
 func assertHookStages(t *testing.T, got, want []models.HookStage) {
 	t.Helper()
 
@@ -896,6 +918,328 @@ func TestRouterCompletionHookRunsExactlyOnce(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			tc.run(t)
+		})
+	}
+}
+
+func TestRouterBypassHookCoverage(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		config         *models.Config
+		method         string
+		path           string
+		headers        map[string]string
+		wantStatus     int
+		wantCORSHeader string
+		wantCORSValue  string
+	}{
+		{
+			name: "hard-disabled request",
+			config: &models.Config{
+				BasePath:      "/api/auth",
+				DisabledPaths: []string{"GET:/api/auth/disabled"},
+			},
+			method:     http.MethodGet,
+			path:       "/api/auth/disabled",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name: "configured disabled path",
+			config: &models.Config{
+				BasePath:      "/api/auth",
+				DisabledPaths: []string{"/api/auth/organizations/*"},
+			},
+			method:     http.MethodGet,
+			path:       "/api/auth/organizations/123",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name: "OPTIONS preflight",
+			config: &models.Config{
+				BasePath: "/api/auth",
+				Security: models.SecurityConfig{
+					CORS: models.CORSConfig{
+						AllowedOrigins: []string{"https://example.com"},
+						AllowedMethods: []string{http.MethodGet, http.MethodPost},
+						AllowedHeaders: []string{"Content-Type"},
+						MaxAge:         time.Hour,
+					},
+				},
+			},
+			method:         http.MethodOptions,
+			path:           "/api/auth/anything",
+			headers:        map[string]string{"Origin": "https://example.com"},
+			wantStatus:     http.StatusOK,
+			wantCORSHeader: "Access-Control-Allow-Origin",
+			wantCORSValue:  "https://example.com",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := newTestRouterWithConfig(tc.config, nil)
+
+			requestRuns := 0
+			completionRuns := 0
+			var completionStatus int
+
+			router.RegisterHook(models.Hook{
+				Stage:       models.HookOnRequest,
+				RunOnBypass: true,
+				Handler: func(ctx *models.RequestContext) error {
+					requestRuns++
+					return nil
+				},
+			})
+
+			router.RegisterHook(models.Hook{
+				Stage: models.HookOnComplete,
+				Handler: func(ctx *models.RequestContext) error {
+					completionRuns++
+					completionStatus = resolveStatus(ctx)
+					return nil
+				},
+			})
+
+			w := performRequestWithHeaders(router, tc.method, tc.path, tc.headers)
+
+			if w.Code != tc.wantStatus {
+				t.Fatalf("expected status %d, got %d", tc.wantStatus, w.Code)
+			}
+
+			if requestRuns != 1 {
+				t.Fatalf("expected bypass HookOnRequest to run once, got %d", requestRuns)
+			}
+
+			if completionRuns != 1 {
+				t.Fatalf("expected HookOnComplete to run once, got %d", completionRuns)
+			}
+
+			if completionStatus != tc.wantStatus {
+				t.Fatalf("expected completion hook to see status %d, got %d", tc.wantStatus, completionStatus)
+			}
+
+			if tc.wantCORSHeader != "" {
+				if got := w.Header().Get(tc.wantCORSHeader); got != tc.wantCORSValue {
+					t.Fatalf("expected %s header %q, got %q", tc.wantCORSHeader, tc.wantCORSValue, got)
+				}
+			}
+		})
+	}
+}
+
+func TestRouterBypassHookOptInGate(t *testing.T) {
+	t.Parallel()
+
+	router := newTestRouterWithConfig(&models.Config{
+		BasePath:      "/api/auth",
+		DisabledPaths: []string{"/api/auth/organizations/*"},
+	}, nil)
+
+	nonOptedRuns := 0
+	optedRuns := 0
+
+	router.RegisterHook(models.Hook{
+		Stage: models.HookOnRequest,
+		Handler: func(ctx *models.RequestContext) error {
+			nonOptedRuns++
+			return nil
+		},
+	})
+
+	router.RegisterHook(models.Hook{
+		Stage:       models.HookOnRequest,
+		RunOnBypass: true,
+		Order:       1,
+		Handler: func(ctx *models.RequestContext) error {
+			optedRuns++
+			return nil
+		},
+	})
+
+	registerTestRoute(router, http.MethodGet, "/test", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Bypass path: the non-opted hook must not run.
+	w := performRequest(router, http.MethodGet, "/api/auth/organizations/123")
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
+	}
+	if nonOptedRuns != 0 {
+		t.Fatalf("expected non-opted HookOnRequest to skip bypass path, got %d runs", nonOptedRuns)
+	}
+	if optedRuns != 1 {
+		t.Fatalf("expected opted-in HookOnRequest to run on bypass path, got %d runs", optedRuns)
+	}
+
+	// Normal path: both hooks must run.
+	w = performRequest(router, http.MethodGet, "/api/auth/test")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+	if nonOptedRuns != 1 {
+		t.Fatalf("expected non-opted HookOnRequest to run on normal path, got %d runs", nonOptedRuns)
+	}
+	if optedRuns != 2 {
+		t.Fatalf("expected opted-in HookOnRequest to run on normal path, got %d runs", optedRuns)
+	}
+}
+
+func TestRouterCompletionHookPluginIDFilter(t *testing.T) {
+	t.Parallel()
+
+	router := newTestRouter("/api/auth", nil)
+
+	scopedRuns := 0
+	unscopedRuns := 0
+
+	router.RegisterHook(models.Hook{
+		Stage:    models.HookOnComplete,
+		PluginID: "scoped_plugin",
+		Handler: func(ctx *models.RequestContext) error {
+			scopedRuns++
+			return nil
+		},
+	})
+
+	router.RegisterHook(models.Hook{
+		Stage: models.HookOnComplete,
+		Handler: func(ctx *models.RequestContext) error {
+			unscopedRuns++
+			return nil
+		},
+	})
+
+	router.RegisterRoute(models.Route{
+		Method: http.MethodGet,
+		Path:   "/scoped",
+		Metadata: map[string]any{
+			"plugins": []string{"scoped_plugin"},
+		},
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	})
+
+	router.RegisterRoute(models.Route{
+		Method: http.MethodGet,
+		Path:   "/plain",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	})
+
+	w := performRequest(router, http.MethodGet, "/api/auth/scoped")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+	if scopedRuns != 1 {
+		t.Fatalf("expected scoped completion hook to run once for matching route, got %d", scopedRuns)
+	}
+	if unscopedRuns != 1 {
+		t.Fatalf("expected unscoped completion hook to run once, got %d", unscopedRuns)
+	}
+
+	w = performRequest(router, http.MethodGet, "/api/auth/plain")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+	if scopedRuns != 1 {
+		t.Fatalf("expected scoped completion hook to skip non-matching route, got %d runs", scopedRuns)
+	}
+	if unscopedRuns != 2 {
+		t.Fatalf("expected unscoped completion hook to run on every route, got %d runs", unscopedRuns)
+	}
+}
+
+func TestRouterBypassHookValueSharing(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		config     *models.Config
+		method     string
+		path       string
+		wantStatus int
+	}{
+		{
+			name: "hard-disabled request",
+			config: &models.Config{
+				BasePath:      "/api/auth",
+				DisabledPaths: []string{"GET:/api/auth/disabled"},
+			},
+			method:     http.MethodGet,
+			path:       "/api/auth/disabled",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name: "configured disabled path",
+			config: &models.Config{
+				BasePath:      "/api/auth",
+				DisabledPaths: []string{"/api/auth/organizations/*"},
+			},
+			method:     http.MethodGet,
+			path:       "/api/auth/organizations/123",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "OPTIONS preflight",
+			config:     &models.Config{BasePath: "/api/auth"},
+			method:     http.MethodOptions,
+			path:       "/api/auth/anything",
+			wantStatus: http.StatusOK,
+		},
+	}
+
+	const markerKey = "test.request.marker"
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := newTestRouterWithConfig(tc.config, nil)
+
+			completed := false
+			var completedStatus int
+
+			router.RegisterHook(models.Hook{
+				Stage:       models.HookOnRequest,
+				RunOnBypass: true,
+				Handler: func(ctx *models.RequestContext) error {
+					ctx.Values[markerKey] = "set"
+					return nil
+				},
+			})
+
+			router.RegisterHook(models.Hook{
+				Stage: models.HookOnComplete,
+				Handler: func(ctx *models.RequestContext) error {
+					if _, ok := ctx.Values[markerKey]; !ok {
+						return nil
+					}
+					delete(ctx.Values, markerKey)
+					completed = true
+					completedStatus = resolveStatus(ctx)
+					return nil
+				},
+			})
+
+			w := performRequest(router, tc.method, tc.path)
+
+			if w.Code != tc.wantStatus {
+				t.Fatalf("expected status %d, got %d", tc.wantStatus, w.Code)
+			}
+			if !completed {
+				t.Fatal("expected completion hook to read the value set by the bypass hook")
+			}
+			if completedStatus != tc.wantStatus {
+				t.Fatalf("expected completion hook to see status %d, got %d", tc.wantStatus, completedStatus)
+			}
 		})
 	}
 }

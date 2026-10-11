@@ -407,6 +407,19 @@ func (r *Router) runCompletionHooks(ctx *models.RequestContext) {
 		if hook.Stage != models.HookOnComplete {
 			continue
 		}
+
+		// Skip hooks not in route metadata
+		if hook.PluginID != "" {
+			if ctx.Route == nil {
+				continue
+			}
+
+			pluginIDs := util.ReadStringSliceFromMetadata(ctx.Route.Metadata, "plugins")
+			if !slices.Contains(pluginIDs, hook.PluginID) {
+				continue
+			}
+		}
+
 		if hook.Matcher != nil && !hook.Matcher(ctx) {
 			continue
 		}
@@ -414,6 +427,40 @@ func (r *Router) runCompletionHooks(ctx *models.RequestContext) {
 			defer r.recoverFromPanic(string(HookTypeSync), hook.PluginID, models.HookOnComplete)
 			if err := hook.Handler(ctx); err != nil {
 				r.handleHookError(hook.PluginID, models.HookOnComplete, err, false)
+			}
+		}()
+	}
+}
+
+// runBypassHooks runs the subset of hooks explicitly opted into bypass paths
+// (Hook.RunOnBypass). These run on requests that never enter the normal hook
+// lifecycle (OPTIONS preflight, disabled paths) and cannot short-circuit.
+func (r *Router) runBypassHooks(stage models.HookStage, ctx *models.RequestContext) {
+	for _, hook := range r.hooks {
+		if hook.Stage != stage || !hook.RunOnBypass {
+			continue
+		}
+
+		// Skip hooks not in route metadata
+		if hook.PluginID != "" {
+			if ctx.Route == nil {
+				continue
+			}
+
+			pluginIDs := util.ReadStringSliceFromMetadata(ctx.Route.Metadata, "plugins")
+			if !slices.Contains(pluginIDs, hook.PluginID) {
+				continue
+			}
+		}
+
+		if hook.Matcher != nil && !hook.Matcher(ctx) {
+			continue
+		}
+
+		func() {
+			defer r.recoverFromPanic(string(HookTypeSync), hook.PluginID, stage)
+			if err := hook.Handler(ctx); err != nil {
+				r.handleHookError(hook.PluginID, stage, err, false)
 			}
 		}()
 	}
@@ -551,12 +598,6 @@ func (r *Router) Handler() http.Handler {
 
 // ServeHTTP implements http.Handler for testing and direct use
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	if r.isRequestDisabled(req) {
-		r.applyCORS(req, w)
-		util.JSONResponse(w, http.StatusNotFound, map[string]any{"message": "Not Found"})
-		return
-	}
-
 	// Wrap response writer to defer writes
 	wrappedWriter := &router.DeferredResponseWriter{
 		Wrapped: w,
@@ -590,13 +631,22 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Associate request context with wrapped writer
 	wrappedWriter.SetRequestContext(reqCtx)
 
-	if util.IsPathDisabled(req.Method, req.URL.Path, r.config.DisabledPaths, r.basePath) {
+	// Store context in request and make it the single source of truth so that
+	// hook-injected context reaches handlers.
+	reqWithCtx := req.WithContext(models.NewContextWithRequestContext(req.Context(), reqCtx))
+	reqCtx.Request = reqWithCtx
+
+	// Bypass 1: hard-disabled request. This path never enters the normal hook
+	// lifecycle, so only hooks opted into bypass paths run.
+	if r.isRequestDisabled(req) {
 		reqCtx.Route = &models.Route{
 			Method:   req.Method,
 			Path:     req.URL.Path,
 			Metadata: make(map[string]any),
 		}
-		reqCtx.SetResponse(http.StatusNotFound, make(http.Header), nil)
+		r.runBypassHooks(models.HookOnRequest, reqCtx)
+		reqCtx.SetJSONResponse(http.StatusNotFound, map[string]any{"message": "Not Found"})
+		r.runCompletionHooks(reqCtx)
 		r.finalizeResponse(reqCtx, wrappedWriter)
 		return
 	}
@@ -619,14 +669,21 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	// Store context in request and make it the single source of truth so that
-	// hook-injected context reaches handlers.
-	reqWithCtx := req.WithContext(models.NewContextWithRequestContext(req.Context(), reqCtx))
-	reqCtx.Request = reqWithCtx
+	// Bypass 2: configured disabled path.
+	if util.IsPathDisabled(req.Method, req.URL.Path, r.config.DisabledPaths, r.basePath) {
+		r.runBypassHooks(models.HookOnRequest, reqCtx)
+		reqCtx.SetResponse(http.StatusNotFound, make(http.Header), nil)
+		r.runCompletionHooks(reqCtx)
+		r.finalizeResponse(reqCtx, wrappedWriter)
+		return
+	}
 
+	// Bypass 3: CORS preflight.
 	if req.Method == http.MethodOptions {
+		r.runBypassHooks(models.HookOnRequest, reqCtx)
 		r.applyCORS(req, wrappedWriter)
 		wrappedWriter.WriteHeader(http.StatusOK)
+		r.runCompletionHooks(reqCtx)
 		if err := wrappedWriter.Flush(); err != nil {
 			r.logger.Error("Failed to flush response", "error", err)
 		}
