@@ -139,6 +139,7 @@ type HookHandler func(reqCtx *RequestContext) error
 //   - If a hook's Matcher returns false, the hook is skipped for that request
 //   - Errors returned by HookHandler should not panic; they are handled gracefully
 //   - Async hooks execute in background goroutines and do not block the response (side-effects only)
+//   - Hooks with RunOnBypass=true also run on bypass paths (OPTIONS preflight, disabled 404s)
 type Hook struct {
 	// Stage determines when this hook is executed
 	Stage HookStage
@@ -160,6 +161,12 @@ type Hook struct {
 	// Must be false for all auth validation, CSRF, rate-limiting, and critical security hooks.
 	// Async hooks execute with a timeout to prevent leaks and have no access to response writer.
 	Async bool
+	// RunOnBypass indicates the hook should also run on requests that bypass the
+	// normal lifecycle: OPTIONS preflight, isRequestDisabled 404s, and
+	// Config.DisabledPaths 404s. Such hooks run at the HookOnRequest stage only and
+	// must not alter routing or short-circuit, since the response is already
+	// decided. Default false.
+	RunOnBypass bool
 }
 
 // PluginWithHooks is an optional interface that plugins can implement
