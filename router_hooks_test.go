@@ -1,6 +1,7 @@
 package authula
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -693,6 +694,208 @@ func TestRouterRedirectHandledRequest(t *testing.T) {
 			if location := w.Header().Get("Location"); location != tc.redirectURL {
 				t.Fatalf("expected Location header %q, got %q", tc.redirectURL, location)
 			}
+		})
+	}
+}
+
+func TestRouterHookContextPropagationToHandler(t *testing.T) {
+	t.Parallel()
+
+	type ctxKey string
+
+	const actorKey ctxKey = "test.actor"
+
+	router := newTestRouter("/api/auth", nil)
+
+	router.RegisterHook(models.Hook{
+		Stage: models.HookOnRequest,
+		Handler: func(ctx *models.RequestContext) error {
+			ctx.Request = ctx.Request.WithContext(
+				context.WithValue(ctx.Request.Context(), actorKey, "hook-actor"),
+			)
+			return nil
+		},
+	})
+
+	var handlerValue any
+	registerTestRoute(router, http.MethodGet, "/test", func(w http.ResponseWriter, r *http.Request) {
+		handlerValue = r.Context().Value(actorKey)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	w := performRequest(router, http.MethodGet, "/api/auth/test")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	if handlerValue != "hook-actor" {
+		t.Fatalf("expected handler to read hook-injected value %q, got %v", "hook-actor", handlerValue)
+	}
+}
+
+func TestRouterHookActorReachesDownstreamHandler(t *testing.T) {
+	t.Parallel()
+
+	router := newTestRouter("/api/auth", nil)
+
+	router.RegisterHook(models.Hook{
+		Stage: models.HookOnRequest,
+		Handler: func(ctx *models.RequestContext) error {
+			ctx.SetActorInContext(&models.Actor{ID: "actor-1", Type: models.ActorUser})
+			return nil
+		},
+	})
+
+	registerTestRoute(router, http.MethodGet, "/test", func(w http.ResponseWriter, r *http.Request) {
+		reqCtx, ok := models.GetRequestContext(r.Context())
+		if !ok {
+			t.Fatal("expected request context to be available to handler")
+		}
+		if reqCtx.Actor == nil || reqCtx.Actor.ID != "actor-1" {
+			t.Fatalf("expected request context actor %q, got %+v", "actor-1", reqCtx.Actor)
+		}
+
+		actor, ok := models.GetActorFromContext(r.Context())
+		if !ok || actor.ID != "actor-1" {
+			t.Fatalf("expected actor %q from request context, got %+v", "actor-1", actor)
+		}
+
+		w.WriteHeader(http.StatusOK)
+	})
+
+	w := performRequest(router, http.MethodGet, "/api/auth/test")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+}
+
+func TestRouterCompletionHookRunsAfterShortCircuit(t *testing.T) {
+	t.Parallel()
+
+	router := newTestRouter("/api/auth", nil)
+
+	completionRuns := 0
+	var seenStatus int
+
+	router.RegisterHook(models.Hook{
+		Stage: models.HookOnRequest,
+		Handler: func(ctx *models.RequestContext) error {
+			ctx.Handled = true
+			ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
+			return nil
+		},
+	})
+
+	router.RegisterHook(models.Hook{
+		Stage: models.HookOnComplete,
+		Handler: func(ctx *models.RequestContext) error {
+			completionRuns++
+			seenStatus = ctx.ResponseStatus
+			if seenStatus == 0 {
+				if provider, ok := ctx.ResponseWriter.(models.ResponseStatusProvider); ok {
+					seenStatus = provider.StatusCode()
+				}
+			}
+			return nil
+		},
+	})
+
+	registerTestRoute(router, http.MethodGet, "/test", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	w := performRequest(router, http.MethodGet, "/api/auth/test")
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, w.Code)
+	}
+
+	if completionRuns != 1 {
+		t.Fatalf("expected completion hook to run exactly once, got %d", completionRuns)
+	}
+
+	if seenStatus != http.StatusUnauthorized {
+		t.Fatalf("expected completion hook to see status %d, got %d", http.StatusUnauthorized, seenStatus)
+	}
+}
+
+func TestRouterCompletionHookRunsExactlyOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		run  func(t *testing.T)
+	}{
+		{
+			name: "normal path",
+			run: func(t *testing.T) {
+				router := newTestRouter("/api/auth", nil)
+				completionRuns := 0
+
+				router.RegisterHook(models.Hook{
+					Stage: models.HookOnComplete,
+					Handler: func(ctx *models.RequestContext) error {
+						completionRuns++
+						return nil
+					},
+				})
+
+				registerTestRoute(router, http.MethodGet, "/test", func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				})
+
+				w := performRequest(router, http.MethodGet, "/api/auth/test")
+				if w.Code != http.StatusOK {
+					t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+				}
+
+				if completionRuns != 1 {
+					t.Fatalf("expected completion hook to run exactly once, got %d", completionRuns)
+				}
+			},
+		},
+		{
+			name: "after HookAfter short-circuit",
+			run: func(t *testing.T) {
+				router := newTestRouter("/api/auth", nil)
+				completionRuns := 0
+
+				router.RegisterHook(models.Hook{
+					Stage: models.HookAfter,
+					Handler: func(ctx *models.RequestContext) error {
+						ctx.Handled = true
+						ctx.SetResponse(http.StatusForbidden, nil, nil)
+						return nil
+					},
+				})
+
+				router.RegisterHook(models.Hook{
+					Stage: models.HookOnComplete,
+					Handler: func(ctx *models.RequestContext) error {
+						completionRuns++
+						return nil
+					},
+				})
+
+				registerTestRoute(router, http.MethodGet, "/test", func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				})
+
+				w := performRequest(router, http.MethodGet, "/api/auth/test")
+				if w.Code != http.StatusForbidden {
+					t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+				}
+
+				if completionRuns != 1 {
+					t.Fatalf("expected completion hook to run exactly once, got %d", completionRuns)
+				}
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tc.run(t)
 		})
 	}
 }
