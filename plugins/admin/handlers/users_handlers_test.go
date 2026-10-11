@@ -118,6 +118,15 @@ func TestGetAllUsersHandler(t *testing.T) {
 			expectedMessage: "forbidden",
 		},
 		{
+			name: "insufficient permissions is forbidden, not internal server error",
+			setup: func(repo *internaltests.MockUserRepository) {
+				repo.On("GetAll", mock.Anything, (*string)(nil), 10).Return(([]models.User)(nil), (*string)(nil), coreerrors.ErrInsufficientPermissions).Once()
+			},
+			path:            "/admin/users",
+			expectedStatus:  http.StatusForbidden,
+			expectedMessage: "forbidden",
+		},
+		{
 			name: "success with cursor and limit",
 			setup: func(repo *internaltests.MockUserRepository) {
 				cursor := "next-cursor"
