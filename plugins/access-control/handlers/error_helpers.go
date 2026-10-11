@@ -9,26 +9,13 @@ import (
 )
 
 func mapHttpErrorStatus(err error) int {
-	if err == nil {
-		return http.StatusInternalServerError
+	if status, ok := coreerrors.StatusFor(err); ok {
+		return status
 	}
-
-	switch {
-	case errors.Is(err, coreerrors.ErrUnauthorized):
-		return http.StatusUnauthorized
-	case errors.Is(err, coreerrors.ErrForbidden), errors.Is(err, accesscontrolconstants.ErrCannotUpdateSystemRole):
+	if errors.Is(err, accesscontrolconstants.ErrCannotUpdateSystemRole) {
 		return http.StatusForbidden
-	case errors.Is(err, coreerrors.ErrNotFound):
-		return http.StatusNotFound
-	case errors.Is(err, coreerrors.ErrConflict):
-		return http.StatusConflict
-	case errors.Is(err, coreerrors.ErrBadRequest):
-		return http.StatusBadRequest
-	case errors.Is(err, coreerrors.ErrUnprocessableEntity):
-		return http.StatusUnprocessableEntity
-	default:
-		return http.StatusInternalServerError
 	}
+	return http.StatusInternalServerError
 }
 
 func mapHttpErrorMessage(err error) string {
@@ -39,7 +26,7 @@ func mapHttpErrorMessage(err error) string {
 	switch {
 	case errors.Is(err, coreerrors.ErrUnauthorized):
 		return "unauthorized"
-	case errors.Is(err, coreerrors.ErrForbidden):
+	case errors.Is(err, coreerrors.ErrForbidden), errors.Is(err, coreerrors.ErrInsufficientPermissions):
 		return "forbidden"
 	case errors.Is(err, coreerrors.ErrNotFound):
 		return "not found"

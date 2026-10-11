@@ -145,6 +145,14 @@ func TestGetAllRolesHandler(t *testing.T) {
 			expectedBody:   map[string]string{"message": "forbidden"},
 		},
 		{
+			name: "insufficient permissions is forbidden, not internal server error",
+			setupMock: func(m *accesscontroltests.MockRolesRepository) {
+				m.On("GetAllRoles", mock.Anything).Return(([]types.Role)(nil), coreerrors.ErrInsufficientPermissions).Once()
+			},
+			expectedStatus: http.StatusForbidden,
+			expectedBody:   map[string]string{"message": "forbidden"},
+		},
+		{
 			name: "success",
 			setupMock: func(m *accesscontroltests.MockRolesRepository) {
 				m.On("GetAllRoles", mock.Anything).Return([]types.Role{
