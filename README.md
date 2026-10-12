@@ -57,6 +57,7 @@ Authula comes with a variety of plugins that provide essential authentication fe
 - Secondary storage (In-memory, DB, Redis)
 - Rate limiting
 - CSRF protection
+- OpenTelemetry (distributed tracing & metrics)
 - Hooks system
 - Event bus
 - Custom routes and logic

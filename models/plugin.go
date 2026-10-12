@@ -27,6 +27,7 @@ const (
 	PluginTOTP             PluginID = "totp"
 	PluginOrganizations    PluginID = "organizations"
 	PluginApiKey           PluginID = "api_key"
+	PluginOtel             PluginID = "otel"
 )
 
 func (id PluginID) String() string {
