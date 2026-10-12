@@ -113,3 +113,41 @@ func TestBuildPluginsFromConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestPluginFactoriesAreWellFormed(t *testing.T) {
+	if len(pluginFactories) == 0 {
+		t.Fatal("expected at least one registered plugin factory")
+	}
+
+	seen := make(map[string]bool, len(pluginFactories))
+
+	for _, factory := range pluginFactories {
+		t.Run(factory.ID, func(t *testing.T) {
+			if seen[factory.ID] {
+				t.Fatalf("duplicate plugin factory ID %q", factory.ID)
+			}
+			seen[factory.ID] = true
+
+			if factory.ConfigParser == nil {
+				t.Fatal("ConfigParser is nil")
+			}
+			if factory.Constructor == nil {
+				t.Fatal("Constructor is nil")
+			}
+
+			typedConfig, err := factory.ConfigParser(nil)
+			if err != nil {
+				t.Fatalf("parsing nil config: %v", err)
+			}
+
+			plugin := factory.Constructor(typedConfig)
+			if plugin == nil {
+				t.Fatal("Constructor returned a nil plugin")
+			}
+
+			if got := plugin.Metadata().ID; got != factory.ID {
+				t.Fatalf("plugin metadata ID mismatch: got %q, want %q", got, factory.ID)
+			}
+		})
+	}
+}

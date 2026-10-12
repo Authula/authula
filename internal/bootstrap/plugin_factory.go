@@ -5,284 +5,72 @@ import (
 
 	"github.com/Authula/authula/models"
 	accesscontrolplugin "github.com/Authula/authula/plugins/access-control"
-	accesscontrolplugintypes "github.com/Authula/authula/plugins/access-control/types"
 	adminplugin "github.com/Authula/authula/plugins/admin"
-	adminplugintypes "github.com/Authula/authula/plugins/admin/types"
 	apikeyplugin "github.com/Authula/authula/plugins/api-key"
-	apikeyplugintypes "github.com/Authula/authula/plugins/api-key/types"
 	bearerplugin "github.com/Authula/authula/plugins/bearer"
 	csrfplugin "github.com/Authula/authula/plugins/csrf"
 	emailplugin "github.com/Authula/authula/plugins/email"
 	emailpasswordplugin "github.com/Authula/authula/plugins/email-password"
-	emailpasswordplugintypes "github.com/Authula/authula/plugins/email-password/types"
-	emailplugintypes "github.com/Authula/authula/plugins/email/types"
 	jwtplugin "github.com/Authula/authula/plugins/jwt"
-	jwtplugintypes "github.com/Authula/authula/plugins/jwt/types"
 	magiclinkplugin "github.com/Authula/authula/plugins/magic-link"
-	magiclinkplugintypes "github.com/Authula/authula/plugins/magic-link/types"
 	oauth2plugin "github.com/Authula/authula/plugins/oauth2"
-	oauth2plugintypes "github.com/Authula/authula/plugins/oauth2/types"
 	organizationsplugin "github.com/Authula/authula/plugins/organizations"
-	organizationsplugintypes "github.com/Authula/authula/plugins/organizations/types"
 	ratelimitplugin "github.com/Authula/authula/plugins/rate-limit"
-	ratelimitplugintypes "github.com/Authula/authula/plugins/rate-limit/types"
 	secondarystorageplugin "github.com/Authula/authula/plugins/secondary-storage"
 	sessionplugin "github.com/Authula/authula/plugins/session"
 	totpplugin "github.com/Authula/authula/plugins/totp"
-	totplugintypes "github.com/Authula/authula/plugins/totp/types"
 	"github.com/Authula/authula/util"
 )
 
-// PluginFactory defines a factory function for creating a plugin instance from typed config data.
-type PluginFactory struct {
+// pluginFactory defines how to parse a plugin's raw config into its typed config
+// and how to construct the plugin from that typed config.
+type pluginFactory struct {
 	ID                string
 	ConfigParser      func(rawConfig any) (any, error)    // Parses raw config to typed config
 	Constructor       func(typedConfig any) models.Plugin // Creates plugin from typed config
 	RequiredByDefault bool                                // Whether this plugin must be enabled
 }
 
+// newPluginFactory builds a pluginFactory for a plugin whose config type is T and
+// whose constructor returns the concrete plugin type P. Go infers T and P from the
+// constructor that is passed in, so no type assertions or config parsing are repeated
+// at the registration site.
+func newPluginFactory[T any, P models.Plugin](id string, requiredByDefault bool, constructor func(T) P) pluginFactory {
+	return pluginFactory{
+		ID:                id,
+		RequiredByDefault: requiredByDefault,
+		ConfigParser: func(rawConfig any) (any, error) {
+			var config T
+			if rawConfig != nil {
+				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
+					return nil, err
+				}
+			}
+			return config, nil
+		},
+		Constructor: func(typedConfig any) models.Plugin {
+			return constructor(typedConfig.(T))
+		},
+	}
+}
+
 // pluginFactories is an ordered list of registered plugin factories.
-var pluginFactories = []PluginFactory{
-	{
-		ID:                models.PluginSecondaryStorage.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := secondarystorageplugin.SecondaryStoragePluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse secondary_storage plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return secondarystorageplugin.New(typedConfig.(secondarystorageplugin.SecondaryStoragePluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginAccessControl.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := accesscontrolplugintypes.AccessControlPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse access control plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return accesscontrolplugin.New(typedConfig.(accesscontrolplugintypes.AccessControlPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginAdmin.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := adminplugintypes.AdminPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse admin plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return adminplugin.New(typedConfig.(adminplugintypes.AdminPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginEmail.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := emailplugintypes.EmailPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse email plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return emailplugin.New(typedConfig.(emailplugintypes.EmailPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginCSRF.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := csrfplugin.CSRFPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse csrf plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return csrfplugin.New(typedConfig.(csrfplugin.CSRFPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginEmailPassword.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := emailpasswordplugintypes.EmailPasswordPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse email_password plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return emailpasswordplugin.New(typedConfig.(emailpasswordplugintypes.EmailPasswordPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginOAuth2.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := oauth2plugintypes.OAuth2PluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse oauth2 plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return oauth2plugin.New(typedConfig.(oauth2plugintypes.OAuth2PluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginSession.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := sessionplugin.SessionPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse session plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return sessionplugin.New(typedConfig.(sessionplugin.SessionPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginJWT.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := jwtplugintypes.JWTPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse jwt plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return jwtplugin.New(typedConfig.(jwtplugintypes.JWTPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginBearer.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := bearerplugin.BearerPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse bearer plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return bearerplugin.New(typedConfig.(bearerplugin.BearerPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginRateLimit.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := ratelimitplugintypes.RateLimitPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse ratelimit plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return ratelimitplugin.New(typedConfig.(ratelimitplugintypes.RateLimitPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginMagicLink.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := magiclinkplugintypes.MagicLinkPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse magic link plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return magiclinkplugin.New(typedConfig.(magiclinkplugintypes.MagicLinkPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginOrganizations.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := organizationsplugintypes.OrganizationsPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse organizations plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return organizationsplugin.New(typedConfig.(organizationsplugintypes.OrganizationsPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginTOTP.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := totplugintypes.TOTPPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse totp plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return totpplugin.New(typedConfig.(totplugintypes.TOTPPluginConfig))
-		},
-	},
-	{
-		ID:                models.PluginApiKey.String(),
-		RequiredByDefault: false,
-		ConfigParser: func(rawConfig any) (any, error) {
-			config := apikeyplugintypes.ApiKeyPluginConfig{}
-			if rawConfig != nil {
-				if err := util.ParsePluginConfig(rawConfig, &config); err != nil {
-					return nil, fmt.Errorf("failed to parse api_key plugin config: %w", err)
-				}
-			}
-			return config, nil
-		},
-		Constructor: func(typedConfig any) models.Plugin {
-			return apikeyplugin.New(typedConfig.(apikeyplugintypes.ApiKeyPluginConfig))
-		},
-	},
+var pluginFactories = []pluginFactory{
+	newPluginFactory(models.PluginSecondaryStorage.String(), false, secondarystorageplugin.New),
+	newPluginFactory(models.PluginAccessControl.String(), false, accesscontrolplugin.New),
+	newPluginFactory(models.PluginAdmin.String(), false, adminplugin.New),
+	newPluginFactory(models.PluginEmail.String(), false, emailplugin.New),
+	newPluginFactory(models.PluginCSRF.String(), false, csrfplugin.New),
+	newPluginFactory(models.PluginEmailPassword.String(), false, emailpasswordplugin.New),
+	newPluginFactory(models.PluginOAuth2.String(), false, oauth2plugin.New),
+	newPluginFactory(models.PluginSession.String(), false, sessionplugin.New),
+	newPluginFactory(models.PluginJWT.String(), false, jwtplugin.New),
+	newPluginFactory(models.PluginBearer.String(), false, bearerplugin.New),
+	newPluginFactory(models.PluginRateLimit.String(), false, ratelimitplugin.New),
+	newPluginFactory(models.PluginMagicLink.String(), false, magiclinkplugin.New),
+	newPluginFactory(models.PluginOrganizations.String(), false, organizationsplugin.New),
+	newPluginFactory(models.PluginTOTP.String(), false, totpplugin.New),
+	newPluginFactory(models.PluginApiKey.String(), false, apikeyplugin.New),
 }
 
 // isPluginEnabled checks if a plugin is enabled in the raw config
