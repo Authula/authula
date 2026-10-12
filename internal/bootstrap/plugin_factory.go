@@ -15,6 +15,7 @@ import (
 	magiclinkplugin "github.com/Authula/authula/plugins/magic-link"
 	oauth2plugin "github.com/Authula/authula/plugins/oauth2"
 	organizationsplugin "github.com/Authula/authula/plugins/organizations"
+	otelplugin "github.com/Authula/authula/plugins/otel"
 	ratelimitplugin "github.com/Authula/authula/plugins/rate-limit"
 	secondarystorageplugin "github.com/Authula/authula/plugins/secondary-storage"
 	sessionplugin "github.com/Authula/authula/plugins/session"
@@ -71,6 +72,7 @@ var pluginFactories = []pluginFactory{
 	newPluginFactory(models.PluginOrganizations.String(), false, organizationsplugin.New),
 	newPluginFactory(models.PluginTOTP.String(), false, totpplugin.New),
 	newPluginFactory(models.PluginApiKey.String(), false, apikeyplugin.New),
+	newPluginFactory(models.PluginOtel.String(), false, otelplugin.New),
 }
 
 // isPluginEnabled checks if a plugin is enabled in the raw config
