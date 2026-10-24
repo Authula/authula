@@ -40,6 +40,13 @@ type Auth struct {
 	Api              core.CoreAPI
 }
 
+// Logger returns the instance's logger. Callers that need to log before or
+// after the Auth lifecycle (for example the standalone command) use it instead
+// of constructing their own logger.
+func (auth *Auth) Logger() models.Logger {
+	return auth.logger
+}
+
 // New creates a new Auth instance using the provided config and plugins.
 // Handles plugin registration, migrations, and initialization in unified way.
 // Works identically whether plugins are manually instantiated or built from config.

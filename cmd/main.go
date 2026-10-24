@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -23,12 +22,7 @@ import (
 func main() {
 	env.LoadEnvConfig()
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
-	slog.SetDefault(logger)
-
-	config := loadConfig()
+	config, configExists := loadConfig()
 
 	pluginsList := bootstrap.BuildPluginsFromConfig(config)
 
@@ -36,6 +30,11 @@ func main() {
 		Config:  config,
 		Plugins: pluginsList,
 	})
+
+	logger := auth.Logger()
+	if !configExists {
+		logger.Debug("No config file found, continuing", "path", env.GetEnv(env.EnvConfigPath, "config.toml"))
+	}
 
 	// Channel to signal restart
 	restartChan := make(chan struct{})
@@ -107,16 +106,13 @@ func runServer(logger models.Logger, auth *authula.Auth, restartChan chan struct
 }
 
 // loadConfig loads configuration with proper precedence:
-func loadConfig() *models.Config {
+func loadConfig() (*models.Config, bool) {
 	configPath := env.GetEnv(env.EnvConfigPath, "config.toml")
 
 	config, exists, err := configloader.Load(configPath)
 	if err != nil {
 		panic(err)
 	}
-	if !exists {
-		slog.Debug("No config file found, continuing", "path", configPath)
-	}
 
-	return config
+	return config, exists
 }

@@ -6,12 +6,16 @@ import (
 	"os"
 	"strings"
 
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -54,6 +58,37 @@ func buildMetricExporter(ctx context.Context, cfg types.OTelPluginConfig) (sdkme
 	default:
 		return nil, fmt.Errorf("otel: unsupported metric exporter %q", cfg.Exporter)
 	}
+}
+
+// buildLogExporter constructs the configured log exporter. It returns a nil
+// exporter when exporting is disabled ("none").
+func buildLogExporter(ctx context.Context, cfg types.OTelPluginConfig) (sdklog.Exporter, error) {
+	switch cfg.Exporter {
+	case types.ExporterNone:
+		return nil, nil
+	case types.ExporterStdout:
+		return stdoutlog.New()
+	case types.ExporterOTLP:
+		if resolveProtocol(cfg) == types.ProtocolGRPC {
+			return otlploggrpc.New(ctx, logGRPCOptions(cfg)...)
+		}
+		return otlploghttp.New(ctx, logHTTPOptions(cfg)...)
+	default:
+		return nil, fmt.Errorf("otel: unsupported log exporter %q", cfg.Exporter)
+	}
+}
+
+// newLoggerProvider builds a LoggerProvider that batches records to the
+// supplied exporter.
+func newLoggerProvider(res *resource.Resource, exp sdklog.Exporter) *sdklog.LoggerProvider {
+	opts := make([]sdklog.LoggerProviderOption, 0, 2)
+	if res != nil {
+		opts = append(opts, sdklog.WithResource(res))
+	}
+	if exp != nil {
+		opts = append(opts, sdklog.WithProcessor(sdklog.NewBatchProcessor(exp)))
+	}
+	return sdklog.NewLoggerProvider(opts...)
 }
 
 // newTracerProvider builds a TracerProvider that batches spans to the supplied
@@ -160,6 +195,34 @@ func metricGRPCOptions(cfg types.OTelPluginConfig) []otlpmetricgrpc.Option {
 	}
 	if len(cfg.Headers) > 0 {
 		opts = append(opts, otlpmetricgrpc.WithHeaders(cfg.Headers))
+	}
+	return opts
+}
+
+func logHTTPOptions(cfg types.OTelPluginConfig) []otlploghttp.Option {
+	opts := make([]otlploghttp.Option, 0, 3)
+	if cfg.Endpoint != "" {
+		opts = append(opts, otlploghttp.WithEndpoint(cfg.Endpoint))
+	}
+	if cfg.Insecure {
+		opts = append(opts, otlploghttp.WithInsecure())
+	}
+	if len(cfg.Headers) > 0 {
+		opts = append(opts, otlploghttp.WithHeaders(cfg.Headers))
+	}
+	return opts
+}
+
+func logGRPCOptions(cfg types.OTelPluginConfig) []otlploggrpc.Option {
+	opts := make([]otlploggrpc.Option, 0, 3)
+	if cfg.Endpoint != "" {
+		opts = append(opts, otlploggrpc.WithEndpoint(cfg.Endpoint))
+	}
+	if cfg.Insecure {
+		opts = append(opts, otlploggrpc.WithInsecure())
+	}
+	if len(cfg.Headers) > 0 {
+		opts = append(opts, otlploggrpc.WithHeaders(cfg.Headers))
 	}
 	return opts
 }

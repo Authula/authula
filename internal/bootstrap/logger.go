@@ -16,39 +16,52 @@ type LoggerOptions struct {
 	Logger models.Logger
 }
 
-// InitLogger creates a configured logger instance
+// InitLogger creates a configured logger instance. It always returns a
+// fan-out: a user-supplied logger is wrapped rather than replaced, so plugins
+// can attach sinks in either case.
 func InitLogger(opts LoggerOptions) models.Logger {
-	if opts.Logger != nil {
-		return opts.Logger
+	base := opts.Logger
+	var slogBase *slog.Logger
+
+	if base == nil {
+		level := parseSlogLevel(opts.Level)
+
+		if os.Getenv(env.EnvGoEnvironment) != "production" {
+			slogBase = slog.New(tint.NewTextHandler(os.Stderr, &tint.Options{
+				Level:      slog.LevelDebug,
+				TimeFormat: time.Kitchen,
+			}))
+		} else {
+			slogBase = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+				Level: level,
+			}))
+		}
+		base = slogBase
 	}
 
-	environment := os.Getenv(env.EnvGoEnvironment)
-	var logger *slog.Logger
+	fanout := newFanoutLogger(base)
+	if slogBase != nil {
+		// Compatibility only: third-party libraries calling slog.* directly reach
+		// stderr, but bypass the fan-out and therefore any attached sinks.
+		slog.SetDefault(slogBase)
+	}
 
-	level := slog.LevelInfo
-	switch opts.Level {
+	return fanout
+}
+
+// parseSlogLevel maps a configured level name to a slog level. Unknown or empty
+// values fall back to info.
+func parseSlogLevel(name string) slog.Level {
+	switch name {
 	case "debug":
-		level = slog.LevelDebug
+		return slog.LevelDebug
 	case "info":
-		level = slog.LevelInfo
+		return slog.LevelInfo
 	case "warn":
-		level = slog.LevelWarn
+		return slog.LevelWarn
 	case "error":
-		level = slog.LevelError
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
 	}
-
-	if environment != "production" {
-		logger = slog.New(tint.NewTextHandler(os.Stderr, &tint.Options{
-			Level:      slog.LevelDebug,
-			TimeFormat: time.Kitchen,
-		}))
-	} else {
-		logger = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-			Level: level,
-		}))
-	}
-
-	slog.SetDefault(logger)
-
-	return logger
 }

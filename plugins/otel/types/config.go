@@ -43,6 +43,7 @@ type OTelPluginConfig struct {
 	Headers        map[string]string `json:"headers,omitempty" toml:"headers"`
 	TracesEnabled  *bool             `json:"traces_enabled,omitempty" toml:"traces_enabled"`
 	MetricsEnabled *bool             `json:"metrics_enabled,omitempty" toml:"metrics_enabled"`
+	LogsEnabled    bool              `json:"logs_enabled,omitempty" toml:"logs_enabled"`
 	RuntimeMetrics *bool             `json:"runtime_metrics,omitempty" toml:"runtime_metrics"`
 	SampleRatio    *float64          `json:"sample_ratio,omitempty" toml:"sample_ratio"`
 	TrustProxy     bool              `json:"trust_proxy,omitempty" toml:"trust_proxy"`
@@ -91,6 +92,13 @@ func (c OTelPluginConfig) TracesActive() bool {
 // treats the "none" exporter as a full disable.
 func (c OTelPluginConfig) MetricsActive() bool {
 	return c.MetricsOn() && c.Exporter != ExporterNone
+}
+
+// LogsActive reports whether the logs bridge should be initialized. Logs are
+// opt-in, so an unset flag means disabled; the "none" exporter also disables
+// them.
+func (c OTelPluginConfig) LogsActive() bool {
+	return c.LogsEnabled && c.Exporter != ExporterNone
 }
 
 // Valid reports whether the configuration values are within their supported

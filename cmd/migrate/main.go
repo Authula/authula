@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -46,7 +45,7 @@ func init() {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		slog.Error("migrate command failed", "error", err)
+		authula.InitLogger(&models.Config{}).Error("migrate command failed", "error", err)
 		os.Exit(1)
 	}
 }
@@ -129,7 +128,7 @@ func runPlugins(action, only, except string, includeDisabled bool) error {
 	}
 	defer runtime.Close()
 
-	selector := buildPluginSelector(runtime.config, only, except, includeDisabled, action == "down")
+	selector := buildPluginSelector(runtime.config, runtime.logger, only, except, includeDisabled, action == "down")
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
@@ -228,11 +227,11 @@ func bootstrapRuntime(configPath string) (*runtimeEnv, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !exists {
-		slog.Debug("No config file found, using defaults", "path", configPath)
-	}
 
 	logger := authula.InitLogger(config)
+	if !exists {
+		logger.Debug("No config file found, using defaults", "path", configPath)
+	}
 	db, err := authula.InitDatabase(config, logger, config.Logger.Level)
 	if err != nil {
 		return nil, fmt.Errorf("init database: %w", err)
@@ -255,14 +254,14 @@ func bootstrapRuntime(configPath string) (*runtimeEnv, error) {
 	}, nil
 }
 
-func buildPluginSelector(config *models.Config, only, except string, includeDisabled bool, isDown bool) migrationmanager.PluginSelector {
+func buildPluginSelector(config *models.Config, logger models.Logger, only, except string, includeDisabled bool, isDown bool) migrationmanager.PluginSelector {
 	selectors := make([]migrationmanager.PluginSelector, 0, 3)
 
 	if !includeDisabled && !isDown {
 		selectors = append(selectors, func(plugin models.Plugin) bool {
 			enabled := util.IsPluginEnabled(config, plugin.Metadata().ID)
 			if !enabled {
-				slog.Debug("plugin disabled, skipping", "plugin", plugin.Metadata().ID)
+				logger.Debug("plugin disabled, skipping", "plugin", plugin.Metadata().ID)
 			}
 			return enabled
 		})

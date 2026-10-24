@@ -1,8 +1,8 @@
 # OpenTelemetry plugin
 
-Opt-in distributed tracing and metrics for Authula, backed by the OpenTelemetry
-SDK. The plugin extracts and propagates W3C trace context and records request
-and runtime metrics.
+Opt-in distributed tracing, metrics, and logs for Authula, backed by the
+OpenTelemetry SDK. The plugin extracts and propagates W3C trace context, records
+request and runtime metrics, and can bridge the core logger to OTLP.
 
 Telemetry is **fail-open**: the hooks never return an error, so a telemetry
 problem can never short-circuit a real request. Invalid configuration or a
@@ -22,6 +22,7 @@ service_name = "authula-service"
 exporter = "otlp"
 endpoint = "http://localhost:4318"
 insecure = true
+logs_enabled = true
 ```
 
 ## Configuration reference
@@ -37,6 +38,7 @@ insecure = true
 | `headers` | map | empty | Extra OTLP headers. Empty lets `OTEL_EXPORTER_OTLP_HEADERS` apply. |
 | `traces_enabled` | bool | `true` | Enable tracing. |
 | `metrics_enabled` | bool | `true` | Enable request/runtime metrics. |
+| `logs_enabled` | bool | `false` | Export Authula's `models.Logger` records over OTLP. |
 | `runtime_metrics` | bool | `true` | Enable Go runtime metrics. |
 | `sample_ratio` | float | unset | Trace sample ratio in `[0,1]`. Omit to let the SDK read `OTEL_TRACES_SAMPLER`. |
 | `trust_proxy` | bool | `false` | Trust `X-Forwarded-Proto` / `X-Forwarded-For`. |
@@ -47,7 +49,8 @@ One rule covers every setting: **config field > standard OpenTelemetry
 environment variable > SDK default**.
 
 - `service_name`: config → `OTEL_SERVICE_NAME` → `authula`.
-- `endpoint` empty: the exporter reads `OTEL_EXPORTER_OTLP_ENDPOINT`.
+- `endpoint` empty: the exporter reads `OTEL_EXPORTER_OTLP_ENDPOINT`. For logs,
+  a non-empty `endpoint` overrides `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`.
 - `protocol` empty: `OTEL_EXPORTER_OTLP_PROTOCOL`, otherwise `http`.
 - `headers` empty: `OTEL_EXPORTER_OTLP_HEADERS` applies.
 - `sample_ratio` unset: `OTEL_TRACES_SAMPLER` applies. When set, the plugin uses
@@ -92,6 +95,45 @@ responses. OPTIONS preflight requests are not recorded.
 `runtime_metrics = true` additionally starts the OpenTelemetry runtime
 instrumentation (Go runtime metrics) on the same meter provider.
 
+### Logs
+
+Logs are opt-in: set `logs_enabled = true`. When enabled, the plugin attaches an
+OTLP sink to the core logger fan-out, so every call made through
+`models.Logger` (the only logging contract used by core and plugins) is also
+exported. A batch processor ships records in the background; `Close` detaches
+the sink first, then flushes and shuts the provider down.
+
+The sink honors the core `logger.level` setting. `config.toml` ships
+`level = "debug"`, so by default debug records are exported too. Set
+`logger.level = "info"` in production to keep debug noise out of the collector.
+
+Records are exported to **both** their normal destination (stderr/JSON) and
+OTLP. This duplication is intended. Exporter settings (`exporter`, `protocol`,
+`endpoint`, `insecure`, `headers`) are shared with traces and metrics.
+
+#### Custom loggers still work
+
+`models.Logger` remains a four-method interface and `InitLogger` now always
+returns a fan-out around the chosen implementation. Supplying a logger through
+`LoggerConfig.Logger` therefore no longer disables log export: the plugin
+attaches its sink to the wrapper, and every call is forwarded to the supplied
+logger unchanged. A logger that does not implement `models.LoggerFanout`
+(only the wrapper does) simply gets no OTLP sink, with one warning.
+
+Two caveats:
+
+- `InitLogger` returns a wrapper, not the exact instance you supplied. It
+  forwards every call, but `logger == yourLogger` comparisons no longer hold.
+- `slog.SetDefault` is called only for the default slog-backed logger, as a
+  compatibility bridge for third-party libraries. Direct `slog.*` calls reach
+  stderr but bypass the fan-out and therefore do not reach OTLP.
+
+#### No trace correlation yet
+
+`models.Logger` has no `context.Context`, so exported records do not carry a
+`trace_id` / `span_id`. Correlating logs with spans needs a context-aware logger
+and is a separate follow-up.
+
 ## Bypass paths
 
 Requests that bypass the normal lifecycle are traced too: OPTIONS preflight,
@@ -119,7 +161,7 @@ intentionally no global-registration option.
 
 ## Dependencies
 
-Adding the plugin links the OpenTelemetry SDK, exporters, and runtime
-instrumentation into the binary even when the plugin is disabled (the factory
-imports it unconditionally). It is "lightweight when disabled" at runtime, not
-in binary size.
+Adding the plugin links the OpenTelemetry SDK, exporters, runtime
+instrumentation, and the `otelslog` bridge into the binary even when the plugin
+is disabled (the factory imports it unconditionally). It is "lightweight when
+disabled" at runtime, not in binary size.

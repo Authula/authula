@@ -4,17 +4,33 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"github.com/Authula/authula/models"
 )
+
+// DatabaseStorageOption customizes a DatabaseSecondaryStorage at construction.
+type DatabaseStorageOption func(*DatabaseSecondaryStorage)
+
+// WithDatabaseStorageLogger injects the logger used for non-fatal cleanup
+// errors. A nil logger is ignored.
+func WithDatabaseStorageLogger(logger models.Logger) DatabaseStorageOption {
+	return func(storage *DatabaseSecondaryStorage) {
+		if logger != nil {
+			storage.logger = logger
+		}
+	}
+}
 
 // DatabaseSecondaryStorage implements the SecondaryStorage interface using Bun ORM.
 type DatabaseSecondaryStorage struct {
 	db bun.IDB
+	// logger receives non-fatal errors (cleanup, expired-entry deletions).
+	logger models.Logger
 	// cleanupInterval controls how often expired entries are cleaned up.
 	cleanupInterval time.Duration
 	// stopCleanup is used to signal the cleanup goroutine to stop.
@@ -27,7 +43,7 @@ type DatabaseSecondaryStorage struct {
 	closeOnce sync.Once
 }
 
-func NewDatabaseSecondaryStorage(db bun.IDB, config DatabaseStorageConfig) *DatabaseSecondaryStorage {
+func NewDatabaseSecondaryStorage(db bun.IDB, config DatabaseStorageConfig, opts ...DatabaseStorageOption) *DatabaseSecondaryStorage {
 	cleanupInterval := time.Minute
 	if config.CleanupInterval != 0 {
 		cleanupInterval = config.CleanupInterval
@@ -41,7 +57,19 @@ func NewDatabaseSecondaryStorage(db bun.IDB, config DatabaseStorageConfig) *Data
 		cleanupStarted:  false,
 	}
 
+	for _, opt := range opts {
+		opt(storage)
+	}
+
 	return storage
+}
+
+// logError reports a non-fatal error through the injected logger. It is a
+// no-op when no logger was supplied.
+func (storage *DatabaseSecondaryStorage) logError(msg string, args ...any) {
+	if storage.logger != nil {
+		storage.logger.Error(msg, args...)
+	}
 }
 
 // StartCleanup starts the background cleanup goroutine that removes expired entries.
@@ -87,7 +115,7 @@ func (storage *DatabaseSecondaryStorage) Get(ctx context.Context, key string) (a
 	if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
 		// Delete the expired entry
 		if _, err := storage.db.NewDelete().Model(&KeyValueStore{}).Where("key = ?", key).Exec(ctx); err != nil {
-			slog.Error("error deleting expired entry", slog.String("key", key), slog.Any("error", err))
+			storage.logError("error deleting expired entry", "key", key, "error", err)
 		}
 		return nil, nil
 	}
@@ -168,7 +196,7 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 			if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
 				// Delete the expired entry
 				if _, err := storage.db.NewDelete().Model(&KeyValueStore{}).Where("key = ?", key).Exec(ctx); err != nil {
-					slog.Error("error deleting expired entry during incr", slog.String("key", key), slog.Any("error", err))
+					storage.logError("error deleting expired entry during incr", "key", key, "error", err)
 				}
 			} else {
 				// Entry exists and is not expired
@@ -186,7 +214,7 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 		if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
 			// Delete the expired entry
 			if _, err := storage.db.NewDelete().Model(&KeyValueStore{}).Where("key = ?", key).Exec(ctx); err != nil {
-				slog.Error("error deleting expired entry during incr", slog.String("key", key), slog.Any("error", err))
+				storage.logError("error deleting expired entry during incr", "key", key, "error", err)
 			}
 		} else {
 			// Entry exists and is not expired
@@ -245,7 +273,7 @@ func (storage *DatabaseSecondaryStorage) removeExpiredEntries() {
 		Exec(ctx)
 
 	if err != nil {
-		slog.Error("error cleaning up expired entries from key_value_store", slog.Any("error", err))
+		storage.logError("error cleaning up expired entries from key_value_store", "error", err)
 	}
 }
 

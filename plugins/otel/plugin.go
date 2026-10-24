@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	metricnoop "go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/propagation"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -41,7 +42,11 @@ type OTelPlugin struct {
 
 	tracerProvider *sdktrace.TracerProvider // nil when traces disabled/none
 	meterProvider  *sdkmetric.MeterProvider // nil when metrics disabled/none
+	loggerProvider *sdklog.LoggerProvider   // nil when logs disabled/none
 	duration       metric.Float64Histogram
+
+	// detachLogSink removes the OTel log sink from the core logger fan-out.
+	detachLogSink func()
 
 	closeOnce sync.Once
 	closeErr  error
@@ -56,7 +61,7 @@ func (p *OTelPlugin) Metadata() models.PluginMetadata {
 	return models.PluginMetadata{
 		ID:          models.PluginOtel.String(),
 		Version:     "1.0.0",
-		Description: "Provides OpenTelemetry distributed tracing and request/runtime metrics",
+		Description: "Provides OpenTelemetry distributed tracing, request/runtime metrics, and log export",
 	}
 }
 
@@ -109,6 +114,10 @@ func (p *OTelPlugin) Init(pluginCtx *models.PluginContext) error {
 	}
 
 	if err := p.initMeter(res); err != nil {
+		return err
+	}
+
+	if err := p.initLogger(res); err != nil {
 		return err
 	}
 
@@ -184,7 +193,17 @@ func (p *OTelPlugin) Close() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
+		if p.detachLogSink != nil {
+			p.detachLogSink()
+			p.detachLogSink = nil
+		}
+
 		var errs []error
+		if p.loggerProvider != nil {
+			if err := p.loggerProvider.Shutdown(ctx); err != nil {
+				errs = append(errs, err)
+			}
+		}
 		if p.meterProvider != nil {
 			if err := p.meterProvider.Shutdown(ctx); err != nil {
 				errs = append(errs, err)
