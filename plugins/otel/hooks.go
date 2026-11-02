@@ -2,6 +2,7 @@ package otel
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -153,7 +154,9 @@ func (p *OTelPlugin) finalize(reqCtx *models.RequestContext) {
 
 // recordSpan attaches the HTTP metadata and, for 5xx responses only, the error
 // status. Per the stable HTTP semantic conventions a 4xx server span is not an
-// error, so its status stays unset.
+// error, so its status stays unset. url.query is deliberately omitted because
+// Authula carries credentials such as email-verification and magic-link tokens
+// in the query string.
 func (p *OTelPlugin) recordSpan(span trace.Span, reqCtx *models.RequestContext, status int, route, scheme, clientAddress string) {
 	attrs := []attribute.KeyValue{
 		requestMethodAttr(reqCtx.Method),
@@ -162,6 +165,21 @@ func (p *OTelPlugin) recordSpan(span trace.Span, reqCtx *models.RequestContext, 
 		semconv.URLScheme(scheme),
 		semconv.ClientAddress(clientAddress),
 		semconv.HTTPResponseStatusCode(status),
+	}
+
+	if methodOriginal, ok := methodOriginalAttr(reqCtx.Method); ok {
+		attrs = append(attrs, methodOriginal)
+	}
+	if host, port := resolveServer(reqCtx, scheme, p.pluginConfig.TrustProxy); host != "" {
+		attrs = append(attrs, semconv.ServerAddress(host), semconv.ServerPort(port))
+	}
+	if version := protocolVersion(reqCtx); version != "" {
+		attrs = append(attrs, semconv.NetworkProtocolVersion(version))
+	}
+	if reqCtx.Request != nil {
+		if userAgent := reqCtx.Request.UserAgent(); userAgent != "" {
+			attrs = append(attrs, semconv.UserAgentOriginal(userAgent))
+		}
 	}
 
 	if reqCtx.Actor != nil {
@@ -245,6 +263,74 @@ func resolveSchemeAndClient(reqCtx *models.RequestContext, trustProxy bool) (str
 	}
 
 	return scheme, clientAddress
+}
+
+// resolveServer derives server.address and server.port from the request
+// authority, preferring X-Forwarded-Host when proxy headers are trusted. If the
+// authority carries no port, the scheme default is used.
+func resolveServer(reqCtx *models.RequestContext, scheme string, trustProxy bool) (string, int) {
+	if reqCtx.Request == nil {
+		return "", 0
+	}
+
+	authority := reqCtx.Request.Host
+	if trustProxy {
+		if forwarded := strings.TrimSpace(reqCtx.Request.Header.Get("X-Forwarded-Host")); forwarded != "" {
+			authority = forwarded
+		}
+	}
+	if authority == "" {
+		return "", 0
+	}
+
+	host, port := authority, defaultPort(scheme)
+	if h, p, err := net.SplitHostPort(authority); err == nil {
+		host = h
+		if parsed, err := strconv.Atoi(p); err == nil {
+			port = parsed
+		}
+	}
+
+	return host, port
+}
+
+// defaultPort returns the default port for the scheme.
+func defaultPort(scheme string) int {
+	if scheme == "https" {
+		return 443
+	}
+	return 80
+}
+
+// protocolVersion converts the Go request protocol ("HTTP/1.1") to the
+// semantic-convention form ("1.1"). It returns an empty string when the
+// version is unknown.
+func protocolVersion(reqCtx *models.RequestContext) string {
+	if reqCtx.Request == nil {
+		return ""
+	}
+
+	version, ok := strings.CutPrefix(reqCtx.Request.Proto, "HTTP/")
+	if !ok {
+		return ""
+	}
+	switch version {
+	case "2.0":
+		return "2"
+	case "3.0":
+		return "3"
+	default:
+		return version
+	}
+}
+
+// methodOriginalAttr returns the http.request.method_original attribute when
+// the method was mapped to _OTHER, as the semantic conventions require.
+func methodOriginalAttr(method string) (attribute.KeyValue, bool) {
+	if requestMethodAttr(method).Value.AsString() != "_OTHER" {
+		return attribute.KeyValue{}, false
+	}
+	return semconv.HTTPRequestMethodOriginal(method), true
 }
 
 func requestContext(reqCtx *models.RequestContext) context.Context {

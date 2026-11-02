@@ -115,6 +115,7 @@ func TestOTelPluginInitInvalidConfig(t *testing.T) {
 		{name: "unknown protocol", config: types.OTelPluginConfig{Exporter: types.ExporterOTLP, Protocol: "quic"}},
 		{name: "sample ratio below zero", config: types.OTelPluginConfig{Exporter: types.ExporterOTLP, SampleRatio: new(-0.5)}},
 		{name: "sample ratio above one", config: types.OTelPluginConfig{Exporter: types.ExporterOTLP, SampleRatio: new(2.0)}},
+		{name: "endpoint with scheme", config: types.OTelPluginConfig{Exporter: types.ExporterOTLP, Endpoint: "http://localhost:4318"}},
 	}
 
 	for _, tc := range cases {

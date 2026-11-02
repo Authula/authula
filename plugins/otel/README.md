@@ -20,9 +20,18 @@ exporters, no goroutines, and no hooks.
 enabled = true
 service_name = "authula-service"
 exporter = "otlp"
-endpoint = "http://localhost:4318"
+endpoint = "localhost:4318"
 insecure = true
 logs_enabled = true
+```
+
+Collectors that require authentication (for example ClickStack) need an
+`authorization` header. Any non-empty `headers` map overrides
+`OTEL_EXPORTER_OTLP_HEADERS`:
+
+```toml
+[plugins.otel]
+headers = { authorization = "<your-ingestion-api-key>" }
 ```
 
 ## Configuration reference
@@ -33,8 +42,8 @@ logs_enabled = true
 | `service_name` | string | `authula` | `service.name` resource attribute. |
 | `exporter` | string | `otlp` | `otlp`, `stdout`, or `none`. |
 | `protocol` | string | `http` | `http`, `grpc`, or empty (env/default). |
-| `endpoint` | string | empty | OTLP endpoint. Empty lets the exporter read `OTEL_EXPORTER_OTLP_ENDPOINT`. |
-| `insecure` | bool | `false` | Disable transport security. |
+| `endpoint` | string | empty | OTLP target as `host:port` (e.g. `localhost:4318`). No scheme or path: the exporter adds the signal-specific path, and `insecure` picks HTTP vs HTTPS. Empty lets the exporter read `OTEL_EXPORTER_OTLP_ENDPOINT`. |
+| `insecure` | bool | `false` | Disable transport security. Required for plain-HTTP collectors (e.g. a local OTLP receiver on port 4318). |
 | `headers` | map | empty | Extra OTLP headers. Empty lets `OTEL_EXPORTER_OTLP_HEADERS` apply. |
 | `traces_enabled` | bool | `true` | Enable tracing. |
 | `metrics_enabled` | bool | `true` | Enable request/runtime metrics. |
@@ -72,10 +81,18 @@ to the SDK: `OTEL_BSP_*`, `OTEL_METRIC_EXPORT_INTERVAL`, and
   existing trace. The span is placed on the request context, so handlers can use
   `trace.SpanFromContext(r.Context())` and create child spans.
 
-Span attributes: `http.request.method`, `http.route` (method-stripped; fixed
-`unmatched` when no route matched), `url.path`, `url.scheme`, `client.address`,
-`http.response.status_code`, and `authula.actor.type` / `authula.actor.id` when
-an actor is present.
+Span attributes: `http.request.method` (plus `http.request.method_original`
+for unrecognized methods), `http.route` (method-stripped; fixed `unmatched` when
+no route matched), `url.path`, `url.scheme`, `client.address`,
+`http.response.status_code`, `server.address`, `server.port`,
+`network.protocol.version`, `user_agent.original`, and `authula.actor.type` /
+`authula.actor.id` when an actor is present.
+
+`url.query` is deliberately not recorded: Authula carries credentials such as
+email-verification, magic-link and invitation tokens in the query string, and
+exporting them would leak secrets into telemetry. `server.address` /
+`server.port` come from `X-Forwarded-Host` when `trust_proxy` is enabled,
+otherwise from the `Host` header.
 
 Status semantics follow the stable HTTP semantic conventions: only `>= 500`
 responses set the span status to `Error` and add `error.type` (the status code

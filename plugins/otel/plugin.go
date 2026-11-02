@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -92,6 +93,15 @@ func (p *OTelPlugin) Init(pluginCtx *models.PluginContext) error {
 			p.pluginConfig.Exporter,
 			p.pluginConfig.Protocol,
 			p.pluginConfig.SampleRatio,
+		)
+	}
+
+	// The OTLP exporters take a bare host:port; a URL makes the SDK build an
+	// invalid address, so reject it here with an actionable message.
+	if strings.Contains(p.pluginConfig.Endpoint, "://") {
+		return fmt.Errorf(
+			`otel: invalid endpoint %q: use host:port (e.g. "localhost:4318") and set insecure = true for plain HTTP`,
+			p.pluginConfig.Endpoint,
 		)
 	}
 

@@ -145,6 +145,7 @@ func TestFinalizeSpanAttributes(t *testing.T) {
 			reqCtx.ClientIP = "203.0.113.7"
 			reqCtx.ResponseStatus = tc.status
 			reqCtx.Actor = tc.actor
+			reqCtx.Request.Header.Set("User-Agent", "authula-test/1.0")
 
 			if err := f.plugin.onRequest()(reqCtx); err != nil {
 				t.Fatalf("onRequest() error = %v", err)
@@ -176,6 +177,21 @@ func TestFinalizeSpanAttributes(t *testing.T) {
 			}
 			if v, ok := findAttribute(span, attribute.Key("http.response.status_code")); !ok || v.AsInt64() != int64(tc.wantStatusAttr) {
 				t.Errorf("http.response.status_code = %d (ok=%v), want %d", v.AsInt64(), ok, tc.wantStatusAttr)
+			}
+			if v, ok := findAttribute(span, attribute.Key("server.address")); !ok || v.AsString() != "example.com" {
+				t.Errorf("server.address = %q (ok=%v), want example.com", v.AsString(), ok)
+			}
+			if v, ok := findAttribute(span, attribute.Key("server.port")); !ok || v.AsInt64() != 80 {
+				t.Errorf("server.port = %d (ok=%v), want 80", v.AsInt64(), ok)
+			}
+			if v, ok := findAttribute(span, attribute.Key("network.protocol.version")); !ok || v.AsString() != "1.1" {
+				t.Errorf("network.protocol.version = %q (ok=%v), want 1.1", v.AsString(), ok)
+			}
+			if v, ok := findAttribute(span, attribute.Key("user_agent.original")); !ok || v.AsString() != "authula-test/1.0" {
+				t.Errorf("user_agent.original = %q (ok=%v), want authula-test/1.0", v.AsString(), ok)
+			}
+			if _, ok := findAttribute(span, attribute.Key("url.query")); ok {
+				t.Error("url.query should not be recorded")
 			}
 
 			_, hasErrorType := findAttribute(span, attribute.Key(errorTypeKey))
@@ -246,6 +262,9 @@ func TestFinalizeUnknownMethodMappedToOther(t *testing.T) {
 	if v, ok := findAttribute(span, attribute.Key("http.request.method")); !ok || v.AsString() != "_OTHER" {
 		t.Errorf("http.request.method = %q (ok=%v), want _OTHER", v.AsString(), ok)
 	}
+	if v, ok := findAttribute(span, attribute.Key("http.request.method_original")); !ok || v.AsString() != "BREW" {
+		t.Errorf("http.request.method_original = %q (ok=%v), want BREW", v.AsString(), ok)
+	}
 }
 
 func TestResolveSchemeAndClient(t *testing.T) {
@@ -301,6 +320,77 @@ func TestResolveSchemeAndClient(t *testing.T) {
 			}
 			if client != tc.wantClient {
 				t.Errorf("client = %q, want %q", client, tc.wantClient)
+			}
+		})
+	}
+}
+
+func TestResolveServer(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		host       string
+		scheme     string
+		trustProxy bool
+		forwarded  string
+		wantHost   string
+		wantPort   int
+	}{
+		{name: "host with port", host: "api.example.com:8443", scheme: "http", wantHost: "api.example.com", wantPort: 8443},
+		{name: "host without port", host: "api.example.com", scheme: "http", wantHost: "api.example.com", wantPort: 80},
+		{name: "https default port", host: "api.example.com", scheme: "https", wantHost: "api.example.com", wantPort: 443},
+		{name: "ipv6 with port", host: "[::1]:8080", scheme: "http", wantHost: "::1", wantPort: 8080},
+		{name: "forwarded host honored", host: "internal:8080", scheme: "http", trustProxy: true, forwarded: "public.example.com:9443", wantHost: "public.example.com", wantPort: 9443},
+		{name: "forwarded host ignored without trust", host: "internal:8080", scheme: "http", forwarded: "public.example.com", wantHost: "internal", wantPort: 8080},
+		{name: "empty host", scheme: "http", wantHost: "", wantPort: 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			reqCtx := newRequestContext(http.MethodGet, "/", "")
+			reqCtx.Request.Host = tc.host
+			if tc.forwarded != "" {
+				reqCtx.Request.Header.Set("X-Forwarded-Host", tc.forwarded)
+			}
+
+			host, port := resolveServer(reqCtx, tc.scheme, tc.trustProxy)
+			if host != tc.wantHost {
+				t.Errorf("host = %q, want %q", host, tc.wantHost)
+			}
+			if port != tc.wantPort {
+				t.Errorf("port = %d, want %d", port, tc.wantPort)
+			}
+		})
+	}
+}
+
+func TestProtocolVersion(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		proto string
+		want  string
+	}{
+		{proto: "HTTP/1.1", want: "1.1"},
+		{proto: "HTTP/1.0", want: "1.0"},
+		{proto: "HTTP/2.0", want: "2"},
+		{proto: "HTTP/3.0", want: "3"},
+		{proto: "", want: ""},
+		{proto: "garbage", want: ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.proto, func(t *testing.T) {
+			t.Parallel()
+
+			reqCtx := newRequestContext(http.MethodGet, "/", "")
+			reqCtx.Request.Proto = tc.proto
+
+			if got := protocolVersion(reqCtx); got != tc.want {
+				t.Errorf("protocolVersion(%q) = %q, want %q", tc.proto, got, tc.want)
 			}
 		})
 	}

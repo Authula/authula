@@ -31,6 +31,10 @@ const (
 // It carries both json tags (used by util.LoadPluginConfig/mapstructure) and
 // matching toml tags for consistency with the other plugin configs.
 //
+// Endpoint takes a bare host:port (e.g. "localhost:4318"), never a scheme or
+// path: the OTLP exporters append the signal-specific path, and Insecure picks
+// between HTTP and HTTPS.
+//
 // TracesEnabled, MetricsEnabled and RuntimeMetrics are pointers so an explicit
 // `false` is distinguishable from "unset" (which defaults to true).
 type OTelPluginConfig struct {
