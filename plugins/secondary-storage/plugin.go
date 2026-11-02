@@ -122,7 +122,7 @@ func (p *SecondaryStoragePlugin) initDatabaseProvider(ctx *models.PluginContext)
 
 	return NewDatabaseSecondaryStorage(ctx.DB, DatabaseStorageConfig{
 		CleanupInterval: cleanupInterval,
-	}), nil
+	}, WithDatabaseStorageLogger(ctx.Logger)), nil
 }
 
 // initRedisProvider initializes the Redis storage provider

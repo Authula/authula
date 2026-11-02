@@ -13,6 +13,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/Authula/authula/internal/sqlitedsn"
+	internaltests "github.com/Authula/authula/internal/tests"
 )
 
 // Helper function to create an in-memory SQLite database for testing
@@ -743,4 +744,26 @@ func TestDatabaseStorage_PersistenceAcrossInstances(t *testing.T) {
 		t.Fatalf("expected to find key2, got error: %v", err)
 	}
 	assertStringDB(t, retrieved2, "value2")
+}
+
+func TestDatabaseStorageCleanupErrorsUseInjectedLogger(t *testing.T) {
+	db := newTestDB(t)
+	logger := new(internaltests.RecordingLogger)
+	storage := NewDatabaseSecondaryStorage(db, DatabaseStorageConfig{
+		CleanupInterval: time.Minute,
+	}, WithDatabaseStorageLogger(logger))
+
+	// Removing the table makes the cleanup query fail.
+	if _, err := db.NewDropTable().Model(&KeyValueStore{}).Exec(context.Background()); err != nil {
+		t.Fatalf("failed to drop table: %v", err)
+	}
+
+	storage.removeExpiredEntries()
+
+	if len(logger.ErrorCalls) != 1 {
+		t.Fatalf("logged %d errors, want 1: %v", len(logger.ErrorCalls), logger.ErrorCalls)
+	}
+	if logger.ErrorCalls[0] != "error cleaning up expired entries from key_value_store" {
+		t.Fatalf("logged %q, want cleanup message", logger.ErrorCalls[0])
+	}
 }

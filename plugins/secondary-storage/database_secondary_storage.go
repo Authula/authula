@@ -4,17 +4,29 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"github.com/Authula/authula/models"
 )
 
-// DatabaseSecondaryStorage implements the SecondaryStorage interface using Bun ORM.
+type DatabaseStorageOption func(*DatabaseSecondaryStorage)
+
+func WithDatabaseStorageLogger(logger models.Logger) DatabaseStorageOption {
+	return func(storage *DatabaseSecondaryStorage) {
+		if logger != nil {
+			storage.logger = logger
+		}
+	}
+}
+
 type DatabaseSecondaryStorage struct {
 	db bun.IDB
+	// logger receives non-fatal errors (cleanup, expired-entry deletions).
+	logger models.Logger
 	// cleanupInterval controls how often expired entries are cleaned up.
 	cleanupInterval time.Duration
 	// stopCleanup is used to signal the cleanup goroutine to stop.
@@ -27,7 +39,7 @@ type DatabaseSecondaryStorage struct {
 	closeOnce sync.Once
 }
 
-func NewDatabaseSecondaryStorage(db bun.IDB, config DatabaseStorageConfig) *DatabaseSecondaryStorage {
+func NewDatabaseSecondaryStorage(db bun.IDB, config DatabaseStorageConfig, opts ...DatabaseStorageOption) *DatabaseSecondaryStorage {
 	cleanupInterval := time.Minute
 	if config.CleanupInterval != 0 {
 		cleanupInterval = config.CleanupInterval
@@ -41,12 +53,19 @@ func NewDatabaseSecondaryStorage(db bun.IDB, config DatabaseStorageConfig) *Data
 		cleanupStarted:  false,
 	}
 
+	for _, opt := range opts {
+		opt(storage)
+	}
+
 	return storage
 }
 
-// StartCleanup starts the background cleanup goroutine that removes expired entries.
-// This should be called after database migrations have completed.
-// It is safe to call this multiple times - subsequent calls will be no-ops.
+func (storage *DatabaseSecondaryStorage) logError(msg string, args ...any) {
+	if storage.logger != nil {
+		storage.logger.Error(msg, args...)
+	}
+}
+
 func (storage *DatabaseSecondaryStorage) StartCleanup() {
 	if storage.cleanupStarted {
 		return
@@ -55,9 +74,6 @@ func (storage *DatabaseSecondaryStorage) StartCleanup() {
 	go storage.cleanupExpiredEntries()
 }
 
-// Get retrieves a value from the database by key.
-// Returns nil if the key does not exist or has expired.
-// Expired entries are deleted immediately to prevent database bloat.
 func (storage *DatabaseSecondaryStorage) Get(ctx context.Context, key string) (any, error) {
 	select {
 	case <-ctx.Done():
@@ -87,7 +103,7 @@ func (storage *DatabaseSecondaryStorage) Get(ctx context.Context, key string) (a
 	if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
 		// Delete the expired entry
 		if _, err := storage.db.NewDelete().Model(&KeyValueStore{}).Where("key = ?", key).Exec(ctx); err != nil {
-			slog.Error("error deleting expired entry", slog.String("key", key), slog.Any("error", err))
+			storage.logError("error deleting expired entry", "key", key, "error", err)
 		}
 		return nil, nil
 	}
@@ -95,8 +111,6 @@ func (storage *DatabaseSecondaryStorage) Get(ctx context.Context, key string) (a
 	return entry.Value, nil
 }
 
-// Set stores a value in the database with an optional TTL.
-// The value must be a string. If ttl is nil, the entry will not expire.
 func (storage *DatabaseSecondaryStorage) Set(ctx context.Context, key string, value any, ttl *time.Duration) error {
 	select {
 	case <-ctx.Done():
@@ -128,8 +142,6 @@ func (storage *DatabaseSecondaryStorage) Set(ctx context.Context, key string, va
 	return nil
 }
 
-// Delete removes a key from the database.
-// It is idempotent: deleting a non-existent key does not return an error.
 func (storage *DatabaseSecondaryStorage) Delete(ctx context.Context, key string) error {
 	select {
 	case <-ctx.Done():
@@ -146,10 +158,6 @@ func (storage *DatabaseSecondaryStorage) Delete(ctx context.Context, key string)
 	return nil
 }
 
-// Incr increments the integer value stored at key by 1.
-// If the key does not exist, it is initialized to 0 and then incremented to 1.
-// If ttl is provided, it will be set or updated on the key.
-// Expired entries are deleted immediately before incrementing.
 func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, ttl *time.Duration) (int, error) {
 	select {
 	case <-ctx.Done():
@@ -168,7 +176,7 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 			if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
 				// Delete the expired entry
 				if _, err := storage.db.NewDelete().Model(&KeyValueStore{}).Where("key = ?", key).Exec(ctx); err != nil {
-					slog.Error("error deleting expired entry during incr", slog.String("key", key), slog.Any("error", err))
+					storage.logError("error deleting expired entry during incr", "key", key, "error", err)
 				}
 			} else {
 				// Entry exists and is not expired
@@ -186,7 +194,7 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 		if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
 			// Delete the expired entry
 			if _, err := storage.db.NewDelete().Model(&KeyValueStore{}).Where("key = ?", key).Exec(ctx); err != nil {
-				slog.Error("error deleting expired entry during incr", slog.String("key", key), slog.Any("error", err))
+				storage.logError("error deleting expired entry during incr", "key", key, "error", err)
 			}
 		} else {
 			// Entry exists and is not expired
@@ -218,8 +226,6 @@ func (storage *DatabaseSecondaryStorage) Incr(ctx context.Context, key string, t
 	return count, nil
 }
 
-// cleanupExpiredEntries runs periodically to remove expired entries from the database.
-// This prevents database bloat from entries with TTL that are never accessed.
 func (storage *DatabaseSecondaryStorage) cleanupExpiredEntries() {
 	ticker := time.NewTicker(storage.cleanupInterval)
 	defer ticker.Stop()
@@ -235,7 +241,6 @@ func (storage *DatabaseSecondaryStorage) cleanupExpiredEntries() {
 	}
 }
 
-// removeExpiredEntries removes all expired entries from the database.
 func (storage *DatabaseSecondaryStorage) removeExpiredEntries() {
 	now := time.Now()
 	ctx := context.Background()
@@ -245,12 +250,10 @@ func (storage *DatabaseSecondaryStorage) removeExpiredEntries() {
 		Exec(ctx)
 
 	if err != nil {
-		slog.Error("error cleaning up expired entries from key_value_store", slog.Any("error", err))
+		storage.logError("error cleaning up expired entries from key_value_store", "error", err)
 	}
 }
 
-// TTL returns the remaining time to live for a key
-// Returns nil if the key does not exist or has no expiration
 func (storage *DatabaseSecondaryStorage) TTL(ctx context.Context, key string) (*time.Duration, error) {
 	select {
 	case <-ctx.Done():
@@ -289,7 +292,6 @@ func (storage *DatabaseSecondaryStorage) TTL(ctx context.Context, key string) (*
 	return &ttl, nil
 }
 
-// Scan returns all non-expired keys matching the given prefix.
 func (storage *DatabaseSecondaryStorage) Scan(ctx context.Context, prefix string) ([]string, error) {
 	select {
 	case <-ctx.Done():
@@ -313,8 +315,6 @@ func (storage *DatabaseSecondaryStorage) Scan(ctx context.Context, prefix string
 	return keys, nil
 }
 
-// Close gracefully shuts down the storage by stopping the cleanup goroutine.
-// This method is idempotent and safe to call multiple times.
 func (storage *DatabaseSecondaryStorage) Close() error {
 	storage.closeOnce.Do(func() {
 		if storage.cleanupStarted {
