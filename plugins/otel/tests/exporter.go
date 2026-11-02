@@ -1,4 +1,3 @@
-// Package tests holds shared test helpers for the OpenTelemetry plugin.
 package tests
 
 import (
@@ -29,7 +28,6 @@ func (e *Exporter) Shutdown(context.Context) error { return nil }
 
 func (e *Exporter) ForceFlush(context.Context) error { return nil }
 
-// Records returns a copy of every exported record, in order.
 func (e *Exporter) Records() []sdklog.Record {
 	e.mu.Lock()
 	defer e.mu.Unlock()

@@ -18,6 +18,7 @@ func TestOTelPluginConfigApplyDefaults(t *testing.T) {
 			name:   "empty config gets all defaults",
 			config: types.OTelPluginConfig{},
 			expected: types.OTelPluginConfig{
+				Enabled:        false,
 				Exporter:       types.ExporterOTLP,
 				TracesEnabled:  new(true),
 				MetricsEnabled: new(true),
@@ -30,6 +31,7 @@ func TestOTelPluginConfigApplyDefaults(t *testing.T) {
 				Exporter: types.ExporterStdout,
 			},
 			expected: types.OTelPluginConfig{
+				Enabled:        false,
 				Exporter:       types.ExporterStdout,
 				TracesEnabled:  new(true),
 				MetricsEnabled: new(true),
@@ -39,11 +41,13 @@ func TestOTelPluginConfigApplyDefaults(t *testing.T) {
 		{
 			name: "explicit toggles are preserved",
 			config: types.OTelPluginConfig{
+				Enabled:        false,
 				TracesEnabled:  new(false),
 				MetricsEnabled: new(true),
 				RuntimeMetrics: new(false),
 			},
 			expected: types.OTelPluginConfig{
+				Enabled:        false,
 				Exporter:       types.ExporterOTLP,
 				TracesEnabled:  new(false),
 				MetricsEnabled: new(true),
@@ -87,6 +91,9 @@ func TestOTelPluginConfigApplyDefaults(t *testing.T) {
 			config := tc.config
 			config.ApplyDefaults()
 
+			if config.Enabled != tc.expected.Enabled {
+				t.Errorf("Enabled = %v, want %v", config.Enabled, tc.expected.Enabled)
+			}
 			if config.Exporter != tc.expected.Exporter {
 				t.Errorf("Exporter = %q, want %q", config.Exporter, tc.expected.Exporter)
 			}
@@ -115,6 +122,17 @@ func TestOTelPluginConfigApplyDefaults(t *testing.T) {
 				t.Errorf("TrustProxy = %v, want %v", config.TrustProxy, tc.expected.TrustProxy)
 			}
 		})
+	}
+}
+
+func TestOTelPluginConfigEnabledDefaultsToFalse(t *testing.T) {
+	t.Parallel()
+
+	config := types.OTelPluginConfig{}
+	config.ApplyDefaults()
+
+	if config.Enabled {
+		t.Fatal("Enabled = true, want false by default")
 	}
 }
 

@@ -1,6 +1,8 @@
 package otel
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/Authula/authula/models"
@@ -50,6 +52,7 @@ func TestOTelPluginHooks(t *testing.T) {
 			t.Parallel()
 
 			plugin := &OTelPlugin{}
+			plugin.pluginConfig.Enabled = true
 			plugin.pluginConfig.TracesEnabled = new(tc.traces)
 			plugin.pluginConfig.MetricsEnabled = new(tc.metrics)
 
@@ -101,6 +104,70 @@ func TestOTelPluginInitDisabledIsNoOp(t *testing.T) {
 	}
 	if plugin.meterProvider != nil {
 		t.Error("meterProvider should be nil when disabled")
+	}
+}
+
+func TestOTelPluginSectionWithoutEnabledStaysInert(t *testing.T) {
+	t.Parallel()
+
+	plugin := New(types.OTelPluginConfig{})
+
+	err := plugin.Init(&models.PluginContext{GetConfig: func() *models.Config {
+		return &models.Config{Plugins: models.PluginsConfig{
+			"otel": map[string]any{
+				"exporter":        "stdout",
+				"metrics_enabled": false,
+				"runtime_metrics": false,
+			},
+		}}
+	}})
+	if err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+
+	if plugin.tracerProvider != nil || plugin.meterProvider != nil {
+		t.Error("providers should not be created when enabled is omitted")
+	}
+	if hooks := plugin.Hooks(); hooks != nil {
+		t.Errorf("Hooks() = %v, want nil when enabled is omitted", hooks)
+	}
+}
+
+func TestOTelPluginInitExplicitlyDisabledByConfig(t *testing.T) {
+	t.Parallel()
+
+	plugin := New(types.OTelPluginConfig{})
+
+	err := plugin.Init(&models.PluginContext{GetConfig: func() *models.Config {
+		return &models.Config{Plugins: models.PluginsConfig{
+			"otel": map[string]any{
+				"enabled":  false,
+				"exporter": "stdout",
+			},
+		}}
+	}})
+	if err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+
+	if plugin.tracerProvider != nil || plugin.meterProvider != nil || plugin.loggerProvider != nil {
+		t.Error("providers should not be created when enabled = false")
+	}
+	if hooks := plugin.Hooks(); hooks != nil {
+		t.Errorf("Hooks() = %v, want nil when enabled = false", hooks)
+	}
+}
+
+func TestHooksBeforeInitDoNotPanic(t *testing.T) {
+	t.Parallel()
+
+	plugin := New(types.OTelPluginConfig{Enabled: true})
+	reqCtx := &models.RequestContext{Method: http.MethodGet, Request: httptest.NewRequest(http.MethodGet, "/", nil)}
+
+	for _, hook := range plugin.Hooks() {
+		if err := hook.Handler(reqCtx); err != nil {
+			t.Fatalf("hook handler error = %v", err)
+		}
 	}
 }
 

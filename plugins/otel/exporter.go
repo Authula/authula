@@ -24,8 +24,6 @@ import (
 	"github.com/Authula/authula/plugins/otel/types"
 )
 
-// buildTraceExporter constructs the configured span exporter. It returns a nil
-// exporter when exporting is disabled ("none").
 func buildTraceExporter(ctx context.Context, cfg types.OTelPluginConfig) (sdktrace.SpanExporter, error) {
 	switch cfg.Exporter {
 	case types.ExporterNone:
@@ -42,8 +40,6 @@ func buildTraceExporter(ctx context.Context, cfg types.OTelPluginConfig) (sdktra
 	}
 }
 
-// buildMetricExporter constructs the configured metric exporter. It returns a
-// nil exporter when exporting is disabled ("none").
 func buildMetricExporter(ctx context.Context, cfg types.OTelPluginConfig) (sdkmetric.Exporter, error) {
 	switch cfg.Exporter {
 	case types.ExporterNone:
@@ -60,8 +56,6 @@ func buildMetricExporter(ctx context.Context, cfg types.OTelPluginConfig) (sdkme
 	}
 }
 
-// buildLogExporter constructs the configured log exporter. It returns a nil
-// exporter when exporting is disabled ("none").
 func buildLogExporter(ctx context.Context, cfg types.OTelPluginConfig) (sdklog.Exporter, error) {
 	switch cfg.Exporter {
 	case types.ExporterNone:
@@ -78,8 +72,6 @@ func buildLogExporter(ctx context.Context, cfg types.OTelPluginConfig) (sdklog.E
 	}
 }
 
-// newLoggerProvider builds a LoggerProvider that batches records to the
-// supplied exporter.
 func newLoggerProvider(res *resource.Resource, exp sdklog.Exporter) *sdklog.LoggerProvider {
 	opts := make([]sdklog.LoggerProviderOption, 0, 2)
 	if res != nil {
@@ -91,9 +83,6 @@ func newLoggerProvider(res *resource.Resource, exp sdklog.Exporter) *sdklog.Logg
 	return sdklog.NewLoggerProvider(opts...)
 }
 
-// newTracerProvider builds a TracerProvider that batches spans to the supplied
-// exporter and only overrides the sampler when a sample ratio is configured.
-// Exported so tests can inject their own exporter.
 func newTracerProvider(cfg types.OTelPluginConfig, res *resource.Resource, exp sdktrace.SpanExporter) *sdktrace.TracerProvider {
 	opts := make([]sdktrace.TracerProviderOption, 0, 3)
 	if res != nil {
@@ -108,7 +97,6 @@ func newTracerProvider(cfg types.OTelPluginConfig, res *resource.Resource, exp s
 	return sdktrace.NewTracerProvider(opts...)
 }
 
-// newMeterProvider builds a MeterProvider reading through the supplied reader.
 func newMeterProvider(_ types.OTelPluginConfig, res *resource.Resource, reader sdkmetric.Reader) *sdkmetric.MeterProvider {
 	opts := make([]sdkmetric.Option, 0, 2)
 	if res != nil {
@@ -120,7 +108,6 @@ func newMeterProvider(_ types.OTelPluginConfig, res *resource.Resource, reader s
 	return sdkmetric.NewMeterProvider(opts...)
 }
 
-// resolveProtocol applies the precedence rule config > OTEL_EXPORTER_OTLP_PROTOCOL > "http".
 func resolveProtocol(cfg types.OTelPluginConfig) types.ProtocolType {
 	if cfg.Protocol != "" {
 		return cfg.Protocol
@@ -132,7 +119,6 @@ func resolveProtocol(cfg types.OTelPluginConfig) types.ProtocolType {
 	return types.ProtocolHTTP
 }
 
-// resolveServiceName applies the precedence rule config > OTEL_SERVICE_NAME > "authula".
 func resolveServiceName(cfg types.OTelPluginConfig) string {
 	if cfg.ServiceName != "" {
 		return cfg.ServiceName

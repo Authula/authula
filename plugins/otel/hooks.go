@@ -24,8 +24,7 @@ const (
 	// durationInstrumentName is the semantic-convention HTTP server duration
 	// histogram name.
 	durationInstrumentName = "http.server.request.duration"
-	// routeUnmatched is the fixed, low-cardinality label used when no route was
-	// matched.
+	// routeUnmatched is the label used when no route was matched.
 	routeUnmatched = "unmatched"
 	// errorTypeKey is the semantic-convention attribute key for the error class.
 	errorTypeKey = "error.type"
@@ -35,17 +34,15 @@ const (
 // for HTTP server request duration, in seconds.
 var durationBuckets = []float64{0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10}
 
-// spanState carries the per-request span and its start time between the
+// spanState carries the per-request span and its start time between
 // on-request and on-complete hooks.
 type spanState struct {
 	span  trace.Span
 	start time.Time
 }
 
-// buildHooks wires the request and completion hooks. When both traces and
-// metrics are off the plugin contributes no hooks at all.
 func (p *OTelPlugin) buildHooks() []models.Hook {
-	if !p.pluginConfig.TracesOn() && !p.pluginConfig.MetricsOn() {
+	if !p.pluginConfig.Enabled || (!p.pluginConfig.TracesOn() && !p.pluginConfig.MetricsOn()) {
 		return nil
 	}
 
@@ -76,7 +73,7 @@ func (p *OTelPlugin) onRequest() models.HookHandler {
 			return nil
 		}
 
-		if !p.pluginConfig.TracesOn() {
+		if !p.pluginConfig.TracesOn() || p.tracer == nil {
 			reqCtx.Values[spanStateKey] = &spanState{start: start}
 			return nil
 		}
@@ -197,8 +194,6 @@ func (p *OTelPlugin) recordSpan(span trace.Span, reqCtx *models.RequestContext, 
 	}
 }
 
-// routePattern returns the matched route with its leading "METHOD:" prefix
-// stripped, or an empty string when no route was matched.
 func routePattern(reqCtx *models.RequestContext) string {
 	if reqCtx.Route == nil {
 		return ""
@@ -207,8 +202,8 @@ func routePattern(reqCtx *models.RequestContext) string {
 	if pattern == "" {
 		return ""
 	}
-	if idx := strings.IndexByte(pattern, ':'); idx >= 0 {
-		return pattern[idx+1:]
+	if _, after, ok := strings.Cut(pattern, ":"); ok {
+		return after
 	}
 	return pattern
 }
@@ -220,8 +215,6 @@ func routeLabel(route string) string {
 	return route
 }
 
-// resolveStatus resolves the final HTTP status from the captured response, the
-// response writer, or defaults to 200.
 func resolveStatus(reqCtx *models.RequestContext) int {
 	if reqCtx.ResponseStatus != 0 {
 		return reqCtx.ResponseStatus
@@ -234,9 +227,6 @@ func resolveStatus(reqCtx *models.RequestContext) int {
 	return http.StatusOK
 }
 
-// resolveSchemeAndClient derives the request scheme and client address. With
-// trust_proxy enabled the X-Forwarded-Proto/X-Forwarded-For headers take
-// precedence; otherwise they are ignored.
 func resolveSchemeAndClient(reqCtx *models.RequestContext, trustProxy bool) (string, string) {
 	scheme := "http"
 	clientAddress := reqCtx.ClientIP
@@ -265,9 +255,6 @@ func resolveSchemeAndClient(reqCtx *models.RequestContext, trustProxy bool) (str
 	return scheme, clientAddress
 }
 
-// resolveServer derives server.address and server.port from the request
-// authority, preferring X-Forwarded-Host when proxy headers are trusted. If the
-// authority carries no port, the scheme default is used.
 func resolveServer(reqCtx *models.RequestContext, scheme string, trustProxy bool) (string, int) {
 	if reqCtx.Request == nil {
 		return "", 0
@@ -294,7 +281,6 @@ func resolveServer(reqCtx *models.RequestContext, scheme string, trustProxy bool
 	return host, port
 }
 
-// defaultPort returns the default port for the scheme.
 func defaultPort(scheme string) int {
 	if scheme == "https" {
 		return 443
@@ -302,9 +288,6 @@ func defaultPort(scheme string) int {
 	return 80
 }
 
-// protocolVersion converts the Go request protocol ("HTTP/1.1") to the
-// semantic-convention form ("1.1"). It returns an empty string when the
-// version is unknown.
 func protocolVersion(reqCtx *models.RequestContext) string {
 	if reqCtx.Request == nil {
 		return ""
@@ -324,8 +307,6 @@ func protocolVersion(reqCtx *models.RequestContext) string {
 	}
 }
 
-// methodOriginalAttr returns the http.request.method_original attribute when
-// the method was mapped to _OTHER, as the semantic conventions require.
 func methodOriginalAttr(method string) (attribute.KeyValue, bool) {
 	if requestMethodAttr(method).Value.AsString() != "_OTHER" {
 		return attribute.KeyValue{}, false
@@ -340,26 +321,24 @@ func requestContext(reqCtx *models.RequestContext) context.Context {
 	return context.Background()
 }
 
-// requestMethodAttr maps the HTTP method to its semantic-convention attribute,
-// falling back to _OTHER for unknown methods.
 func requestMethodAttr(method string) attribute.KeyValue {
 	switch method {
 	case http.MethodConnect:
 		return semconv.HTTPRequestMethodConnect
-	case http.MethodDelete:
-		return semconv.HTTPRequestMethodDelete
-	case http.MethodGet:
-		return semconv.HTTPRequestMethodGet
 	case http.MethodHead:
 		return semconv.HTTPRequestMethodHead
 	case http.MethodOptions:
 		return semconv.HTTPRequestMethodOptions
-	case http.MethodPatch:
-		return semconv.HTTPRequestMethodPatch
+	case http.MethodGet:
+		return semconv.HTTPRequestMethodGet
 	case http.MethodPost:
 		return semconv.HTTPRequestMethodPost
 	case http.MethodPut:
 		return semconv.HTTPRequestMethodPut
+	case http.MethodPatch:
+		return semconv.HTTPRequestMethodPatch
+	case http.MethodDelete:
+		return semconv.HTTPRequestMethodDelete
 	case http.MethodTrace:
 		return semconv.HTTPRequestMethodTrace
 	default:

@@ -58,8 +58,6 @@ func (h levelHandler) WithGroup(name string) slog.Handler {
 	return levelHandler{min: h.min, inner: h.inner.WithGroup(name)}
 }
 
-// parseLevel maps a configured level name to a slog level. Unknown or empty
-// values fall back to info.
 func parseLevel(name string) slog.Level {
 	switch name {
 	case "debug":

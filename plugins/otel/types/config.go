@@ -1,42 +1,22 @@
 package types
 
-// DefaultServiceName is used when neither the plugin config nor the
-// OTEL_SERVICE_NAME environment variable provides a service name.
 const DefaultServiceName = "authula"
 
-// ExporterType selects where telemetry is exported.
 type ExporterType string
 
 const (
-	// ExporterOTLP exports over the OpenTelemetry Protocol.
-	ExporterOTLP ExporterType = "otlp"
-	// ExporterStdout writes telemetry to standard output (useful for debugging).
+	ExporterOTLP   ExporterType = "otlp"
 	ExporterStdout ExporterType = "stdout"
-	// ExporterNone disables exporting entirely.
-	ExporterNone ExporterType = "none"
+	ExporterNone   ExporterType = "none"
 )
 
-// ProtocolType selects the OTLP transport.
 type ProtocolType string
 
 const (
-	// ProtocolHTTP uses OTLP over HTTP/protobuf.
 	ProtocolHTTP ProtocolType = "http"
-	// ProtocolGRPC uses OTLP over gRPC.
 	ProtocolGRPC ProtocolType = "grpc"
 )
 
-// OTelPluginConfig is the OpenTelemetry plugin configuration.
-//
-// It carries both json tags (used by util.LoadPluginConfig/mapstructure) and
-// matching toml tags for consistency with the other plugin configs.
-//
-// Endpoint takes a bare host:port (e.g. "localhost:4318"), never a scheme or
-// path: the OTLP exporters append the signal-specific path, and Insecure picks
-// between HTTP and HTTPS.
-//
-// TracesEnabled, MetricsEnabled and RuntimeMetrics are pointers so an explicit
-// `false` is distinguishable from "unset" (which defaults to true).
 type OTelPluginConfig struct {
 	Enabled        bool              `json:"enabled" toml:"enabled"`
 	ServiceName    string            `json:"service_name,omitempty" toml:"service_name"`
@@ -53,8 +33,6 @@ type OTelPluginConfig struct {
 	TrustProxy     bool              `json:"trust_proxy,omitempty" toml:"trust_proxy"`
 }
 
-// ApplyDefaults fills unset fields with their default values. It does not touch
-// Enabled, which is resolved by the plugin factory and the Init guard.
 func (c *OTelPluginConfig) ApplyDefaults() {
 	if c.Exporter == "" {
 		c.Exporter = ExporterOTLP
@@ -70,43 +48,32 @@ func (c *OTelPluginConfig) ApplyDefaults() {
 	}
 }
 
-// TracesOn reports whether tracing is enabled, defaulting to true when unset.
 func (c OTelPluginConfig) TracesOn() bool {
 	return boolValue(c.TracesEnabled, true)
 }
 
-// MetricsOn reports whether metrics are enabled, defaulting to true when unset.
 func (c OTelPluginConfig) MetricsOn() bool {
 	return boolValue(c.MetricsEnabled, true)
 }
 
-// RuntimeOn reports whether runtime metrics are enabled, defaulting to true
-// when unset.
+// RuntimeOn reports whether Go runtime metrics should be started. It defaults
+// to true when unset.
 func (c OTelPluginConfig) RuntimeOn() bool {
 	return boolValue(c.RuntimeMetrics, true)
 }
 
-// TracesActive reports whether tracing should be initialized. It additionally
-// treats the "none" exporter as a full disable.
 func (c OTelPluginConfig) TracesActive() bool {
 	return c.TracesOn() && c.Exporter != ExporterNone
 }
 
-// MetricsActive reports whether metrics should be initialized. It additionally
-// treats the "none" exporter as a full disable.
 func (c OTelPluginConfig) MetricsActive() bool {
 	return c.MetricsOn() && c.Exporter != ExporterNone
 }
 
-// LogsActive reports whether the logs bridge should be initialized. Logs are
-// opt-in, so an unset flag means disabled; the "none" exporter also disables
-// them.
 func (c OTelPluginConfig) LogsActive() bool {
 	return c.LogsEnabled && c.Exporter != ExporterNone
 }
 
-// Valid reports whether the configuration values are within their supported
-// ranges.
 func (c OTelPluginConfig) Valid() bool {
 	switch c.Exporter {
 	case ExporterOTLP, ExporterStdout, ExporterNone:

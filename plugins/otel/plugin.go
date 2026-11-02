@@ -29,9 +29,6 @@ import (
 // metric produced by the plugin.
 const scopeName = "github.com/Authula/authula/plugins/otel"
 
-// OTelPlugin provides distributed tracing and request/runtime metrics backed by
-// the OpenTelemetry SDK. All providers are instance-local: the plugin never
-// touches the process-global otel providers.
 type OTelPlugin struct {
 	pluginConfig types.OTelPluginConfig
 	pluginCtx    *models.PluginContext
@@ -41,9 +38,9 @@ type OTelPlugin struct {
 	meter      metric.Meter
 	propagator propagation.TextMapPropagator
 
-	tracerProvider *sdktrace.TracerProvider // nil when traces disabled/none
-	meterProvider  *sdkmetric.MeterProvider // nil when metrics disabled/none
-	loggerProvider *sdklog.LoggerProvider   // nil when logs disabled/none
+	tracerProvider *sdktrace.TracerProvider
+	meterProvider  *sdkmetric.MeterProvider
+	loggerProvider *sdklog.LoggerProvider
 	duration       metric.Float64Histogram
 
 	// detachLogSink removes the OTel log sink from the core logger fan-out.
@@ -70,9 +67,6 @@ func (p *OTelPlugin) Config() any {
 	return p.pluginConfig
 }
 
-// Init builds the tracer, meter and propagator. Invalid configuration and
-// provider construction failures are returned so the server refuses to start
-// rather than running blind. A disabled plugin is a no-op.
 func (p *OTelPlugin) Init(pluginCtx *models.PluginContext) error {
 	p.pluginCtx = pluginCtx
 	p.logger = pluginCtx.Logger
@@ -176,8 +170,6 @@ func (p *OTelPlugin) initMeter(res *resource.Resource) error {
 	return p.bindMeter(p.meterProvider.Meter(scopeName, metric.WithInstrumentationVersion(p.Metadata().Version)))
 }
 
-// bindMeter stores the meter and creates the sole instrument used by the
-// plugin. It is split out so tests can inject an in-memory meter.
 func (p *OTelPlugin) bindMeter(meter metric.Meter) error {
 	p.meter = meter
 
