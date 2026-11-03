@@ -6,7 +6,7 @@ MIGRATE_ARGS?=
 MIGRATE_CMD=CGO_ENABLED=0 go run ./cmd/migrate
 OPENAPI_EXPORT_BINARY=./tmp/openapi-export
 BIN_DIR=$(CURDIR)/bin
-GOLANGCI_LINT_VERSION?=v2.13.2
+GOLANGCI_LINT_VERSION?=v2.15.0
 AIR_VERSION?=latest
 
 .PHONY: help build build-exe run dev test clean install setup tools hooks hooks-uninstall

@@ -1,4 +1,4 @@
-FROM golang:1.26.4
+FROM golang:1.27
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -24,8 +24,8 @@ RUN git config --global --add safe.directory "/workspaces/authula"
 # Oh my zsh
 # --------------------------------------
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" -- \
-  -t robbyrussell \
-  -p git -p node -p npm
+    -t robbyrussell \
+    -p git -p node -p npm
 
 ENV SHELL=/bin/zsh
 # --------------------------------------

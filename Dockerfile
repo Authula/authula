@@ -1,7 +1,7 @@
 # -------------------
 # Build stage
 # -------------------
-FROM golang:1.26.4-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates
 
@@ -19,7 +19,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # -------------------
 # Production stage
 # -------------------
-FROM alpine:3.23.3
+FROM alpine:3.24
 
 RUN apk add --no-cache ca-certificates curl tzdata
 
