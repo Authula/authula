@@ -261,12 +261,13 @@ func (uc *callbackUseCase) resolveLinkUser(ctx context.Context, providerID, acto
 func (uc *callbackUseCase) persistAccount(ctx context.Context, providerID string, user *models.User, userInfo *types.UserInfo, token *oauth2.Token, existingAccount *models.Account, createdUser bool) error {
 	expiry := tokenExpiry(token)
 	refreshToken := optionalToken(token.RefreshToken)
+	scope := tokenScope(token)
 
 	if existingAccount != nil {
 		if existingAccount.UserID != user.ID {
 			return constants.ErrAccountLinkedToAnotherUser
 		}
-		if _, err := uc.AccountService.UpdateOAuth2Tokens(ctx, existingAccount.ID, token.AccessToken, refreshToken, expiry, nil, nil); err != nil {
+		if _, err := uc.AccountService.UpdateOAuth2Tokens(ctx, existingAccount.ID, token.AccessToken, refreshToken, expiry, nil, scope); err != nil {
 			if errors.Is(err, coreservices.ErrTokenExpired) {
 				return constants.ErrTokenExpired
 			}
@@ -275,7 +276,7 @@ func (uc *callbackUseCase) persistAccount(ctx context.Context, providerID string
 		return nil
 	}
 
-	_, err := uc.AccountService.CreateOAuth2(ctx, user.ID, userInfo.ProviderAccountID, providerID, token.AccessToken, refreshToken, expiry, nil, nil)
+	_, err := uc.AccountService.CreateOAuth2(ctx, user.ID, userInfo.ProviderAccountID, providerID, token.AccessToken, refreshToken, expiry, nil, scope)
 	if err == nil {
 		return nil
 	}
@@ -286,7 +287,7 @@ func (uc *callbackUseCase) persistAccount(ctx context.Context, providerID string
 		if racedAccount.UserID != user.ID {
 			return constants.ErrAccountLinkedToAnotherUser
 		}
-		if _, updateErr := uc.AccountService.UpdateOAuth2Tokens(ctx, racedAccount.ID, token.AccessToken, refreshToken, expiry, nil, nil); updateErr == nil {
+		if _, updateErr := uc.AccountService.UpdateOAuth2Tokens(ctx, racedAccount.ID, token.AccessToken, refreshToken, expiry, nil, scope); updateErr == nil {
 			return nil
 		}
 	}
@@ -380,6 +381,35 @@ func optionalToken(value string) *string {
 		return nil
 	}
 	return &value
+}
+
+// tokenScope returns the scope granted by the provider, if present.
+func tokenScope(token *oauth2.Token) *string {
+	if token == nil {
+		return nil
+	}
+
+	var scope string
+	switch value := token.Extra("scope").(type) {
+	case string:
+		scope = value
+	case []string:
+		scope = strings.Join(value, " ")
+	case []any:
+		parts := make([]string, 0, len(value))
+		for _, part := range value {
+			if str, ok := part.(string); ok {
+				parts = append(parts, str)
+			}
+		}
+		scope = strings.Join(parts, " ")
+	}
+
+	scope = strings.TrimSpace(scope)
+	if scope == "" {
+		return nil
+	}
+	return &scope
 }
 
 func imagePointer(image string) *string {

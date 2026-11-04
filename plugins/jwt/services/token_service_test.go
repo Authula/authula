@@ -92,7 +92,7 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			setupMocks: func(t *testing.T, f *serviceTestFixture) {
 				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-1").Return(false, nil)
 				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "session:sess-1").Return(false, nil)
-				f.sessionSvc.On("GetByID", mock.Anything, "sess-1").Return(&models.Session{ID: "sess-1"}, nil)
+				f.sessionSvc.On("GetByID", mock.Anything, "sess-1").Return(&models.Session{ID: "sess-1", ExpiresAt: time.Now().Add(time.Hour)}, nil)
 			},
 			wantActor: func(t *testing.T, actor *models.Actor) {
 				require.Equal(t, "user-1", actor.ID)
@@ -114,7 +114,7 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			setupMocks: func(t *testing.T, f *serviceTestFixture) {
 				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-2").Return(false, nil)
 				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "session:sess-1").Return(false, nil)
-				f.sessionSvc.On("GetByID", mock.Anything, "sess-1").Return(&models.Session{ID: "sess-1"}, nil)
+				f.sessionSvc.On("GetByID", mock.Anything, "sess-1").Return(&models.Session{ID: "sess-1", ExpiresAt: time.Now().Add(time.Hour)}, nil)
 			},
 			wantActor: func(t *testing.T, actor *models.Actor) {
 				require.Equal(t, "user-1", actor.ID)
@@ -236,6 +236,27 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			},
 			wantErr: "session not found or invalid",
 		},
+		{
+			name: "expired_session",
+			claims: map[string]any{
+				jwt.SubjectKey:    "user-1",
+				"user_id":         "user-1",
+				"session_id":      "sess-1",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
+				jwt.JwtIDKey:      "jti-9",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			setupMocks: func(t *testing.T, f *serviceTestFixture) {
+				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-9").Return(false, nil)
+				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "session:sess-1").Return(false, nil)
+				f.sessionSvc.On("GetByID", mock.Anything, "sess-1").Return(&models.Session{
+					ID: "sess-1", ExpiresAt: time.Now().Add(-time.Minute),
+				}, nil)
+			},
+			wantErr: "session expired or invalid",
+		},
 	}
 
 	for _, tt := range tests {
@@ -341,6 +362,11 @@ func TestTokenService_GenerateUserToken(t *testing.T) {
 				require.Equal(t, "user", claims["actor_type"])
 				require.Equal(t, "access_token", claims["token_type"])
 				require.NotEmpty(t, claims["jti"])
+
+				refreshClaims := parseTestToken(t, pair.RefreshToken, f)
+				require.Equal(t, "refresh_token", refreshClaims["token_type"])
+				require.NotEmpty(t, refreshClaims["jti"])
+				require.NotEqual(t, claims["jti"], refreshClaims["jti"], "access and refresh tokens must not share a jti")
 			}
 
 			f.keySvc.AssertExpectations(t)

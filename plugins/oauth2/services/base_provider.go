@@ -46,18 +46,26 @@ type BaseProvider struct {
 	config *oauth2.Config
 	name   string
 	opts   ProviderOptions
+	pkce   bool
 }
 
 // NewBaseProvider creates a new base provider
-func NewBaseProvider(name string, config *oauth2.Config, opts *ProviderOptions) *BaseProvider {
+func NewBaseProvider(name string, config *oauth2.Config, opts *ProviderOptions, pkce bool) *BaseProvider {
 	var options ProviderOptions
 	if opts != nil {
 		options = *opts
+	}
+	if !pkce && options.Logger != nil {
+		options.Logger.Warn(
+			"oauth provider has PKCE disabled and is not OAuth 2.1 compliant",
+			"provider", name,
+		)
 	}
 	return &BaseProvider{
 		config: config,
 		name:   name,
 		opts:   options,
+		pkce:   pkce,
 	}
 }
 
@@ -83,7 +91,7 @@ func (p *BaseProvider) Name() string {
 
 // RequiresPKCE returns whether the provider requires PKCE
 func (p *BaseProvider) RequiresPKCE() bool {
-	return true
+	return p.pkce
 }
 
 // FetchUserInfo fetches and parses user info with a bounded response body.

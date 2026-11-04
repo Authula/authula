@@ -19,6 +19,18 @@ func (h *RefreshTokenHandler) Handle() http.HandlerFunc {
 		ctx := r.Context()
 		reqCtx, _ := models.GetRequestContext(ctx)
 
+		// Refresh responses must never be cached by browsers or intermediaries.
+		defer func() {
+			if reqCtx == nil {
+				return
+			}
+			if reqCtx.ResponseHeaders == nil {
+				reqCtx.ResponseHeaders = make(http.Header)
+			}
+			reqCtx.ResponseHeaders.Set("Cache-Control", "no-store")
+			reqCtx.ResponseHeaders.Set("Pragma", "no-cache")
+		}()
+
 		var request types.RefreshTokenRequest
 		if err := util.ParseJSON(r, &request); err != nil {
 			reqCtx.SetJSONResponse(http.StatusUnprocessableEntity, map[string]any{"message": err.Error()})
@@ -42,7 +54,7 @@ func (h *RefreshTokenHandler) Handle() http.HandlerFunc {
 		result, err := h.RefreshTokenUseCase.RefreshTokens(ctx, request.RefreshToken)
 		if err != nil {
 			reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]any{
-				"message": err.Error(),
+				"message": "invalid refresh token",
 			})
 			reqCtx.Handled = true
 			return
@@ -51,6 +63,8 @@ func (h *RefreshTokenHandler) Handle() http.HandlerFunc {
 		reqCtx.SetJSONResponse(http.StatusOK, types.RefreshTokenResponse{
 			AccessToken:  result.AccessToken,
 			RefreshToken: result.RefreshToken,
+			TokenType:    result.TokenType,
+			ExpiresIn:    result.ExpiresIn,
 		})
 	}
 }

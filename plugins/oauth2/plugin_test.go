@@ -155,6 +155,47 @@ func TestRegisterProviders(t *testing.T) {
 			},
 		},
 		{
+			name: "invalid redirect wildcard",
+			providers: map[string]types.ProviderConfig{
+				"google": {ClientID: "id", ClientSecret: "secret", RedirectURL: "https://*.example.com/callback"},
+			},
+			wantErr: constants.ErrProviderConfigInvalid,
+		},
+		{
+			name: "invalid redirect fragment",
+			providers: map[string]types.ProviderConfig{
+				"google": {ClientID: "id", ClientSecret: "secret", RedirectURL: "https://app.example.com/callback#frag"},
+			},
+			wantErr: constants.ErrProviderConfigInvalid,
+		},
+		{
+			name: "insecure redirect rejected",
+			providers: map[string]types.ProviderConfig{
+				"google": {ClientID: "id", ClientSecret: "secret", RedirectURL: "http://app.example.com/callback"},
+			},
+			wantErr: constants.ErrProviderConfigInvalid,
+		},
+		{
+			name: "unsafe provider name rejected",
+			providers: map[string]types.ProviderConfig{
+				"bad name": {ClientID: "id", ClientSecret: "secret", RedirectURL: "https://app.example.com/cb"},
+			},
+			wantErr: constants.ErrProviderConfigInvalid,
+		},
+		{
+			name: "per provider PKCE opt out is honoured",
+			providers: map[string]types.ProviderConfig{
+				"google": {ClientID: "config-id", ClientSecret: "config-secret", PKCE: new(false)},
+			},
+			verify: func(t *testing.T, plugin *OAuth2Plugin) {
+				t.Helper()
+
+				google, ok := plugin.providerRegistry.Get("google")
+				require.True(t, ok)
+				assert.False(t, google.RequiresPKCE())
+			},
+		},
+		{
 			name: "custom provider",
 			providers: map[string]types.ProviderConfig{
 				"Okta": {

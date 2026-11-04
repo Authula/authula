@@ -51,6 +51,13 @@ func (r *RefreshTokenRequest) Validate() error {
 type RefreshTokenResponse struct {
 	AccessToken  string `json:"access_token" required:"true" nullable:"false"`
 	RefreshToken string `json:"refresh_token" required:"true" nullable:"false"`
+	TokenType    string `json:"token_type" required:"true" nullable:"false"`
+	ExpiresIn    int64  `json:"expires_in" required:"true" nullable:"false"`
+}
+
+// RefreshErrorResponse is the generic error body returned by the refresh endpoint.
+type RefreshErrorResponse struct {
+	Message string `json:"message" required:"true" nullable:"false"`
 }
 
 type JWK struct {

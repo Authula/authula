@@ -151,8 +151,8 @@ func (p *OAuth2Plugin) registerProviders() error {
 	configured := make(map[string]types.ProviderConfig, len(p.pluginConfig.Providers))
 	for name, cfg := range p.pluginConfig.Providers {
 		canonical := strings.ToLower(strings.TrimSpace(name))
-		if canonical == "" {
-			return fmt.Errorf("%w: empty provider name", constants.ErrProviderConfigInvalid)
+		if err := services.ValidateProviderName(canonical); err != nil {
+			return fmt.Errorf("%w: %v", constants.ErrProviderConfigInvalid, err)
 		}
 		if _, exists := configured[canonical]; exists {
 			return fmt.Errorf("%w: duplicate provider %s", constants.ErrProviderConfigInvalid, canonical)
@@ -272,12 +272,20 @@ func (p *OAuth2Plugin) defaultRedirectURL(provider string) (string, error) {
 	base.Path = path.Join(base.Path, p.globalConfig.BasePath, "/oauth2/callback/", provider)
 	base.RawQuery = ""
 	base.Fragment = ""
-	return base.String(), nil
+
+	redirectURL := base.String()
+	if err := services.ValidateRedirectURL(redirectURL); err != nil {
+		return "", fmt.Errorf("%w: provider %s %v", constants.ErrProviderConfigInvalid, provider, err)
+	}
+	return redirectURL, nil
 }
 
 func (p *OAuth2Plugin) validateProviderConfig(name string, cfg types.ProviderConfig) error {
 	if strings.TrimSpace(cfg.ClientID) == "" || strings.TrimSpace(cfg.ClientSecret) == "" || strings.TrimSpace(cfg.RedirectURL) == "" {
 		return fmt.Errorf("%w: provider %s is missing client_id, client_secret or redirect_url", constants.ErrProviderConfigInvalid, name)
+	}
+	if err := services.ValidateRedirectURL(cfg.RedirectURL); err != nil {
+		return fmt.Errorf("%w: provider %s: %v", constants.ErrProviderConfigInvalid, name, err)
 	}
 
 	for label, endpoint := range map[string]string{

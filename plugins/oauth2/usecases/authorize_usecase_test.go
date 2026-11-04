@@ -27,6 +27,65 @@ func newAuthorizeUseCase(t *testing.T, provider *oauth2tests.MockProvider) *auth
 	)
 }
 
+func TestValidateAuthorizationURL(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		url          string
+		pkceRequired bool
+		wantErr      error
+	}{
+		{
+			name:         "code flow with S256",
+			url:          "https://provider.example/authorize?response_type=code&code_challenge=abc&code_challenge_method=S256",
+			pkceRequired: true,
+		},
+		{
+			name:         "code flow without PKCE when opted out",
+			url:          "https://provider.example/authorize?response_type=code",
+			pkceRequired: false,
+		},
+		{
+			name:         "implicit response is rejected",
+			url:          "https://provider.example/authorize?response_type=token",
+			pkceRequired: false,
+			wantErr:      constants.ErrProviderFailure,
+		},
+		{
+			name:         "missing challenge is rejected",
+			url:          "https://provider.example/authorize?response_type=code",
+			pkceRequired: true,
+			wantErr:      constants.ErrPKCEChallengeMissing,
+		},
+		{
+			name:         "plain challenge is rejected",
+			url:          "https://provider.example/authorize?response_type=code&code_challenge=abc&code_challenge_method=plain",
+			pkceRequired: true,
+			wantErr:      constants.ErrPKCEChallengeMissing,
+		},
+		{
+			name:         "relative URL is rejected",
+			url:          "/authorize?response_type=code",
+			pkceRequired: false,
+			wantErr:      constants.ErrProviderFailure,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateAuthorizationURL(tt.url, tt.pkceRequired)
+			if tt.wantErr == nil {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}
+
 func TestAuthorizeUseCase(t *testing.T) {
 	t.Parallel()
 
@@ -91,6 +150,7 @@ func TestAuthorizeUseCase(t *testing.T) {
 			authURL, err := url.Parse(result.AuthorizationURL)
 			require.NoError(t, err)
 			assert.NotEmpty(t, authURL.Query().Get("state"))
+			assert.Equal(t, "code", authURL.Query().Get("response_type"), "implicit flow must never be used")
 			assert.NotEmpty(t, result.StateCookie)
 			assert.NotEmpty(t, result.RedirectCookie)
 

@@ -79,7 +79,8 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 
 	keyAlgorithm := s.detectAlgorithmFromKey()
 	now := time.Now()
-	jti := uuid.New().String()
+	accessJTI := uuid.New().String()
+	refreshJTI := uuid.New().String()
 
 	accessClaims := jwt.New()
 	if err := accessClaims.Set(jwt.SubjectKey, userID); err != nil {
@@ -91,7 +92,7 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 	if err := accessClaims.Set(jwt.ExpirationKey, now.Add(s.expiresIn)); err != nil {
 		return nil, fmt.Errorf("failed to set expiration: %w", err)
 	}
-	if err := accessClaims.Set(jwt.JwtIDKey, jti); err != nil {
+	if err := accessClaims.Set(jwt.JwtIDKey, accessJTI); err != nil {
 		return nil, fmt.Errorf("failed to set JWT ID: %w", err)
 	}
 	if err := accessClaims.Set("user_id", userID); err != nil {
@@ -128,7 +129,7 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 	if err := refreshClaims.Set(jwt.ExpirationKey, now.Add(s.refreshExpiresIn)); err != nil {
 		return nil, fmt.Errorf("failed to set expiration in refresh token: %w", err)
 	}
-	if err := refreshClaims.Set(jwt.JwtIDKey, jti); err != nil {
+	if err := refreshClaims.Set(jwt.JwtIDKey, refreshJTI); err != nil {
 		return nil, fmt.Errorf("failed to set JWT ID in refresh token: %w", err)
 	}
 	if err := refreshClaims.Set("user_id", userID); err != nil {
@@ -327,8 +328,11 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 	if err != nil || session == nil {
 		return nil, errors.New("session not found or invalid")
 	}
-	actor.Claims["session_id"] = session.ID
+	if !session.ExpiresAt.After(time.Now()) {
+		return nil, errors.New("session expired or invalid")
+	}
 
+	actor.Claims["session_id"] = session.ID
 	actor.ID = userID
 	actor.Type = models.ActorUser
 

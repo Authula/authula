@@ -212,6 +212,11 @@ func (m *MockRefreshTokenRepository) GetRefreshToken(ctx context.Context, tokenH
 	return args.Get(0).(*jwtservicesTypes.RefreshToken), args.Error(1)
 }
 
+func (m *MockRefreshTokenRepository) RotateRefreshToken(ctx context.Context, oldTokenHash string, newRecord *jwtservicesTypes.RefreshToken) (bool, error) {
+	args := m.Called(ctx, oldTokenHash, newRecord)
+	return args.Bool(0), args.Error(1)
+}
+
 func (m *MockRefreshTokenRepository) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
 	args := m.Called(ctx, tokenHash)
 	return args.Error(0)

@@ -9,6 +9,7 @@ var (
 	ErrStateProviderMismatch        = errors.New("oauth state does not belong to this provider")
 	ErrInvalidCode                  = errors.New("missing oauth authorization code")
 	ErrPKCEVerifierMissing          = errors.New("missing oauth PKCE verifier")
+	ErrPKCEChallengeMissing         = errors.New("oauth authorization URL is missing a S256 PKCE challenge")
 	ErrEmailRequired                = errors.New("oauth provider did not return an email address")
 	ErrEmailNotVerified             = errors.New("oauth provider email is not verified")
 	ErrProviderAccountIDRequired    = errors.New("oauth provider did not return an account id")

@@ -1239,6 +1239,36 @@ func TestCallbackTokenHelpers(t *testing.T) {
 	}
 }
 
+func TestTokenScope(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		token *oauth2.Token
+		want  *string
+	}{
+		{name: "nil token", token: nil},
+		{name: "missing scope", token: &oauth2.Token{}},
+		{name: "empty scope", token: (&oauth2.Token{}).WithExtra(map[string]any{"scope": "   "})},
+		{name: "string scope", token: (&oauth2.Token{}).WithExtra(map[string]any{"scope": "openid email"}), want: new("openid email")},
+		{name: "string slice scope", token: (&oauth2.Token{}).WithExtra(map[string]any{"scope": []string{"openid", "email"}}), want: new("openid email")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := tokenScope(tt.token)
+			if tt.want == nil {
+				assert.Nil(t, got)
+				return
+			}
+			require.NotNil(t, got)
+			assert.Equal(t, *tt.want, *got)
+		})
+	}
+}
+
 func TestCallbackUseCase_DeleteOrphanUser(t *testing.T) {
 	t.Parallel()
 
@@ -1274,6 +1304,7 @@ func TestCallbackUseCase_PersistAccount(t *testing.T) {
 	tests := []struct {
 		name           string
 		existingUserID string
+		token          *oauth2.Token
 		setup          func(*callbackFixture, *models.Account)
 		wantErr        error
 	}{
@@ -1289,6 +1320,23 @@ func TestCallbackUseCase_PersistAccount(t *testing.T) {
 				f.accountService.On("UpdateOAuth2Tokens", mock.Anything, "account-1", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
 			},
 		},
+		{
+			name:           "persists the provider-granted scope",
+			existingUserID: "user-1",
+			token:          newOAuthToken().WithExtra(map[string]any{"scope": "openid email"}),
+			setup: func(f *callbackFixture, account *models.Account) {
+				f.accountService.On(
+					"UpdateOAuth2Tokens",
+					mock.Anything,
+					"account-1",
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+					mock.MatchedBy(func(scope *string) bool { return scope != nil && *scope == "openid email" }),
+				).Return(account, nil)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1301,12 +1349,17 @@ func TestCallbackUseCase_PersistAccount(t *testing.T) {
 				tt.setup(f, account)
 			}
 
+			token := tt.token
+			if token == nil {
+				token = newOAuthToken()
+			}
+
 			err := f.useCase.persistAccount(
 				context.Background(),
 				"google",
 				&models.User{ID: "user-1"},
 				&types.UserInfo{ProviderAccountID: "google-1"},
-				newOAuthToken(),
+				token,
 				account,
 				false,
 			)

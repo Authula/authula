@@ -7,10 +7,16 @@ import (
 	"github.com/Authula/authula/plugins/oauth2/constants"
 )
 
+// flowCookieSameSite is forced for OAuth flow cookies. SameSite=Strict prevents
+// the browser from sending the state cookie on the provider's cross-site callback.
+const flowCookieSameSite = http.SameSiteLaxMode
+
 // CookieOptions describes the attributes applied to OAuth2 flow cookies.
 type CookieOptions struct {
-	Secure   bool
-	Domain   string
+	Secure bool
+	Domain string
+	// SameSite is retained for configuration parity but is ignored. OAuth flow
+	// cookies are always SameSite=Lax.
 	SameSite http.SameSite
 	MaxAge   time.Duration
 }
@@ -25,7 +31,7 @@ func (o CookieOptions) set(w http.ResponseWriter, name, value string) {
 		MaxAge:   int(o.effectiveMaxAge().Seconds()),
 		HttpOnly: true,
 		Secure:   o.Secure,
-		SameSite: o.SameSite,
+		SameSite: flowCookieSameSite,
 	})
 }
 
@@ -39,7 +45,7 @@ func (o CookieOptions) clear(w http.ResponseWriter, name string) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   o.Secure,
-		SameSite: o.SameSite,
+		SameSite: flowCookieSameSite,
 	})
 }
 

@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/plugins/oauth2/types"
 )
 
@@ -113,27 +115,46 @@ func TestGoogleProviderGetUserInfo(t *testing.T) {
 	}
 }
 
-func TestDiscordProviderEmptyAvatarAndNameFallback(t *testing.T) {
+func TestDiscordProviderGetUserInfo(t *testing.T) {
 	t.Parallel()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"id": "discord-1", "username": "", "global_name": "Global Name", "email": "user@example.com", "verified": true, "avatar": ""}`))
-	}))
-	t.Cleanup(server.Close)
+	tests := []struct {
+		name         string
+		body         string
+		wantName     string
+		wantPicture  string
+		wantVerified bool
+	}{
+		{
+			name:         "empty avatar and username falls back to global name",
+			body:         `{"id": "discord-1", "username": "", "global_name": "Global Name", "email": "user@example.com", "verified": true, "avatar": ""}`,
+			wantName:     "Global Name",
+			wantVerified: true,
+		},
+		{
+			name:        "avatar builds a CDN URL and username is preferred",
+			body:        `{"id": "discord-2", "username": "local", "global_name": "Global", "email": "user@example.com", "verified": false, "avatar": "abc"}`,
+			wantName:    "local",
+			wantPicture: "https://cdn.discordapp.com/avatars/discord-2/abc.png",
+		},
+	}
 
-	provider := NewDiscordOAuth2Provider(testProviderConfig(server.URL), newTestProviderOptions(server))
-	info, err := provider.GetUserInfo(context.Background(), &oauth2.Token{AccessToken: "token"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if info.Picture != "" {
-		t.Fatalf("Picture = %q, want empty", info.Picture)
-	}
-	if info.Name != "Global Name" {
-		t.Fatalf("Name = %q, want Global Name", info.Name)
-	}
-	if !info.EmailVerified {
-		t.Fatal("expected verified email")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			t.Cleanup(server.Close)
+
+			provider := NewDiscordOAuth2Provider(testProviderConfig(server.URL), newTestProviderOptions(server))
+			info, err := provider.GetUserInfo(context.Background(), &oauth2.Token{AccessToken: "token"})
+			require.NoError(t, err)
+			require.Equal(t, tt.wantPicture, info.Picture)
+			require.Equal(t, tt.wantName, info.Name)
+			require.Equal(t, tt.wantVerified, info.EmailVerified)
+		})
 	}
 }
 
@@ -218,58 +239,176 @@ func TestGitHubProviderEmailVerification(t *testing.T) {
 func TestGenericProviderFieldMapping(t *testing.T) {
 	t.Parallel()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"sub": 42, "mail": "Person@Example.com", "display_name": "Person", "avatar_url": "https://img.example/p.png", "email_ok": true}`))
-	}))
-	t.Cleanup(server.Close)
-
-	cfg := testProviderConfig(server.URL)
-	cfg.AuthURL = server.URL + "/authorize"
-	cfg.TokenURL = server.URL + "/token"
-	cfg.UserIDField = "sub"
-	cfg.EmailField = "mail"
-	cfg.NameField = "display_name"
-	cfg.PictureField = "avatar_url"
-	cfg.EmailVerifiedField = "email_ok"
-
-	provider := NewGenericOAuth2Provider("custom", cfg, newTestProviderOptions(server))
-	info, err := provider.GetUserInfo(context.Background(), &oauth2.Token{AccessToken: "token"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	tests := []struct {
+		name          string
+		body          string
+		userIDField   string
+		emailField    string
+		nameField     string
+		pictureField  string
+		verifiedField string
+		wantID        string
+		wantEmail     string
+		wantName      string
+		wantPicture   string
+		wantVerified  bool
+	}{
+		{
+			name:          "custom field mapping",
+			body:          `{"sub": 42, "mail": "Person@Example.com", "display_name": "Person", "avatar_url": "https://img.example/p.png", "email_ok": true}`,
+			userIDField:   "sub",
+			emailField:    "mail",
+			nameField:     "display_name",
+			pictureField:  "avatar_url",
+			verifiedField: "email_ok",
+			wantID:        "42",
+			wantEmail:     "person@example.com",
+			wantName:      "Person",
+			wantPicture:   "https://img.example/p.png",
+			wantVerified:  true,
+		},
+		{
+			name:        "default field mapping",
+			body:        `{"sub": "provider-1", "email": "user@example.com", "name": "User", "picture": "https://img.example/u.png"}`,
+			wantID:      "provider-1",
+			wantEmail:   "user@example.com",
+			wantName:    "User",
+			wantPicture: "https://img.example/u.png",
+		},
 	}
-	if info.ProviderAccountID != "42" || info.Email != "person@example.com" || info.Name != "Person" || !info.EmailVerified {
-		t.Fatalf("unexpected info: %+v", info)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			t.Cleanup(server.Close)
+
+			cfg := testProviderConfig(server.URL)
+			cfg.AuthURL = server.URL + "/authorize"
+			cfg.TokenURL = server.URL + "/token"
+			cfg.UserIDField = tt.userIDField
+			cfg.EmailField = tt.emailField
+			cfg.NameField = tt.nameField
+			cfg.PictureField = tt.pictureField
+			cfg.EmailVerifiedField = tt.verifiedField
+
+			provider := NewGenericOAuth2Provider("custom", cfg, newTestProviderOptions(server))
+			info, err := provider.GetUserInfo(context.Background(), &oauth2.Token{AccessToken: "token"})
+			require.NoError(t, err)
+			require.Equal(t, tt.wantID, info.ProviderAccountID)
+			require.Equal(t, tt.wantEmail, info.Email)
+			require.Equal(t, tt.wantName, info.Name)
+			require.Equal(t, tt.wantPicture, info.Picture)
+			require.Equal(t, tt.wantVerified, info.EmailVerified)
+		})
 	}
 }
 
-func TestFetchUserInfoBodyLimit(t *testing.T) {
+func TestProvidersRequirePKCEByDefault(t *testing.T) {
 	t.Parallel()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"id":"` + strings.Repeat("a", maxUserInfoResponseBytes) + `"}`))
-	}))
-	t.Cleanup(server.Close)
+	cfg := testProviderConfig("https://provider.example.com/user")
 
-	_, err := FetchUserInfo(context.Background(), server.Client(), nil, &oauth2.Token{AccessToken: "token"}, server.URL)
-	if err == nil {
-		t.Fatal("expected a body limit error")
+	tests := []struct {
+		name     string
+		provider func() types.OAuth2Provider
+	}{
+		{name: "google", provider: func() types.OAuth2Provider { return NewGoogleProvider(cfg, nil) }},
+		{name: "github", provider: func() types.OAuth2Provider { return NewGitHubOAuth2Provider(cfg, nil) }},
+		{name: "discord", provider: func() types.OAuth2Provider { return NewDiscordOAuth2Provider(cfg, nil) }},
+		{name: "generic", provider: func() types.OAuth2Provider { return NewGenericOAuth2Provider("custom", cfg, nil) }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.True(t, tt.provider().RequiresPKCE(), "%s must require PKCE by default", tt.name)
+		})
 	}
 }
 
-func TestFetchUserInfoHonoursClientTimeout(t *testing.T) {
+func TestProviderPKCEOptOutLogsWarning(t *testing.T) {
 	t.Parallel()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(100 * time.Millisecond)
-		_, _ = w.Write([]byte(`{"id":"1"}`))
-	}))
-	t.Cleanup(server.Close)
+	tests := []struct {
+		name        string
+		pkce        *bool
+		wantPKCE    bool
+		wantWarning bool
+	}{
+		{name: "default enables PKCE", pkce: nil, wantPKCE: true, wantWarning: false},
+		{name: "explicit true enables PKCE", pkce: new(true), wantPKCE: true, wantWarning: false},
+		{name: "explicit false opts out and warns", pkce: new(false), wantPKCE: false, wantWarning: true},
+	}
 
-	client := server.Client()
-	client.Timeout = 10 * time.Millisecond
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	_, err := FetchUserInfo(context.Background(), client, nil, &oauth2.Token{AccessToken: "token"}, server.URL)
-	if err == nil {
-		t.Fatal("expected a timeout error")
+			cfg := testProviderConfig("https://provider.example.com/user")
+			cfg.PKCE = tt.pkce
+
+			logger := &internaltests.LevelRecordingLogger{}
+			provider := NewGoogleProvider(cfg, &ProviderOptions{Logger: logger})
+
+			require.Equal(t, tt.wantPKCE, provider.RequiresPKCE())
+
+			records := logger.Records()
+			if !tt.wantWarning {
+				require.Empty(t, records)
+				return
+			}
+			require.Len(t, records, 1)
+			require.Equal(t, "warn", records[0].Level)
+			require.Contains(t, records[0].Message, "not OAuth 2.1 compliant")
+		})
+	}
+}
+
+func TestFetchUserInfoFailures(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		body          string
+		delay         time.Duration
+		clientTimeout time.Duration
+	}{
+		{
+			name: "body limit",
+			body: `{"id":"` + strings.Repeat("a", maxUserInfoResponseBytes) + `"}`,
+		},
+		{
+			name:          "client timeout",
+			body:          `{"id":"1"}`,
+			delay:         100 * time.Millisecond,
+			clientTimeout: 10 * time.Millisecond,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tt.delay > 0 {
+					time.Sleep(tt.delay)
+				}
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			t.Cleanup(server.Close)
+
+			client := server.Client()
+			if tt.clientTimeout > 0 {
+				client.Timeout = tt.clientTimeout
+			}
+
+			_, err := FetchUserInfo(context.Background(), client, nil, &oauth2.Token{AccessToken: "token"}, server.URL)
+			require.Error(t, err)
+		})
 	}
 }

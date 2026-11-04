@@ -35,7 +35,7 @@ func NewGenericOAuth2Provider(name string, cfg types.ProviderConfig, opts *Provi
 	}
 
 	return &GenericOAuth2Provider{
-		BaseProvider:       NewBaseProvider(name, config, opts),
+		BaseProvider:       NewBaseProvider(name, config, opts, cfg.PKCEEnabled()),
 		userInfoURL:        cfg.UserInfoURL,
 		userIDField:        defaultField(cfg.UserIDField, "sub"),
 		emailField:         defaultField(cfg.EmailField, "email"),
