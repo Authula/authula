@@ -17,7 +17,7 @@ type SignUpRequest struct {
 
 func (p *SignUpRequest) Validate() error {
 	p.Name = strings.TrimSpace(p.Name)
-	p.Email = strings.TrimSpace(p.Email)
+	p.Email = strings.ToLower(strings.TrimSpace(p.Email))
 	p.Password = strings.TrimSpace(p.Password)
 	if p.Image != nil {
 		*p.Image = strings.TrimSpace(*p.Image)
@@ -46,7 +46,7 @@ type SignInRequest struct {
 }
 
 func (p *SignInRequest) Validate() error {
-	p.Email = strings.TrimSpace(p.Email)
+	p.Email = strings.ToLower(strings.TrimSpace(p.Email))
 	p.Password = strings.TrimSpace(p.Password)
 	if p.CallbackURL != nil {
 		*p.CallbackURL = strings.TrimSpace(*p.CallbackURL)
@@ -95,7 +95,7 @@ type RequestPasswordResetRequest struct {
 }
 
 func (p *RequestPasswordResetRequest) Validate() error {
-	p.Email = strings.TrimSpace(p.Email)
+	p.Email = strings.ToLower(strings.TrimSpace(p.Email))
 	if p.CallbackURL != nil {
 		*p.CallbackURL = strings.TrimSpace(*p.CallbackURL)
 	}
@@ -108,7 +108,7 @@ type RequestEmailChangeRequest struct {
 }
 
 func (p *RequestEmailChangeRequest) Validate() error {
-	p.NewEmail = strings.TrimSpace(p.NewEmail)
+	p.NewEmail = strings.ToLower(strings.TrimSpace(p.NewEmail))
 	if p.CallbackURL != nil {
 		*p.CallbackURL = strings.TrimSpace(*p.CallbackURL)
 	}
