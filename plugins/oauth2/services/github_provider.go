@@ -165,7 +165,6 @@ func (p *GitHubOAuth2Provider) listEmails(ctx context.Context, token *oauth2.Tok
 	return emails, nil
 }
 
-// RequiresPKCE returns false for GitHub (doesn't require PKCE)
 func (p *GitHubOAuth2Provider) RequiresPKCE() bool {
-	return false
+	return true
 }
