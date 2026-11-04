@@ -43,6 +43,7 @@ func (p *DiscordProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) 
 	userInfo := &types.UserInfo{
 		ProviderAccountID: GetStringField(info, "id"),
 		Email:             GetStringField(info, "email"),
+		EmailVerified:     info["verified"] == true,
 		Name:              GetStringField(info, "username"),
 		Picture:           fmt.Sprintf("https://cdn.discordapp.com/avatars/%s/%s.png", GetStringField(info, "id"), GetStringField(info, "avatar")),
 		Raw:               info,

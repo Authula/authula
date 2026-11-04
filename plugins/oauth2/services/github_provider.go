@@ -53,9 +53,11 @@ func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 	userInfo := &types.UserInfo{
 		ProviderAccountID: fmt.Sprintf("%v", info["id"]),
 		Email:             email,
-		Name:              GetStringField(info, "login"),
-		Picture:           GetStringField(info, "avatar_url"),
-		Raw:               info,
+		// GitHub only allows verified addresses as the public email, and getGitHubUserEmail only returns verified ones.
+		EmailVerified: email != "",
+		Name:          GetStringField(info, "login"),
+		Picture:       GetStringField(info, "avatar_url"),
+		Raw:           info,
 	}
 
 	return userInfo, nil

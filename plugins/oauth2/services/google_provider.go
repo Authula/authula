@@ -44,6 +44,7 @@ func (p *GoogleProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 	userInfo := &types.UserInfo{
 		ProviderAccountID: GetStringField(info, "id"),
 		Email:             GetStringField(info, "email"),
+		EmailVerified:     info["verified_email"] == true,
 		Name:              GetStringField(info, "name"),
 		Picture:           GetStringField(info, "picture"),
 		Raw:               info,

@@ -20,6 +20,7 @@ type OAuth2Provider interface {
 type UserInfo struct {
 	ProviderAccountID string         `json:"provider_account_id"`
 	Email             string         `json:"email"`
+	EmailVerified     bool           `json:"email_verified"`
 	Name              string         `json:"name"`
 	Picture           string         `json:"picture"`
 	Raw               map[string]any `json:"raw"`
