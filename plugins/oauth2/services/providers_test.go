@@ -121,7 +121,7 @@ func TestDiscordProviderEmptyAvatarAndNameFallback(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	provider := NewDiscordProvider(testProviderConfig(server.URL), newTestProviderOptions(server))
+	provider := NewDiscordOAuth2Provider(testProviderConfig(server.URL), newTestProviderOptions(server))
 	info, err := provider.GetUserInfo(context.Background(), &oauth2.Token{AccessToken: "token"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -186,7 +186,7 @@ func TestGitHubProviderEmailVerification(t *testing.T) {
 			}))
 			t.Cleanup(server.Close)
 
-			provider := NewGitHubProvider(testProviderConfig(server.URL+"/user"), newTestProviderOptions(server))
+			provider := NewGitHubOAuth2Provider(testProviderConfig(server.URL+"/user"), newTestProviderOptions(server))
 			provider.emailsURL = server.URL + "/emails"
 
 			info, err := provider.GetUserInfo(context.Background(), &oauth2.Token{AccessToken: "token"})
@@ -232,7 +232,7 @@ func TestGenericProviderFieldMapping(t *testing.T) {
 	cfg.PictureField = "avatar_url"
 	cfg.EmailVerifiedField = "email_ok"
 
-	provider := NewGenericProvider("custom", cfg, newTestProviderOptions(server))
+	provider := NewGenericOAuth2Provider("custom", cfg, newTestProviderOptions(server))
 	info, err := provider.GetUserInfo(context.Background(), &oauth2.Token{AccessToken: "token"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -12,7 +12,7 @@ import (
 
 const defaultDiscordUserInfoURL = "https://discord.com/api/users/@me"
 
-type DiscordProvider struct {
+type DiscordOAuth2Provider struct {
 	*BaseProvider
 	userInfoURL string
 	fields      providerFields
@@ -24,8 +24,8 @@ var discordDefaults = ProviderDefaults{
 	UserInfoURL: defaultDiscordUserInfoURL,
 }
 
-func NewDiscordProvider(cfg types.ProviderConfig, opts *ProviderOptions) *DiscordProvider {
-	return &DiscordProvider{
+func NewDiscordOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *DiscordOAuth2Provider {
+	return &DiscordOAuth2Provider{
 		BaseProvider: NewBaseProvider("discord", ResolveOAuth2Config(cfg, discordDefaults), opts),
 		userInfoURL:  ResolveUserInfoURL(cfg, defaultDiscordUserInfoURL),
 		fields: providerFields{
@@ -38,7 +38,7 @@ func NewDiscordProvider(cfg types.ProviderConfig, opts *ProviderOptions) *Discor
 	}
 }
 
-func (p *DiscordProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
+func (p *DiscordOAuth2Provider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
 	info, err := FetchUserInfo(ctx, p.opts.httpClient(), p.opts.logger(), token, p.userInfoURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch Discord user info: %w", err)

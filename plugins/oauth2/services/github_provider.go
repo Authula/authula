@@ -18,7 +18,7 @@ const (
 	defaultGitHubEmailsURL   = "https://api.github.com/user/emails"
 )
 
-type GitHubProvider struct {
+type GitHubOAuth2Provider struct {
 	*BaseProvider
 	userInfoURL string
 	emailsURL   string
@@ -37,8 +37,8 @@ type githubEmail struct {
 	Verified bool   `json:"verified"`
 }
 
-func NewGitHubProvider(cfg types.ProviderConfig, opts *ProviderOptions) *GitHubProvider {
-	return &GitHubProvider{
+func NewGitHubOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *GitHubOAuth2Provider {
+	return &GitHubOAuth2Provider{
 		BaseProvider: NewBaseProvider("github", ResolveOAuth2Config(cfg, githubDefaults), opts),
 		userInfoURL:  ResolveUserInfoURL(cfg, defaultGitHubUserInfoURL),
 		emailsURL:    defaultGitHubEmailsURL,
@@ -51,7 +51,7 @@ func NewGitHubProvider(cfg types.ProviderConfig, opts *ProviderOptions) *GitHubP
 	}
 }
 
-func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
+func (p *GitHubOAuth2Provider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
 	info, err := FetchUserInfo(ctx, p.opts.httpClient(), p.opts.logger(), token, p.userInfoURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch GitHub user info: %w", err)
@@ -85,7 +85,7 @@ func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 
 // resolveEmail prefers a verified address from /user/emails. The profile email is used
 // as a fallback and is marked unverified.
-func (p *GitHubProvider) resolveEmail(ctx context.Context, token *oauth2.Token, profileEmail string) (string, bool, error) {
+func (p *GitHubOAuth2Provider) resolveEmail(ctx context.Context, token *oauth2.Token, profileEmail string) (string, bool, error) {
 	emails, err := p.listEmails(ctx, token)
 	if err != nil {
 		if profileEmail != "" {
@@ -123,7 +123,7 @@ func selectVerifiedEmail(emails []githubEmail) (string, bool) {
 	return "", false
 }
 
-func (p *GitHubProvider) listEmails(ctx context.Context, token *oauth2.Token) ([]githubEmail, error) {
+func (p *GitHubOAuth2Provider) listEmails(ctx context.Context, token *oauth2.Token) ([]githubEmail, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.emailsURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GitHub email request: %w", err)
@@ -165,6 +165,6 @@ func (p *GitHubProvider) listEmails(ctx context.Context, token *oauth2.Token) ([
 }
 
 // RequiresPKCE returns false for GitHub (doesn't require PKCE)
-func (p *GitHubProvider) RequiresPKCE() bool {
+func (p *GitHubOAuth2Provider) RequiresPKCE() bool {
 	return false
 }

@@ -237,9 +237,9 @@ func (p *OAuth2Plugin) registerBuiltInProvider(name string, cfg types.ProviderCo
 
 	switch name {
 	case "discord":
-		provider = services.NewDiscordProvider(cfg, options)
+		provider = services.NewDiscordOAuth2Provider(cfg, options)
 	case "github":
-		provider = services.NewGitHubProvider(cfg, options)
+		provider = services.NewGitHubOAuth2Provider(cfg, options)
 	case "google":
 		provider = services.NewGoogleProvider(cfg, options)
 	default:
@@ -253,7 +253,7 @@ func (p *OAuth2Plugin) registerBuiltInProvider(name string, cfg types.ProviderCo
 }
 
 func (p *OAuth2Plugin) registerGenericProvider(name string, cfg types.ProviderConfig) error {
-	provider := services.NewGenericProvider(name, cfg, &services.ProviderOptions{
+	provider := services.NewGenericOAuth2Provider(name, cfg, &services.ProviderOptions{
 		HTTPClient: p.httpClient,
 		Logger:     p.logger,
 	})

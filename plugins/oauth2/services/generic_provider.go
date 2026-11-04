@@ -9,8 +9,8 @@ import (
 	"github.com/Authula/authula/plugins/oauth2/types"
 )
 
-// GenericProvider implements OAuth2Provider for custom OIDC/OAuth2 endpoints
-type GenericProvider struct {
+// GenericOAuth2Provider implements OAuth2Provider for custom OIDC/OAuth2 endpoints
+type GenericOAuth2Provider struct {
 	*BaseProvider
 	userInfoURL        string
 	userIDField        string
@@ -20,8 +20,8 @@ type GenericProvider struct {
 	emailVerifiedField string
 }
 
-// NewGenericProvider creates a new generic OAuth2 provider
-func NewGenericProvider(name string, cfg types.ProviderConfig, opts *ProviderOptions) *GenericProvider {
+// NewGenericOAuth2Provider creates a new generic OAuth2 provider
+func NewGenericOAuth2Provider(name string, cfg types.ProviderConfig, opts *ProviderOptions) *GenericOAuth2Provider {
 	config := &oauth2.Config{
 		ClientID:     cfg.ClientID,
 		ClientSecret: cfg.ClientSecret,
@@ -33,7 +33,7 @@ func NewGenericProvider(name string, cfg types.ProviderConfig, opts *ProviderOpt
 		},
 	}
 
-	return &GenericProvider{
+	return &GenericOAuth2Provider{
 		BaseProvider:       NewBaseProvider(name, config, opts),
 		userInfoURL:        cfg.UserInfoURL,
 		userIDField:        defaultField(cfg.UserIDField, "sub"),
@@ -45,7 +45,7 @@ func NewGenericProvider(name string, cfg types.ProviderConfig, opts *ProviderOpt
 }
 
 // GetUserInfo fetches and normalizes user information using custom field mapping
-func (p *GenericProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
+func (p *GenericOAuth2Provider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
 	info, err := FetchUserInfo(ctx, p.opts.httpClient(), p.opts.logger(), token, p.userInfoURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch user info from %s: %w", p.userInfoURL, err)

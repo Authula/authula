@@ -188,6 +188,6 @@ func TestRegisterProviders_CustomProvider(t *testing.T) {
 	assert.Equal(t, []string{"okta"}, names)
 	provider, ok := plugin.providerRegistry.Get("okta")
 	require.True(t, ok)
-	_, ok = provider.(*services.GenericProvider)
+	_, ok = provider.(*services.GenericOAuth2Provider)
 	assert.True(t, ok)
 }
