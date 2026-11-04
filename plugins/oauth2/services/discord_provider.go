@@ -8,6 +8,7 @@ import (
 	"golang.org/x/oauth2/endpoints"
 
 	"github.com/Authula/authula/plugins/oauth2/types"
+	"github.com/Authula/authula/util"
 )
 
 const defaultDiscordUserInfoURL = "https://discord.com/api/users/@me"
@@ -61,7 +62,7 @@ func (p *DiscordOAuth2Provider) GetUserInfo(ctx context.Context, token *oauth2.T
 
 	return &types.UserInfo{
 		ProviderAccountID: id,
-		Email:             NormalizeEmail(GetStringField(info, p.fields.email)),
+		Email:             util.NormalizeEmail(GetStringField(info, p.fields.email)),
 		EmailVerified:     GetBoolField(info, p.fields.emailVerified),
 		Name:              name,
 		Picture:           picture,

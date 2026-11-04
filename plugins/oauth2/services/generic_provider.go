@@ -7,6 +7,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/Authula/authula/plugins/oauth2/types"
+	"github.com/Authula/authula/util"
 )
 
 // GenericOAuth2Provider implements OAuth2Provider for custom OIDC/OAuth2 endpoints
@@ -58,7 +59,7 @@ func (p *GenericOAuth2Provider) GetUserInfo(ctx context.Context, token *oauth2.T
 
 	return &types.UserInfo{
 		ProviderAccountID: id,
-		Email:             NormalizeEmail(GetStringField(info, p.emailField)),
+		Email:             util.NormalizeEmail(GetStringField(info, p.emailField)),
 		EmailVerified:     GetBoolField(info, p.emailVerifiedField),
 		Name:              GetStringField(info, p.nameField),
 		Picture:           GetStringField(info, p.pictureField),

@@ -1,8 +1,6 @@
 package services
 
 import (
-	"strings"
-
 	"golang.org/x/oauth2"
 
 	"github.com/Authula/authula/plugins/oauth2/types"
@@ -45,11 +43,6 @@ func ResolveUserInfoURL(cfg types.ProviderConfig, defaultURL string) string {
 		return cfg.UserInfoURL
 	}
 	return defaultURL
-}
-
-// NormalizeEmail lower-cases and trims an email address so lookups are case-insensitive.
-func NormalizeEmail(email string) string {
-	return strings.ToLower(strings.TrimSpace(email))
 }
 
 type providerFields struct {

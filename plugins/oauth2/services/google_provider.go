@@ -8,6 +8,7 @@ import (
 	"golang.org/x/oauth2/google"
 
 	"github.com/Authula/authula/plugins/oauth2/types"
+	"github.com/Authula/authula/util"
 )
 
 const defaultGoogleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo"
@@ -55,7 +56,7 @@ func (p *GoogleProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 
 	return &types.UserInfo{
 		ProviderAccountID: id,
-		Email:             NormalizeEmail(GetStringField(info, p.fields.email)),
+		Email:             util.NormalizeEmail(GetStringField(info, p.fields.email)),
 		EmailVerified:     GetBoolField(info, p.fields.emailVerified),
 		Name:              GetStringField(info, p.fields.name),
 		Picture:           GetStringField(info, p.fields.picture),

@@ -11,6 +11,7 @@ import (
 	"golang.org/x/oauth2/github"
 
 	"github.com/Authula/authula/plugins/oauth2/types"
+	"github.com/Authula/authula/util"
 )
 
 const (
@@ -62,7 +63,7 @@ func (p *GitHubOAuth2Provider) GetUserInfo(ctx context.Context, token *oauth2.To
 		return nil, fmt.Errorf("invalid GitHub account id: %w", err)
 	}
 
-	profileEmail := NormalizeEmail(GetStringField(info, p.fields.email))
+	profileEmail := util.NormalizeEmail(GetStringField(info, p.fields.email))
 	email, verified, err := p.resolveEmail(ctx, token, profileEmail)
 	if err != nil {
 		return nil, err
@@ -103,7 +104,7 @@ func (p *GitHubOAuth2Provider) resolveEmail(ctx context.Context, token *oauth2.T
 		return profileEmail, false, nil
 	}
 	if len(emails) > 0 {
-		return NormalizeEmail(emails[0].Email), false, nil
+		return util.NormalizeEmail(emails[0].Email), false, nil
 	}
 
 	return "", false, nil
@@ -112,12 +113,12 @@ func (p *GitHubOAuth2Provider) resolveEmail(ctx context.Context, token *oauth2.T
 func selectVerifiedEmail(emails []githubEmail) (string, bool) {
 	for _, email := range emails {
 		if email.Verified && email.Primary {
-			return NormalizeEmail(email.Email), true
+			return util.NormalizeEmail(email.Email), true
 		}
 	}
 	for _, email := range emails {
 		if email.Verified {
-			return NormalizeEmail(email.Email), true
+			return util.NormalizeEmail(email.Email), true
 		}
 	}
 	return "", false
