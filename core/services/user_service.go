@@ -2,7 +2,7 @@ package services
 
 import (
 	"context"
-	"errors"
+	"strings"
 
 	"github.com/Authula/authula/core/repositories"
 	"github.com/Authula/authula/models"
@@ -21,9 +21,15 @@ func NewUserService(repo repositories.UserRepository, serviceHooks *models.CoreS
 }
 
 func (s *userService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata map[string]any) (*models.User, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	name = strings.TrimSpace(name)
+	if email == "" {
+		return nil, ErrEmailRequired
+	}
+
 	existing, _ := s.repo.GetByEmail(ctx, email)
 	if existing != nil {
-		return nil, errors.New("email already in use")
+		return nil, ErrEmailInUse
 	}
 
 	user := &models.User{
@@ -70,6 +76,11 @@ func (s *userService) GetByEmail(ctx context.Context, email string) (*models.Use
 }
 
 func (s *userService) Update(ctx context.Context, user *models.User) (*models.User, error) {
+	if user != nil {
+		user.Email = strings.ToLower(strings.TrimSpace(user.Email))
+		user.Name = strings.TrimSpace(user.Name)
+	}
+
 	if s.serviceHooks != nil && s.serviceHooks.Users != nil {
 		if err := runHooks(s.serviceHooks.Users.BeforeUpdateHooks(), user); err != nil {
 			return nil, err

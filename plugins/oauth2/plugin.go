@@ -2,14 +2,21 @@ package oauth2
 
 import (
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
+	"path"
+	"sort"
+	"strings"
 
 	"github.com/uptrace/bun"
 
 	"github.com/Authula/authula/env"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/oauth2/constants"
 	"github.com/Authula/authula/plugins/oauth2/services"
 	"github.com/Authula/authula/plugins/oauth2/types"
+	"github.com/Authula/authula/plugins/oauth2/usecases"
 	rootservices "github.com/Authula/authula/services"
 	"github.com/Authula/authula/util"
 )
@@ -24,9 +31,10 @@ type OAuth2Plugin struct {
 	accountService   rootservices.AccountService
 	sessionService   rootservices.SessionService
 	tokenService     rootservices.TokenService
-	eventBus         models.EventBus
 	providerRegistry *services.ProviderRegistry
+	httpClient       *http.Client
 	hmacKey          []byte
+	useCases         *usecases.UseCases
 	Api              *API
 }
 
@@ -40,7 +48,7 @@ func New(config types.OAuth2PluginConfig) *OAuth2Plugin {
 func (p *OAuth2Plugin) Metadata() models.PluginMetadata {
 	return models.PluginMetadata{
 		ID:          models.PluginOAuth2.String(),
-		Version:     "1.0.0",
+		Version:     "1.1.0",
 		Description: "OAuth2 authentication plugin with support for various providers.",
 	}
 }
@@ -60,16 +68,22 @@ func (p *OAuth2Plugin) Init(ctx *models.PluginContext) error {
 	}
 	p.pluginConfig.ApplyDefaults()
 
+	if strings.TrimSpace(p.globalConfig.Secret) == "" {
+		return constants.ErrOAuthSecretNotConfigured
+	}
+
 	if err := p.initializeServices(ctx); err != nil {
 		return err
 	}
 
+	p.httpClient = &http.Client{Timeout: p.pluginConfig.HTTPTimeout}
 	p.providerRegistry = services.NewProviderRegistry()
-	if err := p.registerBuiltInProviders(); err != nil {
-		return fmt.Errorf("failed to register built-in providers: %w", err)
+	if err := p.registerProviders(); err != nil {
+		return fmt.Errorf("failed to register oauth providers: %w", err)
 	}
 
-	p.Api = BuildAPI(p)
+	p.useCases = BuildUseCases(p)
+	p.Api = &API{UseCases: p.useCases}
 
 	return nil
 }
@@ -101,93 +115,197 @@ func (p *OAuth2Plugin) initializeServices(ctx *models.PluginContext) error {
 		return fmt.Errorf("token service not available in service registry")
 	}
 
-	p.eventBus = ctx.EventBus
 	p.hmacKey = services.DeriveOAuthHMACKey(p.globalConfig.Secret)
 
 	return nil
 }
 
-func getEnvKey(provider, suffix string) string {
+func getEnvKey(provider, suffix string) (string, bool) {
 	switch provider {
 	case "discord":
-		if suffix == "CLIENT_ID" {
-			return env.EnvDiscordClientID
-		}
-		if suffix == "CLIENT_SECRET" {
-			return env.EnvDiscordClientSecret
+		switch suffix {
+		case "CLIENT_ID":
+			return env.EnvDiscordClientID, true
+		case "CLIENT_SECRET":
+			return env.EnvDiscordClientSecret, true
 		}
 	case "github":
-		if suffix == "CLIENT_ID" {
-			return env.EnvGithubClientID
-		}
-		if suffix == "CLIENT_SECRET" {
-			return env.EnvGithubClientSecret
+		switch suffix {
+		case "CLIENT_ID":
+			return env.EnvGithubClientID, true
+		case "CLIENT_SECRET":
+			return env.EnvGithubClientSecret, true
 		}
 	case "google":
-		if suffix == "CLIENT_ID" {
-			return env.EnvGoogleClientID
-		}
-		if suffix == "CLIENT_SECRET" {
-			return env.EnvGoogleClientSecret
+		switch suffix {
+		case "CLIENT_ID":
+			return env.EnvGoogleClientID, true
+		case "CLIENT_SECRET":
+			return env.EnvGoogleClientSecret, true
 		}
 	}
-	return ""
+	return "", false
 }
 
-func (p *OAuth2Plugin) registerBuiltInProviders() error {
-	providers := map[string]struct {
-		validator func(types.ProviderConfig) error
-		creator   func(types.ProviderConfig) types.OAuth2Provider
-	}{
-		"discord": {
-			validator: p.validateProviderConfig,
-			creator: func(cfg types.ProviderConfig) types.OAuth2Provider {
-				return services.NewDiscordProvider(cfg.ClientID, cfg.ClientSecret, cfg.RedirectURL)
-			},
-		},
-		"github": {
-			validator: p.validateProviderConfig,
-			creator: func(cfg types.ProviderConfig) types.OAuth2Provider {
-				return services.NewGitHubProvider(cfg.ClientID, cfg.ClientSecret, cfg.RedirectURL)
-			},
-		},
-		"google": {
-			validator: p.validateProviderConfig,
-			creator: func(cfg types.ProviderConfig) types.OAuth2Provider {
-				return services.NewGoogleProvider(cfg.ClientID, cfg.ClientSecret, cfg.RedirectURL)
-			},
-		},
+func (p *OAuth2Plugin) registerProviders() error {
+	configured := make(map[string]types.ProviderConfig, len(p.pluginConfig.Providers))
+	for name, cfg := range p.pluginConfig.Providers {
+		canonical := strings.ToLower(strings.TrimSpace(name))
+		if canonical == "" {
+			return fmt.Errorf("%w: empty provider name", constants.ErrProviderConfigInvalid)
+		}
+		if _, exists := configured[canonical]; exists {
+			return fmt.Errorf("%w: duplicate provider %s", constants.ErrProviderConfigInvalid, canonical)
+		}
+		configured[canonical] = cfg
 	}
 
-	for name, provider := range providers {
-		var providerConfig types.ProviderConfig
-		clientID := os.Getenv(getEnvKey(name, "CLIENT_ID"))
-		clientSecret := os.Getenv(getEnvKey(name, "CLIENT_SECRET"))
-		if clientID != "" && clientSecret != "" {
-			providerConfig = types.ProviderConfig{
-				ClientID:     clientID,
-				ClientSecret: clientSecret,
-				RedirectURL:  p.globalConfig.BaseURL + p.globalConfig.BasePath + "/oauth2/callback/" + name,
-			}
-		} else if config, ok := p.pluginConfig.Providers[name]; ok {
-			providerConfig = config
-		} else {
-			continue // skip if neither env vars nor config is set
+	names := make([]string, 0, len(configured))
+	for name := range configured {
+		names = append(names, name)
+	}
+	for _, builtIn := range []string{"discord", "github", "google"} {
+		if _, exists := configured[builtIn]; !exists {
+			names = append(names, builtIn)
 		}
-		if err := provider.validator(providerConfig); err != nil {
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		cfg, configuredProvider := configured[name]
+
+		if configuredProvider && !cfg.IsEnabled() {
+			continue
+		}
+
+		clientIDKey, ok := getEnvKey(name, "CLIENT_ID")
+		if !ok {
+			// Custom provider: every endpoint must be configured explicitly.
+			if !configuredProvider {
+				continue
+			}
+			if err := p.validateProviderConfig(name, cfg); err != nil {
+				return err
+			}
+			if cfg.AuthURL == "" || cfg.TokenURL == "" || cfg.UserInfoURL == "" {
+				return fmt.Errorf("%w: provider %s requires auth_url, token_url and user_info_url", constants.ErrProviderConfigInvalid, name)
+			}
+			if err := p.registerGenericProvider(name, cfg); err != nil {
+				return err
+			}
+			continue
+		}
+
+		clientSecretKey, _ := getEnvKey(name, "CLIENT_SECRET")
+		envClientID := strings.TrimSpace(os.Getenv(clientIDKey))
+		envClientSecret := strings.TrimSpace(os.Getenv(clientSecretKey))
+		if (envClientID == "") != (envClientSecret == "") {
+			return fmt.Errorf("%w: provider %s", constants.ErrProviderConfigurationPartial, name)
+		}
+
+		if envClientID != "" {
+			cfg.ClientID = envClientID
+			cfg.ClientSecret = envClientSecret
+			configuredProvider = true
+		}
+		if !configuredProvider {
+			continue
+		}
+
+		if cfg.RedirectURL == "" {
+			redirectURL, err := p.defaultRedirectURL(name)
+			if err != nil {
+				return err
+			}
+			cfg.RedirectURL = redirectURL
+		}
+
+		if err := p.validateProviderConfig(name, cfg); err != nil {
 			return err
 		}
-		if err := p.providerRegistry.Register(name, provider.creator(providerConfig)); err != nil {
-			return fmt.Errorf("failed to register provider %s: %w", name, err)
+		if err := p.registerBuiltInProvider(name, cfg); err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-func (p *OAuth2Plugin) validateProviderConfig(config types.ProviderConfig) error {
-	if config.ClientID == "" || config.ClientSecret == "" || config.RedirectURL == "" {
-		return fmt.Errorf("provider config missing required fields (ClientID, ClientSecret, RedirectURL)")
+func (p *OAuth2Plugin) registerBuiltInProvider(name string, cfg types.ProviderConfig) error {
+	var provider types.OAuth2Provider
+	options := &services.ProviderOptions{HTTPClient: p.httpClient, Logger: p.logger}
+
+	switch name {
+	case "discord":
+		provider = services.NewDiscordProvider(cfg, options)
+	case "github":
+		provider = services.NewGitHubProvider(cfg, options)
+	case "google":
+		provider = services.NewGoogleProvider(cfg, options)
+	default:
+		return fmt.Errorf("%w: unsupported built-in provider %s", constants.ErrProviderConfigInvalid, name)
+	}
+
+	if err := p.providerRegistry.Register(name, provider); err != nil {
+		return fmt.Errorf("failed to register provider %s: %w", name, err)
+	}
+	return nil
+}
+
+func (p *OAuth2Plugin) registerGenericProvider(name string, cfg types.ProviderConfig) error {
+	provider := services.NewGenericProvider(name, cfg, &services.ProviderOptions{
+		HTTPClient: p.httpClient,
+		Logger:     p.logger,
+	})
+	if err := p.providerRegistry.Register(name, provider); err != nil {
+		return fmt.Errorf("failed to register provider %s: %w", name, err)
+	}
+	return nil
+}
+
+func (p *OAuth2Plugin) defaultRedirectURL(provider string) (string, error) {
+	base, err := url.Parse(p.globalConfig.BaseURL)
+	if err != nil || base.Scheme == "" || base.Host == "" {
+		return "", fmt.Errorf("%w: base_url must be an absolute URL", constants.ErrProviderConfigInvalid)
+	}
+
+	base.Path = path.Join(base.Path, p.globalConfig.BasePath, "/oauth2/callback/", provider)
+	base.RawQuery = ""
+	base.Fragment = ""
+	return base.String(), nil
+}
+
+func (p *OAuth2Plugin) validateProviderConfig(name string, cfg types.ProviderConfig) error {
+	if strings.TrimSpace(cfg.ClientID) == "" || strings.TrimSpace(cfg.ClientSecret) == "" || strings.TrimSpace(cfg.RedirectURL) == "" {
+		return fmt.Errorf("%w: provider %s is missing client_id, client_secret or redirect_url", constants.ErrProviderConfigInvalid, name)
+	}
+
+	for label, endpoint := range map[string]string{
+		"auth_url":      cfg.AuthURL,
+		"token_url":     cfg.TokenURL,
+		"user_info_url": cfg.UserInfoURL,
+	} {
+		if endpoint == "" {
+			continue
+		}
+		if err := validateEndpointURL(label, endpoint); err != nil {
+			return fmt.Errorf("%w: provider %s %s", constants.ErrProviderConfigInvalid, name, err)
+		}
+	}
+
+	return nil
+}
+
+func validateEndpointURL(label, endpoint string) error {
+	parsed, err := url.Parse(endpoint)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return fmt.Errorf("%s must be an absolute URL", label)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("%s must use http or https", label)
+	}
+	if parsed.Scheme == "http" && !util.IsLocalhost(parsed.Host) {
+		return fmt.Errorf("%s must use https except for localhost", label)
 	}
 	return nil
 }

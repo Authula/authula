@@ -82,7 +82,7 @@ func (r *BunUserRepository) GetByEmail(ctx context.Context, email string) (*mode
 	user := new(models.User)
 	err := r.db.NewSelect().
 		Model(user).
-		Where("email = ?", email).
+		Where("LOWER(email) = LOWER(?)", strings.TrimSpace(email)).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
