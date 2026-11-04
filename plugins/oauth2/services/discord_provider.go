@@ -12,7 +12,6 @@ import (
 
 const defaultDiscordUserInfoURL = "https://discord.com/api/users/@me"
 
-// DiscordProvider implements OAuth2Provider for Discord
 type DiscordProvider struct {
 	*BaseProvider
 	userInfoURL string
@@ -25,7 +24,6 @@ var discordDefaults = ProviderDefaults{
 	UserInfoURL: defaultDiscordUserInfoURL,
 }
 
-// NewDiscordProvider creates a new Discord OAuth2 provider
 func NewDiscordProvider(cfg types.ProviderConfig, opts *ProviderOptions) *DiscordProvider {
 	return &DiscordProvider{
 		BaseProvider: NewBaseProvider("discord", ResolveOAuth2Config(cfg, discordDefaults), opts),
@@ -40,7 +38,6 @@ func NewDiscordProvider(cfg types.ProviderConfig, opts *ProviderOptions) *Discor
 	}
 }
 
-// GetUserInfo fetches and normalizes Discord user information
 func (p *DiscordProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
 	info, err := FetchUserInfo(ctx, p.opts.httpClient(), p.opts.logger(), token, p.userInfoURL)
 	if err != nil {

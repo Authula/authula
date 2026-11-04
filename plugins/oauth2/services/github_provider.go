@@ -18,7 +18,6 @@ const (
 	defaultGitHubEmailsURL   = "https://api.github.com/user/emails"
 )
 
-// GitHubProvider implements OAuth2Provider for GitHub
 type GitHubProvider struct {
 	*BaseProvider
 	userInfoURL string
@@ -38,7 +37,6 @@ type githubEmail struct {
 	Verified bool   `json:"verified"`
 }
 
-// NewGitHubProvider creates a new GitHub OAuth2 provider
 func NewGitHubProvider(cfg types.ProviderConfig, opts *ProviderOptions) *GitHubProvider {
 	return &GitHubProvider{
 		BaseProvider: NewBaseProvider("github", ResolveOAuth2Config(cfg, githubDefaults), opts),
@@ -53,7 +51,6 @@ func NewGitHubProvider(cfg types.ProviderConfig, opts *ProviderOptions) *GitHubP
 	}
 }
 
-// GetUserInfo fetches and normalizes GitHub user information
 func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
 	info, err := FetchUserInfo(ctx, p.opts.httpClient(), p.opts.logger(), token, p.userInfoURL)
 	if err != nil {

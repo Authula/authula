@@ -12,7 +12,6 @@ import (
 
 const defaultGoogleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
-// GoogleProvider implements OAuth2Provider for Google
 type GoogleProvider struct {
 	*BaseProvider
 	userInfoURL string
@@ -29,7 +28,6 @@ var googleDefaults = ProviderDefaults{
 	UserInfoURL: defaultGoogleUserInfoURL,
 }
 
-// NewGoogleProvider creates a new Google OAuth2 provider
 func NewGoogleProvider(cfg types.ProviderConfig, opts *ProviderOptions) *GoogleProvider {
 	return &GoogleProvider{
 		BaseProvider: NewBaseProvider("google", ResolveOAuth2Config(cfg, googleDefaults), opts),
@@ -44,7 +42,6 @@ func NewGoogleProvider(cfg types.ProviderConfig, opts *ProviderOptions) *GoogleP
 	}
 }
 
-// GetUserInfo fetches and normalizes Google user information
 func (p *GoogleProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
 	info, err := FetchUserInfo(ctx, p.opts.httpClient(), p.opts.logger(), token, p.userInfoURL)
 	if err != nil {
