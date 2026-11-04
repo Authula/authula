@@ -4,77 +4,65 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Authula/authula/plugins/oauth2/types"
 	"golang.org/x/oauth2"
+
+	"github.com/Authula/authula/plugins/oauth2/types"
+	"github.com/Authula/authula/util"
 )
 
-// GenericProvider implements OAuth2Provider for custom OIDC/OAuth2 endpoints
-type GenericProvider struct {
+// GenericOAuth2Provider implements OAuth2Provider for custom OIDC/OAuth2 endpoints
+type GenericOAuth2Provider struct {
 	*BaseProvider
-	userInfoURL  string
-	userIDField  string
-	emailField   string
-	nameField    string
-	pictureField string
+	userInfoURL        string
+	userIDField        string
+	emailField         string
+	nameField          string
+	pictureField       string
+	emailVerifiedField string
 }
 
-// NewGenericProvider creates a new generic OAuth2 provider
-func NewGenericProvider(
-	name, clientID, clientSecret, redirectURL,
-	authURL, tokenURL, userInfoURL string,
-	scopes []string,
-	userIDField, emailField, nameField, pictureField string,
-) *GenericProvider {
+// NewGenericOAuth2Provider creates a new generic OAuth2 provider
+func NewGenericOAuth2Provider(name string, cfg types.ProviderConfig, opts *ProviderOptions) *GenericOAuth2Provider {
 	config := &oauth2.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		RedirectURL:  redirectURL,
-		Scopes:       scopes,
+		ClientID:     cfg.ClientID,
+		ClientSecret: cfg.ClientSecret,
+		RedirectURL:  cfg.RedirectURL,
+		Scopes:       cfg.Scopes,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  authURL,
-			TokenURL: tokenURL,
+			AuthURL:  cfg.AuthURL,
+			TokenURL: cfg.TokenURL,
 		},
 	}
 
-	// Set defaults for field mapping
-	if userIDField == "" {
-		userIDField = "sub"
-	}
-	if emailField == "" {
-		emailField = "email"
-	}
-	if nameField == "" {
-		nameField = "name"
-	}
-	if pictureField == "" {
-		pictureField = "picture"
-	}
-
-	return &GenericProvider{
-		BaseProvider: NewBaseProvider(name, config),
-		userInfoURL:  userInfoURL,
-		userIDField:  userIDField,
-		emailField:   emailField,
-		nameField:    nameField,
-		pictureField: pictureField,
+	return &GenericOAuth2Provider{
+		BaseProvider:       NewBaseProvider(name, config, opts),
+		userInfoURL:        cfg.UserInfoURL,
+		userIDField:        defaultField(cfg.UserIDField, "sub"),
+		emailField:         defaultField(cfg.EmailField, "email"),
+		nameField:          defaultField(cfg.NameField, "name"),
+		pictureField:       defaultField(cfg.PictureField, "picture"),
+		emailVerifiedField: cfg.EmailVerifiedField,
 	}
 }
 
 // GetUserInfo fetches and normalizes user information using custom field mapping
-func (p *GenericProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
-	info, err := FetchUserInfo(ctx, token, p.userInfoURL)
+func (p *GenericOAuth2Provider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
+	info, err := FetchUserInfo(ctx, p.opts.httpClient(), p.opts.logger(), token, p.userInfoURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch user info from %s: %w", p.userInfoURL, err)
 	}
 
-	// Normalize fields using custom mapping
-	userInfo := &types.UserInfo{
-		ProviderAccountID: fmt.Sprintf("%v", info[p.userIDField]),
-		Email:             GetStringField(info, p.emailField),
+	id, err := GetIDField(info, p.userIDField)
+	if err != nil {
+		return nil, fmt.Errorf("invalid provider account id: %w", err)
+	}
+
+	return &types.UserInfo{
+		ProviderAccountID: id,
+		Email:             util.NormalizeEmail(GetStringField(info, p.emailField)),
+		EmailVerified:     GetBoolField(info, p.emailVerifiedField),
 		Name:              GetStringField(info, p.nameField),
 		Picture:           GetStringField(info, p.pictureField),
 		Raw:               info,
-	}
-
-	return userInfo, nil
+	}, nil
 }

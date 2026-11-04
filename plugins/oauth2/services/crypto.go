@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -18,36 +19,54 @@ func DeriveOAuthHMACKey(appSecret string) []byte {
 	return mac.Sum(nil)
 }
 
-// GenerateRandomString generates a cryptographically secure random string
+// GenerateRandomString generates a cryptographically secure random URL-safe string
+// of exactly length characters.
 func GenerateRandomString(length int) (string, error) {
-	bytes := make([]byte, length)
-	if _, err := rand.Read(bytes); err != nil {
+	if length < 0 {
+		return "", fmt.Errorf("length must not be negative")
+	}
+	if length == 0 {
+		return "", nil
+	}
+
+	// Raw URL encoding produces ceil(4*n/3) characters for n bytes.
+	byteLen := (length*3 + 3) / 4
+	randomBytes := make([]byte, byteLen)
+	if _, err := rand.Read(randomBytes); err != nil {
 		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(bytes)[:length], nil
+
+	return base64.RawURLEncoding.EncodeToString(randomBytes)[:length], nil
 }
 
-// SignCookie creates a signed cookie value with format: payload.timestamp.signature
+// SignCookie creates a signed cookie value with format: base64(payload).timestamp.signature
 func SignCookie(payload string, secret []byte) (string, error) {
-	timestamp := fmt.Sprintf("%d", time.Now().Unix())
+	if len(secret) == 0 {
+		return "", fmt.Errorf("signing secret is empty")
+	}
 
-	// Create signature: HMAC(payload|timestamp)
-	data := fmt.Sprintf("%s|%s", payload, timestamp)
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+
+	data := payload + "|" + timestamp
 	mac := hmac.New(sha256.New, secret)
 	mac.Write([]byte(data))
 	signature := hex.EncodeToString(mac.Sum(nil))
 
-	// Format: base64(payload).timestamp.signature
-	encoded := fmt.Sprintf("%s.%s.%s",
+	return fmt.Sprintf("%s.%s.%s",
 		base64.RawURLEncoding.EncodeToString([]byte(payload)),
 		timestamp,
-		signature)
-
-	return encoded, nil
+		signature), nil
 }
 
-// ValidateCookie validates a signed cookie and returns the payload
+// ValidateCookie validates a signed cookie and returns the payload.
 func ValidateCookie(signed string, secret []byte, maxAge time.Duration) (string, error) {
+	if len(secret) == 0 {
+		return "", fmt.Errorf("signing secret is empty")
+	}
+	if maxAge <= 0 {
+		return "", fmt.Errorf("invalid max age")
+	}
+
 	parts := strings.Split(signed, ".")
 	if len(parts) != 3 {
 		return "", fmt.Errorf("invalid cookie format")
@@ -62,24 +81,24 @@ func ValidateCookie(signed string, secret []byte, maxAge time.Duration) (string,
 		return "", fmt.Errorf("invalid payload encoding: %w", err)
 	}
 
-	var ts int64
-	_, err = fmt.Sscanf(timestamp, "%d", &ts)
-	if err != nil {
-		return "", fmt.Errorf("invalid timestamp: %w", err)
+	ts, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil || ts <= 0 {
+		return "", fmt.Errorf("invalid timestamp")
 	}
 
-	// Check expiry
-	if time.Since(time.Unix(ts, 0)) > maxAge {
+	now := time.Now().Unix()
+	if ts > now {
+		return "", fmt.Errorf("cookie timestamp is in the future")
+	}
+	if now-ts > int64(maxAge.Seconds()) {
 		return "", fmt.Errorf("cookie expired")
 	}
 
-	// Verify signature
-	data := fmt.Sprintf("%s|%s", string(payload), timestamp)
+	data := string(payload) + "|" + timestamp
 	mac := hmac.New(sha256.New, secret)
 	mac.Write([]byte(data))
 	expectedSignature := hex.EncodeToString(mac.Sum(nil))
 
-	// Constant-time comparison
 	if !hmac.Equal([]byte(signature), []byte(expectedSignature)) {
 		return "", fmt.Errorf("signature verification failed")
 	}
@@ -87,18 +106,12 @@ func ValidateCookie(signed string, secret []byte, maxAge time.Duration) (string,
 	return string(payload), nil
 }
 
-// GeneratePKCEChallenge generates PKCE code_verifier and code_challenge
-func GeneratePKCEChallenge() (verifier string, challenge string, err error) {
-	// Generate code_verifier (32 bytes for maximum entropy)
+// GeneratePKCEVerifier generates a PKCE code_verifier.
+func GeneratePKCEVerifier() (string, error) {
 	verifierBytes := make([]byte, 32)
 	if _, err := rand.Read(verifierBytes); err != nil {
-		return "", "", fmt.Errorf("failed to generate verifier: %w", err)
+		return "", fmt.Errorf("failed to generate verifier: %w", err)
 	}
-	verifier = base64.RawURLEncoding.EncodeToString(verifierBytes)
 
-	// Generate code_challenge = base64url(sha256(verifier))
-	hash := sha256.Sum256([]byte(verifier))
-	challenge = base64.RawURLEncoding.EncodeToString(hash[:])
-
-	return verifier, challenge, nil
+	return base64.RawURLEncoding.EncodeToString(verifierBytes), nil
 }

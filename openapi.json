@@ -2310,7 +2310,7 @@
           "OAuth2 Plugin"
         ],
         "summary": "Authorize with OAuth2 provider",
-        "description": "Initiates the OAuth2 authorization flow with the specified provider. Returns the provider's authorization URL to redirect the user to.",
+        "description": "Initiates the OAuth2 authorization flow. Returns the provider authorization URL and sets short-lived, signed flow cookies for state, redirect, and PKCE.",
         "operationId": "oauthAuthorize",
         "parameters": [
           {
@@ -2339,6 +2339,36 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2349,13 +2379,12 @@
           "OAuth2 Plugin"
         ],
         "summary": "OAuth2 callback",
-        "description": "Handles the OAuth2 callback from the provider. Exchanges the authorization code for tokens, creates or links a user account, and returns the authenticated user and session.",
+        "description": "Handles the OAuth2 callback. Validates the provider-bound state, consumes PKCE, exchanges the code, links the provider account, and returns the user and a safe session view. When a validated redirect_to was supplied, responds with 302 and a Location header.",
         "operationId": "oauthCallback",
         "parameters": [
           {
             "name": "code",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2363,7 +2392,6 @@
           {
             "name": "state",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2391,6 +2419,79 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CallbackResponse"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4148,7 +4249,7 @@
       "CallbackResponse": {
         "properties": {
           "session": {
-            "$ref": "#/components/schemas/Session"
+            "$ref": "#/components/schemas/CallbackSession"
           },
           "user": {
             "$ref": "#/components/schemas/User"
@@ -4157,6 +4258,26 @@
         "required": [
           "user",
           "session"
+        ],
+        "type": "object"
+      },
+      "CallbackSession": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "expires_at"
         ],
         "type": "object"
       },
@@ -4790,6 +4911,17 @@
         "required": [
           "totp_uri",
           "backup_codes"
+        ],
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
         ],
         "type": "object"
       },

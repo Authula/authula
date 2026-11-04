@@ -2,49 +2,21 @@ package services
 
 import (
 	"fmt"
-	"net/url"
 
 	"github.com/Authula/authula/util"
 )
 
-// ValidateRedirectTo validates a redirect URL against trusted origins
-func ValidateRedirectTo(redirectTo string, trustedOrigins []string) error {
+// ValidateRedirectTo validates a redirect destination and returns its normalised form.
+// Relative paths and absolute URLs on trusted origins are allowed.
+func ValidateRedirectTo(redirectTo string, trustedOrigins []string) (string, error) {
 	if redirectTo == "" {
-		return fmt.Errorf("redirect_to is required")
+		return "/", nil
 	}
 
-	// Parse the redirect URL
-	u, err := url.Parse(redirectTo)
+	parsed, err := util.IsTrustedCallbackURL(redirectTo, trustedOrigins)
 	if err != nil {
-		return fmt.Errorf("invalid redirect_to URL: %w", err)
+		return "", fmt.Errorf("invalid redirect_to: %w", err)
 	}
 
-	// Redirect must be absolute URL
-	if u.Scheme == "" || u.Host == "" {
-		return fmt.Errorf("redirect_to must be an absolute URL")
-	}
-
-	// Only allow HTTPS (except for localhost)
-	if u.Scheme != "https" {
-		if !util.IsLocalhost(u.Host) {
-			return fmt.Errorf("redirect_to must use HTTPS scheme (except for localhost)")
-		}
-	}
-
-	// Must not contain credentials
-	if u.User != nil {
-		return fmt.Errorf("redirect_to must not contain credentials")
-	}
-
-	// Validate against trusted origins
-	if len(trustedOrigins) == 0 {
-		return fmt.Errorf("no trusted origins configured")
-	}
-
-	origin := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
-	if !util.IsTrustedOrigin(origin, trustedOrigins) {
-		return fmt.Errorf("redirect_to does not match any trusted origin")
-	}
-
-	return nil
+	return parsed.String(), nil
 }

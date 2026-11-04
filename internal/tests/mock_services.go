@@ -93,6 +93,14 @@ func (m *MockAccountService) CreateOAuth2(ctx context.Context, userID, providerA
 	return args.Get(0).(*models.Account), args.Error(1)
 }
 
+func (m *MockAccountService) UpdateOAuth2Tokens(ctx context.Context, accountID string, accessToken string, refreshToken *string, accessTokenExpiresAt, refreshTokenExpiresAt *time.Time, scope *string) (*models.Account, error) {
+	args := m.Called(ctx, accountID, accessToken, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt, scope)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Account), args.Error(1)
+}
+
 func (m *MockAccountService) GetByUserID(ctx context.Context, userID string) (*models.Account, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {

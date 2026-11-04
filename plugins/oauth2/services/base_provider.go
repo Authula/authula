@@ -1,28 +1,63 @@
 package services
 
 import (
+	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"golang.org/x/oauth2"
+
+	"github.com/Authula/authula/models"
 )
+
+const (
+	defaultProviderHTTPTimeout = 10 * time.Second
+	maxUserInfoResponseBytes   = 1 << 20 // 1 MiB
+)
+
+// ProviderOptions carries optional dependencies shared by providers.
+type ProviderOptions struct {
+	HTTPClient *http.Client
+	Logger     models.Logger
+}
+
+func (o *ProviderOptions) httpClient() *http.Client {
+	if o != nil && o.HTTPClient != nil {
+		return o.HTTPClient
+	}
+	return &http.Client{Timeout: defaultProviderHTTPTimeout}
+}
+
+func (o *ProviderOptions) logger() models.Logger {
+	if o == nil {
+		return nil
+	}
+	return o.Logger
+}
 
 // BaseProvider provides common functionality for OAuth2 providers
 type BaseProvider struct {
 	config *oauth2.Config
 	name   string
+	opts   ProviderOptions
 }
 
 // NewBaseProvider creates a new base provider
-func NewBaseProvider(name string, config *oauth2.Config) *BaseProvider {
+func NewBaseProvider(name string, config *oauth2.Config, opts *ProviderOptions) *BaseProvider {
+	var options ProviderOptions
+	if opts != nil {
+		options = *opts
+	}
 	return &BaseProvider{
 		config: config,
 		name:   name,
+		opts:   options,
 	}
 }
 
@@ -51,8 +86,8 @@ func (p *BaseProvider) RequiresPKCE() bool {
 	return true
 }
 
-// FetchUserInfo is a helper to fetch and parse user info
-func FetchUserInfo(ctx context.Context, token *oauth2.Token, url string) (map[string]interface{}, error) {
+// FetchUserInfo fetches and parses user info with a bounded response body.
+func FetchUserInfo(ctx context.Context, client *http.Client, logger models.Logger, token *oauth2.Token, url string) (map[string]any, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user info request: %w", err)
@@ -60,51 +95,105 @@ func FetchUserInfo(ctx context.Context, token *oauth2.Token, url string) (map[st
 
 	token.SetAuthHeader(req)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
-	if resp != nil && resp.Body != nil {
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				// Optionally log the error, e.g. using log.Printf
-				fmt.Printf("error closing response body: %v\n", err)
-			}
-		}()
+	if resp == nil || resp.Body == nil {
+		return nil, fmt.Errorf("failed to get user info: empty response")
 	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil && logger != nil {
+			logger.Debug("failed to close oauth response body", "error", closeErr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get user info: status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxUserInfoResponseBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read user info response: %w", err)
 	}
+	if len(body) > maxUserInfoResponseBytes {
+		return nil, fmt.Errorf("user info response exceeds %d bytes", maxUserInfoResponseBytes)
+	}
 
-	var info map[string]interface{}
-	if err := json.Unmarshal(body, &info); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+
+	var info map[string]any
+	if err := decoder.Decode(&info); err != nil {
 		return nil, fmt.Errorf("failed to parse user info: %w", err)
 	}
 
 	return info, nil
 }
 
-// GetStringField safely gets a string field from a map
-func GetStringField(data map[string]interface{}, field string) string {
+// GetStringField safely gets a string field from a map.
+func GetStringField(data map[string]any, field string) string {
+	if field == "" {
+		return ""
+	}
 	if val, ok := data[field]; ok {
 		if str, ok := val.(string); ok {
-			return str
+			return strings.TrimSpace(str)
 		}
 	}
 	return ""
 }
 
-// VerifyHMAC verifies an HMAC signature
-func VerifyHMAC(signature, data string, secret []byte) bool {
-	expectedMAC := hmac.New(sha256.New, secret)
-	expectedMAC.Write([]byte(data))
-	expectedSignature := fmt.Sprintf("%x", expectedMAC.Sum(nil))
+// GetBoolField safely gets a boolean field from a map.
+func GetBoolField(data map[string]any, field string) bool {
+	if field == "" {
+		return false
+	}
+	val, ok := data[field]
+	if !ok {
+		return false
+	}
+	switch typed := val.(type) {
+	case bool:
+		return typed
+	case string:
+		parsed, err := strconv.ParseBool(strings.TrimSpace(typed))
+		return err == nil && parsed
+	default:
+		return false
+	}
+}
 
-	return hmac.Equal([]byte(signature), []byte(expectedSignature))
+// GetIDField returns a canonical string representation of an identifier field.
+// Numeric IDs are kept as integers instead of being formatted through float64.
+func GetIDField(data map[string]any, field string) (string, error) {
+	if field == "" {
+		return "", fmt.Errorf("id field is empty")
+	}
+	val, ok := data[field]
+	if !ok || val == nil {
+		return "", fmt.Errorf("id field %q is missing", field)
+	}
+
+	var id string
+	switch typed := val.(type) {
+	case string:
+		id = strings.TrimSpace(typed)
+	case json.Number:
+		id = typed.String()
+	case float64:
+		id = strconv.FormatFloat(typed, 'f', -1, 64)
+	case int:
+		id = strconv.Itoa(typed)
+	case int64:
+		id = strconv.FormatInt(typed, 10)
+	default:
+		return "", fmt.Errorf("id field %q has unsupported type %T", field, val)
+	}
+
+	if id == "" || id == "<nil>" || id == "null" {
+		return "", fmt.Errorf("id field %q is empty", field)
+	}
+
+	return id, nil
 }

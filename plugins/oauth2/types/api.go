@@ -10,6 +10,8 @@ import (
 type AuthorizeRequest struct {
 	ProviderID string `path:"provider"`
 	RedirectTo string `query:"redirect_to" json:"redirect_to,omitempty" nullable:"true"`
+	// ActorID is set when an already signed-in user starts a linking flow.
+	ActorID string `json:"-"`
 }
 
 // AuthorizeResponse represents an authorization response
@@ -20,46 +22,48 @@ type AuthorizeResponse struct {
 // CallbackRequest represents an OAuth2 callback request
 type CallbackRequest struct {
 	ProviderID string `path:"provider"`
-	Code       string `query:"code" json:"code" required:"true" nullable:"false"`
-	State      string `query:"state" json:"state" required:"true" nullable:"false"`
+	Code       string `query:"code" json:"code,omitempty" nullable:"true"`
+	State      string `query:"state" json:"state,omitempty" nullable:"true"`
 	Error      string `query:"error" json:"error,omitempty" nullable:"true"`
+
+	// ActorID and SessionID are populated from the request context when a signed-in
+	// user starts a linking flow.
+	ActorID   string `json:"-"`
+	SessionID string `json:"-"`
+
+	// Signed flow cookies are validated by the use case.
+	StateCookie    string `json:"-"`
+	RedirectCookie string `json:"-"`
+	VerifierCookie string `json:"-"`
 }
 
 // CallbackResult represents the result of OAuth2 callback
 type CallbackResult struct {
-	User         *models.User
-	Session      *models.Session
-	SessionToken string
+	User          *models.User
+	Session       *models.Session
+	SessionToken  string
+	RedirectTo    string
+	ReusedSession bool
 }
 
-// CallbackResponse represents an OAuth2 callback response
+// CallbackResponse represents an OAuth2 callback response.
+// It intentionally omits the session token, IP address, and user agent.
 type CallbackResponse struct {
-	User    *models.User    `json:"user" required:"true" nullable:"false"`
-	Session *models.Session `json:"session" required:"true" nullable:"false"`
+	User    *models.User     `json:"user" required:"true" nullable:"false"`
+	Session *CallbackSession `json:"session" required:"true" nullable:"false"`
 }
 
-// RefreshRequest represents a token refresh request
-type RefreshRequest struct {
-	Provider string
-	UserID   string
+// CallbackSession is the safe public view of a session.
+type CallbackSession struct {
+	ID        string    `json:"id" required:"true" nullable:"false"`
+	UserID    string    `json:"user_id" required:"true" nullable:"false"`
+	ExpiresAt time.Time `json:"expires_at" required:"true" nullable:"false"`
 }
 
-// RefreshResponse represents a token refresh response
-type RefreshResponse struct {
-	AccessToken string    `json:"access_token"`
-	TokenType   string    `json:"token_type"`
-	ExpiresIn   int       `json:"expires_in"`
-	ExpiresAt   time.Time `json:"expires_at"`
+// ErrorResponse is the generic error body returned by OAuth2 endpoints.
+type ErrorResponse struct {
+	Message string `json:"message" required:"true" nullable:"false"`
 }
 
-// LinkAccountRequest represents an account linking request
-type LinkAccountRequest struct {
-	Provider   string
-	UserID     string
-	RedirectTo string
-}
-
-// LinkAccountResponse represents an account linking response
-type LinkAccountResponse struct {
-	User *models.User `json:"user,omitempty"`
-}
+// RedirectResponse documents the empty body returned with a 302 response.
+type RedirectResponse struct{}
