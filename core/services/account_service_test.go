@@ -24,6 +24,100 @@ func newAccountServiceForTest() (interface {
 	return svc, repo, tokenRepo
 }
 
+func TestAccountService_CreateOAuth2(t *testing.T) {
+	t.Parallel()
+
+	storedRefresh := "encrypted-old-refresh"
+	existingAccount := &models.Account{
+		ID:           "account-1",
+		UserID:       "user-1",
+		ProviderID:   "google",
+		AccountID:    "google-1",
+		RefreshToken: &storedRefresh,
+	}
+
+	tests := []struct {
+		name           string
+		callerUserID   string
+		existing       *models.Account
+		refreshToken   *string
+		encryptRefresh *string
+		wantRefresh    *string
+		wantErr        error
+		expectUpdate   bool
+	}{
+		{
+			name:         "rejects an account owned by another user",
+			callerUserID: "user-2",
+			existing:     existingAccount,
+			wantErr:      coreservices.ErrAccountLinkedToAnotherUser,
+		},
+		{
+			name:         "preserves stored refresh token when the new one is empty",
+			callerUserID: "user-1",
+			existing:     existingAccount,
+			refreshToken: new(""),
+			wantRefresh:  &storedRefresh,
+			expectUpdate: true,
+		},
+		{
+			name:           "stores and encrypts a new refresh token",
+			callerUserID:   "user-1",
+			existing:       existingAccount,
+			refreshToken:   new("new-refresh"),
+			encryptRefresh: new("encrypted-new-refresh"),
+			wantRefresh:    new("encrypted-new-refresh"),
+			expectUpdate:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, repo, tokenRepo := newAccountServiceForTest()
+			existing := tt.existing
+			if existing != nil {
+				clone := *existing
+				existing = &clone
+			}
+
+			tokenRepo.On("Encrypt", "access").Return("encrypted-access", nil)
+			if tt.encryptRefresh != nil {
+				tokenRepo.On("Encrypt", "new-refresh").Return(*tt.encryptRefresh, nil)
+			}
+			repo.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(existing, nil)
+			if tt.expectUpdate {
+				repo.On("Update", mock.Anything, mock.Anything).Return(existing, nil)
+			}
+
+			updated, err := svc.CreateOAuth2(
+				context.Background(),
+				tt.callerUserID,
+				"google-1",
+				"google",
+				"access",
+				tt.refreshToken,
+				nil,
+				nil,
+				nil,
+			)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				repo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, updated)
+				assert.Equal(t, tt.wantRefresh, updated.RefreshToken)
+			}
+
+			repo.AssertExpectations(t)
+			tokenRepo.AssertExpectations(t)
+		})
+	}
+}
+
 func TestAccountService_UpdateOAuth2Tokens(t *testing.T) {
 	t.Parallel()
 
@@ -154,45 +248,4 @@ func TestAccountService_UpdateOAuth2Tokens(t *testing.T) {
 			tokenRepo.AssertExpectations(t)
 		})
 	}
-}
-
-func TestAccountService_CreateOAuth2RejectsAnotherOwner(t *testing.T) {
-	t.Parallel()
-
-	svc, repo, tokenRepo := newAccountServiceForTest()
-	existing := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
-
-	tokenRepo.On("Encrypt", "access").Return("encrypted-access", nil)
-	repo.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(existing, nil)
-
-	_, err := svc.CreateOAuth2(context.Background(), "user-2", "google-1", "google", "access", nil, nil, nil, nil)
-
-	require.ErrorIs(t, err, coreservices.ErrAccountLinkedToAnotherUser)
-	repo.AssertExpectations(t)
-	tokenRepo.AssertExpectations(t)
-}
-
-func TestAccountService_CreateOAuth2PreservesStoredRefreshToken(t *testing.T) {
-	t.Parallel()
-
-	svc, repo, tokenRepo := newAccountServiceForTest()
-	storedRefresh := "encrypted-old-refresh"
-	existing := &models.Account{
-		ID:           "account-1",
-		UserID:       "user-1",
-		ProviderID:   "google",
-		AccountID:    "google-1",
-		RefreshToken: &storedRefresh,
-	}
-
-	tokenRepo.On("Encrypt", "access").Return("encrypted-access", nil)
-	repo.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(existing, nil)
-	repo.On("Update", mock.Anything, mock.Anything).Return(existing, nil)
-
-	updated, err := svc.CreateOAuth2(context.Background(), "user-1", "google-1", "google", "access", new(""), nil, nil, nil)
-
-	require.NoError(t, err)
-	assert.Equal(t, &storedRefresh, updated.RefreshToken)
-	repo.AssertExpectations(t)
-	tokenRepo.AssertExpectations(t)
 }

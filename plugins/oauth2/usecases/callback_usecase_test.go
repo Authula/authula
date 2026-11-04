@@ -1,4 +1,4 @@
-package usecases_test
+package usecases
 
 import (
 	"context"
@@ -11,17 +11,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 
+	coreservices "github.com/Authula/authula/core/services"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/oauth2/constants"
 	"github.com/Authula/authula/plugins/oauth2/services"
 	oauth2tests "github.com/Authula/authula/plugins/oauth2/tests"
 	"github.com/Authula/authula/plugins/oauth2/types"
-	"github.com/Authula/authula/plugins/oauth2/usecases"
 )
 
 type callbackFixture struct {
-	useCase        *usecases.CallbackUseCase
+	useCase        *callbackUseCase
 	provider       *oauth2tests.MockProvider
 	userService    *internaltests.MockUserService
 	accountService *internaltests.MockAccountService
@@ -39,7 +39,7 @@ func newCallbackFixture(t *testing.T, provider *oauth2tests.MockProvider) *callb
 	sessionService := &internaltests.MockSessionService{}
 	tokenService := &internaltests.MockTokenService{}
 
-	useCase := usecases.NewCallbackUseCase(
+	useCase := NewCallbackUseCase(
 		&models.Config{Session: models.SessionConfig{ExpiresIn: time.Hour}},
 		oauth2tests.NewRegistry(provider),
 		&internaltests.MockLogger{},
@@ -106,125 +106,769 @@ func newOAuthToken() *oauth2.Token {
 	}
 }
 
-func TestCallbackUseCase_ExistingAccountUpdatesTokensForOwner(t *testing.T) {
-	t.Parallel()
-
-	provider := &oauth2tests.MockProvider{
-		ProviderName: "google",
-		PKCE:         true,
-		Token:        newOAuthToken(),
-		UserInfo: &types.UserInfo{
-			ProviderAccountID: "google-1",
-			Email:             "user@example.com",
-			EmailVerified:     true,
-			Name:              "User",
-		},
-	}
-	f := newCallbackFixture(t, provider)
-	user := &models.User{ID: "user-1", Email: "user@example.com"}
-	account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
-	session := &models.Session{ID: "session-new", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}
-
-	f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
-	f.userService.On("GetByID", mock.Anything, "user-1").Return(user, nil)
-	f.accountService.On("UpdateOAuth2Tokens", mock.Anything, "account-1", "new-access-token", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
-	f.tokenService.On("Generate").Return("plain-session-token", nil)
-	f.tokenService.On("Hash", "plain-session-token").Return("hashed-session-token")
-	f.sessionService.On("Create", mock.Anything, "user-1", "hashed-session-token", mock.Anything, mock.Anything, time.Hour).Return(session, nil)
-
-	result, err := f.useCase.Callback(context.Background(), f.request(t, services.StatePurposeLogin, ""), nil, nil)
-
-	require.NoError(t, err)
-	assert.Equal(t, "user-1", result.User.ID)
-	assert.Equal(t, "plain-session-token", result.SessionToken)
-	assert.Equal(t, "code-1", provider.ExchangeCode)
-	assert.Len(t, provider.ExchangeOpts, 1, "PKCE verifier must be passed to Exchange")
-	f.assertExpectations(t)
-}
-
-func TestCallbackUseCase_RejectsAccountOwnedByAnotherUserDuringLink(t *testing.T) {
-	t.Parallel()
-
-	provider := &oauth2tests.MockProvider{
-		ProviderName: "google",
-		Token:        newOAuthToken(),
-		UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "provider@example.com", EmailVerified: true},
-	}
-	f := newCallbackFixture(t, provider)
-	account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
-
-	f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
-
-	_, err := f.useCase.Callback(context.Background(), f.request(t, services.StatePurposeLink, "user-2"), nil, nil)
-
-	require.ErrorIs(t, err, constants.ErrAccountLinkedToAnotherUser)
-	f.assertExpectations(t)
-}
-
-func TestCallbackUseCase_AuthenticatedLinkReusesCurrentSession(t *testing.T) {
-	t.Parallel()
-
-	provider := &oauth2tests.MockProvider{
-		ProviderName: "google",
-		Token:        newOAuthToken(),
-		UserInfo: &types.UserInfo{
-			ProviderAccountID: "google-2",
-			Email:             "user@example.com",
-			EmailVerified:     true,
-		},
-	}
-	f := newCallbackFixture(t, provider)
-	user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: true}
-	createdAccount := &models.Account{ID: "account-2", UserID: "user-1", ProviderID: "google", AccountID: "google-2"}
-	session := &models.Session{ID: "session-1", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}
-
-	f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-2").Return(nil, nil)
-	f.userService.On("GetByID", mock.Anything, "user-1").Return(user, nil)
-	f.accountService.On("GetByUserIDAndProvider", mock.Anything, "user-1", "google").Return(nil, nil)
-	f.accountService.On("CreateOAuth2", mock.Anything, "user-1", "google-2", "google", "new-access-token", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(createdAccount, nil)
-	f.sessionService.On("GetByID", mock.Anything, "session-1").Return(session, nil)
-
-	result, err := f.useCase.Callback(context.Background(), f.request(t, services.StatePurposeLink, "user-1"), nil, nil)
-
-	require.NoError(t, err)
-	assert.True(t, result.ReusedSession)
-	assert.Equal(t, "session-1", result.Session.ID)
-	assert.Empty(t, result.SessionToken)
-	f.assertExpectations(t)
-}
-
-func TestCallbackUseCase_ValidationAndIdentityErrors(t *testing.T) {
+func TestCallbackUseCase(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		userInfo  *types.UserInfo
-		wantError error
-		setup     func(*callbackFixture)
+		name              string
+		provider          *oauth2tests.MockProvider
+		purpose           services.StatePurpose
+		actorID           string
+		setup             func(*callbackFixture)
+		mutateRequest     func(*callbackFixture, *types.CallbackRequest)
+		wantErr           error
+		wantAnyErr        bool
+		wantUserID        string
+		wantSessionToken  string
+		wantReusedSession bool
+		wantEmailVerified *bool
+		wantRedirectTo    string
+		wantPKCE          bool
 	}{
 		{
-			name:      "missing email",
-			userInfo:  &types.UserInfo{ProviderAccountID: "google-1"},
-			wantError: constants.ErrEmailRequired,
+			name: "existing account updates tokens for the owner",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				PKCE:         true,
+				Token:        newOAuthToken(),
+				UserInfo: &types.UserInfo{
+					ProviderAccountID: "google-1",
+					Email:             "user@example.com",
+					EmailVerified:     true,
+					Name:              "User",
+				},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				user := &models.User{ID: "user-1", Email: "user@example.com"}
+				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
+				session := &models.Session{ID: "session-new", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}
+
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(user, nil)
+				f.accountService.On("UpdateOAuth2Tokens", mock.Anything, "account-1", "new-access-token", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
+				f.tokenService.On("Generate").Return("plain-session-token", nil)
+				f.tokenService.On("Hash", "plain-session-token").Return("hashed-session-token")
+				f.sessionService.On("Create", mock.Anything, "user-1", "hashed-session-token", mock.Anything, mock.Anything, time.Hour).Return(session, nil)
+			},
+			wantUserID:       "user-1",
+			wantSessionToken: "plain-session-token",
+			wantPKCE:         true,
 		},
 		{
-			name:      "missing provider account id",
-			userInfo:  &types.UserInfo{Email: "user@example.com", EmailVerified: true},
-			wantError: constants.ErrProviderAccountIDRequired,
+			name: "authenticated link reuses the current session",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				PKCE:         true,
+				Token:        newOAuthToken(),
+				UserInfo: &types.UserInfo{
+					ProviderAccountID: "google-2",
+					Email:             "user@example.com",
+					EmailVerified:     true,
+				},
+			},
+			purpose: services.StatePurposeLink,
+			actorID: "user-1",
+			setup: func(f *callbackFixture) {
+				user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: true}
+				createdAccount := &models.Account{ID: "account-2", UserID: "user-1", ProviderID: "google", AccountID: "google-2"}
+				session := &models.Session{ID: "session-1", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}
+
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-2").Return(nil, nil)
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(user, nil)
+				f.accountService.On("GetByUserIDAndProvider", mock.Anything, "user-1", "google").Return(nil, nil)
+				f.accountService.On("CreateOAuth2", mock.Anything, "user-1", "google-2", "google", "new-access-token", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(createdAccount, nil)
+				f.sessionService.On("GetByID", mock.Anything, "session-1").Return(session, nil)
+			},
+			wantUserID:        "user-1",
+			wantReusedSession: true,
+			wantPKCE:          true,
 		},
 		{
-			name:      "nil provider account id",
-			userInfo:  &types.UserInfo{ProviderAccountID: "<nil>", Email: "user@example.com", EmailVerified: true},
-			wantError: constants.ErrProviderAccountIDRequired,
+			name: "link marks a matching verified email as verified",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo: &types.UserInfo{
+					ProviderAccountID: "google-3",
+					Email:             "user@example.com",
+					EmailVerified:     true,
+				},
+			},
+			purpose: services.StatePurposeLink,
+			actorID: "user-1",
+			setup: func(f *callbackFixture) {
+				user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: false}
+				verifiedUser := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: true}
+				createdAccount := &models.Account{ID: "account-3", UserID: "user-1", ProviderID: "google", AccountID: "google-3"}
+				session := &models.Session{ID: "session-1", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}
+
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-3").Return(nil, nil)
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(user, nil)
+				f.accountService.On("GetByUserIDAndProvider", mock.Anything, "user-1", "google").Return(nil, nil)
+				f.accountService.On("CreateOAuth2", mock.Anything, "user-1", "google-3", "google", "new-access-token", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(createdAccount, nil)
+				f.userService.On("Update", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
+					return u.Email == "user@example.com" && u.EmailVerified
+				})).Return(verifiedUser, nil)
+				f.sessionService.On("GetByID", mock.Anything, "session-1").Return(session, nil)
+			},
+			wantUserID:        "user-1",
+			wantReusedSession: true,
+			wantEmailVerified: new(true),
 		},
 		{
-			name:     "unverified provider email does not auto-link",
-			userInfo: &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: false},
+			name: "identity is authoritative over the provider email",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo: &types.UserInfo{
+					ProviderAccountID: "google-1",
+					Email:             "changed@example.com",
+					EmailVerified:     true,
+				},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				owner := &models.User{ID: "owner-1", Email: "original@example.com"}
+				account := &models.Account{ID: "account-1", UserID: "owner-1", ProviderID: "google", AccountID: "google-1"}
+				session := &models.Session{ID: "session-new", UserID: "owner-1", ExpiresAt: time.Now().Add(time.Hour)}
+
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
+				f.userService.On("GetByID", mock.Anything, "owner-1").Return(owner, nil)
+				f.accountService.On("UpdateOAuth2Tokens", mock.Anything, "account-1", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
+				f.tokenService.On("Generate").Return("session-token", nil)
+				f.tokenService.On("Hash", "session-token").Return("hashed")
+				f.sessionService.On("Create", mock.Anything, "owner-1", "hashed", mock.Anything, mock.Anything, time.Hour).Return(session, nil)
+			},
+			wantUserID:       "owner-1",
+			wantSessionToken: "session-token",
+		},
+		{
+			name: "unverified new email creates an unverified user",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo: &types.UserInfo{
+					ProviderAccountID: "google-1",
+					Email:             "new@example.com",
+					EmailVerified:     false,
+				},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				createdUser := &models.User{ID: "new-user", Email: "new@example.com", EmailVerified: false}
+				account := &models.Account{ID: "account-1", UserID: "new-user"}
+				session := &models.Session{ID: "session-new", UserID: "new-user", ExpiresAt: time.Now().Add(time.Hour)}
+
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
+				f.userService.On("GetByEmail", mock.Anything, "new@example.com").Return(nil, nil)
+				f.userService.On("Create", mock.Anything, "new", "new@example.com", false, (*string)(nil), mock.Anything).Return(createdUser, nil)
+				f.accountService.On("CreateOAuth2", mock.Anything, "new-user", "google-1", "google", "new-access-token", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
+				f.tokenService.On("Generate").Return("session-token", nil)
+				f.tokenService.On("Hash", "session-token").Return("hashed")
+				f.sessionService.On("Create", mock.Anything, "new-user", "hashed", mock.Anything, mock.Anything, time.Hour).Return(session, nil)
+			},
+			wantUserID:        "new-user",
+			wantSessionToken:  "session-token",
+			wantEmailVerified: new(false),
+		},
+		{
+			name: "account create race resolves to the same owner",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo: &types.UserInfo{
+					ProviderAccountID: "google-1",
+					Email:             "user@example.com",
+					EmailVerified:     true,
+				},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: true}
+				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
+				session := &models.Session{ID: "session-new", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}
+
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil).Once()
+				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(user, nil)
+				f.accountService.On("CreateOAuth2", mock.Anything, "user-1", "google-1", "google", "new-access-token", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("unique constraint"))
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil).Once()
+				f.accountService.On("UpdateOAuth2Tokens", mock.Anything, "account-1", "new-access-token", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
+				f.tokenService.On("Generate").Return("session-token", nil)
+				f.tokenService.On("Hash", "session-token").Return("hashed")
+				f.sessionService.On("Create", mock.Anything, "user-1", "hashed", mock.Anything, mock.Anything, time.Hour).Return(session, nil)
+			},
+			wantUserID:       "user-1",
+			wantSessionToken: "session-token",
+		},
+		{
+			name: "rejects an account owned by another user during link",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "provider@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLink,
+			actorID: "user-2",
+			setup: func(f *callbackFixture) {
+				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
+			},
+			wantErr: constants.ErrAccountLinkedToAnotherUser,
+		},
+		{
+			name: "missing email",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1"},
+			},
+			purpose: services.StatePurposeLogin,
+			wantErr: constants.ErrEmailRequired,
+		},
+		{
+			name: "missing provider account id",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			wantErr: constants.ErrProviderAccountIDRequired,
+		},
+		{
+			name: "nil provider account id",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "<nil>", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			wantErr: constants.ErrProviderAccountIDRequired,
+		},
+		{
+			name: "unverified provider email does not auto-link",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: false},
+			},
+			purpose: services.StatePurposeLogin,
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
 				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil)
 			},
-			wantError: constants.ErrEmailNotVerified,
+			wantErr: constants.ErrEmailNotVerified,
+		},
+		{
+			name: "account create failure deletes the new user",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo: &types.UserInfo{
+					ProviderAccountID: "google-1",
+					Email:             "new@example.com",
+					EmailVerified:     true,
+				},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				createdUser := &models.User{ID: "new-user", Email: "new@example.com"}
+
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
+				f.userService.On("GetByEmail", mock.Anything, "new@example.com").Return(nil, nil)
+				f.userService.On("Create", mock.Anything, "new", "new@example.com", true, mock.Anything, mock.Anything).Return(createdUser, nil)
+				f.accountService.On("CreateOAuth2", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("unique constraint"))
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
+				f.userService.On("Delete", mock.Anything, "new-user").Return(nil)
+			},
+			wantAnyErr: true,
+		},
+		{
+			name: "provider denied access",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+			},
+			purpose: services.StatePurposeLogin,
+			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
+				req.Error = "access_denied"
+			},
+			wantErr: constants.ErrAccessDenied,
+		},
+		{
+			name: "unknown provider",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+			},
+			purpose: services.StatePurposeLogin,
+			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
+				req.ProviderID = "missing"
+			},
+			wantErr: constants.ErrProviderNotFound,
+		},
+		{
+			name: "invalid state cookie",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+			},
+			purpose: services.StatePurposeLogin,
+			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
+				req.StateCookie = "not-a-cookie"
+			},
+			wantErr: constants.ErrInvalidState,
+		},
+		{
+			name: "state value mismatch",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+			},
+			purpose: services.StatePurposeLogin,
+			mutateRequest: func(f *callbackFixture, req *types.CallbackRequest) {
+				stateCookie, err := services.SignState(services.StatePayload{
+					State:    "other-state",
+					Provider: "google",
+					Purpose:  services.StatePurposeLogin,
+				}, f.hmacKey)
+				require.NoError(t, err)
+				req.StateCookie = stateCookie
+			},
+			wantErr: constants.ErrInvalidState,
+		},
+		{
+			name: "invalid state purpose",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+			},
+			purpose: services.StatePurposeLogin,
+			mutateRequest: func(f *callbackFixture, req *types.CallbackRequest) {
+				stateCookie, err := services.SignState(services.StatePayload{
+					State:    "state-1",
+					Provider: "google",
+					Purpose:  services.StatePurpose("invalid"),
+				}, f.hmacKey)
+				require.NoError(t, err)
+				req.StateCookie = stateCookie
+			},
+			wantErr: constants.ErrInvalidState,
+		},
+		{
+			name: "login flow rejected when an actor is present",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+			},
+			purpose: services.StatePurposeLogin,
+			actorID: "user-1",
+			wantErr: constants.ErrUnauthorized,
+		},
+		{
+			name: "missing authorization code",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+			},
+			purpose: services.StatePurposeLogin,
+			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
+				req.Code = ""
+			},
+			wantErr: constants.ErrInvalidCode,
+		},
+		{
+			name: "provider exchange failure",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				ExchangeErr:  errors.New("exchange failed"),
+			},
+			purpose: services.StatePurposeLogin,
+			wantErr: constants.ErrProviderFailure,
+		},
+		{
+			name: "provider user info failure",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfoErr:  errors.New("user info failed"),
+			},
+			purpose: services.StatePurposeLogin,
+			wantErr: constants.ErrProviderFailure,
+		},
+		{
+			name: "empty access token",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        &oauth2.Token{},
+			},
+			purpose: services.StatePurposeLogin,
+			wantErr: constants.ErrProviderFailure,
+		},
+		{
+			name: "invalid pkce verifier cookie",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				PKCE:         true,
+			},
+			purpose: services.StatePurposeLogin,
+			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
+				req.VerifierCookie = "not-a-cookie"
+			},
+			wantErr: constants.ErrPKCEVerifierMissing,
+		},
+		{
+			name: "account lookup failure",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, errors.New("lookup failed"))
+			},
+			wantAnyErr: true,
+		},
+		{
+			name: "account owner lookup failure",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(nil, errors.New("load failed"))
+			},
+			wantAnyErr: true,
+		},
+		{
+			name: "account owner is missing",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(nil, nil)
+			},
+			wantErr: constants.ErrAccountConflict,
+		},
+		{
+			name: "email lookup failure",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
+				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(nil, errors.New("lookup failed"))
+			},
+			wantAnyErr: true,
+		},
+		{
+			name: "user creation reports email already in use",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
+				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(nil, nil)
+				f.userService.On("Create", mock.Anything, mock.Anything, "user@example.com", true, mock.Anything, mock.Anything).Return(nil, coreservices.ErrEmailInUse)
+			},
+			wantErr: constants.ErrEmailInUse,
+		},
+		{
+			name: "user creation failure",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
+				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(nil, nil)
+				f.userService.On("Create", mock.Anything, mock.Anything, "user@example.com", true, mock.Anything, mock.Anything).Return(nil, errors.New("create failed"))
+			},
+			wantAnyErr: true,
+		},
+		{
+			name: "link user lookup failure",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLink,
+			actorID: "user-1",
+			setup: func(f *callbackFixture) {
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(nil, errors.New("load failed"))
+			},
+			wantAnyErr: true,
+		},
+		{
+			name: "link user is missing",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLink,
+			actorID: "user-1",
+			setup: func(f *callbackFixture) {
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(nil, nil)
+			},
+			wantErr: constants.ErrUnauthorized,
+		},
+		{
+			name: "link account check failure",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLink,
+			actorID: "user-1",
+			setup: func(f *callbackFixture) {
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil)
+				f.accountService.On("GetByUserIDAndProvider", mock.Anything, "user-1", "google").Return(nil, errors.New("lookup failed"))
+			},
+			wantAnyErr: true,
+		},
+		{
+			name: "provider already linked to the user",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLink,
+			actorID: "user-1",
+			setup: func(f *callbackFixture) {
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil)
+				f.accountService.On("GetByUserIDAndProvider", mock.Anything, "user-1", "google").Return(&models.Account{ID: "account-existing", UserID: "user-1", ProviderID: "google"}, nil)
+			},
+			wantErr: constants.ErrAccountConflict,
+		},
+		{
+			name: "token update failure",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil)
+				f.accountService.On("UpdateOAuth2Tokens", mock.Anything, "account-1", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("update failed"))
+			},
+			wantAnyErr: true,
+		},
+		{
+			name: "token update rejects an expired token",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil)
+				f.accountService.On("UpdateOAuth2Tokens", mock.Anything, "account-1", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, coreservices.ErrTokenExpired)
+			},
+			wantErr: constants.ErrTokenExpired,
+		},
+		{
+			name: "account create race belongs to another user",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil).Once()
+				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil)
+				f.accountService.On("CreateOAuth2", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("unique constraint"))
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(&models.Account{ID: "account-1", UserID: "user-2", ProviderID: "google", AccountID: "google-1"}, nil).Once()
+			},
+			wantErr: constants.ErrAccountLinkedToAnotherUser,
+		},
+		{
+			name: "account create reports another owner",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil).Once()
+				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil)
+				f.accountService.On("CreateOAuth2", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, coreservices.ErrAccountLinkedToAnotherUser)
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil).Once()
+			},
+			wantErr: constants.ErrAccountLinkedToAnotherUser,
+		},
+		{
+			name: "account create reports an expired token",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil).Once()
+				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil)
+				f.accountService.On("CreateOAuth2", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, coreservices.ErrTokenExpired)
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil).Once()
+			},
+			wantErr: constants.ErrTokenExpired,
+		},
+		{
+			name: "link account create failure does not delete the user",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLink,
+			actorID: "user-1",
+			setup: func(f *callbackFixture) {
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil).Once()
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil)
+				f.accountService.On("GetByUserIDAndProvider", mock.Anything, "user-1", "google").Return(nil, nil)
+				f.accountService.On("CreateOAuth2", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("create failed"))
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil).Once()
+			},
+			wantAnyErr: true,
+		},
+		{
+			name: "link verification update failure leaves the user unverified",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLink,
+			actorID: "user-1",
+			setup: func(f *callbackFixture) {
+				user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: false}
+				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
+				session := &models.Session{ID: "session-1", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}
+
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(user, nil)
+				f.accountService.On("GetByUserIDAndProvider", mock.Anything, "user-1", "google").Return(nil, nil)
+				f.accountService.On("CreateOAuth2", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
+				f.userService.On("Update", mock.Anything, mock.Anything).Return(nil, errors.New("update failed"))
+				f.sessionService.On("GetByID", mock.Anything, "session-1").Return(session, nil)
+			},
+			wantUserID:        "user-1",
+			wantReusedSession: true,
+			wantEmailVerified: new(false),
+		},
+		{
+			name: "link fails when the current session is missing",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLink,
+			actorID: "user-1",
+			setup: func(f *callbackFixture) {
+				user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: true}
+				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
+
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
+				f.userService.On("GetByID", mock.Anything, "user-1").Return(user, nil)
+				f.accountService.On("GetByUserIDAndProvider", mock.Anything, "user-1", "google").Return(nil, nil)
+				f.accountService.On("CreateOAuth2", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
+			},
+			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
+				req.SessionID = ""
+			},
+			wantErr: constants.ErrUnauthorized,
+		},
+		{
+			name: "login fails when session creation fails",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			setup: func(f *callbackFixture) {
+				user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: true}
+				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
+
+				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
+				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(user, nil)
+				f.accountService.On("CreateOAuth2", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
+				f.tokenService.On("Generate").Return(nil, errors.New("generate failed"))
+			},
+			wantAnyErr: true,
+		},
+		{
+			name: "pkce requires a verifier",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				PKCE:         true,
+				Token:        newOAuthToken(),
+				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			},
+			purpose: services.StatePurposeLogin,
+			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
+				req.VerifierCookie = ""
+			},
+			wantErr: constants.ErrPKCEVerifierMissing,
+		},
+		{
+			name: "state provider mismatch",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+			},
+			purpose: services.StatePurposeLogin,
+			mutateRequest: func(f *callbackFixture, req *types.CallbackRequest) {
+				stateCookie, err := services.SignState(services.StatePayload{
+					State:    "state-1",
+					Provider: "github",
+					Purpose:  services.StatePurposeLogin,
+				}, f.hmacKey)
+				require.NoError(t, err)
+				req.StateCookie = stateCookie
+			},
+			wantErr: constants.ErrStateProviderMismatch,
+		},
+		{
+			name: "actor mismatch for link",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+			},
+			purpose: services.StatePurposeLink,
+			actorID: "user-1",
+			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
+				req.ActorID = "user-2"
+			},
+			wantErr: constants.ErrUnauthorized,
 		},
 	}
 
@@ -232,160 +876,447 @@ func TestCallbackUseCase_ValidationAndIdentityErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			provider := &oauth2tests.MockProvider{
-				ProviderName: "google",
-				Token:        newOAuthToken(),
-				UserInfo:     tt.userInfo,
-			}
-			f := newCallbackFixture(t, provider)
+			f := newCallbackFixture(t, tt.provider)
 			if tt.setup != nil {
 				tt.setup(f)
 			}
 
-			_, err := f.useCase.Callback(context.Background(), f.request(t, services.StatePurposeLogin, ""), nil, nil)
+			req := f.request(t, tt.purpose, tt.actorID)
+			if tt.mutateRequest != nil {
+				tt.mutateRequest(f, req)
+			}
 
-			require.ErrorIs(t, err, tt.wantError)
+			result, err := f.useCase.Callback(context.Background(), req, nil, nil)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, result)
+				f.assertExpectations(t)
+				return
+			}
+			if tt.wantAnyErr {
+				require.Error(t, err)
+				assert.Nil(t, result)
+				f.assertExpectations(t)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.NotNil(t, result.User)
+			require.NotNil(t, result.Session)
+			assert.Equal(t, tt.wantUserID, result.User.ID)
+			assert.Equal(t, tt.wantSessionToken, result.SessionToken)
+			assert.Equal(t, tt.wantReusedSession, result.ReusedSession)
+			assert.Equal(t, tt.wantRedirectTo, result.RedirectTo)
+			assert.Equal(t, "code-1", tt.provider.ExchangeCode)
+
+			if tt.wantPKCE {
+				assert.Len(t, tt.provider.ExchangeOpts, 1, "PKCE verifier must be passed to Exchange")
+			} else {
+				assert.Empty(t, tt.provider.ExchangeOpts)
+			}
+			if tt.wantEmailVerified != nil {
+				assert.Equal(t, *tt.wantEmailVerified, result.User.EmailVerified)
+			}
+
 			f.assertExpectations(t)
 		})
 	}
 }
 
-func TestCallbackUseCase_IdentityIsAuthoritativeOverEmail(t *testing.T) {
+func TestCallbackUseCase_CurrentSession(t *testing.T) {
 	t.Parallel()
 
-	provider := &oauth2tests.MockProvider{
-		ProviderName: "google",
-		Token:        newOAuthToken(),
-		UserInfo: &types.UserInfo{
-			ProviderAccountID: "google-1",
-			Email:             "changed@example.com",
-			EmailVerified:     true,
+	tests := []struct {
+		name          string
+		sessionID     string
+		actorID       string
+		setup         func(*callbackFixture)
+		wantErr       error
+		wantAnyErr    bool
+		wantSessionID string
+	}{
+		{
+			name:    "missing session id",
+			actorID: "user-1",
+			wantErr: constants.ErrUnauthorized,
+		},
+		{
+			name:      "session lookup failure",
+			sessionID: "session-1",
+			actorID:   "user-1",
+			setup: func(f *callbackFixture) {
+				f.sessionService.On("GetByID", mock.Anything, "session-1").Return(nil, errors.New("lookup failed"))
+			},
+			wantAnyErr: true,
+		},
+		{
+			name:      "session not found",
+			sessionID: "session-1",
+			actorID:   "user-1",
+			setup: func(f *callbackFixture) {
+				f.sessionService.On("GetByID", mock.Anything, "session-1").Return(nil, nil)
+			},
+			wantErr: constants.ErrSessionNotFound,
+		},
+		{
+			name:      "session belongs to another user",
+			sessionID: "session-1",
+			actorID:   "user-1",
+			setup: func(f *callbackFixture) {
+				f.sessionService.On("GetByID", mock.Anything, "session-1").Return(&models.Session{
+					ID: "session-1", UserID: "user-2", ExpiresAt: time.Now().Add(time.Hour),
+				}, nil)
+			},
+			wantErr: constants.ErrSessionNotFound,
+		},
+		{
+			name:      "expired session",
+			sessionID: "session-1",
+			actorID:   "user-1",
+			setup: func(f *callbackFixture) {
+				f.sessionService.On("GetByID", mock.Anything, "session-1").Return(&models.Session{
+					ID: "session-1", UserID: "user-1", ExpiresAt: time.Now().Add(-time.Minute),
+				}, nil)
+			},
+			wantErr: constants.ErrSessionNotFound,
+		},
+		{
+			name:      "valid session",
+			sessionID: "session-1",
+			actorID:   "user-1",
+			setup: func(f *callbackFixture) {
+				f.sessionService.On("GetByID", mock.Anything, "session-1").Return(&models.Session{
+					ID: "session-1", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour),
+				}, nil)
+			},
+			wantSessionID: "session-1",
 		},
 	}
-	f := newCallbackFixture(t, provider)
-	owner := &models.User{ID: "owner-1", Email: "original@example.com"}
-	account := &models.Account{ID: "account-1", UserID: "owner-1", ProviderID: "google", AccountID: "google-1"}
-	session := &models.Session{ID: "session-new", UserID: "owner-1", ExpiresAt: time.Now().Add(time.Hour)}
 
-	f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
-	f.userService.On("GetByID", mock.Anything, "owner-1").Return(owner, nil)
-	f.accountService.On("UpdateOAuth2Tokens", mock.Anything, "account-1", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
-	f.tokenService.On("Generate").Return("session-token", nil)
-	f.tokenService.On("Hash", "session-token").Return("hashed")
-	f.sessionService.On("Create", mock.Anything, "owner-1", "hashed", mock.Anything, mock.Anything, time.Hour).Return(session, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	result, err := f.useCase.Callback(context.Background(), f.request(t, services.StatePurposeLogin, ""), nil, nil)
+			f := newCallbackFixture(t, &oauth2tests.MockProvider{ProviderName: "google"})
+			if tt.setup != nil {
+				tt.setup(f)
+			}
 
-	require.NoError(t, err)
-	assert.Equal(t, "owner-1", result.User.ID)
-	f.assertExpectations(t)
+			session, err := f.useCase.currentSession(context.Background(), &types.CallbackRequest{
+				SessionID: tt.sessionID,
+				ActorID:   tt.actorID,
+			})
+
+			switch {
+			case tt.wantErr != nil:
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, session)
+			case tt.wantAnyErr:
+				require.Error(t, err)
+				assert.Nil(t, session)
+			default:
+				require.NoError(t, err)
+				require.NotNil(t, session)
+				assert.Equal(t, tt.wantSessionID, session.ID)
+			}
+			f.assertExpectations(t)
+		})
+	}
 }
 
-func TestCallbackUseCase_AccountCreateFailureDeletesNewUser(t *testing.T) {
+func TestCallbackUseCase_CreateSession(t *testing.T) {
 	t.Parallel()
 
-	provider := &oauth2tests.MockProvider{
-		ProviderName: "google",
-		Token:        newOAuthToken(),
-		UserInfo: &types.UserInfo{
-			ProviderAccountID: "google-1",
-			Email:             "new@example.com",
-			EmailVerified:     true,
+	tests := []struct {
+		name          string
+		setup         func(*callbackFixture)
+		wantErr       bool
+		wantToken     string
+		wantSessionID string
+	}{
+		{
+			name: "token generation failure",
+			setup: func(f *callbackFixture) {
+				f.tokenService.On("Generate").Return(nil, errors.New("generate failed"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "session creation failure",
+			setup: func(f *callbackFixture) {
+				f.tokenService.On("Generate").Return("session-token", nil)
+				f.tokenService.On("Hash", "session-token").Return("hashed")
+				f.sessionService.On("Create", mock.Anything, "user-1", "hashed", mock.Anything, mock.Anything, time.Hour).Return(nil, errors.New("create failed"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "success",
+			setup: func(f *callbackFixture) {
+				f.tokenService.On("Generate").Return("session-token", nil)
+				f.tokenService.On("Hash", "session-token").Return("hashed")
+				f.sessionService.On("Create", mock.Anything, "user-1", "hashed", mock.Anything, mock.Anything, time.Hour).Return(&models.Session{
+					ID: "session-1", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour),
+				}, nil)
+			},
+			wantToken:     "session-token",
+			wantSessionID: "session-1",
 		},
 	}
-	f := newCallbackFixture(t, provider)
-	createdUser := &models.User{ID: "new-user", Email: "new@example.com"}
 
-	f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
-	f.userService.On("GetByEmail", mock.Anything, "new@example.com").Return(nil, nil)
-	f.userService.On("Create", mock.Anything, "new", "new@example.com", true, mock.Anything, mock.Anything).Return(createdUser, nil)
-	f.accountService.On("CreateOAuth2", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("unique constraint"))
-	f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
-	f.userService.On("Delete", mock.Anything, "new-user").Return(nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	_, err := f.useCase.Callback(context.Background(), f.request(t, services.StatePurposeLogin, ""), nil, nil)
+			f := newCallbackFixture(t, &oauth2tests.MockProvider{ProviderName: "google"})
+			tt.setup(f)
 
-	require.Error(t, err)
-	f.assertExpectations(t)
+			token, session, err := f.useCase.createSession(context.Background(), "user-1", nil, nil)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Empty(t, token)
+				assert.Nil(t, session)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.wantToken, token)
+				require.NotNil(t, session)
+				assert.Equal(t, tt.wantSessionID, session.ID)
+			}
+			f.assertExpectations(t)
+		})
+	}
 }
 
-func TestCallbackUseCase_UnverifiedNewEmailCreatesUnverifiedUser(t *testing.T) {
+func TestCallbackUseCase_Redirect(t *testing.T) {
 	t.Parallel()
 
-	provider := &oauth2tests.MockProvider{
-		ProviderName: "google",
-		Token:        newOAuthToken(),
-		UserInfo: &types.UserInfo{
-			ProviderAccountID: "google-1",
-			Email:             "new@example.com",
-			EmailVerified:     false,
-			Picture:           "",
+	tests := []struct {
+		name   string
+		cookie func(*callbackFixture) string
+		want   string
+	}{
+		{
+			name:   "missing redirect cookie",
+			cookie: func(*callbackFixture) string { return "" },
+		},
+		{
+			name: "relative redirect",
+			cookie: func(f *callbackFixture) string {
+				signed, err := services.SignCookie("/welcome", f.hmacKey)
+				require.NoError(t, err)
+				return signed
+			},
+			want: "/welcome",
+		},
+		{
+			name: "trusted absolute redirect",
+			cookie: func(f *callbackFixture) string {
+				signed, err := services.SignCookie("https://app.example.com/welcome", f.hmacKey)
+				require.NoError(t, err)
+				return signed
+			},
+			want: "https://app.example.com/welcome",
+		},
+		{
+			name:   "invalid signature",
+			cookie: func(*callbackFixture) string { return "not-a-cookie" },
+		},
+		{
+			name: "untrusted redirect",
+			cookie: func(f *callbackFixture) string {
+				signed, err := services.SignCookie("https://evil.example/callback", f.hmacKey)
+				require.NoError(t, err)
+				return signed
+			},
 		},
 	}
-	f := newCallbackFixture(t, provider)
-	createdUser := &models.User{ID: "new-user", Email: "new@example.com", EmailVerified: false}
-	account := &models.Account{ID: "account-1", UserID: "new-user"}
-	session := &models.Session{ID: "session-new", UserID: "new-user", ExpiresAt: time.Now().Add(time.Hour)}
 
-	f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
-	f.userService.On("GetByEmail", mock.Anything, "new@example.com").Return(nil, nil)
-	f.userService.On("Create", mock.Anything, "new", "new@example.com", false, (*string)(nil), mock.Anything).Return(createdUser, nil)
-	f.accountService.On("CreateOAuth2", mock.Anything, "new-user", "google-1", "google", "new-access-token", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
-	f.tokenService.On("Generate").Return("session-token", nil)
-	f.tokenService.On("Hash", "session-token").Return("hashed")
-	f.sessionService.On("Create", mock.Anything, "new-user", "hashed", mock.Anything, mock.Anything, time.Hour).Return(session, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	result, err := f.useCase.Callback(context.Background(), f.request(t, services.StatePurposeLogin, ""), nil, nil)
+			f := newCallbackFixture(t, &oauth2tests.MockProvider{ProviderName: "google"})
+			f.useCase.GlobalConfig.Security.TrustedOrigins = []string{"https://app.example.com"}
 
-	require.NoError(t, err)
-	assert.False(t, result.User.EmailVerified)
-	f.assertExpectations(t)
-}
+			got := f.useCase.redirectTo(&types.CallbackRequest{RedirectCookie: tt.cookie(f)})
 
-func TestCallbackUseCase_PKCERequiresVerifier(t *testing.T) {
-	t.Parallel()
-
-	provider := &oauth2tests.MockProvider{
-		ProviderName: "google",
-		PKCE:         true,
-		Token:        newOAuthToken(),
-		UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
+			assert.Equal(t, tt.want, got)
+		})
 	}
-	f := newCallbackFixture(t, provider)
-	req := f.request(t, services.StatePurposeLogin, "")
-	req.VerifierCookie = ""
-
-	_, err := f.useCase.Callback(context.Background(), req, nil, nil)
-
-	require.ErrorIs(t, err, constants.ErrPKCEVerifierMissing)
 }
 
-func TestCallbackUseCase_StateBindingErrors(t *testing.T) {
+func TestValidateUserInfo(t *testing.T) {
 	t.Parallel()
 
-	provider := &oauth2tests.MockProvider{ProviderName: "google", Token: newOAuthToken()}
-	f := newCallbackFixture(t, provider)
+	tests := []struct {
+		name    string
+		info    *types.UserInfo
+		wantErr error
+	}{
+		{name: "nil info", info: nil, wantErr: constants.ErrProviderFailure},
+		{name: "empty provider id", info: &types.UserInfo{Email: "user@example.com"}, wantErr: constants.ErrProviderAccountIDRequired},
+		{name: "nil-like provider id", info: &types.UserInfo{ProviderAccountID: "<nil>", Email: "user@example.com"}, wantErr: constants.ErrProviderAccountIDRequired},
+		{name: "null provider id", info: &types.UserInfo{ProviderAccountID: "null", Email: "user@example.com"}, wantErr: constants.ErrProviderAccountIDRequired},
+		{name: "empty email", info: &types.UserInfo{ProviderAccountID: "provider-1"}, wantErr: constants.ErrEmailRequired},
+		{name: "valid", info: &types.UserInfo{ProviderAccountID: "provider-1", Email: "user@example.com"}},
+	}
 
-	t.Run("provider mismatch", func(t *testing.T) {
-		stateCookie, err := services.SignState(services.StatePayload{
-			State:    "state-1",
-			Provider: "github",
-			Purpose:  services.StatePurposeLogin,
-		}, f.hmacKey)
-		require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		req := f.request(t, services.StatePurposeLogin, "")
-		req.StateCookie = stateCookie
+			err := validateUserInfo(tt.info)
+			if tt.wantErr == nil {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}
 
-		_, err = f.useCase.Callback(context.Background(), req, nil, nil)
-		require.ErrorIs(t, err, constants.ErrStateProviderMismatch)
-	})
+func TestFallbackName(t *testing.T) {
+	t.Parallel()
 
-	t.Run("actor mismatch for link", func(t *testing.T) {
-		req := f.request(t, services.StatePurposeLink, "user-1")
-		req.ActorID = "user-2"
+	tests := []struct {
+		name string
+		info *types.UserInfo
+		want string
+	}{
+		{name: "provider name", info: &types.UserInfo{Name: "  User Name  ", Email: "user@example.com"}, want: "User Name"},
+		{name: "email local part fallback", info: &types.UserInfo{Email: "user@example.com"}, want: "user"},
+		{name: "generic fallback", info: &types.UserInfo{Email: "invalid"}, want: "User"},
+	}
 
-		_, err := f.useCase.Callback(context.Background(), req, nil, nil)
-		require.ErrorIs(t, err, constants.ErrUnauthorized)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, fallbackName(tt.info))
+		})
+	}
+}
+
+func TestCallbackTokenHelpers(t *testing.T) {
+	t.Parallel()
+
+	future := time.Now().Add(time.Hour)
+
+	tests := []struct {
+		name           string
+		expiry         time.Time
+		refreshToken   string
+		image          string
+		wantExpiry     *time.Time
+		wantRefreshNil bool
+		wantImageNil   bool
+	}{
+		{name: "zero expiry", expiry: time.Time{}, refreshToken: "refresh", image: "image", wantRefreshNil: false, wantImageNil: false},
+		{name: "non-zero expiry and empty optional values", expiry: future, refreshToken: "  ", image: "  ", wantExpiry: &future, wantRefreshNil: true, wantImageNil: true},
+		{name: "non-empty optional values", expiry: future, refreshToken: "refresh", image: "image", wantExpiry: &future},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.wantExpiry, tokenExpiry(&oauth2.Token{Expiry: tt.expiry}))
+			if tt.wantRefreshNil {
+				assert.Nil(t, optionalToken(tt.refreshToken))
+			} else {
+				require.NotNil(t, optionalToken(tt.refreshToken))
+				assert.Equal(t, tt.refreshToken, *optionalToken(tt.refreshToken))
+			}
+			if tt.wantImageNil {
+				assert.Nil(t, imagePointer(tt.image))
+			} else {
+				require.NotNil(t, imagePointer(tt.image))
+				assert.Equal(t, tt.image, *imagePointer(tt.image))
+			}
+		})
+	}
+}
+
+func TestCallbackUseCase_DeleteOrphanUser(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		deleteErr error
+		wantLogs  int
+	}{
+		{name: "success does not log", deleteErr: nil, wantLogs: 0},
+		{name: "failure is logged", deleteErr: errors.New("delete failed"), wantLogs: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newCallbackFixture(t, &oauth2tests.MockProvider{ProviderName: "google"})
+			logger := &internaltests.RecordingLogger{}
+			f.useCase.Logger = logger
+			f.userService.On("Delete", mock.Anything, "user-1").Return(tt.deleteErr)
+
+			f.useCase.deleteOrphanUser(context.Background(), "user-1")
+
+			assert.Len(t, logger.ErrorCalls, tt.wantLogs)
+			f.assertExpectations(t)
+		})
+	}
+}
+
+func TestCallbackUseCase_PersistAccount(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		existingUserID string
+		setup          func(*callbackFixture, *models.Account)
+		wantErr        error
+	}{
+		{
+			name:           "rejects a mismatched owner",
+			existingUserID: "user-2",
+			wantErr:        constants.ErrAccountLinkedToAnotherUser,
+		},
+		{
+			name:           "updates tokens for the matching owner",
+			existingUserID: "user-1",
+			setup: func(f *callbackFixture, account *models.Account) {
+				f.accountService.On("UpdateOAuth2Tokens", mock.Anything, "account-1", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newCallbackFixture(t, &oauth2tests.MockProvider{ProviderName: "google"})
+			account := &models.Account{ID: "account-1", UserID: tt.existingUserID, ProviderID: "google", AccountID: "google-1"}
+			if tt.setup != nil {
+				tt.setup(f, account)
+			}
+
+			err := f.useCase.persistAccount(
+				context.Background(),
+				"google",
+				&models.User{ID: "user-1"},
+				&types.UserInfo{ProviderAccountID: "google-1"},
+				newOAuthToken(),
+				account,
+				false,
+			)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			f.assertExpectations(t)
+		})
+	}
 }

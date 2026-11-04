@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"maps"
 	"strings"
 
 	"github.com/Authula/authula/core/repositories"
@@ -21,7 +22,7 @@ func NewUserService(repo repositories.UserRepository, serviceHooks *models.CoreS
 }
 
 func (s *userService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata map[string]any) (*models.User, error) {
-	email = strings.ToLower(strings.TrimSpace(email))
+	email = util.NormalizeEmail(email)
 	name = strings.TrimSpace(name)
 	if email == "" {
 		return nil, ErrEmailRequired
@@ -72,12 +73,12 @@ func (s *userService) GetByID(ctx context.Context, id string) (*models.User, err
 }
 
 func (s *userService) GetByEmail(ctx context.Context, email string) (*models.User, error) {
-	return s.repo.GetByEmail(ctx, email)
+	return s.repo.GetByEmail(ctx, util.NormalizeEmail(email))
 }
 
 func (s *userService) Update(ctx context.Context, user *models.User) (*models.User, error) {
 	if user != nil {
-		user.Email = strings.ToLower(strings.TrimSpace(user.Email))
+		user.Email = util.NormalizeEmail(user.Email)
 		user.Name = strings.TrimSpace(user.Name)
 	}
 
@@ -100,6 +101,13 @@ func (s *userService) Update(ctx context.Context, user *models.User) (*models.Us
 }
 
 func (s *userService) UpdateFields(ctx context.Context, id string, fields map[string]any) error {
+	if email, ok := fields["email"].(string); ok {
+		normalized := make(map[string]any, len(fields))
+		maps.Copy(normalized, fields)
+		normalized["email"] = util.NormalizeEmail(email)
+		fields = normalized
+	}
+
 	return s.repo.UpdateFields(ctx, id, fields)
 }
 

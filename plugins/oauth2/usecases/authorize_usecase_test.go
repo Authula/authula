@@ -1,4 +1,4 @@
-package usecases_test
+package usecases
 
 import (
 	"context"
@@ -13,13 +13,12 @@ import (
 	"github.com/Authula/authula/plugins/oauth2/services"
 	oauth2tests "github.com/Authula/authula/plugins/oauth2/tests"
 	"github.com/Authula/authula/plugins/oauth2/types"
-	"github.com/Authula/authula/plugins/oauth2/usecases"
 )
 
-func newAuthorizeUseCase(t *testing.T, provider *oauth2tests.MockProvider) *usecases.AuthorizeUseCase {
+func newAuthorizeUseCase(t *testing.T, provider *oauth2tests.MockProvider) *authorizeUseCase {
 	t.Helper()
 
-	return usecases.NewAuthorizeUseCase(
+	return NewAuthorizeUseCase(
 		oauth2tests.NewRegistry(provider),
 		&internaltests.MockLogger{},
 		[]string{"https://app.example.com"},
@@ -27,16 +26,44 @@ func newAuthorizeUseCase(t *testing.T, provider *oauth2tests.MockProvider) *usec
 	)
 }
 
-func TestAuthorizeUseCase_PKCE(t *testing.T) {
+func TestAuthorizeUseCase(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name          string
 		pkce          bool
+		providerID    string
+		redirectTo    string
+		wantErr       error
 		wantChallenge bool
 	}{
-		{name: "pkce provider includes challenge", pkce: true, wantChallenge: true},
-		{name: "non pkce provider omits challenge", pkce: false, wantChallenge: false},
+		{
+			name:          "pkce provider includes challenge",
+			pkce:          true,
+			providerID:    "google",
+			redirectTo:    "/welcome",
+			wantChallenge: true,
+		},
+		{
+			name:       "non pkce provider omits challenge",
+			pkce:       false,
+			providerID: "google",
+			redirectTo: "/welcome",
+		},
+		{
+			name:       "rejects untrusted redirect",
+			pkce:       true,
+			providerID: "google",
+			redirectTo: "https://evil.example/callback",
+			wantErr:    constants.ErrInvalidRedirectTo,
+		},
+		{
+			name:       "unknown provider",
+			pkce:       true,
+			providerID: "missing",
+			redirectTo: "/welcome",
+			wantErr:    constants.ErrProviderNotFound,
+		},
 	}
 
 	for _, tt := range tests {
@@ -47,47 +74,34 @@ func TestAuthorizeUseCase_PKCE(t *testing.T) {
 			useCase := newAuthorizeUseCase(t, provider)
 
 			result, err := useCase.Authorize(context.Background(), &types.AuthorizeRequest{
-				ProviderID: "google",
-				RedirectTo: "/welcome",
+				ProviderID: tt.providerID,
+				RedirectTo: tt.redirectTo,
 			})
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, result)
+				return
+			}
+
 			require.NoError(t, err)
+			require.NotNil(t, result)
 
 			authURL, err := url.Parse(result.AuthorizationURL)
 			require.NoError(t, err)
+			assert.NotEmpty(t, authURL.Query().Get("state"))
+			assert.NotEmpty(t, result.StateCookie)
+			assert.NotEmpty(t, result.RedirectCookie)
 
 			if tt.wantChallenge {
 				assert.NotEmpty(t, authURL.Query().Get("code_challenge"))
 				assert.Equal(t, "S256", authURL.Query().Get("code_challenge_method"))
 				require.NotNil(t, result.VerifierCookie)
-			} else {
-				assert.Empty(t, authURL.Query().Get("code_challenge"))
-				assert.Nil(t, result.VerifierCookie)
+				return
 			}
+
+			assert.Empty(t, authURL.Query().Get("code_challenge"))
+			assert.Nil(t, result.VerifierCookie)
 		})
 	}
-}
-
-func TestAuthorizeUseCase_RejectsUntrustedRedirect(t *testing.T) {
-	t.Parallel()
-
-	provider := &oauth2tests.MockProvider{ProviderName: "google", PKCE: true}
-	useCase := newAuthorizeUseCase(t, provider)
-
-	_, err := useCase.Authorize(context.Background(), &types.AuthorizeRequest{
-		ProviderID: "google",
-		RedirectTo: "https://evil.example/callback",
-	})
-
-	require.ErrorIs(t, err, constants.ErrInvalidRedirectTo)
-}
-
-func TestAuthorizeUseCase_UnknownProvider(t *testing.T) {
-	t.Parallel()
-
-	provider := &oauth2tests.MockProvider{ProviderName: "google", PKCE: true}
-	useCase := newAuthorizeUseCase(t, provider)
-
-	_, err := useCase.Authorize(context.Background(), &types.AuthorizeRequest{ProviderID: "missing"})
-
-	require.ErrorIs(t, err, constants.ErrProviderNotFound)
 }

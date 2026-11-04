@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -9,15 +8,11 @@ import (
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/oauth2/constants"
 	"github.com/Authula/authula/plugins/oauth2/types"
+	"github.com/Authula/authula/plugins/oauth2/usecases"
 )
 
-// CallbackUseCase is the handler-facing contract for completing an OAuth2 flow.
-type CallbackUseCase interface {
-	Callback(ctx context.Context, req *types.CallbackRequest, ipAddress *string, userAgent *string) (*types.CallbackResult, error)
-}
-
 type CallbackHandler struct {
-	UseCase CallbackUseCase
+	UseCase usecases.CallbackUseCase
 	Cookie  CookieOptions
 	Logger  models.Logger
 }

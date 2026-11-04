@@ -13,22 +13,21 @@ import (
 	"github.com/Authula/authula/plugins/oauth2/types"
 )
 
-// AuthorizeUseCase handles the authorization flow initiation
-type AuthorizeUseCase struct {
+// authorizeUseCase handles the authorization flow initiation
+type authorizeUseCase struct {
 	ProviderRegistry *services.ProviderRegistry
 	Logger           models.Logger
 	TrustedOrigins   []string
 	HMACKey          []byte
 }
 
-// NewAuthorizeUseCase creates a new authorize usecase
 func NewAuthorizeUseCase(
 	registry *services.ProviderRegistry,
 	logger models.Logger,
 	trustedOrigins []string,
 	hmacKey []byte,
-) *AuthorizeUseCase {
-	return &AuthorizeUseCase{
+) *authorizeUseCase {
+	return &authorizeUseCase{
 		ProviderRegistry: registry,
 		Logger:           logger,
 		TrustedOrigins:   trustedOrigins,
@@ -36,8 +35,7 @@ func NewAuthorizeUseCase(
 	}
 }
 
-// Authorize initiates an OAuth2 authorization flow
-func (uc *AuthorizeUseCase) Authorize(ctx context.Context, req *types.AuthorizeRequest) (*AuthorizeResult, error) {
+func (uc *authorizeUseCase) Authorize(ctx context.Context, req *types.AuthorizeRequest) (*AuthorizeResult, error) {
 	providerID := strings.ToLower(strings.TrimSpace(req.ProviderID))
 	oauthProvider, exists := uc.ProviderRegistry.Get(providerID)
 	if !exists {

@@ -28,6 +28,8 @@ func NewAccountService(
 	return &accountService{config: config, accountRepo: accountRepo, tokenRepo: tokenRepo, serviceHooks: serviceHooks, logger: logger}
 }
 func (s *accountService) Create(ctx context.Context, userID string, accountID string, providerID string, password *string) (*models.Account, error) {
+	accountID = normalizeEmailProviderAccountID(providerID, accountID)
+
 	account := &models.Account{
 		ID:         util.GenerateUUID(),
 		UserID:     userID,
@@ -185,6 +187,10 @@ func (s *accountService) Update(ctx context.Context, account *models.Account) (*
 }
 
 func (s *accountService) updateAccount(ctx context.Context, account *models.Account) (*models.Account, error) {
+	if account != nil {
+		account.AccountID = normalizeEmailProviderAccountID(account.ProviderID, account.AccountID)
+	}
+
 	if s.serviceHooks != nil && s.serviceHooks.Accounts != nil {
 		if err := runHooks(s.serviceHooks.Accounts.BeforeUpdateHooks(), account); err != nil {
 			return nil, err
@@ -224,4 +230,13 @@ func validateOAuthTokenExpiry(expiresAt *time.Time) error {
 
 func (s *accountService) UpdateFields(ctx context.Context, userID string, fields map[string]any) error {
 	return s.accountRepo.UpdateFields(ctx, userID, fields)
+}
+
+// normalizeEmailProviderAccountID keeps email/password accounts keyed by the
+// normalized email, matching users.email.
+func normalizeEmailProviderAccountID(providerID, accountID string) string {
+	if providerID == models.AuthProviderEmail.String() {
+		return util.NormalizeEmail(accountID)
+	}
+	return accountID
 }

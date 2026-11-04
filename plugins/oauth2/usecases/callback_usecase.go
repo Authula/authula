@@ -17,7 +17,7 @@ import (
 	rootservices "github.com/Authula/authula/services"
 )
 
-type CallbackUseCase struct {
+type callbackUseCase struct {
 	GlobalConfig     *models.Config
 	ProviderRegistry *services.ProviderRegistry
 	Logger           models.Logger
@@ -37,8 +37,8 @@ func NewCallbackUseCase(
 	accountService rootservices.AccountService,
 	sessionService rootservices.SessionService,
 	tokenService rootservices.TokenService,
-) *CallbackUseCase {
-	return &CallbackUseCase{
+) *callbackUseCase {
+	return &callbackUseCase{
 		GlobalConfig:     globalConfig,
 		ProviderRegistry: registry,
 		Logger:           logger,
@@ -50,7 +50,7 @@ func NewCallbackUseCase(
 	}
 }
 
-func (uc *CallbackUseCase) Callback(ctx context.Context, req *types.CallbackRequest, ipAddress *string, userAgent *string) (*types.CallbackResult, error) {
+func (uc *callbackUseCase) Callback(ctx context.Context, req *types.CallbackRequest, ipAddress *string, userAgent *string) (*types.CallbackResult, error) {
 	if req.Error != "" {
 		uc.Logger.Warn("oauth provider returned an error", "provider", req.ProviderID, "error", req.Error)
 		return nil, constants.ErrAccessDenied
@@ -84,8 +84,6 @@ func (uc *CallbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 			// A signed-in browser must restart the flow as an explicit link.
 			return nil, constants.ErrUnauthorized
 		}
-	default:
-		return nil, constants.ErrInvalidState
 	}
 
 	if req.Code == "" {
@@ -122,10 +120,11 @@ func (uc *CallbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 		return nil, err
 	}
 
-	if state.Purpose == services.StatePurposeLink && userInfo.EmailVerified && strings.EqualFold(user.Email, userInfo.Email) && !user.EmailVerified {
+	if state.Purpose == services.StatePurposeLink && userInfo.EmailVerified && user.Email == userInfo.Email && !user.EmailVerified {
 		user.EmailVerified = true
 		updated, updateErr := uc.UserService.Update(ctx, user)
 		if updateErr != nil {
+			user.EmailVerified = false
 			uc.Logger.Error("failed to mark user email verified after link", "error", updateErr)
 		} else {
 			user = updated
@@ -155,7 +154,7 @@ func (uc *CallbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 	return result, nil
 }
 
-func (uc *CallbackUseCase) exchange(ctx context.Context, provider types.OAuth2Provider, req *types.CallbackRequest) (*oauth2.Token, error) {
+func (uc *callbackUseCase) exchange(ctx context.Context, provider types.OAuth2Provider, req *types.CallbackRequest) (*oauth2.Token, error) {
 	options := make([]oauth2.AuthCodeOption, 0, 1)
 	if provider.RequiresPKCE() {
 		if req.VerifierCookie == "" {
@@ -191,7 +190,7 @@ func validateUserInfo(info *types.UserInfo) error {
 	return nil
 }
 
-func (uc *CallbackUseCase) resolveUser(ctx context.Context, providerID string, userInfo *types.UserInfo, state *services.StatePayload, req *types.CallbackRequest) (*models.User, *models.Account, bool, error) {
+func (uc *callbackUseCase) resolveUser(ctx context.Context, providerID string, userInfo *types.UserInfo, state *services.StatePayload, req *types.CallbackRequest) (*models.User, *models.Account, bool, error) {
 	existingAccount, err := uc.AccountService.GetByProviderAndAccountID(ctx, providerID, userInfo.ProviderAccountID)
 	if err != nil {
 		return nil, nil, false, fmt.Errorf("failed to check existing account: %w", err)
@@ -239,7 +238,7 @@ func (uc *CallbackUseCase) resolveUser(ctx context.Context, providerID string, u
 	return created, nil, true, nil
 }
 
-func (uc *CallbackUseCase) resolveLinkUser(ctx context.Context, providerID, actorID string) (*models.User, error) {
+func (uc *callbackUseCase) resolveLinkUser(ctx context.Context, providerID, actorID string) (*models.User, error) {
 	user, err := uc.UserService.GetByID(ctx, actorID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load signed-in user: %w", err)
@@ -259,7 +258,7 @@ func (uc *CallbackUseCase) resolveLinkUser(ctx context.Context, providerID, acto
 	return user, nil
 }
 
-func (uc *CallbackUseCase) persistAccount(ctx context.Context, providerID string, user *models.User, userInfo *types.UserInfo, token *oauth2.Token, existingAccount *models.Account, createdUser bool) error {
+func (uc *callbackUseCase) persistAccount(ctx context.Context, providerID string, user *models.User, userInfo *types.UserInfo, token *oauth2.Token, existingAccount *models.Account, createdUser bool) error {
 	expiry := tokenExpiry(token)
 	refreshToken := optionalToken(token.RefreshToken)
 
@@ -306,7 +305,7 @@ func (uc *CallbackUseCase) persistAccount(ctx context.Context, providerID string
 	return fmt.Errorf("failed to link oauth account: %w", err)
 }
 
-func (uc *CallbackUseCase) currentSession(ctx context.Context, req *types.CallbackRequest) (*models.Session, error) {
+func (uc *callbackUseCase) currentSession(ctx context.Context, req *types.CallbackRequest) (*models.Session, error) {
 	if req.SessionID == "" {
 		return nil, constants.ErrUnauthorized
 	}
@@ -321,7 +320,7 @@ func (uc *CallbackUseCase) currentSession(ctx context.Context, req *types.Callba
 	return session, nil
 }
 
-func (uc *CallbackUseCase) createSession(ctx context.Context, userID string, ipAddress, userAgent *string) (string, *models.Session, error) {
+func (uc *callbackUseCase) createSession(ctx context.Context, userID string, ipAddress, userAgent *string) (string, *models.Session, error) {
 	sessionToken, err := uc.TokenService.Generate()
 	if err != nil {
 		uc.Logger.Error("failed to generate session token", "error", err)
@@ -345,13 +344,13 @@ func (uc *CallbackUseCase) createSession(ctx context.Context, userID string, ipA
 	return sessionToken, session, nil
 }
 
-func (uc *CallbackUseCase) deleteOrphanUser(ctx context.Context, userID string) {
+func (uc *callbackUseCase) deleteOrphanUser(ctx context.Context, userID string) {
 	if err := uc.UserService.Delete(ctx, userID); err != nil {
 		uc.Logger.Error("failed to delete orphan oauth user", "user_id", userID, "error", err)
 	}
 }
 
-func (uc *CallbackUseCase) redirectTo(req *types.CallbackRequest) string {
+func (uc *callbackUseCase) redirectTo(req *types.CallbackRequest) string {
 	if req.RedirectCookie == "" {
 		return ""
 	}

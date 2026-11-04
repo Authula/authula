@@ -9,6 +9,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/util"
 )
 
 type BunUserRepository struct {
@@ -20,6 +21,8 @@ func NewBunUserRepository(db bun.IDB) UserRepository {
 }
 
 func (r *BunUserRepository) Create(ctx context.Context, user *models.User) (*models.User, error) {
+	normalizeUserEmail(user)
+
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := tx.NewInsert().
 			Model(user).
@@ -82,7 +85,7 @@ func (r *BunUserRepository) GetByEmail(ctx context.Context, email string) (*mode
 	user := new(models.User)
 	err := r.db.NewSelect().
 		Model(user).
-		Where("LOWER(email) = LOWER(?)", strings.TrimSpace(email)).
+		Where("email = ?", util.NormalizeEmail(email)).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
@@ -93,6 +96,8 @@ func (r *BunUserRepository) GetByEmail(ctx context.Context, email string) (*mode
 }
 
 func (r *BunUserRepository) Update(ctx context.Context, user *models.User) (*models.User, error) {
+	normalizeUserEmail(user)
+
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := tx.NewUpdate().
 			Model(user).
@@ -118,11 +123,22 @@ func (r *BunUserRepository) UpdateFields(ctx context.Context, id string, fields 
 		Where("id = ?", id)
 
 	for field, value := range fields {
+		if field == "email" {
+			if email, ok := value.(string); ok {
+				value = util.NormalizeEmail(email)
+			}
+		}
 		q = q.Set(field+" = ?", value)
 	}
 
 	_, err := q.Exec(ctx)
 	return err
+}
+
+func normalizeUserEmail(user *models.User) {
+	if user != nil {
+		user.Email = util.NormalizeEmail(user.Email)
+	}
 }
 
 func (r *BunUserRepository) Delete(ctx context.Context, id string) error {

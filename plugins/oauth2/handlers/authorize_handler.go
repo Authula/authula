@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
@@ -11,13 +10,8 @@ import (
 	"github.com/Authula/authula/plugins/oauth2/usecases"
 )
 
-// AuthorizeUseCase is the handler-facing contract for starting an OAuth2 flow.
-type AuthorizeUseCase interface {
-	Authorize(ctx context.Context, req *types.AuthorizeRequest) (*usecases.AuthorizeResult, error)
-}
-
 type AuthorizeHandler struct {
-	UseCase AuthorizeUseCase
+	UseCase usecases.AuthorizeUseCase
 	Cookie  CookieOptions
 	Logger  models.Logger
 }
