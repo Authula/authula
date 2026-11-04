@@ -66,22 +66,9 @@ func (uc *CallbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
 
-	user, err := uc.UserService.GetByEmail(ctx, userInfo.Email)
+	user, err := uc.resolveUser(ctx, req.ProviderID, userInfo)
 	if err != nil {
-		return nil, fmt.Errorf("database error checking user: %w", err)
-	}
-
-	if user == nil {
-		user, err = uc.UserService.Create(ctx, userInfo.Name, userInfo.Email, true, &userInfo.Picture, nil)
-		if err != nil {
-			uc.Logger.Error(fmt.Sprintf("Failed to create user: %v", err))
-			return nil, fmt.Errorf("failed to create user: %w", err)
-		}
-	}
-
-	existingAccount, err := uc.AccountService.GetByProviderAndAccountID(ctx, req.ProviderID, userInfo.ProviderAccountID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check existing account: %w", err)
+		return nil, err
 	}
 
 	var accessTokenExpiry *time.Time
@@ -89,26 +76,18 @@ func (uc *CallbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 		accessTokenExpiry = &token.Expiry
 	}
 
-	if existingAccount == nil {
-		_, err = uc.AccountService.CreateOAuth2(
-			ctx,
-			user.ID,
-			userInfo.ProviderAccountID,
-			req.ProviderID,
-			token.AccessToken,
-			&token.RefreshToken,
-			accessTokenExpiry,
-			nil,
-			nil,
-		)
-	} else {
-		err = uc.AccountService.UpdateFields(ctx, existingAccount.ID, map[string]any{
-			"access_token":            token.AccessToken,
-			"refresh_token":           token.RefreshToken,
-			"access_token_expires_at": accessTokenExpiry,
-		})
-	}
-	if err != nil {
+	// CreateOAuth2 upserts by (provider, account ID) and encrypts the tokens.
+	if _, err := uc.AccountService.CreateOAuth2(
+		ctx,
+		user.ID,
+		userInfo.ProviderAccountID,
+		req.ProviderID,
+		token.AccessToken,
+		&token.RefreshToken,
+		accessTokenExpiry,
+		nil,
+		nil,
+	); err != nil {
 		return nil, fmt.Errorf("failed to handle account linking: %w", err)
 	}
 
@@ -138,6 +117,51 @@ func (uc *CallbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 		Session:      newSession,
 		SessionToken: sessionToken,
 	}, nil
+}
+
+// resolveUser finds the user for a provider identity. A known provider account always wins over email,
+// because emails are mutable. Linking to an existing user by email is only allowed when the provider
+// verified that email; otherwise anyone controlling the provider profile could take over the account.
+func (uc *CallbackUseCase) resolveUser(ctx context.Context, providerID string, userInfo *types.UserInfo) (*models.User, error) {
+	if userInfo.ProviderAccountID == "" {
+		return nil, fmt.Errorf("provider did not return an account id")
+	}
+	if userInfo.Email == "" {
+		return nil, fmt.Errorf("provider did not return an email address")
+	}
+
+	account, err := uc.AccountService.GetByProviderAndAccountID(ctx, providerID, userInfo.ProviderAccountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing account: %w", err)
+	}
+	if account != nil {
+		user, err := uc.UserService.GetByID(ctx, account.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("database error checking user: %w", err)
+		}
+		if user == nil {
+			return nil, fmt.Errorf("linked user not found")
+		}
+		return user, nil
+	}
+
+	user, err := uc.UserService.GetByEmail(ctx, userInfo.Email)
+	if err != nil {
+		return nil, fmt.Errorf("database error checking user: %w", err)
+	}
+	if user != nil {
+		if !userInfo.EmailVerified {
+			return nil, fmt.Errorf("email is not verified by %s; sign in with your existing method first", providerID)
+		}
+		return user, nil
+	}
+
+	user, err = uc.UserService.Create(ctx, userInfo.Name, userInfo.Email, userInfo.EmailVerified, &userInfo.Picture, nil)
+	if err != nil {
+		uc.Logger.Error(fmt.Sprintf("Failed to create user: %v", err))
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+	return user, nil
 }
 
 func (uc *CallbackUseCase) GetSessionByID(ctx context.Context, sessionID string) (*models.Session, error) {

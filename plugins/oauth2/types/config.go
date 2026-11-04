@@ -19,6 +19,7 @@ type ProviderConfig struct {
 	ClientID     string   `json:"client_id" toml:"client_id"`
 	ClientSecret string   `json:"client_secret" toml:"client_secret"`
 	RedirectURL  string   `json:"redirect_url" toml:"redirect_url"`
+	TenantID     string   `json:"tenant_id" toml:"tenant_id"` // Microsoft only: common (default), organizations, consumers or a tenant ID
 	Scopes       []string `json:"scopes" toml:"scopes"`
 	AuthURL      string   `json:"auth_url" toml:"auth_url"`
 	TokenURL     string   `json:"token_url" toml:"token_url"`

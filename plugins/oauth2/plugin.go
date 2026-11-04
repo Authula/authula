@@ -130,6 +130,15 @@ func getEnvKey(provider, suffix string) string {
 		if suffix == "CLIENT_SECRET" {
 			return env.EnvGoogleClientSecret
 		}
+	case "microsoft":
+		switch suffix {
+		case "CLIENT_ID":
+			return env.EnvMicrosoftClientID
+		case "CLIENT_SECRET":
+			return env.EnvMicrosoftClientSecret
+		case "TENANT_ID":
+			return env.EnvMicrosoftTenantID
+		}
 	}
 	return ""
 }
@@ -157,6 +166,12 @@ func (p *OAuth2Plugin) registerBuiltInProviders() error {
 				return services.NewGoogleProvider(cfg.ClientID, cfg.ClientSecret, cfg.RedirectURL)
 			},
 		},
+		"microsoft": {
+			validator: p.validateProviderConfig,
+			creator: func(cfg types.ProviderConfig) types.OAuth2Provider {
+				return services.NewMicrosoftProvider(cfg.ClientID, cfg.ClientSecret, cfg.RedirectURL, cfg.TenantID)
+			},
+		},
 	}
 
 	for name, provider := range providers {
@@ -168,6 +183,7 @@ func (p *OAuth2Plugin) registerBuiltInProviders() error {
 				ClientID:     clientID,
 				ClientSecret: clientSecret,
 				RedirectURL:  p.globalConfig.BaseURL + p.globalConfig.BasePath + "/oauth2/callback/" + name,
+				TenantID:     os.Getenv(getEnvKey(name, "TENANT_ID")),
 			}
 		} else if config, ok := p.pluginConfig.Providers[name]; ok {
 			providerConfig = config

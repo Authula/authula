@@ -57,3 +57,9 @@ events.db*
 .gemini/skills
 .qwen/skills
 .opencode/skills
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+.trail/
+.omc/
+.ignore
