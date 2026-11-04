@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/plugins/oauth2/constants"
@@ -97,6 +98,11 @@ func TestAuthorizeUseCase(t *testing.T) {
 				assert.NotEmpty(t, authURL.Query().Get("code_challenge"))
 				assert.Equal(t, "S256", authURL.Query().Get("code_challenge_method"))
 				require.NotNil(t, result.VerifierCookie)
+
+				verifier, err := services.ValidateCookie(*result.VerifierCookie, services.DeriveOAuthHMACKey("test-secret"), constants.FlowCookieTTL)
+				require.NoError(t, err)
+				require.NotEmpty(t, verifier)
+				assert.Equal(t, oauth2.S256ChallengeFromVerifier(verifier), authURL.Query().Get("code_challenge"))
 				return
 			}
 

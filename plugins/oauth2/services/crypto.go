@@ -106,16 +106,12 @@ func ValidateCookie(signed string, secret []byte, maxAge time.Duration) (string,
 	return string(payload), nil
 }
 
-// GeneratePKCEChallenge generates PKCE code_verifier and code_challenge
-func GeneratePKCEChallenge() (verifier string, challenge string, err error) {
+// GeneratePKCEVerifier generates a PKCE code_verifier.
+func GeneratePKCEVerifier() (string, error) {
 	verifierBytes := make([]byte, 32)
 	if _, err := rand.Read(verifierBytes); err != nil {
-		return "", "", fmt.Errorf("failed to generate verifier: %w", err)
+		return "", fmt.Errorf("failed to generate verifier: %w", err)
 	}
-	verifier = base64.RawURLEncoding.EncodeToString(verifierBytes)
 
-	hash := sha256.Sum256([]byte(verifier))
-	challenge = base64.RawURLEncoding.EncodeToString(hash[:])
-
-	return verifier, challenge, nil
+	return base64.RawURLEncoding.EncodeToString(verifierBytes), nil
 }

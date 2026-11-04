@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/oauth2"
 )
 
 func TestGenerateRandomString(t *testing.T) {
@@ -24,6 +26,39 @@ func TestGenerateRandomString(t *testing.T) {
 				t.Fatalf("GenerateRandomString(%d) returned length %d", length, len(got))
 			}
 		})
+	}
+}
+
+func TestGeneratePKCEVerifier(t *testing.T) {
+	t.Parallel()
+
+	const base64URLAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+	seen := make(map[string]struct{}, 10)
+	for range 10 {
+		verifier, err := GeneratePKCEVerifier()
+		if err != nil {
+			t.Fatalf("GeneratePKCEVerifier returned error: %v", err)
+		}
+		if len(verifier) != 43 {
+			t.Fatalf("expected verifier length 43, got %d", len(verifier))
+		}
+		if strings.IndexFunc(verifier, func(r rune) bool { return !strings.ContainsRune(base64URLAlphabet, r) }) != -1 {
+			t.Fatalf("verifier contains non-base64url characters: %q", verifier)
+		}
+		if _, exists := seen[verifier]; exists {
+			t.Fatalf("GeneratePKCEVerifier returned a duplicate verifier: %q", verifier)
+		}
+		seen[verifier] = struct{}{}
+
+		challenge := oauth2.S256ChallengeFromVerifier(verifier)
+		if len(challenge) != 43 {
+			t.Fatalf("expected challenge length 43, got %d", len(challenge))
+		}
+	}
+
+	if len(seen) != 10 {
+		t.Fatalf("expected 10 unique verifiers, got %d", len(seen))
 	}
 }
 

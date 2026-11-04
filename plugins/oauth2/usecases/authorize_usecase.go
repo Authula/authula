@@ -78,10 +78,10 @@ func (uc *authorizeUseCase) Authorize(ctx context.Context, req *types.AuthorizeR
 	var verifierCookie *string
 	authOptions := make([]oauth2.AuthCodeOption, 0, 1)
 	if oauthProvider.RequiresPKCE() {
-		verifier, challenge, err := services.GeneratePKCEChallenge()
+		verifier, err := services.GeneratePKCEVerifier()
 		if err != nil {
-			uc.Logger.Error("failed to generate PKCE challenge", "error", err)
-			return nil, fmt.Errorf("failed to generate PKCE challenge")
+			uc.Logger.Error("failed to generate PKCE verifier", "error", err)
+			return nil, fmt.Errorf("failed to generate PKCE verifier")
 		}
 
 		signedVerifier, err := services.SignCookie(verifier, uc.HMACKey)
@@ -91,7 +91,7 @@ func (uc *authorizeUseCase) Authorize(ctx context.Context, req *types.AuthorizeR
 		}
 
 		verifierCookie = &signedVerifier
-		authOptions = append(authOptions, oauth2.S256ChallengeOption(challenge))
+		authOptions = append(authOptions, oauth2.S256ChallengeOption(verifier))
 	}
 
 	return &AuthorizeResult{
