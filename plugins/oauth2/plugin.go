@@ -143,6 +143,13 @@ func getEnvKey(provider, suffix string) (string, bool) {
 		case "CLIENT_SECRET":
 			return env.EnvGoogleClientSecret, true
 		}
+	case "microsoft":
+		switch suffix {
+		case "CLIENT_ID":
+			return env.EnvMicrosoftClientID, true
+		case "CLIENT_SECRET":
+			return env.EnvMicrosoftClientSecret, true
+		}
 	}
 	return "", false
 }
@@ -164,7 +171,7 @@ func (p *OAuth2Plugin) registerProviders() error {
 	for name := range configured {
 		names = append(names, name)
 	}
-	for _, builtIn := range []string{"discord", "github", "google"} {
+	for _, builtIn := range []string{"discord", "github", "google", "microsoft"} {
 		if _, exists := configured[builtIn]; !exists {
 			names = append(names, builtIn)
 		}
@@ -242,6 +249,11 @@ func (p *OAuth2Plugin) registerBuiltInProvider(name string, cfg types.ProviderCo
 		provider = services.NewGitHubOAuth2Provider(cfg, options)
 	case "google":
 		provider = services.NewGoogleProvider(cfg, options)
+	case "microsoft":
+		if tenantID := strings.TrimSpace(os.Getenv(env.EnvMicrosoftTenantID)); tenantID != "" {
+			cfg.TenantID = tenantID
+		}
+		provider = services.NewMicrosoftProvider(cfg, options)
 	default:
 		return fmt.Errorf("%w: unsupported built-in provider %s", constants.ErrProviderConfigInvalid, name)
 	}

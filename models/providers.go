@@ -8,6 +8,7 @@ const (
 	AuthProviderDiscord   AuthProviderID = "discord"
 	AuthProviderGitHub    AuthProviderID = "github"
 	AuthProviderGoogle    AuthProviderID = "google"
+	AuthProviderMicrosoft AuthProviderID = "microsoft"
 )
 
 func (id AuthProviderID) String() string {
