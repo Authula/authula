@@ -60,6 +60,12 @@ func (s *refreshTokenService) RefreshTokens(ctx context.Context, refreshToken st
 
 // RefreshTokensWithMetadata refreshes tokens with optional audit metadata for event logging.
 func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, refreshToken string, auditMeta events.AuditMetadata) (*types.RefreshTokenResponse, error) {
+	claims, err := s.jwtService.ValidateRefreshToken(ctx, refreshToken)
+	if err != nil {
+		s.logger.Debug("refresh token validation failed", "error", err)
+		return nil, constants.ErrInvalidRefreshToken
+	}
+
 	tokenHash := HashRefreshToken(refreshToken)
 
 	record, err := s.storage.GetRefreshToken(ctx, tokenHash)
@@ -68,6 +74,11 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 		return nil, constants.ErrInvalidRefreshToken
 	}
 	if record == nil {
+		return nil, constants.ErrInvalidRefreshToken
+	}
+
+	claimSessionID, _ := claims["session_id"].(string)
+	if claimSessionID == "" || claimSessionID != record.SessionID {
 		return nil, constants.ErrInvalidRefreshToken
 	}
 
@@ -92,7 +103,12 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 		return nil, constants.ErrInvalidRefreshToken
 	}
 
-	extraClaims := s.extraClaims(ctx, refreshToken)
+	claimUserID, _ := claims["user_id"].(string)
+	if claimUserID == "" || claimUserID != session.UserID {
+		return nil, constants.ErrInvalidRefreshToken
+	}
+
+	extraClaims := s.extraClaims(claims)
 
 	tokenPair, err := s.jwtService.GenerateUserToken(ctx, session.UserID, record.SessionID, extraClaims)
 	if err != nil {
@@ -193,17 +209,12 @@ func (s *refreshTokenService) invalidateSessionFamily(ctx context.Context, sessi
 	}
 }
 
-func (s *refreshTokenService) extraClaims(ctx context.Context, rawRefreshToken string) map[string]any {
-	claims, err := s.jwtService.ExtractClaims(ctx, rawRefreshToken)
-	if err != nil {
-		return nil
-	}
-
+func (s *refreshTokenService) extraClaims(claims map[string]any) map[string]any {
 	extraClaims := make(map[string]any)
 	for k, v := range claims {
 		switch k {
-		case "sub", "user_id", "session_id", "iat", "exp", "jti",
-			"token_type", "actor_type", "organization_id", "scopes":
+		case "iss", "aud", "sub", "user_id", "session_id", "iat", "exp", "nbf", "jti",
+			"token_type", "actor_type", "organization_id", "scopes", "client_id":
 			continue
 		default:
 			extraClaims[k] = v

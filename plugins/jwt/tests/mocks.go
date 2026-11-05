@@ -90,7 +90,7 @@ func (m *MockTokenService) GenerateUserToken(ctx context.Context, userID string,
 	return args.Get(0).(*jwtservicesTypes.TokenPair), args.Error(1)
 }
 
-func (m *MockTokenService) ExtractClaims(ctx context.Context, token string) (map[string]any, error) {
+func (m *MockTokenService) ValidateRefreshToken(ctx context.Context, token string) (map[string]any, error) {
 	args := m.Called(ctx, token)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"maps"
 	"testing"
 	"time"
 
@@ -21,6 +22,11 @@ import (
 	"github.com/Authula/authula/plugins/jwt/types"
 )
 
+const (
+	testIssuer   = "https://auth.example.com/api/auth"
+	testAudience = "authula"
+)
+
 type serviceTestFixture struct {
 	logger           models.Logger
 	sessionSvc       *jwttests.MockSessionService
@@ -32,6 +38,8 @@ type serviceTestFixture struct {
 	activeKey        *types.JWKS
 	expiresIn        time.Duration
 	refreshExpiresIn time.Duration
+	issuer           string
+	audience         string
 }
 
 func newServiceTestFixture(t *testing.T) *serviceTestFixture {
@@ -60,6 +68,8 @@ func newServiceTestFixture(t *testing.T) *serviceTestFixture {
 		activeKey:        activeKey,
 		expiresIn:        15 * time.Minute,
 		refreshExpiresIn: 7 * 24 * time.Hour,
+		issuer:           testIssuer,
+		audience:         testAudience,
 	}
 }
 
@@ -73,10 +83,26 @@ func (f *serviceTestFixture) newJWTService() *tokenService {
 		sessionService:   f.sessionSvc,
 		expiresIn:        f.expiresIn,
 		refreshExpiresIn: f.refreshExpiresIn,
+		issuer:           f.issuer,
+		audience:         f.audience,
 	}
 }
 
+// signTestToken signs the supplied claims after adding the issuer and audience
+// that every valid Authula token must carry. Use signTestTokenRaw when a test
+// needs to omit or override those claims.
 func (f *serviceTestFixture) signTestToken(t *testing.T, claims map[string]any) string {
+	t.Helper()
+
+	merged := map[string]any{
+		jwt.IssuerKey:   f.issuer,
+		jwt.AudienceKey: []string{f.audience},
+	}
+	maps.Copy(merged, claims)
+	return f.signTestTokenRaw(t, merged)
+}
+
+func (f *serviceTestFixture) signTestTokenRaw(t *testing.T, claims map[string]any) string {
 	t.Helper()
 
 	privKey, err := jwk.ParseKey([]byte(f.activeKey.PrivateKey), jwk.WithPEM(true))

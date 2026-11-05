@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,42 +26,12 @@ func parseTestToken(t *testing.T, tokenStr string, f *serviceTestFixture) map[st
 	parsed, err := jwt.Parse([]byte(tokenStr), jwt.WithKey(jwa.EdDSA(), pubKey), jwt.WithValidate(false))
 	require.NoError(t, err)
 
-	var sub, userID, sessionID, tokenType, actType, jti, orgID string
-	var scopes []any
-
-	_ = parsed.Get("sub", &sub)
-	_ = parsed.Get("user_id", &userID)
-	_ = parsed.Get("session_id", &sessionID)
-	_ = parsed.Get("token_type", &tokenType)
-	_ = parsed.Get("actor_type", &actType)
-	_ = parsed.Get("scopes", &scopes)
-	_ = parsed.Get(jwt.JwtIDKey, &jti)
-	_ = parsed.Get("organization_id", &orgID)
-
 	result := make(map[string]any)
-	if sub != "" {
-		result["sub"] = sub
-	}
-	if userID != "" {
-		result["user_id"] = userID
-	}
-	if sessionID != "" {
-		result["session_id"] = sessionID
-	}
-	if tokenType != "" {
-		result["token_type"] = tokenType
-	}
-	if actType != "" {
-		result["actor_type"] = actType
-	}
-	if len(scopes) > 0 {
-		result["scopes"] = scopes
-	}
-	if jti != "" {
-		result["jti"] = jti
-	}
-	if orgID != "" {
-		result["organization_id"] = orgID
+	for _, key := range parsed.Keys() {
+		var value any
+		if err := parsed.Get(key, &value); err == nil {
+			result[key] = value
+		}
 	}
 	return result
 }
@@ -73,6 +44,7 @@ func TestTokenService_ValidateToken(t *testing.T) {
 	tests := []struct {
 		name       string
 		claims     map[string]any
+		raw        bool
 		setupMocks func(t *testing.T, f *serviceTestFixture)
 		wantActor  func(t *testing.T, actor *models.Actor)
 		wantErr    string
@@ -101,7 +73,34 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			},
 		},
 		{
-			name: "valid_user_token_no_actor_type",
+			name: "valid_user_token_does_not_leak_registered_claims",
+			claims: map[string]any{
+				jwt.SubjectKey:    "user-1",
+				"user_id":         "user-1",
+				"session_id":      "sess-1",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
+				"client_id":       "client-1",
+				"organization_id": "org-1",
+				jwt.JwtIDKey:      "jti-leak",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			setupMocks: func(t *testing.T, f *serviceTestFixture) {
+				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-leak").Return(false, nil)
+				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "session:sess-1").Return(false, nil)
+				f.sessionSvc.On("GetByID", mock.Anything, "sess-1").Return(&models.Session{ID: "sess-1", ExpiresAt: time.Now().Add(time.Hour)}, nil)
+			},
+			wantActor: func(t *testing.T, actor *models.Actor) {
+				require.Equal(t, "user-1", actor.ID)
+				for _, claim := range []string{"iss", "aud", "client_id", "organization_id"} {
+					_, ok := actor.Claims[claim]
+					require.False(t, ok, "claim %s must not leak into Actor.Claims", claim)
+				}
+			},
+		},
+		{
+			name: "missing_actor_type",
 			claims: map[string]any{
 				jwt.SubjectKey:    "user-1",
 				"user_id":         "user-1",
@@ -111,16 +110,111 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.IssuedAtKey:   time.Now(),
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
 			},
-			setupMocks: func(t *testing.T, f *serviceTestFixture) {
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-2").Return(false, nil)
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "session:sess-1").Return(false, nil)
-				f.sessionSvc.On("GetByID", mock.Anything, "sess-1").Return(&models.Session{ID: "sess-1", ExpiresAt: time.Now().Add(time.Hour)}, nil)
+			wantErr: "missing actor_type claim",
+		},
+		{
+			name: "unknown_actor_type",
+			claims: map[string]any{
+				jwt.SubjectKey:    "user-1",
+				"user_id":         "user-1",
+				"session_id":      "sess-1",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "admin",
+				jwt.JwtIDKey:      "jti-unknown-actor",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
 			},
-			wantActor: func(t *testing.T, actor *models.Actor) {
-				require.Equal(t, "user-1", actor.ID)
-				require.Equal(t, models.ActorUser, actor.Type)
-				require.Equal(t, "jwt_bearer", actor.Claims["auth_mechanism"])
+			wantErr: "invalid actor_type claim",
+		},
+		{
+			name: "missing_issuer",
+			claims: map[string]any{
+				jwt.SubjectKey:    "user-1",
+				"user_id":         "user-1",
+				"session_id":      "sess-1",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
+				jwt.JwtIDKey:      "jti-missing-iss",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
 			},
+			raw:     true,
+			wantErr: "missing issuer claim",
+		},
+		{
+			name: "wrong_issuer",
+			claims: map[string]any{
+				jwt.SubjectKey:    "user-1",
+				"user_id":         "user-1",
+				"session_id":      "sess-1",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
+				jwt.IssuerKey:     "https://evil.example.com",
+				jwt.JwtIDKey:      "jti-wrong-iss",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			wantErr: "invalid issuer claim",
+		},
+		{
+			name: "missing_audience",
+			claims: map[string]any{
+				jwt.SubjectKey:    "user-1",
+				"user_id":         "user-1",
+				"session_id":      "sess-1",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
+				jwt.IssuerKey:     testIssuer,
+				jwt.JwtIDKey:      "jti-missing-aud",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			raw:     true,
+			wantErr: "missing audience claim",
+		},
+		{
+			name: "wrong_audience",
+			claims: map[string]any{
+				jwt.SubjectKey:    "user-1",
+				"user_id":         "user-1",
+				"session_id":      "sess-1",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
+				jwt.AudienceKey:   []string{"another-service"},
+				jwt.JwtIDKey:      "jti-wrong-aud",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			wantErr: "invalid audience claim",
+		},
+		{
+			name: "external_audience_rejected",
+			claims: map[string]any{
+				jwt.SubjectKey:    "user-1",
+				"user_id":         "user-1",
+				"session_id":      "sess-1",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
+				jwt.AudienceKey:   []string{"external-api"},
+				jwt.JwtIDKey:      "jti-external-aud",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			wantErr: "invalid audience claim",
+		},
+		{
+			name: "refresh_token_rejected_as_access",
+			claims: map[string]any{
+				jwt.SubjectKey:    "user-1",
+				"user_id":         "user-1",
+				"session_id":      "sess-1",
+				"token_type":      types.JWTTokenTypeRefresh.String(),
+				"actor_type":      "user",
+				jwt.JwtIDKey:      "jti-refresh-as-access",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			wantErr: "invalid token_type",
 		},
 		{
 			name: "valid_machine_token",
@@ -264,9 +358,16 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			f := newServiceTestFixture(t)
 			svc := f.newJWTService()
 			f.setupKeyServiceMock()
-			tt.setupMocks(t, f)
+			if tt.setupMocks != nil {
+				tt.setupMocks(t, f)
+			}
 
-			tokenStr := f.signTestToken(t, tt.claims)
+			tokenStr := ""
+			if tt.raw {
+				tokenStr = f.signTestTokenRaw(t, tt.claims)
+			} else {
+				tokenStr = f.signTestToken(t, tt.claims)
+			}
 			actor, err := svc.ValidateToken(ctx, tokenStr)
 
 			if tt.wantErr != "" {
@@ -289,11 +390,14 @@ func TestTokenService_GenerateUserToken(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		userID     string
-		sessionID  string
-		setupMocks func(*serviceTestFixture)
-		wantErr    string
+		name        string
+		userID      string
+		sessionID   string
+		extraClaims map[string]any
+		setupMocks  func(*serviceTestFixture)
+		wantErr     string
+		wantClaims  map[string]any
+		wantAbsent  []string
 	}{
 		{
 			name:      "success",
@@ -303,6 +407,32 @@ func TestTokenService_GenerateUserToken(t *testing.T) {
 				f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
 				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
 			},
+		},
+		{
+			name:      "reserved_extra_claims_are_ignored",
+			userID:    "user-1",
+			sessionID: "sess-1",
+			extraClaims: map[string]any{
+				jwt.IssuerKey:     "https://evil.example.com",
+				jwt.AudienceKey:   []string{"evil"},
+				jwt.SubjectKey:    "evil-subject",
+				jwt.ExpirationKey: time.Now().Add(365 * 24 * time.Hour),
+				jwt.IssuedAtKey:   time.Now().Add(-time.Hour),
+				jwt.NotBeforeKey:  time.Now().Add(-time.Hour),
+				jwt.JwtIDKey:      "evil-jti",
+				"token_type":      types.JWTTokenTypeRefresh.String(),
+				"actor_type":      "machine",
+				"user_id":         "evil-user",
+				"session_id":      "evil-session",
+				"client_id":       "evil-client",
+				"custom":          "kept",
+			},
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
+				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
+			},
+			wantClaims: map[string]any{"custom": "kept"},
+			wantAbsent: []string{"client_id"},
 		},
 		{
 			name:       "empty session id",
@@ -341,7 +471,7 @@ func TestTokenService_GenerateUserToken(t *testing.T) {
 			tt.setupMocks(f)
 
 			ctx := context.Background()
-			pair, err := svc.GenerateUserToken(ctx, tt.userID, tt.sessionID, nil)
+			pair, err := svc.GenerateUserToken(ctx, tt.userID, tt.sessionID, tt.extraClaims)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)
@@ -356,6 +486,8 @@ func TestTokenService_GenerateUserToken(t *testing.T) {
 				require.Equal(t, "Bearer", pair.TokenType)
 
 				claims := parseTestToken(t, pair.AccessToken, f)
+				require.Equal(t, f.issuer, claims["iss"])
+				require.Equal(t, []string{f.audience}, claims["aud"])
 				require.Equal(t, tt.userID, claims["sub"])
 				require.Equal(t, tt.userID, claims["user_id"])
 				require.Equal(t, tt.sessionID, claims["session_id"])
@@ -364,9 +496,22 @@ func TestTokenService_GenerateUserToken(t *testing.T) {
 				require.NotEmpty(t, claims["jti"])
 
 				refreshClaims := parseTestToken(t, pair.RefreshToken, f)
+				require.Equal(t, f.issuer, refreshClaims["iss"])
+				require.Equal(t, []string{f.audience}, refreshClaims["aud"])
+				require.Equal(t, tt.userID, refreshClaims["user_id"])
+				require.Equal(t, tt.sessionID, refreshClaims["session_id"])
 				require.Equal(t, "refresh_token", refreshClaims["token_type"])
 				require.NotEmpty(t, refreshClaims["jti"])
 				require.NotEqual(t, claims["jti"], refreshClaims["jti"], "access and refresh tokens must not share a jti")
+
+				for claim, want := range tt.wantClaims {
+					require.Equal(t, want, claims[claim], "access token claim %q", claim)
+					require.Equal(t, want, refreshClaims[claim], "refresh token claim %q", claim)
+				}
+				for _, claim := range tt.wantAbsent {
+					require.NotContains(t, claims, claim, "access token must not contain %q", claim)
+					require.NotContains(t, refreshClaims, claim, "refresh token must not contain %q", claim)
+				}
 			}
 
 			f.keySvc.AssertExpectations(t)
@@ -457,7 +602,10 @@ func TestTokenService_GenerateMachineToken(t *testing.T) {
 				require.Equal(t, "Bearer", pair.TokenType)
 
 				claims := parseTestToken(t, pair.AccessToken, f)
+				require.Equal(t, f.issuer, claims["iss"])
+				require.Equal(t, []string{f.audience}, claims["aud"])
 				require.Equal(t, tt.clientID, claims["sub"])
+				require.Equal(t, tt.clientID, claims["client_id"])
 				require.Equal(t, "machine", claims["actor_type"])
 				require.Equal(t, "access_token", claims["token_type"])
 				require.NotEmpty(t, claims["jti"])
@@ -479,6 +627,135 @@ func TestTokenService_GenerateMachineToken(t *testing.T) {
 
 			f.keySvc.AssertExpectations(t)
 			f.coreTokenSvc.AssertExpectations(t)
+		})
+	}
+}
+
+func TestTokenService_ValidateRefreshToken(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	validRefreshClaims := func() map[string]any {
+		return map[string]any{
+			jwt.SubjectKey:    "user-1",
+			"user_id":         "user-1",
+			"session_id":      "sess-1",
+			"token_type":      types.JWTTokenTypeRefresh.String(),
+			"actor_type":      "user",
+			jwt.JwtIDKey:      "refresh-jti",
+			jwt.IssuedAtKey:   time.Now(),
+			jwt.ExpirationKey: time.Now().Add(time.Hour),
+		}
+	}
+
+	tests := []struct {
+		name        string
+		claims      map[string]any
+		raw         bool
+		tamper      bool
+		wantErr     string
+		wantSession string
+		wantUser    string
+	}{
+		{
+			name:        "valid_refresh_token",
+			claims:      validRefreshClaims(),
+			wantSession: "sess-1",
+			wantUser:    "user-1",
+		},
+		{
+			name: "access_token_rejected_as_refresh",
+			claims: func() map[string]any {
+				claims := validRefreshClaims()
+				claims["token_type"] = types.JWTTokenTypeAccess.String()
+				return claims
+			}(),
+			wantErr: "invalid token_type",
+		},
+		{
+			name: "missing_issuer",
+			claims: func() map[string]any {
+				claims := validRefreshClaims()
+				return claims
+			}(),
+			raw:     true,
+			wantErr: "missing issuer claim",
+		},
+		{
+			name: "wrong_issuer",
+			claims: func() map[string]any {
+				claims := validRefreshClaims()
+				claims[jwt.IssuerKey] = "https://evil.example.com"
+				return claims
+			}(),
+			wantErr: "invalid issuer claim",
+		},
+		{
+			name: "missing_audience",
+			claims: func() map[string]any {
+				claims := validRefreshClaims()
+				claims[jwt.IssuerKey] = testIssuer
+				return claims
+			}(),
+			raw:     true,
+			wantErr: "missing audience claim",
+		},
+		{
+			name: "wrong_audience",
+			claims: func() map[string]any {
+				claims := validRefreshClaims()
+				claims[jwt.AudienceKey] = []string{"another-service"}
+				return claims
+			}(),
+			wantErr: "invalid audience claim",
+		},
+		{
+			name:    "tampered_signature",
+			claims:  validRefreshClaims(),
+			tamper:  true,
+			wantErr: "failed to parse token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newServiceTestFixture(t)
+			svc := f.newJWTService()
+			f.setupKeyServiceMock()
+
+			tokenStr := ""
+			if tt.raw {
+				tokenStr = f.signTestTokenRaw(t, tt.claims)
+			} else {
+				tokenStr = f.signTestToken(t, tt.claims)
+			}
+			if tt.tamper {
+				// Mutate a byte inside the signature. Changing the final base64url
+				// character can leave the decoded signature unchanged.
+				signatureStart := strings.LastIndex(tokenStr, ".") + 1
+				index := signatureStart + 10
+				replacement := "A"
+				if tokenStr[index:index+1] == replacement {
+					replacement = "B"
+				}
+				tokenStr = tokenStr[:index] + replacement + tokenStr[index+1:]
+			}
+
+			claims, err := svc.ValidateRefreshToken(ctx, tokenStr)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+				require.Nil(t, claims)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.wantSession, claims["session_id"])
+			require.Equal(t, tt.wantUser, claims["user_id"])
 		})
 	}
 }

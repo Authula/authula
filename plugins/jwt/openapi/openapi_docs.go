@@ -15,7 +15,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 			"/token/refresh",
 			openapi.WithOperationID("refreshToken"),
 			openapi.WithSummary("Refresh JWT token"),
-			openapi.WithDescription("Exchanges a valid refresh token for a new access token and refresh token pair. Refresh tokens rotate atomically and are single-use. Replaying a revoked token never mints new tokens; reuse after the grace period revokes the session. Responses are never cached."),
+			openapi.WithDescription("Exchanges a valid refresh token for a new access token and refresh token pair."),
 			openapi.WithTags("JWT Plugin"),
 			openapi.WithRequest(&types.RefreshTokenRequest{}),
 			openapi.WithResponseStatus(http.StatusOK, &types.RefreshTokenResponse{}),
