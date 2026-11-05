@@ -14,6 +14,7 @@ var (
 	ErrTokenRevoked           = errors.New("token has been revoked")
 	ErrRefreshTokenNotFound   = errors.New("refresh token not found")
 	ErrRefreshTokenIsRequired = errors.New("refresh token is required")
+	ErrInvalidRefreshToken    = errors.New("invalid refresh token")
 	ErrJWKSNotFound           = errors.New("JWKS (JSON Web Key Set) not available")
 	ErrTokenGenerationFailed  = errors.New("failed to generate token")
 	ErrTokenValidationFailed  = errors.New("failed to validate token")

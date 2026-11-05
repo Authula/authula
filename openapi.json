@@ -2310,7 +2310,7 @@
           "OAuth2 Plugin"
         ],
         "summary": "Authorize with OAuth2 provider",
-        "description": "Initiates the OAuth2 authorization flow. Returns the provider authorization URL and sets short-lived, signed flow cookies for state, redirect, and PKCE.",
+        "description": "Initiates the OAuth2 authorization flow.",
         "operationId": "oauthAuthorize",
         "parameters": [
           {
@@ -2379,7 +2379,7 @@
           "OAuth2 Plugin"
         ],
         "summary": "OAuth2 callback",
-        "description": "Handles the OAuth2 callback. Validates the provider-bound state, consumes PKCE, exchanges the code, links the provider account, and returns the user and a safe session view. When a validated redirect_to was supplied, responds with 302 and a Location header.",
+        "description": "Handles the OAuth2 callback.",
         "operationId": "oauthCallback",
         "parameters": [
           {
@@ -3655,6 +3655,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RefreshTokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshErrorResponse"
                 }
               }
             }
@@ -5741,6 +5751,17 @@
         ],
         "type": "object"
       },
+      "RefreshErrorResponse": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
       "RefreshTokenRequest": {
         "properties": {
           "refresh_token": {
@@ -5757,13 +5778,22 @@
           "access_token": {
             "type": "string"
           },
+          "expires_in": {
+            "format": "int64",
+            "type": "integer"
+          },
           "refresh_token": {
+            "type": "string"
+          },
+          "token_type": {
             "type": "string"
           }
         },
         "required": [
           "access_token",
-          "refresh_token"
+          "refresh_token",
+          "token_type",
+          "expires_in"
         ],
         "type": "object"
       },

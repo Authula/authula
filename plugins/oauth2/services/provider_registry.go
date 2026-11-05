@@ -2,12 +2,23 @@ package services
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
 
 	"github.com/Authula/authula/plugins/oauth2/types"
 )
+
+var providerNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
+
+// ValidateProviderName enforces a path-safe provider identifier.
+func ValidateProviderName(name string) error {
+	if !providerNamePattern.MatchString(name) {
+		return fmt.Errorf("provider name %q must match %s", name, providerNamePattern.String())
+	}
+	return nil
+}
 
 // ProviderRegistry manages OAuth2 providers
 type ProviderRegistry struct {
@@ -25,8 +36,8 @@ func NewProviderRegistry() *ProviderRegistry {
 // Register registers a provider
 func (r *ProviderRegistry) Register(name string, provider types.OAuth2Provider) error {
 	name = strings.ToLower(strings.TrimSpace(name))
-	if name == "" {
-		return fmt.Errorf("provider name is required")
+	if err := ValidateProviderName(name); err != nil {
+		return err
 	}
 	if provider == nil {
 		return fmt.Errorf("provider %s is nil", name)

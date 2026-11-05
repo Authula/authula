@@ -55,6 +55,16 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		return err
 	}
 
+	var baseURL, basePath string
+	if p.globalConfig != nil {
+		baseURL = p.globalConfig.BaseURL
+		basePath = p.globalConfig.BasePath
+	}
+	p.pluginConfig.ApplyDefaultsFromGlobal(baseURL, basePath)
+	if err := p.pluginConfig.Validate(); err != nil {
+		return err
+	}
+
 	sessionService, ok := ctx.ServiceRegistry.Get(models.ServiceSession.String()).(services.SessionService)
 	if !ok {
 		p.Logger.Error("session service not found")
@@ -115,8 +125,12 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		p.keyService,
 		p.cacheService,
 		p.blacklistService,
-		p.pluginConfig.ExpiresIn,
-		p.pluginConfig.RefreshExpiresIn,
+		jwtservices.TokenServiceConfig{
+			ExpiresIn:        p.pluginConfig.ExpiresIn,
+			RefreshExpiresIn: p.pluginConfig.RefreshExpiresIn,
+			Issuer:           p.pluginConfig.Issuer,
+			Audience:         p.pluginConfig.Audience,
+		},
 	)
 
 	p.refreshService = jwtservices.NewRefreshTokenService(
@@ -125,7 +139,9 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		p.sessionService,
 		p.jwtService.(jwtservices.TokenService),
 		refreshTokenRepo,
+		p.blacklistService,
 		p.pluginConfig.RefreshGracePeriod,
+		p.pluginConfig.ExpiresIn,
 		p.pluginConfig.RefreshExpiresIn,
 	)
 

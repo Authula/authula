@@ -9,10 +9,17 @@ import (
 	"github.com/Authula/authula/plugins/jwt/types"
 )
 
+type TokenServiceConfig struct {
+	ExpiresIn        time.Duration
+	RefreshExpiresIn time.Duration
+	Issuer           string
+	Audience         string
+}
+
 type TokenService interface {
 	GenerateUserToken(ctx context.Context, userID string, sessionID string, extraClaims map[string]any) (*types.TokenPair, error)
 	GenerateMachineToken(ctx context.Context, clientID string, organizationID string, scopes []string) (*types.TokenPair, error)
-	ExtractClaims(ctx context.Context, token string) (map[string]any, error)
+	ValidateRefreshToken(ctx context.Context, token string) (map[string]any, error)
 }
 
 type KeyService interface {
@@ -28,6 +35,7 @@ type KeyService interface {
 type RefreshTokenRepository interface {
 	StoreRefreshToken(ctx context.Context, record *types.RefreshToken) error
 	GetRefreshToken(ctx context.Context, tokenHash string) (*types.RefreshToken, error)
+	RotateRefreshToken(ctx context.Context, oldTokenHash string, newRecord *types.RefreshToken) (bool, error)
 	RevokeRefreshToken(ctx context.Context, tokenHash string) error
 	RevokeAllSessionTokens(ctx context.Context, sessionID string) error
 	SetLastReuseAttempt(ctx context.Context, tokenHash string) error

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +17,21 @@ import (
 	"github.com/Authula/authula/services"
 )
 
+var reservedTokenClaims = map[string]struct{}{
+	jwt.IssuerKey:     {},
+	jwt.AudienceKey:   {},
+	jwt.SubjectKey:    {},
+	jwt.ExpirationKey: {},
+	jwt.IssuedAtKey:   {},
+	jwt.NotBeforeKey:  {},
+	jwt.JwtIDKey:      {},
+	"token_type":      {},
+	"actor_type":      {},
+	"user_id":         {},
+	"session_id":      {},
+	"client_id":       {},
+}
+
 type tokenService struct {
 	logger           models.Logger
 	coreTokenService services.TokenService
@@ -25,6 +41,8 @@ type tokenService struct {
 	sessionService   services.SessionService
 	expiresIn        time.Duration
 	refreshExpiresIn time.Duration
+	issuer           string
+	audience         string
 }
 
 func NewJWTService(
@@ -34,8 +52,7 @@ func NewJWTService(
 	keyService KeyService,
 	cacheService CacheService,
 	blacklistService BlacklistService,
-	expiresIn time.Duration,
-	refreshExpiresIn time.Duration,
+	config TokenServiceConfig,
 ) services.JWTService {
 	return &tokenService{
 		logger:           logger,
@@ -44,8 +61,10 @@ func NewJWTService(
 		keyService:       keyService,
 		cacheService:     cacheService,
 		blacklistService: blacklistService,
-		expiresIn:        expiresIn,
-		refreshExpiresIn: refreshExpiresIn,
+		expiresIn:        config.ExpiresIn,
+		refreshExpiresIn: config.RefreshExpiresIn,
+		issuer:           config.Issuer,
+		audience:         config.Audience,
 	}
 }
 
@@ -79,7 +98,8 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 
 	keyAlgorithm := s.detectAlgorithmFromKey()
 	now := time.Now()
-	jti := uuid.New().String()
+	accessJTI := uuid.New().String()
+	refreshJTI := uuid.New().String()
 
 	accessClaims := jwt.New()
 	if err := accessClaims.Set(jwt.SubjectKey, userID); err != nil {
@@ -91,7 +111,7 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 	if err := accessClaims.Set(jwt.ExpirationKey, now.Add(s.expiresIn)); err != nil {
 		return nil, fmt.Errorf("failed to set expiration: %w", err)
 	}
-	if err := accessClaims.Set(jwt.JwtIDKey, jti); err != nil {
+	if err := accessClaims.Set(jwt.JwtIDKey, accessJTI); err != nil {
 		return nil, fmt.Errorf("failed to set JWT ID: %w", err)
 	}
 	if err := accessClaims.Set("user_id", userID); err != nil {
@@ -103,14 +123,15 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 	if err := accessClaims.Set("token_type", types.JWTTokenTypeAccess.String()); err != nil {
 		return nil, fmt.Errorf("failed to set token_type: %w", err)
 	}
-	if err := accessClaims.Set("actor_type", "user"); err != nil {
+	if err := accessClaims.Set("actor_type", string(models.ActorUser)); err != nil {
 		return nil, fmt.Errorf("failed to set actor_type: %w", err)
 	}
 
-	for k, v := range extraClaims {
-		if err := accessClaims.Set(k, v); err != nil {
-			return nil, fmt.Errorf("failed to set extra claim %s: %w", k, err)
-		}
+	if err := s.applyExtraClaims(accessClaims, extraClaims); err != nil {
+		return nil, err
+	}
+	if err := s.setIssuerAndAudience(accessClaims); err != nil {
+		return nil, err
 	}
 
 	accessTokenBytes, err := jwt.Sign(accessClaims, jwt.WithKey(keyAlgorithm, privKey))
@@ -128,7 +149,7 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 	if err := refreshClaims.Set(jwt.ExpirationKey, now.Add(s.refreshExpiresIn)); err != nil {
 		return nil, fmt.Errorf("failed to set expiration in refresh token: %w", err)
 	}
-	if err := refreshClaims.Set(jwt.JwtIDKey, jti); err != nil {
+	if err := refreshClaims.Set(jwt.JwtIDKey, refreshJTI); err != nil {
 		return nil, fmt.Errorf("failed to set JWT ID in refresh token: %w", err)
 	}
 	if err := refreshClaims.Set("user_id", userID); err != nil {
@@ -140,14 +161,15 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 	if err := refreshClaims.Set("token_type", types.JWTTokenTypeRefresh.String()); err != nil {
 		return nil, fmt.Errorf("failed to set token_type in refresh token: %w", err)
 	}
-	if err := refreshClaims.Set("actor_type", "user"); err != nil {
+	if err := refreshClaims.Set("actor_type", string(models.ActorUser)); err != nil {
 		return nil, fmt.Errorf("failed to set actor_type in refresh token: %w", err)
 	}
 
-	for k, v := range extraClaims {
-		if err := refreshClaims.Set(k, v); err != nil {
-			return nil, fmt.Errorf("failed to set extra claim %s in refresh token: %w", k, err)
-		}
+	if err := s.applyExtraClaims(refreshClaims, extraClaims); err != nil {
+		return nil, err
+	}
+	if err := s.setIssuerAndAudience(refreshClaims); err != nil {
+		return nil, err
 	}
 
 	refreshTokenBytes, err := jwt.Sign(refreshClaims, jwt.WithKey(keyAlgorithm, privKey))
@@ -203,8 +225,11 @@ func (s *tokenService) GenerateMachineToken(ctx context.Context, clientID string
 	if err := accessClaims.Set("token_type", types.JWTTokenTypeAccess.String()); err != nil {
 		return nil, fmt.Errorf("failed to set token_type: %w", err)
 	}
-	if err := accessClaims.Set("actor_type", "machine"); err != nil {
+	if err := accessClaims.Set("actor_type", string(models.ActorMachine)); err != nil {
 		return nil, fmt.Errorf("failed to set actor_type: %w", err)
+	}
+	if err := accessClaims.Set("client_id", clientID); err != nil {
+		return nil, fmt.Errorf("failed to set client_id: %w", err)
 	}
 
 	if organizationID != "" {
@@ -217,6 +242,10 @@ func (s *tokenService) GenerateMachineToken(ctx context.Context, clientID string
 		if err := accessClaims.Set("scopes", scopes); err != nil {
 			return nil, fmt.Errorf("failed to set scopes: %w", err)
 		}
+	}
+
+	if err := s.setIssuerAndAudience(accessClaims); err != nil {
+		return nil, err
 	}
 
 	accessTokenBytes, err := jwt.Sign(accessClaims, jwt.WithKey(keyAlgorithm, privKey))
@@ -238,7 +267,12 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 		return nil, fmt.Errorf("failed to get JWKS: %w", err)
 	}
 
-	parsedToken, err := jwt.Parse([]byte(token), jwt.WithKeySet(jwkSet), jwt.WithValidate(true))
+	parsedToken, err := jwt.Parse(
+		[]byte(token),
+		jwt.WithKeySet(jwkSet),
+		jwt.WithValidate(true),
+		jwt.WithValidator(s.accessTokenValidator()),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
@@ -251,18 +285,15 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 		}
 	}
 
-	var tokenType string
-	if err := parsedToken.Get("token_type", &tokenType); err != nil {
-		return nil, errors.New("missing token_type claim")
-	}
-
-	if tokenType != types.JWTTokenTypeAccess.String() {
-		return nil, errors.New("invalid token_type")
-	}
-
 	var actorType string
 	if err := parsedToken.Get("actor_type", &actorType); err != nil || actorType == "" {
-		actorType = "user"
+		return nil, errors.New("missing actor_type claim")
+	}
+
+	switch models.ActorType(actorType) {
+	case models.ActorUser, models.ActorMachine:
+	default:
+		return nil, errors.New("invalid actor_type claim")
 	}
 
 	actor := &models.Actor{
@@ -327,17 +358,20 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 	if err != nil || session == nil {
 		return nil, errors.New("session not found or invalid")
 	}
-	actor.Claims["session_id"] = session.ID
+	if !session.ExpiresAt.After(time.Now()) {
+		return nil, errors.New("session expired or invalid")
+	}
 
+	actor.Claims["session_id"] = session.ID
 	actor.ID = userID
 	actor.Type = models.ActorUser
 
-	// Passthrough any extra claims from the token into Actor.Claims
+	// Passthrough any extra claims from the token into Actor.Claims.
 	for _, key := range parsedToken.Keys() {
 		switch key {
 		case jwt.SubjectKey, jwt.IssuedAtKey, jwt.ExpirationKey, jwt.JwtIDKey,
-			"user_id", "session_id", "token_type", "actor_type",
-			"organization_id", "scopes":
+			jwt.IssuerKey, jwt.AudienceKey, "user_id", "session_id", "token_type",
+			"actor_type", "organization_id", "scopes", "client_id":
 			continue
 		default:
 			var val any
@@ -350,13 +384,26 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 	return actor, nil
 }
 
-func (s *tokenService) ExtractClaims(ctx context.Context, token string) (map[string]any, error) {
-	parsedToken, err := jwt.Parse([]byte(token), jwt.WithValidate(false))
+func (s *tokenService) ValidateRefreshToken(ctx context.Context, token string) (map[string]any, error) {
+	jwkSet, err := s.cacheService.GetJWKSWithFallback(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get JWKS: %w", err)
+	}
+
+	parsedToken, err := jwt.Parse(
+		[]byte(token),
+		jwt.WithKeySet(jwkSet),
+		jwt.WithValidate(true),
+		// Refresh expiry and rotation state are enforced against the stored
+		// record so revoked-token reuse is still detected after expiry.
+		jwt.WithResetValidators(true),
+		jwt.WithValidator(s.refreshTokenValidator()),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
 
-	claims := make(map[string]any)
+	claims := make(map[string]any, len(parsedToken.Keys()))
 	for _, key := range parsedToken.Keys() {
 		var val any
 		if err := parsedToken.Get(key, &val); err == nil {
@@ -364,4 +411,80 @@ func (s *tokenService) ExtractClaims(ctx context.Context, token string) (map[str
 		}
 	}
 	return claims, nil
+}
+
+func (s *tokenService) accessTokenValidator() jwt.ValidatorFunc {
+	return func(_ context.Context, token jwt.Token) error {
+		if err := s.validateTokenPolicy(token, types.JWTTokenTypeAccess); err != nil {
+			return err
+		}
+
+		var actorType string
+		if err := token.Get("actor_type", &actorType); err != nil || actorType == "" {
+			return errors.New("missing actor_type claim")
+		}
+		switch models.ActorType(actorType) {
+		case models.ActorUser, models.ActorMachine:
+			return nil
+		default:
+			return errors.New("invalid actor_type claim")
+		}
+	}
+}
+
+func (s *tokenService) refreshTokenValidator() jwt.ValidatorFunc {
+	return func(_ context.Context, token jwt.Token) error {
+		return s.validateTokenPolicy(token, types.JWTTokenTypeRefresh)
+	}
+}
+
+func (s *tokenService) validateTokenPolicy(token jwt.Token, expectedTokenType types.JWTTokenType) error {
+	issuer, ok := token.Issuer()
+	if !ok || issuer == "" {
+		return errors.New("missing issuer claim")
+	}
+	if issuer != s.issuer {
+		return errors.New("invalid issuer claim")
+	}
+
+	audiences, ok := token.Audience()
+	if !ok || len(audiences) == 0 {
+		return errors.New("missing audience claim")
+	}
+	if !slices.Contains(audiences, s.audience) {
+		return errors.New("invalid audience claim")
+	}
+
+	var tokenType string
+	if err := token.Get("token_type", &tokenType); err != nil || tokenType == "" {
+		return errors.New("missing token_type claim")
+	}
+	if tokenType != expectedTokenType.String() {
+		return errors.New("invalid token_type")
+	}
+
+	return nil
+}
+
+func (s *tokenService) applyExtraClaims(token jwt.Token, extraClaims map[string]any) error {
+	for key, value := range extraClaims {
+		if _, reserved := reservedTokenClaims[key]; reserved {
+			s.logger.Debug("ignoring reserved JWT claim from extra claims", "claim", key)
+			continue
+		}
+		if err := token.Set(key, value); err != nil {
+			return fmt.Errorf("failed to set extra claim %s: %w", key, err)
+		}
+	}
+	return nil
+}
+
+func (s *tokenService) setIssuerAndAudience(token jwt.Token) error {
+	if err := token.Set(jwt.IssuerKey, s.issuer); err != nil {
+		return fmt.Errorf("failed to set issuer: %w", err)
+	}
+	if err := token.Set(jwt.AudienceKey, []string{s.audience}); err != nil {
+		return fmt.Errorf("failed to set audience: %w", err)
+	}
+	return nil
 }

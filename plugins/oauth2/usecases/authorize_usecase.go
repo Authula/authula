@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"golang.org/x/oauth2"
@@ -94,10 +95,40 @@ func (uc *authorizeUseCase) Authorize(ctx context.Context, req *types.AuthorizeR
 		authOptions = append(authOptions, oauth2.S256ChallengeOption(verifier))
 	}
 
+	authorizationURL := oauthProvider.GetAuthURL(state, authOptions...)
+	if err := validateAuthorizationURL(authorizationURL, oauthProvider.RequiresPKCE()); err != nil {
+		uc.Logger.Error("oauth provider generated an unusable authorization URL", "provider", providerID, "error", err)
+		return nil, err
+	}
+
 	return &AuthorizeResult{
-		AuthorizationURL: oauthProvider.GetAuthURL(state, authOptions...),
+		AuthorizationURL: authorizationURL,
 		StateCookie:      signedState,
 		VerifierCookie:   verifierCookie,
 		RedirectCookie:   signedRedirectTo,
 	}, nil
+}
+
+// validateAuthorizationURL asserts the OAuth 2.1 required parameters and rejects
+// implicit or malformed authorization requests.
+func validateAuthorizationURL(raw string, pkceRequired bool) error {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return fmt.Errorf("%w: invalid authorization URL", constants.ErrProviderFailure)
+	}
+
+	query := parsed.Query()
+	if query.Get("response_type") != "code" {
+		return fmt.Errorf("%w: authorization URL must use response_type=code", constants.ErrProviderFailure)
+	}
+	if !pkceRequired {
+		return nil
+	}
+	if query.Get("code_challenge") == "" {
+		return constants.ErrPKCEChallengeMissing
+	}
+	if query.Get("code_challenge_method") != "S256" {
+		return constants.ErrPKCEChallengeMissing
+	}
+	return nil
 }

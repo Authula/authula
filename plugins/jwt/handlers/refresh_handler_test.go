@@ -34,6 +34,7 @@ func TestRefreshTokenHandler(t *testing.T) {
 		body           []byte
 		prepare        func(*mockRefreshTokenUseCase)
 		expectedStatus int
+		wantBody       string
 	}{
 		{
 			name:           "invalid_json",
@@ -49,9 +50,10 @@ func TestRefreshTokenHandler(t *testing.T) {
 			name: "use_case_error",
 			body: internaltests.MarshalToJSON(t, types.RefreshTokenRequest{RefreshToken: "bad-token"}),
 			prepare: func(m *mockRefreshTokenUseCase) {
-				m.On("RefreshTokens", mock.Anything, "bad-token").Return((*usecases.RefreshTokenResult)(nil), errors.New("invalid")).Once()
+				m.On("RefreshTokens", mock.Anything, "bad-token").Return((*usecases.RefreshTokenResult)(nil), errors.New("internal detail")).Once()
 			},
 			expectedStatus: http.StatusUnauthorized,
+			wantBody:       `{"message":"invalid refresh token"}`,
 		},
 		{
 			name: "success",
@@ -60,9 +62,12 @@ func TestRefreshTokenHandler(t *testing.T) {
 				m.On("RefreshTokens", mock.Anything, "valid-token").Return(&usecases.RefreshTokenResult{
 					AccessToken:  "new-access",
 					RefreshToken: "new-refresh",
+					TokenType:    "Bearer",
+					ExpiresIn:    900,
 				}, nil).Once()
 			},
 			expectedStatus: http.StatusOK,
+			wantBody:       `{"access_token":"new-access","refresh_token":"new-refresh","token_type":"Bearer","expires_in":900}`,
 		},
 	}
 
@@ -83,6 +88,12 @@ func TestRefreshTokenHandler(t *testing.T) {
 			req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodPost, "/token/refresh", tt.body, nil)
 			handler.Handle().ServeHTTP(w, req)
 			require.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
+			require.Equal(t, "no-store", reqCtx.ResponseHeaders.Get("Cache-Control"))
+			require.Equal(t, "no-cache", reqCtx.ResponseHeaders.Get("Pragma"))
+			require.NotContains(t, string(reqCtx.ResponseBody), "internal detail")
+			if tt.wantBody != "" {
+				require.JSONEq(t, tt.wantBody, string(reqCtx.ResponseBody))
+			}
 			mockUC.AssertExpectations(t)
 		})
 	}

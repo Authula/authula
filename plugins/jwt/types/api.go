@@ -19,10 +19,13 @@ func (t JWTTokenType) String() string {
 
 type TokenClaims struct {
 	Subject        string   `json:"sub"`
+	Issuer         string   `json:"iss"`
+	Audience       []string `json:"aud"`
 	UserID         string   `json:"user_id,omitempty"`
 	SessionID      string   `json:"session_id,omitempty"`
 	TokenType      string   `json:"token_type"`
 	ActorType      string   `json:"actor_type,omitempty"`
+	ClientID       string   `json:"client_id,omitempty"`
 	OrganizationID string   `json:"organization_id,omitempty"`
 	Scopes         []string `json:"scopes,omitempty"`
 	JTI            string   `json:"jti"`
@@ -51,6 +54,13 @@ func (r *RefreshTokenRequest) Validate() error {
 type RefreshTokenResponse struct {
 	AccessToken  string `json:"access_token" required:"true" nullable:"false"`
 	RefreshToken string `json:"refresh_token" required:"true" nullable:"false"`
+	TokenType    string `json:"token_type" required:"true" nullable:"false"`
+	ExpiresIn    int64  `json:"expires_in" required:"true" nullable:"false"`
+}
+
+// RefreshErrorResponse is the generic error body returned by the refresh endpoint.
+type RefreshErrorResponse struct {
+	Message string `json:"message" required:"true" nullable:"false"`
 }
 
 type JWK struct {

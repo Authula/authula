@@ -235,6 +235,100 @@ func TestRefreshTokenRepository_RevokeAllSessionTokens(t *testing.T) {
 	}
 }
 
+func TestRefreshTokenRepository_RotateRefreshToken(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		revokeFirst       bool
+		conflictingInsert bool
+		wantErr           bool
+		wantRotated       bool
+		wantNewStored     bool
+		wantOldRevoked    bool
+	}{
+		{
+			name:           "rotates an active token",
+			wantRotated:    true,
+			wantNewStored:  true,
+			wantOldRevoked: true,
+		},
+		{
+			name:           "reports a conflict when already revoked",
+			revokeFirst:    true,
+			wantRotated:    false,
+			wantNewStored:  false,
+			wantOldRevoked: true,
+		},
+		{
+			name:              "rolls back the revocation when the insert fails",
+			conflictingInsert: true,
+			wantErr:           true,
+			wantRotated:       false,
+			wantNewStored:     false,
+			wantOldRevoked:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, repo := setupRefreshTokenRepo(t)
+			ctx := context.Background()
+
+			oldToken := &types.RefreshToken{
+				ID:        uuid.New().String(),
+				SessionID: uuid.New().String(),
+				TokenHash: uuid.New().String(),
+				ExpiresAt: time.Now().Add(time.Hour),
+			}
+			require.NoError(t, repo.StoreRefreshToken(ctx, oldToken))
+			if tt.revokeFirst {
+				require.NoError(t, repo.RevokeRefreshToken(ctx, oldToken.TokenHash))
+			}
+
+			newToken := &types.RefreshToken{
+				ID:        uuid.New().String(),
+				SessionID: oldToken.SessionID,
+				TokenHash: uuid.New().String(),
+				ExpiresAt: time.Now().Add(time.Hour),
+			}
+			if tt.conflictingInsert {
+				// Reusing the old primary key makes the insert fail inside the transaction.
+				newToken.ID = oldToken.ID
+			}
+
+			rotated, err := repo.RotateRefreshToken(ctx, oldToken.TokenHash, newToken)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tt.wantRotated, rotated)
+
+			gotOld, err := repo.GetRefreshToken(ctx, oldToken.TokenHash)
+			require.NoError(t, err)
+			require.NotNil(t, gotOld)
+			require.Equal(t, tt.wantOldRevoked, gotOld.IsRevoked)
+			if tt.wantOldRevoked {
+				require.NotNil(t, gotOld.RevokedAt)
+			} else {
+				require.Nil(t, gotOld.RevokedAt)
+			}
+
+			gotNew, err := repo.GetRefreshToken(ctx, newToken.TokenHash)
+			require.NoError(t, err)
+			if tt.wantNewStored {
+				require.NotNil(t, gotNew)
+				require.False(t, gotNew.IsRevoked)
+			} else {
+				require.Nil(t, gotNew)
+			}
+		})
+	}
+}
+
 func TestRefreshTokenRepository_SetLastReuseAttempt(t *testing.T) {
 	t.Parallel()
 

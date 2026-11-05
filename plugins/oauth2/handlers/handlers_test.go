@@ -69,64 +69,101 @@ func findCookie(t *testing.T, recorder *httptest.ResponseRecorder, name string) 
 	return nil
 }
 
-func TestAuthorizeHandler_SuccessSetsCookiesFromConfig(t *testing.T) {
+func TestAuthorizeHandler(t *testing.T) {
 	t.Parallel()
 
-	stub := &authorizeUseCaseStub{result: &usecases.AuthorizeResult{
-		AuthorizationURL: "https://provider.example/authorize?state=1",
-		StateCookie:      "signed-state",
-		RedirectCookie:   "signed-redirect",
-		VerifierCookie:   new("signed-verifier"),
-	}}
-	handler := &handlers.AuthorizeHandler{
-		UseCase: stub,
-		Cookie: handlers.CookieOptions{
-			Secure:   false,
-			Domain:   "api.example.com",
-			SameSite: http.SameSiteStrictMode,
-			MaxAge:   5 * time.Minute,
+	tests := []struct {
+		name             string
+		result           *usecases.AuthorizeResult
+		err              error
+		cookie           handlers.CookieOptions
+		actor            *models.Actor
+		provider         string
+		wantStatus       int
+		wantActorID      string
+		wantRedirectTo   string
+		wantBodyContains string
+		checkCookies     func(*testing.T, *httptest.ResponseRecorder)
+	}{
+		{
+			name: "success sets flow cookies from config",
+			result: &usecases.AuthorizeResult{
+				AuthorizationURL: "https://provider.example/authorize?state=1",
+				StateCookie:      "signed-state",
+				RedirectCookie:   "signed-redirect",
+				VerifierCookie:   new("signed-verifier"),
+			},
+			cookie: handlers.CookieOptions{
+				Secure:   false,
+				Domain:   "api.example.com",
+				SameSite: http.SameSiteStrictMode,
+				MaxAge:   5 * time.Minute,
+			},
+			actor:          &models.Actor{ID: "user-1", Type: models.ActorUser},
+			provider:       "google",
+			wantStatus:     http.StatusOK,
+			wantActorID:    "user-1",
+			wantRedirectTo: "/welcome",
+			checkCookies: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				t.Helper()
+
+				stateCookie := findCookie(t, recorder, constants.CookieState)
+				require.NotNil(t, stateCookie)
+				assert.Equal(t, "signed-state", stateCookie.Value)
+				assert.Equal(t, "api.example.com", stateCookie.Domain)
+				assert.False(t, stateCookie.Secure, "Secure must follow config, not X-Forwarded-Proto")
+				assert.Equal(t, http.SameSiteLaxMode, stateCookie.SameSite, "OAuth flow cookies must be Lax even when the session is strict")
+
+				verifierCookie := findCookie(t, recorder, constants.CookieVerifier)
+				require.NotNil(t, verifierCookie)
+				assert.Equal(t, "signed-verifier", verifierCookie.Value)
+			},
 		},
-		Logger: &internaltests.MockLogger{},
+		{
+			name:             "error maps without leaking details",
+			err:              constants.ErrProviderNotFound,
+			provider:         "missing",
+			wantStatus:       http.StatusNotFound,
+			wantBodyContains: "provider not found",
+		},
 	}
 
-	req, reqCtx, recorder := newHandlerRequest(t, http.MethodGet, "/oauth2/authorize/google?redirect_to=/welcome")
-	req.SetPathValue("provider", "google")
-	req.Header.Set("X-Forwarded-Proto", "https")
-	reqCtx.Actor = &models.Actor{ID: "user-1", Type: models.ActorUser}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	handler.Handle()(recorder, req)
+			stub := &authorizeUseCaseStub{result: tt.result, err: tt.err}
+			handler := &handlers.AuthorizeHandler{
+				UseCase: stub,
+				Cookie:  tt.cookie,
+				Logger:  &internaltests.MockLogger{},
+			}
 
-	assert.Equal(t, http.StatusOK, reqCtx.ResponseStatus)
-	assert.Equal(t, "user-1", stub.req.ActorID)
-	assert.Equal(t, "/welcome", stub.req.RedirectTo)
-	assert.Equal(t, "no-store", reqCtx.ResponseHeaders.Get("Cache-Control"))
+			target := "/oauth2/authorize/" + tt.provider
+			if tt.wantRedirectTo != "" {
+				target += "?redirect_to=/welcome"
+			}
+			req, reqCtx, recorder := newHandlerRequest(t, http.MethodGet, target)
+			req.SetPathValue("provider", tt.provider)
+			req.Header.Set("X-Forwarded-Proto", "https")
+			reqCtx.Actor = tt.actor
 
-	stateCookie := findCookie(t, recorder, constants.CookieState)
-	require.NotNil(t, stateCookie)
-	assert.Equal(t, "signed-state", stateCookie.Value)
-	assert.Equal(t, "api.example.com", stateCookie.Domain)
-	assert.False(t, stateCookie.Secure, "Secure must follow config, not X-Forwarded-Proto")
-	assert.Equal(t, http.SameSiteStrictMode, stateCookie.SameSite)
+			handler.Handle()(recorder, req)
 
-	verifierCookie := findCookie(t, recorder, constants.CookieVerifier)
-	require.NotNil(t, verifierCookie)
-	assert.Equal(t, "signed-verifier", verifierCookie.Value)
-}
-
-func TestAuthorizeHandler_MapsErrorsWithoutLeakingDetails(t *testing.T) {
-	t.Parallel()
-
-	stub := &authorizeUseCaseStub{err: constants.ErrProviderNotFound}
-	handler := &handlers.AuthorizeHandler{UseCase: stub, Logger: &internaltests.MockLogger{}}
-
-	req, reqCtx, recorder := newHandlerRequest(t, http.MethodGet, "/oauth2/authorize/missing")
-	req.SetPathValue("provider", "missing")
-
-	handler.Handle()(recorder, req)
-
-	assert.Equal(t, http.StatusNotFound, reqCtx.ResponseStatus)
-	assert.Equal(t, "no-store", reqCtx.ResponseHeaders.Get("Cache-Control"))
-	assert.Contains(t, string(reqCtx.ResponseBody), "provider not found")
+			assert.Equal(t, tt.wantStatus, reqCtx.ResponseStatus)
+			assert.Equal(t, "no-store", reqCtx.ResponseHeaders.Get("Cache-Control"))
+			if tt.wantBodyContains != "" {
+				assert.Contains(t, string(reqCtx.ResponseBody), tt.wantBodyContains)
+			}
+			if tt.actor != nil {
+				assert.Equal(t, tt.wantActorID, stub.req.ActorID)
+				assert.Equal(t, tt.wantRedirectTo, stub.req.RedirectTo)
+			}
+			if tt.checkCookies != nil {
+				tt.checkCookies(t, recorder)
+			}
+		})
+	}
 }
 
 func TestCallbackHandler_ClearsFlowCookiesOnEveryPath(t *testing.T) {
@@ -176,90 +213,117 @@ func TestCallbackHandler_ClearsFlowCookiesOnEveryPath(t *testing.T) {
 	}
 }
 
-func TestCallbackHandler_SuccessReturnsSafeResponseAndSetsSession(t *testing.T) {
+func TestCallbackHandler(t *testing.T) {
 	t.Parallel()
 
-	session := &models.Session{
-		ID:        "session-1",
-		UserID:    "user-1",
-		Token:     "hashed-token",
-		ExpiresAt: time.Now().Add(time.Hour),
-		IPAddress: new("203.0.113.9"),
-		UserAgent: new("secret-agent"),
-	}
-	stub := &callbackUseCaseStub{result: &types.CallbackResult{
-		User:         &models.User{ID: "user-1", Email: "user@example.com"},
-		Session:      session,
-		SessionToken: "plain-token",
-	}}
-	handler := &handlers.CallbackHandler{
-		UseCase: stub,
-		Cookie:  handlers.CookieOptions{Secure: true},
-		Logger:  &internaltests.MockLogger{},
+	safeSession := func() *models.Session {
+		return &models.Session{
+			ID:        "session-1",
+			UserID:    "user-1",
+			Token:     "hashed-token",
+			ExpiresAt: time.Now().Add(time.Hour),
+			IPAddress: new("203.0.113.9"),
+			UserAgent: new("secret-agent"),
+		}
 	}
 
-	req, reqCtx, recorder := newHandlerRequest(t, http.MethodGet, "/oauth2/callback/google?code=1&state=1")
-	req.SetPathValue("provider", "google")
-	req.AddCookie(&http.Cookie{Name: constants.CookieState, Value: "signed-state"})
+	tests := []struct {
+		name             string
+		cookie           handlers.CookieOptions
+		result           func() *types.CallbackResult
+		wantStatus       int
+		wantRedirectURL  string
+		wantSessionToken string
+		wantSafeBody     bool
+		wantNoToken      bool
+		wantCacheControl string
+	}{
+		{
+			name:   "success returns a safe response and sets the session",
+			cookie: handlers.CookieOptions{Secure: true},
+			result: func() *types.CallbackResult {
+				return &types.CallbackResult{
+					User:         &models.User{ID: "user-1", Email: "user@example.com"},
+					Session:      safeSession(),
+					SessionToken: "plain-token",
+				}
+			},
+			wantStatus:       http.StatusOK,
+			wantSessionToken: "plain-token",
+			wantSafeBody:     true,
+			wantCacheControl: "no-store",
+		},
+		{
+			name: "reused session does not mint a new token",
+			result: func() *types.CallbackResult {
+				return &types.CallbackResult{
+					User:          &models.User{ID: "user-1"},
+					Session:       safeSession(),
+					ReusedSession: true,
+				}
+			},
+			wantStatus:       http.StatusOK,
+			wantNoToken:      true,
+			wantCacheControl: "no-store",
+		},
+		{
+			name: "redirect is applied only after usecase success",
+			result: func() *types.CallbackResult {
+				return &types.CallbackResult{
+					User:       &models.User{ID: "user-1"},
+					Session:    safeSession(),
+					RedirectTo: "/welcome",
+				}
+			},
+			wantStatus:      http.StatusFound,
+			wantRedirectURL: "/welcome",
+			wantNoToken:     true,
+		},
+	}
 
-	handler.Handle()(recorder, req)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.Equal(t, http.StatusOK, reqCtx.ResponseStatus)
-	assert.Equal(t, "no-store", reqCtx.ResponseHeaders.Get("Cache-Control"))
-	assert.Equal(t, "user-1", reqCtx.Actor.ID)
-	assert.Equal(t, "session-1", reqCtx.Values[models.ContextSessionID.String()])
-	assert.Equal(t, "plain-token", reqCtx.Values[models.ContextSessionToken.String()])
+			stub := &callbackUseCaseStub{result: tt.result()}
+			handler := &handlers.CallbackHandler{
+				UseCase: stub,
+				Cookie:  tt.cookie,
+				Logger:  &internaltests.MockLogger{},
+			}
 
-	var body map[string]any
-	require.NoError(t, json.Unmarshal(reqCtx.ResponseBody, &body))
-	sessionBody := body["session"].(map[string]any)
-	assert.NotContains(t, sessionBody, "token")
-	assert.NotContains(t, sessionBody, "ip_address")
-	assert.NotContains(t, sessionBody, "user_agent")
-	assert.NotContains(t, string(reqCtx.ResponseBody), "plain-token")
-	assert.NotContains(t, string(reqCtx.ResponseBody), "hashed-token")
-}
+			req, reqCtx, recorder := newHandlerRequest(t, http.MethodGet, "/oauth2/callback/google?code=1&state=1")
+			req.SetPathValue("provider", "google")
+			req.AddCookie(&http.Cookie{Name: constants.CookieState, Value: "signed-state"})
 
-func TestCallbackHandler_ReusedSessionDoesNotMintANewToken(t *testing.T) {
-	t.Parallel()
+			handler.Handle()(recorder, req)
 
-	stub := &callbackUseCaseStub{result: &types.CallbackResult{
-		User:          &models.User{ID: "user-1"},
-		Session:       &models.Session{ID: "session-1", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)},
-		ReusedSession: true,
-	}}
-	handler := &handlers.CallbackHandler{UseCase: stub, Logger: &internaltests.MockLogger{}}
+			assert.Equal(t, tt.wantStatus, reqCtx.ResponseStatus)
+			assert.Equal(t, tt.wantCacheControl, reqCtx.ResponseHeaders.Get("Cache-Control"))
+			assert.Equal(t, "session-1", reqCtx.Values[models.ContextSessionID.String()])
+			assert.Equal(t, tt.wantRedirectURL, reqCtx.RedirectURL)
 
-	req, reqCtx, recorder := newHandlerRequest(t, http.MethodGet, "/oauth2/callback/google?code=1&state=1")
-	req.SetPathValue("provider", "google")
-	req.AddCookie(&http.Cookie{Name: constants.CookieState, Value: "signed-state"})
+			if tt.wantSessionToken != "" {
+				assert.Equal(t, tt.wantSessionToken, reqCtx.Values[models.ContextSessionToken.String()])
+			}
+			if tt.wantNoToken {
+				assert.NotContains(t, reqCtx.Values, models.ContextSessionToken.String())
+			}
 
-	handler.Handle()(recorder, req)
+			if tt.wantSafeBody {
+				assert.Equal(t, "user-1", reqCtx.Actor.ID)
 
-	assert.Equal(t, http.StatusOK, reqCtx.ResponseStatus)
-	assert.Equal(t, "session-1", reqCtx.Values[models.ContextSessionID.String()])
-	assert.NotContains(t, reqCtx.Values, models.ContextSessionToken.String())
-}
-
-func TestCallbackHandler_RedirectsOnlyAfterUsecaseValidation(t *testing.T) {
-	t.Parallel()
-
-	stub := &callbackUseCaseStub{result: &types.CallbackResult{
-		User:       &models.User{ID: "user-1"},
-		Session:    &models.Session{ID: "session-1", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)},
-		RedirectTo: "/welcome",
-	}}
-	handler := &handlers.CallbackHandler{UseCase: stub, Logger: &internaltests.MockLogger{}}
-
-	req, reqCtx, recorder := newHandlerRequest(t, http.MethodGet, "/oauth2/callback/google?code=1&state=1")
-	req.SetPathValue("provider", "google")
-	req.AddCookie(&http.Cookie{Name: constants.CookieState, Value: "signed-state"})
-
-	handler.Handle()(recorder, req)
-
-	assert.Equal(t, "/welcome", reqCtx.RedirectURL)
-	assert.Equal(t, http.StatusFound, reqCtx.ResponseStatus)
-	assert.Equal(t, "session-1", reqCtx.Values[models.ContextSessionID.String()])
+				var body map[string]any
+				require.NoError(t, json.Unmarshal(reqCtx.ResponseBody, &body))
+				sessionBody := body["session"].(map[string]any)
+				assert.NotContains(t, sessionBody, "token")
+				assert.NotContains(t, sessionBody, "ip_address")
+				assert.NotContains(t, sessionBody, "user_agent")
+				assert.NotContains(t, string(reqCtx.ResponseBody), "plain-token")
+				assert.NotContains(t, string(reqCtx.ResponseBody), "hashed-token")
+			}
+		})
+	}
 }
 
 func TestCallbackHandler_ErrorStatusMapping(t *testing.T) {

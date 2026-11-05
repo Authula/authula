@@ -22,7 +22,9 @@ type refreshTokenTestFixture struct {
 	sessionSvc       *tests.MockSessionService
 	tokenSvc         *tests.MockTokenService
 	repo             *tests.MockRefreshTokenRepository
+	blacklistSvc     *tests.MockBlacklistService
 	gracePeriod      time.Duration
+	expiresIn        time.Duration
 	refreshExpiresIn time.Duration
 }
 
@@ -33,7 +35,9 @@ func newRefreshTokenTestFixture() *refreshTokenTestFixture {
 		sessionSvc:       &tests.MockSessionService{},
 		tokenSvc:         &tests.MockTokenService{},
 		repo:             &tests.MockRefreshTokenRepository{},
+		blacklistSvc:     &tests.MockBlacklistService{},
 		gracePeriod:      10 * time.Second,
+		expiresIn:        15 * time.Minute,
 		refreshExpiresIn: 7 * 24 * time.Hour,
 	}
 }
@@ -45,8 +49,39 @@ func (f *refreshTokenTestFixture) newService() RefreshTokenService {
 		sessionService:   f.sessionSvc,
 		jwtService:       f.tokenSvc,
 		storage:          f.repo,
+		blacklistService: f.blacklistSvc,
 		gracePeriod:      f.gracePeriod,
+		expiresIn:        f.expiresIn,
 		refreshExpiresIn: f.refreshExpiresIn,
+	}
+}
+
+func activeRefreshRecord(expiresAt time.Time) *types.RefreshToken {
+	return &types.RefreshToken{
+		ID:        uuid.New().String(),
+		SessionID: "sess-1",
+		TokenHash: "hash",
+		ExpiresAt: expiresAt,
+		IsRevoked: false,
+	}
+}
+
+func revokedRefreshRecord(revokedAt time.Time, lastReuse *time.Time) *types.RefreshToken {
+	return &types.RefreshToken{
+		ID:               uuid.New().String(),
+		SessionID:        "sess-1",
+		TokenHash:        "hash",
+		ExpiresAt:        time.Now().Add(time.Hour),
+		IsRevoked:        true,
+		RevokedAt:        &revokedAt,
+		LastReuseAttempt: lastReuse,
+	}
+}
+
+func validRefreshClaims() map[string]any {
+	return map[string]any{
+		"session_id": "sess-1",
+		"user_id":    "user-1",
 	}
 }
 
@@ -61,34 +96,21 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 		{
 			name: "successful_rotation",
 			setup: func(f *refreshTokenTestFixture) {
-				now := time.Now()
-				record := &types.RefreshToken{
-					ID:        uuid.New().String(),
-					SessionID: "sess-1",
-					TokenHash: "hash",
-					ExpiresAt: now.Add(1 * time.Hour),
-					IsRevoked: false,
-				}
-				session := &models.Session{
-					ID:     "sess-1",
-					UserID: "user-1",
-				}
-				tokenPair := &types.TokenPair{
-					AccessToken:  "access-token-1",
-					RefreshToken: "refresh-token-1",
-				}
+				record := activeRefreshRecord(time.Now().Add(time.Hour))
+				session := &models.Session{ID: "sess-1", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}
+				tokenPair := &types.TokenPair{AccessToken: "access-token-1", RefreshToken: "refresh-token-1"}
 
+				f.tokenSvc.On("ValidateRefreshToken", ctx, "refresh-token").Return(validRefreshClaims(), nil)
 				f.repo.On("GetRefreshToken", ctx, mock.Anything).Return(record, nil)
 				f.sessionSvc.On("GetByID", ctx, "sess-1").Return(session, nil)
-				f.repo.On("RevokeRefreshToken", ctx, mock.Anything).Return(nil)
-				f.tokenSvc.On("ExtractClaims", mock.Anything, mock.Anything).Return(map[string]any{}, nil).Maybe()
 				f.tokenSvc.On("GenerateUserToken", ctx, "user-1", "sess-1", mock.Anything).Return(tokenPair, nil)
-				f.repo.On("StoreRefreshToken", ctx, mock.Anything).Return(nil)
+				f.repo.On("RotateRefreshToken", ctx, mock.Anything, mock.Anything).Return(true, nil)
 			},
 		},
 		{
 			name: "token_not_found",
 			setup: func(f *refreshTokenTestFixture) {
+				f.tokenSvc.On("ValidateRefreshToken", ctx, "refresh-token").Return(validRefreshClaims(), nil)
 				f.repo.On("GetRefreshToken", ctx, mock.Anything).Return(nil, nil)
 			},
 			wantErr: "invalid refresh token",
@@ -96,102 +118,133 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 		{
 			name: "token_expired",
 			setup: func(f *refreshTokenTestFixture) {
-				now := time.Now()
-				record := &types.RefreshToken{
-					ID:        uuid.New().String(),
-					SessionID: "sess-1",
-					TokenHash: "hash",
-					ExpiresAt: now.Add(-1 * time.Hour),
-					IsRevoked: false,
-				}
+				record := activeRefreshRecord(time.Now().Add(-time.Hour))
+				f.tokenSvc.On("ValidateRefreshToken", ctx, "refresh-token").Return(validRefreshClaims(), nil)
 				f.repo.On("GetRefreshToken", ctx, mock.Anything).Return(record, nil)
 			},
-			wantErr: "refresh token expired",
+			wantErr: "invalid refresh token",
 		},
 		{
 			name: "session_not_found",
 			setup: func(f *refreshTokenTestFixture) {
-				now := time.Now()
-				record := &types.RefreshToken{
-					ID:        uuid.New().String(),
-					SessionID: "sess-1",
-					TokenHash: "hash",
-					ExpiresAt: now.Add(1 * time.Hour),
-					IsRevoked: false,
-				}
+				record := activeRefreshRecord(time.Now().Add(time.Hour))
+				f.tokenSvc.On("ValidateRefreshToken", ctx, "refresh-token").Return(validRefreshClaims(), nil)
 				f.repo.On("GetRefreshToken", ctx, mock.Anything).Return(record, nil)
 				f.sessionSvc.On("GetByID", ctx, "sess-1").Return(nil, nil)
 			},
-			wantErr: "session expired or invalid",
+			wantErr: "invalid refresh token",
 		},
 		{
-			name: "reuse_tier1_recovery",
+			name: "session_expired",
 			setup: func(f *refreshTokenTestFixture) {
-				now := time.Now()
-				revokedAt := now.Add(-5 * time.Second)
-				record := &types.RefreshToken{
-					ID:               uuid.New().String(),
-					SessionID:        "sess-1",
-					TokenHash:        "hash",
-					ExpiresAt:        now.Add(1 * time.Hour),
-					IsRevoked:        true,
-					RevokedAt:        &revokedAt,
-					LastReuseAttempt: nil,
-				}
-				session := &models.Session{
-					ID:     "sess-1",
-					UserID: "user-1",
-				}
-				tokenPair := &types.TokenPair{
-					AccessToken:  "access-token-1",
-					RefreshToken: "refresh-token-1",
-				}
-
+				record := activeRefreshRecord(time.Now().Add(time.Hour))
+				session := &models.Session{ID: "sess-1", UserID: "user-1", ExpiresAt: time.Now().Add(-time.Minute)}
+				f.tokenSvc.On("ValidateRefreshToken", ctx, "refresh-token").Return(validRefreshClaims(), nil)
 				f.repo.On("GetRefreshToken", ctx, mock.Anything).Return(record, nil)
-				f.repo.On("SetLastReuseAttempt", ctx, mock.Anything).Return(nil)
 				f.sessionSvc.On("GetByID", ctx, "sess-1").Return(session, nil)
-				f.repo.On("RevokeRefreshToken", ctx, mock.Anything).Return(nil)
-				f.tokenSvc.On("ExtractClaims", mock.Anything, mock.Anything).Return(map[string]any{}, nil).Maybe()
+			},
+			wantErr: "invalid refresh token",
+		},
+		{
+			name: "reuse_within_grace_is_rejected_without_side_effects",
+			setup: func(f *refreshTokenTestFixture) {
+				record := revokedRefreshRecord(time.Now().Add(-5*time.Second), nil)
+				f.tokenSvc.On("ValidateRefreshToken", ctx, "refresh-token").Return(validRefreshClaims(), nil)
+				f.repo.On("GetRefreshToken", ctx, mock.Anything).Return(record, nil)
+			},
+			wantErr: "invalid refresh token",
+		},
+		{
+			name: "reuse_after_grace_invalidates_the_session",
+			setup: func(f *refreshTokenTestFixture) {
+				record := revokedRefreshRecord(time.Now().Add(-30*time.Second), nil)
+				f.tokenSvc.On("ValidateRefreshToken", ctx, "refresh-token").Return(validRefreshClaims(), nil)
+				f.repo.On("GetRefreshToken", ctx, mock.Anything).Return(record, nil)
+				f.repo.On("RevokeAllSessionTokens", ctx, "sess-1").Return(nil)
+				f.blacklistSvc.On("BlacklistAllSessionTokens", ctx, "sess-1", mock.Anything).Return(nil)
+				f.sessionSvc.On("Delete", ctx, "sess-1").Return(nil)
+			},
+			wantErr: "invalid refresh token",
+		},
+		{
+			name: "rotation_conflict_re_reads_and_treats_as_reuse",
+			setup: func(f *refreshTokenTestFixture) {
+				record := activeRefreshRecord(time.Now().Add(time.Hour))
+				revoked := revokedRefreshRecord(time.Now().Add(-30*time.Second), nil)
+				session := &models.Session{ID: "sess-1", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}
+				tokenPair := &types.TokenPair{AccessToken: "access-token-1", RefreshToken: "refresh-token-1"}
+
+				f.tokenSvc.On("ValidateRefreshToken", ctx, "refresh-token").Return(validRefreshClaims(), nil)
+				f.repo.On("GetRefreshToken", ctx, mock.Anything).Return(record, nil).Once()
+				f.repo.On("GetRefreshToken", ctx, mock.Anything).Return(revoked, nil).Once()
+				f.sessionSvc.On("GetByID", ctx, "sess-1").Return(session, nil)
 				f.tokenSvc.On("GenerateUserToken", ctx, "user-1", "sess-1", mock.Anything).Return(tokenPair, nil)
-				f.repo.On("StoreRefreshToken", ctx, mock.Anything).Return(nil)
+				f.repo.On("RotateRefreshToken", ctx, mock.Anything, mock.Anything).Return(false, nil)
+				f.repo.On("RevokeAllSessionTokens", ctx, "sess-1").Return(nil)
+				f.blacklistSvc.On("BlacklistAllSessionTokens", ctx, "sess-1", mock.Anything).Return(nil)
+				f.sessionSvc.On("Delete", ctx, "sess-1").Return(nil)
 			},
+			wantErr: "invalid refresh token",
 		},
 		{
-			name: "reuse_tier2_throttle",
+			name: "invalid_signature_is_rejected_before_lookup",
 			setup: func(f *refreshTokenTestFixture) {
-				now := time.Now()
-				revokedAt := now.Add(-5 * time.Second)
-				lastReuse := now.Add(-2 * time.Second)
-				record := &types.RefreshToken{
-					ID:               uuid.New().String(),
-					SessionID:        "sess-1",
-					TokenHash:        "hash",
-					ExpiresAt:        now.Add(1 * time.Hour),
-					IsRevoked:        true,
-					RevokedAt:        &revokedAt,
-					LastReuseAttempt: &lastReuse,
-				}
+				f.tokenSvc.On("ValidateRefreshToken", ctx, "refresh-token").Return(nil, assert.AnError)
+			},
+			wantErr: "invalid refresh token",
+		},
+		{
+			name: "access_token_cannot_be_used_as_refresh",
+			setup: func(f *refreshTokenTestFixture) {
+				f.tokenSvc.On("ValidateRefreshToken", ctx, "refresh-token").Return(nil, assert.AnError)
+			},
+			wantErr: "invalid refresh token",
+		},
+		{
+			name: "session_claim_does_not_match_stored_record",
+			setup: func(f *refreshTokenTestFixture) {
+				record := activeRefreshRecord(time.Now().Add(time.Hour))
+				claims := validRefreshClaims()
+				claims["session_id"] = "sess-2"
+				f.tokenSvc.On("ValidateRefreshToken", ctx, "refresh-token").Return(claims, nil)
 				f.repo.On("GetRefreshToken", ctx, mock.Anything).Return(record, nil)
 			},
 			wantErr: "invalid refresh token",
 		},
 		{
-			name: "reuse_tier3_reject",
+			name: "user_claim_does_not_match_session",
 			setup: func(f *refreshTokenTestFixture) {
-				now := time.Now()
-				revokedAt := now.Add(-30 * time.Second)
-				record := &types.RefreshToken{
-					ID:               uuid.New().String(),
-					SessionID:        "sess-1",
-					TokenHash:        "hash",
-					ExpiresAt:        now.Add(1 * time.Hour),
-					IsRevoked:        true,
-					RevokedAt:        &revokedAt,
-					LastReuseAttempt: nil,
-				}
+				record := activeRefreshRecord(time.Now().Add(time.Hour))
+				session := &models.Session{ID: "sess-1", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}
+				claims := validRefreshClaims()
+				claims["user_id"] = "user-2"
+				f.tokenSvc.On("ValidateRefreshToken", ctx, "refresh-token").Return(claims, nil)
 				f.repo.On("GetRefreshToken", ctx, mock.Anything).Return(record, nil)
+				f.sessionSvc.On("GetByID", ctx, "sess-1").Return(session, nil)
 			},
 			wantErr: "invalid refresh token",
+		},
+		{
+			name: "reserved_claims_are_not_copied_to_new_tokens",
+			setup: func(f *refreshTokenTestFixture) {
+				record := activeRefreshRecord(time.Now().Add(time.Hour))
+				session := &models.Session{ID: "sess-1", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}
+				claims := validRefreshClaims()
+				claims["iss"] = "https://issuer"
+				claims["aud"] = []string{"authula"}
+				claims["client_id"] = "client-1"
+				claims["nbf"] = time.Now()
+				claims["organization_id"] = "org-1"
+				tokenPair := &types.TokenPair{AccessToken: "access-token-1", RefreshToken: "refresh-token-1"}
+
+				f.tokenSvc.On("ValidateRefreshToken", ctx, "refresh-token").Return(claims, nil)
+				f.repo.On("GetRefreshToken", ctx, mock.Anything).Return(record, nil)
+				f.sessionSvc.On("GetByID", ctx, "sess-1").Return(session, nil)
+				f.tokenSvc.On("GenerateUserToken", ctx, "user-1", "sess-1", mock.MatchedBy(func(extra map[string]any) bool {
+					return len(extra) == 0
+				})).Return(tokenPair, nil)
+				f.repo.On("RotateRefreshToken", ctx, mock.Anything, mock.Anything).Return(true, nil)
+			},
 		},
 	}
 
@@ -214,11 +267,14 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 				require.NotNil(t, resp)
 				require.NotEmpty(t, resp.AccessToken)
 				require.NotEmpty(t, resp.RefreshToken)
+				require.Equal(t, "Bearer", resp.TokenType)
+				require.Equal(t, int64(900), resp.ExpiresIn)
 			}
 
 			f.repo.AssertExpectations(t)
 			f.sessionSvc.AssertExpectations(t)
 			f.tokenSvc.AssertExpectations(t)
+			f.blacklistSvc.AssertExpectations(t)
 		})
 	}
 }

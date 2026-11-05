@@ -105,6 +105,12 @@ func extraClaimsFromActor(actor *models.Actor) map[string]any {
 }
 
 func (p *JWTPlugin) respondHook(reqCtx *models.RequestContext) error {
+	// A redirect from the handler (for example the OAuth2 callback) must not be
+	// replaced with a JSON token response.
+	if reqCtx.RedirectURL != "" || reqCtx.Handled {
+		return nil
+	}
+
 	if reqCtx.Actor == nil {
 		return nil
 	}
@@ -117,6 +123,7 @@ func (p *JWTPlugin) respondHook(reqCtx *models.RequestContext) error {
 	payload := map[string]any{
 		"access_token": access,
 		"token_type":   "Bearer",
+		"expires_in":   int64(p.pluginConfig.ExpiresIn.Seconds()),
 	}
 
 	if refresh, ok := reqCtx.Values[types.JWTTokenTypeRefresh.String()].(string); ok && refresh != "" {
@@ -124,6 +131,11 @@ func (p *JWTPlugin) respondHook(reqCtx *models.RequestContext) error {
 	}
 
 	reqCtx.SetJSONResponse(http.StatusOK, payload)
+	if reqCtx.ResponseHeaders == nil {
+		reqCtx.ResponseHeaders = make(http.Header)
+	}
+	reqCtx.ResponseHeaders.Set("Cache-Control", "no-store")
+	reqCtx.ResponseHeaders.Set("Pragma", "no-cache")
 	reqCtx.Handled = true
 	return nil
 }

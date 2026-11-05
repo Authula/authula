@@ -39,6 +39,46 @@ func (r *refreshTokenRepositoryImpl) GetRefreshToken(ctx context.Context, tokenH
 	return &record, nil
 }
 
+func (r *refreshTokenRepositoryImpl) RotateRefreshToken(ctx context.Context, oldTokenHash string, newRecord *types.RefreshToken) (bool, error) {
+	if newRecord == nil {
+		return false, errors.New("new refresh token record is required")
+	}
+
+	rotated := false
+	now := time.Now()
+
+	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		result, err := tx.NewUpdate().
+			Model(&types.RefreshToken{}).
+			Where("token_hash = ?", oldTokenHash).
+			Where("is_revoked = ?", false).
+			Set("is_revoked = ?, revoked_at = ?", true, now).
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to revoke old refresh token: %w", err)
+		}
+
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to read rotation result: %w", err)
+		}
+		if affected == 0 {
+			return nil
+		}
+
+		if _, err := tx.NewInsert().Model(newRecord).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to store rotated refresh token: %w", err)
+		}
+
+		rotated = true
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	return rotated, nil
+}
+
 func (r *refreshTokenRepositoryImpl) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
 	now := time.Now()
 	_, err := r.db.NewUpdate().

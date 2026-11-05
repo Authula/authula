@@ -38,9 +38,17 @@ type ProviderConfig struct {
 	PictureField string   `json:"picture_field" toml:"picture_field"`
 	// EmailVerifiedField is the field that carries the provider's email verification flag.
 	EmailVerifiedField string `json:"email_verified_field" toml:"email_verified_field"`
+	// PKCE controls whether this provider must use PKCE with S256. It defaults to true.
+	// Setting it to false is an explicit opt-out and is not OAuth 2.1 compliant.
+	PKCE *bool `json:"pkce,omitempty" toml:"pkce,omitempty"`
 }
 
 // IsEnabled reports whether the provider is enabled. Absent means enabled.
 func (c ProviderConfig) IsEnabled() bool {
 	return c.Enabled == nil || *c.Enabled
+}
+
+// PKCEEnabled reports whether PKCE is required for this provider. Absent means enabled.
+func (c ProviderConfig) PKCEEnabled() bool {
+	return c.PKCE == nil || *c.PKCE
 }

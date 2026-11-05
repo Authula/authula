@@ -207,6 +207,31 @@ func TestRespondHook(t *testing.T) {
 			},
 		},
 		{
+			name:  "redirect_is_not_overridden",
+			actor: &models.Actor{ID: "user-1", Type: models.ActorUser},
+			setup: func(t *testing.T, reqCtx *models.RequestContext) {
+				reqCtx.RedirectURL = "/welcome"
+				reqCtx.Values[types.JWTTokenTypeAccess.String()] = "access-1"
+			},
+			check: func(t *testing.T, reqCtx *models.RequestContext) {
+				require.False(t, reqCtx.Handled)
+				require.Empty(t, reqCtx.ResponseBody)
+				require.Equal(t, "/welcome", reqCtx.RedirectURL)
+			},
+		},
+		{
+			name:  "already_handled_is_not_overridden",
+			actor: &models.Actor{ID: "user-1", Type: models.ActorUser},
+			setup: func(t *testing.T, reqCtx *models.RequestContext) {
+				reqCtx.Handled = true
+				reqCtx.Values[types.JWTTokenTypeAccess.String()] = "access-1"
+			},
+			check: func(t *testing.T, reqCtx *models.RequestContext) {
+				require.True(t, reqCtx.Handled)
+				require.Empty(t, reqCtx.ResponseBody)
+			},
+		},
+		{
 			name:  "user_success",
 			actor: &models.Actor{ID: "user-1", Type: models.ActorUser},
 			setup: func(t *testing.T, reqCtx *models.RequestContext) {
@@ -216,7 +241,9 @@ func TestRespondHook(t *testing.T) {
 			check: func(t *testing.T, reqCtx *models.RequestContext) {
 				require.True(t, reqCtx.Handled)
 				require.Equal(t, http.StatusOK, reqCtx.ResponseStatus)
-				require.JSONEq(t, `{"access_token":"access-1","token_type":"Bearer","refresh_token":"refresh-1"}`, string(reqCtx.ResponseBody))
+				require.JSONEq(t, `{"access_token":"access-1","token_type":"Bearer","refresh_token":"refresh-1","expires_in":900}`, string(reqCtx.ResponseBody))
+				require.Equal(t, "no-store", reqCtx.ResponseHeaders.Get("Cache-Control"))
+				require.Equal(t, "no-cache", reqCtx.ResponseHeaders.Get("Pragma"))
 			},
 		},
 		{
@@ -232,7 +259,7 @@ func TestRespondHook(t *testing.T) {
 			check: func(t *testing.T, reqCtx *models.RequestContext) {
 				require.True(t, reqCtx.Handled)
 				require.Equal(t, http.StatusOK, reqCtx.ResponseStatus)
-				require.JSONEq(t, `{"access_token":"machine-access-1","token_type":"Bearer"}`, string(reqCtx.ResponseBody))
+				require.JSONEq(t, `{"access_token":"machine-access-1","token_type":"Bearer","expires_in":900}`, string(reqCtx.ResponseBody))
 			},
 		},
 	}
