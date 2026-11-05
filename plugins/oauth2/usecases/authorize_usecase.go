@@ -3,28 +3,32 @@ package usecases
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
+
+	"golang.org/x/oauth2"
 
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/oauth2/constants"
 	"github.com/Authula/authula/plugins/oauth2/services"
 	"github.com/Authula/authula/plugins/oauth2/types"
 )
 
-// AuthorizeUseCase handles the authorization flow initiation
-type AuthorizeUseCase struct {
+// authorizeUseCase handles the authorization flow initiation
+type authorizeUseCase struct {
 	ProviderRegistry *services.ProviderRegistry
 	Logger           models.Logger
 	TrustedOrigins   []string
 	HMACKey          []byte
 }
 
-// NewAuthorizeUseCase creates a new authorize usecase
 func NewAuthorizeUseCase(
 	registry *services.ProviderRegistry,
 	logger models.Logger,
 	trustedOrigins []string,
 	hmacKey []byte,
-) *AuthorizeUseCase {
-	return &AuthorizeUseCase{
+) *authorizeUseCase {
+	return &authorizeUseCase{
 		ProviderRegistry: registry,
 		Logger:           logger,
 		TrustedOrigins:   trustedOrigins,
@@ -32,59 +36,99 @@ func NewAuthorizeUseCase(
 	}
 }
 
-// Authorize initiates an OAuth2 authorization flow
-func (uc *AuthorizeUseCase) Authorize(ctx context.Context, req *types.AuthorizeRequest) (*AuthorizeResult, error) {
-	oauthProvider, exists := uc.ProviderRegistry.Get(req.ProviderID)
+func (uc *authorizeUseCase) Authorize(ctx context.Context, req *types.AuthorizeRequest) (*AuthorizeResult, error) {
+	providerID := strings.ToLower(strings.TrimSpace(req.ProviderID))
+	oauthProvider, exists := uc.ProviderRegistry.Get(providerID)
 	if !exists {
-		return nil, fmt.Errorf("provider %s not found", req.ProviderID)
+		return nil, constants.ErrProviderNotFound
+	}
+
+	redirectTo, err := services.ValidateRedirectTo(req.RedirectTo, uc.TrustedOrigins)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", constants.ErrInvalidRedirectTo, err)
 	}
 
 	state, err := services.GenerateRandomString(32)
 	if err != nil {
-		uc.Logger.Error(fmt.Sprintf("Failed to generate state: %v", err))
+		uc.Logger.Error("failed to generate oauth state", "error", err)
 		return nil, fmt.Errorf("failed to generate state")
 	}
 
-	signedState, err := services.SignCookie(state, uc.HMACKey)
-	if err != nil {
-		uc.Logger.Error(fmt.Sprintf("Failed to sign state: %v", err))
-		return nil, fmt.Errorf("failed to sign state")
+	purpose := services.StatePurposeLogin
+	if req.ActorID != "" {
+		purpose = services.StatePurposeLink
 	}
 
-	redirectTo := req.RedirectTo
-	if redirectTo == "" {
-		redirectTo = "/"
+	signedState, err := services.SignState(services.StatePayload{
+		State:    state,
+		Provider: providerID,
+		UserID:   req.ActorID,
+		Purpose:  purpose,
+	}, uc.HMACKey)
+	if err != nil {
+		uc.Logger.Error("failed to sign oauth state", "error", err)
+		return nil, fmt.Errorf("failed to sign state")
 	}
 
 	signedRedirectTo, err := services.SignCookie(redirectTo, uc.HMACKey)
 	if err != nil {
-		uc.Logger.Error(fmt.Sprintf("Failed to sign redirect URL: %v", err))
+		uc.Logger.Error("failed to sign redirect URL", "error", err)
 		return nil, fmt.Errorf("failed to sign redirect URL")
 	}
 
 	var verifierCookie *string
+	authOptions := make([]oauth2.AuthCodeOption, 0, 1)
 	if oauthProvider.RequiresPKCE() {
-		verifier, _, err := services.GeneratePKCEChallenge()
+		verifier, err := services.GeneratePKCEVerifier()
 		if err != nil {
-			uc.Logger.Error(fmt.Sprintf("Failed to generate PKCE challenge: %v", err))
-			return nil, fmt.Errorf("failed to generate PKCE challenge")
+			uc.Logger.Error("failed to generate PKCE verifier", "error", err)
+			return nil, fmt.Errorf("failed to generate PKCE verifier")
 		}
 
 		signedVerifier, err := services.SignCookie(verifier, uc.HMACKey)
 		if err != nil {
-			uc.Logger.Error(fmt.Sprintf("Failed to sign verifier: %v", err))
-			return nil, fmt.Errorf("failed to sign verifier")
+			uc.Logger.Error("failed to sign PKCE verifier", "error", err)
+			return nil, fmt.Errorf("failed to sign PKCE verifier")
 		}
 
 		verifierCookie = &signedVerifier
+		authOptions = append(authOptions, oauth2.S256ChallengeOption(verifier))
 	}
 
-	authURL := oauthProvider.GetAuthURL(state)
+	authorizationURL := oauthProvider.GetAuthURL(state, authOptions...)
+	if err := validateAuthorizationURL(authorizationURL, oauthProvider.RequiresPKCE()); err != nil {
+		uc.Logger.Error("oauth provider generated an unusable authorization URL", "provider", providerID, "error", err)
+		return nil, err
+	}
 
 	return &AuthorizeResult{
-		AuthorizationURL: authURL,
+		AuthorizationURL: authorizationURL,
 		StateCookie:      signedState,
 		VerifierCookie:   verifierCookie,
 		RedirectCookie:   signedRedirectTo,
 	}, nil
+}
+
+// validateAuthorizationURL asserts the OAuth 2.1 required parameters and rejects
+// implicit or malformed authorization requests.
+func validateAuthorizationURL(raw string, pkceRequired bool) error {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return fmt.Errorf("%w: invalid authorization URL", constants.ErrProviderFailure)
+	}
+
+	query := parsed.Query()
+	if query.Get("response_type") != "code" {
+		return fmt.Errorf("%w: authorization URL must use response_type=code", constants.ErrProviderFailure)
+	}
+	if !pkceRequired {
+		return nil
+	}
+	if query.Get("code_challenge") == "" {
+		return constants.ErrPKCEChallengeMissing
+	}
+	if query.Get("code_challenge_method") != "S256" {
+		return constants.ErrPKCEChallengeMissing
+	}
+	return nil
 }

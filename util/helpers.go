@@ -19,6 +19,12 @@ func GenerateUUID() string {
 	return uuid.New().String()
 }
 
+// NormalizeEmail trims and lower-cases an email address so comparisons and
+// stored values are consistent regardless of the database collation.
+func NormalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
 func CompareStringArrays(arr1 []string, arr2 []string) bool {
 	if len(arr1) != len(arr2) {
 		return false

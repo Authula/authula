@@ -90,7 +90,7 @@ func (m *MockTokenService) GenerateUserToken(ctx context.Context, userID string,
 	return args.Get(0).(*jwtservicesTypes.TokenPair), args.Error(1)
 }
 
-func (m *MockTokenService) ExtractClaims(ctx context.Context, token string) (map[string]any, error) {
+func (m *MockTokenService) ValidateRefreshToken(ctx context.Context, token string) (map[string]any, error) {
 	args := m.Called(ctx, token)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -210,6 +210,11 @@ func (m *MockRefreshTokenRepository) GetRefreshToken(ctx context.Context, tokenH
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*jwtservicesTypes.RefreshToken), args.Error(1)
+}
+
+func (m *MockRefreshTokenRepository) RotateRefreshToken(ctx context.Context, oldTokenHash string, newRecord *jwtservicesTypes.RefreshToken) (bool, error) {
+	args := m.Called(ctx, oldTokenHash, newRecord)
+	return args.Bool(0), args.Error(1)
 }
 
 func (m *MockRefreshTokenRepository) RevokeRefreshToken(ctx context.Context, tokenHash string) error {

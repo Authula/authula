@@ -11,117 +11,156 @@ import (
 	"golang.org/x/oauth2/github"
 
 	"github.com/Authula/authula/plugins/oauth2/types"
+	"github.com/Authula/authula/util"
 )
 
-// GitHubProvider implements OAuth2Provider for GitHub
-type GitHubProvider struct {
+const (
+	defaultGitHubUserInfoURL = "https://api.github.com/user"
+	defaultGitHubEmailsURL   = "https://api.github.com/user/emails"
+)
+
+type GitHubOAuth2Provider struct {
 	*BaseProvider
+	userInfoURL string
+	emailsURL   string
+	fields      providerFields
 }
 
-// NewGitHubProvider creates a new GitHub OAuth2 provider
-func NewGitHubProvider(clientID, clientSecret, redirectURL string) *GitHubProvider {
-	config := &oauth2.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		RedirectURL:  redirectURL,
-		Scopes: []string{
-			"read:user",
-			"user:email",
+var githubDefaults = ProviderDefaults{
+	Endpoint:    github.Endpoint,
+	Scopes:      []string{"read:user", "user:email"},
+	UserInfoURL: defaultGitHubUserInfoURL,
+}
+
+type githubEmail struct {
+	Email    string `json:"email"`
+	Primary  bool   `json:"primary"`
+	Verified bool   `json:"verified"`
+}
+
+func NewGitHubOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *GitHubOAuth2Provider {
+	return &GitHubOAuth2Provider{
+		BaseProvider: NewBaseProvider("github", ResolveOAuth2Config(cfg, githubDefaults), opts, cfg.PKCEEnabled()),
+		userInfoURL:  ResolveUserInfoURL(cfg, defaultGitHubUserInfoURL),
+		emailsURL:    defaultGitHubEmailsURL,
+		fields: providerFields{
+			userID:  defaultField(cfg.UserIDField, "id"),
+			email:   defaultField(cfg.EmailField, "email"),
+			name:    defaultField(cfg.NameField, "name"),
+			picture: defaultField(cfg.PictureField, "avatar_url"),
 		},
-		Endpoint: github.Endpoint,
-	}
-
-	return &GitHubProvider{
-		BaseProvider: NewBaseProvider("github", config),
 	}
 }
 
-// GetUserInfo fetches and normalizes GitHub user information
-func (p *GitHubProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
-	info, err := FetchUserInfo(ctx, token, "https://api.github.com/user")
+func (p *GitHubOAuth2Provider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
+	info, err := FetchUserInfo(ctx, p.opts.httpClient(), p.opts.logger(), token, p.userInfoURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch GitHub user info: %w", err)
 	}
 
-	// Get email if not in main response
-	email := GetStringField(info, "email")
-	if email == "" {
-		email, _ = p.getGitHubUserEmail(ctx, token)
+	id, err := GetIDField(info, p.fields.userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid GitHub account id: %w", err)
 	}
 
-	// Normalize fields
-	userInfo := &types.UserInfo{
-		ProviderAccountID: fmt.Sprintf("%v", info["id"]),
+	profileEmail := util.NormalizeEmail(GetStringField(info, p.fields.email))
+	email, verified, err := p.resolveEmail(ctx, token, profileEmail)
+	if err != nil {
+		return nil, err
+	}
+
+	name := GetStringField(info, p.fields.name)
+	if name == "" {
+		name = GetStringField(info, "login")
+	}
+
+	return &types.UserInfo{
+		ProviderAccountID: id,
 		Email:             email,
-		// GitHub only allows verified addresses as the public email, and getGitHubUserEmail only returns verified ones.
-		EmailVerified: email != "",
-		Name:          GetStringField(info, "login"),
-		Picture:       GetStringField(info, "avatar_url"),
-		Raw:           info,
-	}
-
-	return userInfo, nil
+		EmailVerified:     verified,
+		Name:              name,
+		Picture:           GetStringField(info, p.fields.picture),
+		Raw:               info,
+	}, nil
 }
 
-// getGitHubUserEmail fetches the user's email from GitHub
-func (p *GitHubProvider) getGitHubUserEmail(ctx context.Context, token *oauth2.Token) (string, error) {
-	client := &http.Client{}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/user/emails", nil)
+// resolveEmail prefers a verified address from /user/emails. The profile email is used
+// as a fallback and is marked unverified.
+func (p *GitHubOAuth2Provider) resolveEmail(ctx context.Context, token *oauth2.Token, profileEmail string) (string, bool, error) {
+	emails, err := p.listEmails(ctx, token)
 	if err != nil {
-		return "", fmt.Errorf("failed to create email request: %w", err)
+		if profileEmail != "" {
+			return profileEmail, false, nil
+		}
+		return "", false, err
+	}
+
+	verifiedEmail, verified := selectVerifiedEmail(emails)
+	if verified {
+		return verifiedEmail, true, nil
+	}
+
+	if profileEmail != "" {
+		return profileEmail, false, nil
+	}
+	if len(emails) > 0 {
+		return util.NormalizeEmail(emails[0].Email), false, nil
+	}
+
+	return "", false, nil
+}
+
+func selectVerifiedEmail(emails []githubEmail) (string, bool) {
+	for _, email := range emails {
+		if email.Verified && email.Primary {
+			return util.NormalizeEmail(email.Email), true
+		}
+	}
+	for _, email := range emails {
+		if email.Verified {
+			return util.NormalizeEmail(email.Email), true
+		}
+	}
+	return "", false
+}
+
+func (p *GitHubOAuth2Provider) listEmails(ctx context.Context, token *oauth2.Token) ([]githubEmail, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.emailsURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub email request: %w", err)
 	}
 
 	token.SetAuthHeader(req)
-	resp, err := client.Do(req)
+
+	resp, err := p.opts.httpClient().Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch emails: %w", err)
+		return nil, fmt.Errorf("failed to fetch GitHub emails: %w", err)
 	}
-	if resp != nil && resp.Body != nil {
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				// Optionally log the error, e.g. using log.Printf
-				fmt.Printf("error closing response body: %v\n", err)
-			}
-		}()
+	if resp == nil || resp.Body == nil {
+		return nil, fmt.Errorf("failed to fetch GitHub emails: empty response")
 	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil && p.opts.logger() != nil {
+			p.opts.logger().Debug("failed to close GitHub emails response", "error", closeErr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to fetch emails: status %d", resp.StatusCode)
+		return nil, fmt.Errorf("failed to fetch GitHub emails: status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxUserInfoResponseBytes+1))
 	if err != nil {
-		return "", fmt.Errorf("failed to read email response: %w", err)
+		return nil, fmt.Errorf("failed to read GitHub emails: %w", err)
+	}
+	if len(body) > maxUserInfoResponseBytes {
+		return nil, fmt.Errorf("GitHub emails response exceeds %d bytes", maxUserInfoResponseBytes)
 	}
 
-	var emailsArray []map[string]any
-	if err := json.Unmarshal(body, &emailsArray); err != nil {
-		return "", fmt.Errorf("failed to parse emails: %w", err)
+	var emails []githubEmail
+	if err := json.Unmarshal(body, &emails); err != nil {
+		return nil, fmt.Errorf("failed to parse GitHub emails: %w", err)
 	}
 
-	for _, emailMap := range emailsArray {
-		if verified, ok := emailMap["verified"].(bool); ok && verified {
-			if primary, ok := emailMap["primary"].(bool); ok && primary {
-				if email, ok := emailMap["email"].(string); ok {
-					return email, nil
-				}
-			}
-		}
-	}
-
-	// If no primary verified email, get any verified email
-	for _, emailMap := range emailsArray {
-		if verified, ok := emailMap["verified"].(bool); ok && verified {
-			if email, ok := emailMap["email"].(string); ok {
-				return email, nil
-			}
-		}
-	}
-
-	return "", nil
-}
-
-// RequiresPKCE returns false for GitHub (doesn't require PKCE)
-func (p *GitHubProvider) RequiresPKCE() bool {
-	return false
+	return emails, nil
 }

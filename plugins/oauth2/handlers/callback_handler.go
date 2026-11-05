@@ -1,155 +1,113 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/oauth2/constants"
-	"github.com/Authula/authula/plugins/oauth2/services"
 	"github.com/Authula/authula/plugins/oauth2/types"
 	"github.com/Authula/authula/plugins/oauth2/usecases"
 )
 
 type CallbackHandler struct {
-	UseCase *usecases.CallbackUseCase
-	HMACKey []byte
-}
-
-func NewCallbackHandler(useCase *usecases.CallbackUseCase, hmacKey []byte) *CallbackHandler {
-	return &CallbackHandler{UseCase: useCase, HMACKey: hmacKey}
+	UseCase usecases.CallbackUseCase
+	Cookie  CookieOptions
+	Logger  models.Logger
 }
 
 func (h *CallbackHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
+		reqCtx, ok := models.GetRequestContext(ctx)
+		if !ok || reqCtx == nil {
+			http.Error(w, "request context missing", http.StatusInternalServerError)
+			return
+		}
 
-		providerID := r.PathValue("provider")
+		// OAuth2 flow cookies are single-use; clear them on every terminal path.
+		defer h.Cookie.clearFlowCookies(reqCtx.ResponseWriter)
+
+		providerID := strings.TrimSpace(r.PathValue("provider"))
 		if providerID == "" {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]string{
-				"message": "provider is required",
-			})
+			WriteError(reqCtx, h.Logger, constants.ErrProviderNotFound)
+			reqCtx.Handled = true
+			return
+		}
+
+		stateCookie, err := r.Cookie(constants.CookieState)
+		if err != nil {
+			WriteError(reqCtx, h.Logger, constants.ErrInvalidState)
 			reqCtx.Handled = true
 			return
 		}
 
 		req := &types.CallbackRequest{
-			ProviderID: providerID,
-			Code:       r.URL.Query().Get("code"),
-			State:      r.URL.Query().Get("state"),
-			Error:      r.URL.Query().Get("error"),
+			ProviderID:  providerID,
+			Code:        r.URL.Query().Get("code"),
+			State:       r.URL.Query().Get("state"),
+			Error:       r.URL.Query().Get("error"),
+			StateCookie: stateCookie.Value,
+		}
+		if cookie, err := r.Cookie(constants.CookieRedirectTo); err == nil {
+			req.RedirectCookie = cookie.Value
+		}
+		if cookie, err := r.Cookie(constants.CookieVerifier); err == nil {
+			req.VerifierCookie = cookie.Value
 		}
 
-		stateCookie, err := r.Cookie(constants.CookieState)
-		if err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]string{
-				"message": "missing state cookie",
-			})
-			reqCtx.Handled = true
-			return
-		}
-
-		validatedState, err := services.ValidateCookie(stateCookie.Value, h.HMACKey, 5*time.Minute)
-		if err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]string{
-				"message": "invalid state cookie",
-			})
-			reqCtx.Handled = true
-			return
-		}
-
-		if validatedState != req.State {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]string{
-				"message": "state mismatch",
-			})
-			reqCtx.Handled = true
-			return
-		}
-
-		if reqCtx.Actor != nil {
-			if sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok && sessionID != "" {
-				existingSession, err := h.UseCase.GetSessionByID(ctx, sessionID)
-				if err == nil && existingSession != nil && existingSession.ExpiresAt.After(time.Now()) {
-					user, _ := h.UseCase.GetUserByID(ctx, existingSession.UserID)
-					if user != nil {
-						reqCtx.SetJSONResponse(http.StatusOK, &types.CallbackResponse{
-							User:    user,
-							Session: existingSession,
-						})
-						return
-					}
-				}
+		if reqCtx.Actor != nil && reqCtx.Actor.Type == models.ActorUser {
+			req.ActorID = reqCtx.Actor.ID
+			if sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string); ok {
+				req.SessionID = sessionID
 			}
 		}
 
 		userAgent := r.UserAgent()
 		result, err := h.UseCase.Callback(ctx, req, &reqCtx.ClientIP, &userAgent)
 		if err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]string{
-				"message": err.Error(),
-			})
+			WriteError(reqCtx, h.Logger, err)
 			reqCtx.Handled = true
 			return
 		}
-
-		secure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
-
-		// Clear cookies
-		http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
-			Name:     constants.CookieState,
-			Value:    "",
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   secure,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   -1,
-		})
-		http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
-			Name:     constants.CookieRedirectTo,
-			Value:    "",
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   secure,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   -1,
-		})
-		http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
-			Name:     constants.CookieVerifier,
-			Value:    "",
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   secure,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   -1,
-		})
+		if result == nil || result.User == nil || result.Session == nil {
+			WriteError(reqCtx, h.Logger, errors.New("oauth callback returned an incomplete result"))
+			reqCtx.Handled = true
+			return
+		}
 
 		reqCtx.SetActorInContext(&models.Actor{
 			ID:   result.User.ID,
 			Type: models.ActorUser,
 		})
 		reqCtx.Values[models.ContextSessionID.String()] = result.Session.ID
-		reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken
-		reqCtx.Values[models.ContextAuthSuccess.String()] = true
-
-		var redirectTo string
-		if cookie, err := r.Cookie(constants.CookieRedirectTo); err == nil {
-			if validated, err := services.ValidateCookie(cookie.Value, h.HMACKey, 5*time.Minute); err == nil {
-				redirectTo = validated
-			}
+		if !result.ReusedSession && result.SessionToken != "" {
+			reqCtx.Values[models.ContextSessionToken.String()] = result.SessionToken
+			reqCtx.Values[models.ContextAuthSuccess.String()] = true
 		}
 
-		if redirectTo != "" {
-			reqCtx.RedirectURL = redirectTo
+		if result.RedirectTo != "" {
+			reqCtx.RedirectURL = result.RedirectTo
 			reqCtx.ResponseStatus = http.StatusFound
-			reqCtx.Handled = true
 			return
 		}
 
-		reqCtx.SetJSONResponse(http.StatusOK, &types.CallbackResponse{
-			User:    result.User,
-			Session: result.Session,
-		})
+		reqCtx.SetJSONResponse(http.StatusOK, callbackResponse(result))
+		if reqCtx.ResponseHeaders == nil {
+			reqCtx.ResponseHeaders = make(http.Header)
+		}
+		reqCtx.ResponseHeaders.Set("Cache-Control", "no-store")
+	}
+}
+
+func callbackResponse(result *types.CallbackResult) *types.CallbackResponse {
+	return &types.CallbackResponse{
+		User: result.User,
+		Session: &types.CallbackSession{
+			ID:        result.Session.ID,
+			UserID:    result.Session.UserID,
+			ExpiresAt: result.Session.ExpiresAt,
+		},
 	}
 }

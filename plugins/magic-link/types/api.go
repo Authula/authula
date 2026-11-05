@@ -24,7 +24,8 @@ func (r *MagicLinkVerifyRequest) Validate() error {
 }
 
 func (r *MagicLinkSignInRequest) Validate() error {
-	if strings.TrimSpace(r.Email) == "" {
+	r.Email = strings.ToLower(strings.TrimSpace(r.Email))
+	if r.Email == "" {
 		return coreerrors.ErrEmailRequired
 	}
 	return nil

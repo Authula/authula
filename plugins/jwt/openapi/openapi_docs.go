@@ -19,6 +19,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 			openapi.WithTags("JWT Plugin"),
 			openapi.WithRequest(&types.RefreshTokenRequest{}),
 			openapi.WithResponseStatus(http.StatusOK, &types.RefreshTokenResponse{}),
+			openapi.WithResponseStatus(http.StatusUnauthorized, &types.RefreshErrorResponse{}),
 		),
 		svc.AddOperation(
 			http.MethodGet,

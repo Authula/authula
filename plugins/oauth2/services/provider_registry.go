@@ -2,10 +2,23 @@ package services
 
 import (
 	"fmt"
+	"regexp"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/Authula/authula/plugins/oauth2/types"
 )
+
+var providerNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
+
+// ValidateProviderName enforces a path-safe provider identifier.
+func ValidateProviderName(name string) error {
+	if !providerNamePattern.MatchString(name) {
+		return fmt.Errorf("provider name %q must match %s", name, providerNamePattern.String())
+	}
+	return nil
+}
 
 // ProviderRegistry manages OAuth2 providers
 type ProviderRegistry struct {
@@ -22,6 +35,14 @@ func NewProviderRegistry() *ProviderRegistry {
 
 // Register registers a provider
 func (r *ProviderRegistry) Register(name string, provider types.OAuth2Provider) error {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if err := ValidateProviderName(name); err != nil {
+		return err
+	}
+	if provider == nil {
+		return fmt.Errorf("provider %s is nil", name)
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -54,8 +75,15 @@ func (r *ProviderRegistry) GetAll() map[string]types.OAuth2Provider {
 	return result
 }
 
-// IsProviderEnabled checks if a provider is registered
-func (r *ProviderRegistry) IsProviderEnabled(name string) bool {
-	_, exists := r.Get(name)
-	return exists
+// Names returns the registered provider names in deterministic order.
+func (r *ProviderRegistry) Names() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	names := make([]string, 0, len(r.providers))
+	for name := range r.providers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }

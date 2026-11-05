@@ -4,51 +4,62 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Authula/authula/plugins/oauth2/types"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+
+	"github.com/Authula/authula/plugins/oauth2/types"
+	"github.com/Authula/authula/util"
 )
 
-// GoogleProvider implements OAuth2Provider for Google
+const defaultGoogleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo"
+
 type GoogleProvider struct {
 	*BaseProvider
+	userInfoURL string
+	fields      providerFields
 }
 
-// NewGoogleProvider creates a new Google OAuth2 provider
-func NewGoogleProvider(clientID, clientSecret, redirectURL string) *GoogleProvider {
-	config := &oauth2.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		RedirectURL:  redirectURL,
-		Scopes: []string{
-			"openid",
-			"https://www.googleapis.com/auth/userinfo.email",
-			"https://www.googleapis.com/auth/userinfo.profile",
-		},
-		Endpoint: google.Endpoint,
-	}
+var googleDefaults = ProviderDefaults{
+	Endpoint: google.Endpoint,
+	Scopes: []string{
+		"openid",
+		"https://www.googleapis.com/auth/userinfo.email",
+		"https://www.googleapis.com/auth/userinfo.profile",
+	},
+	UserInfoURL: defaultGoogleUserInfoURL,
+}
 
+func NewGoogleProvider(cfg types.ProviderConfig, opts *ProviderOptions) *GoogleProvider {
 	return &GoogleProvider{
-		BaseProvider: NewBaseProvider("google", config),
+		BaseProvider: NewBaseProvider("google", ResolveOAuth2Config(cfg, googleDefaults), opts, cfg.PKCEEnabled()),
+		userInfoURL:  ResolveUserInfoURL(cfg, defaultGoogleUserInfoURL),
+		fields: providerFields{
+			userID:        defaultField(cfg.UserIDField, "id"),
+			email:         defaultField(cfg.EmailField, "email"),
+			name:          defaultField(cfg.NameField, "name"),
+			picture:       defaultField(cfg.PictureField, "picture"),
+			emailVerified: defaultField(cfg.EmailVerifiedField, "verified_email"),
+		},
 	}
 }
 
-// GetUserInfo fetches and normalizes Google user information
 func (p *GoogleProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
-	info, err := FetchUserInfo(ctx, token, "https://www.googleapis.com/oauth2/v2/userinfo")
+	info, err := FetchUserInfo(ctx, p.opts.httpClient(), p.opts.logger(), token, p.userInfoURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch Google user info: %w", err)
 	}
 
-	// Normalize fields
-	userInfo := &types.UserInfo{
-		ProviderAccountID: GetStringField(info, "id"),
-		Email:             GetStringField(info, "email"),
-		EmailVerified:     info["verified_email"] == true,
-		Name:              GetStringField(info, "name"),
-		Picture:           GetStringField(info, "picture"),
-		Raw:               info,
+	id, err := GetIDField(info, p.fields.userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid Google account id: %w", err)
 	}
 
-	return userInfo, nil
+	return &types.UserInfo{
+		ProviderAccountID: id,
+		Email:             util.NormalizeEmail(GetStringField(info, p.fields.email)),
+		EmailVerified:     GetBoolField(info, p.fields.emailVerified),
+		Name:              GetStringField(info, p.fields.name),
+		Picture:           GetStringField(info, p.fields.picture),
+		Raw:               info,
+	}, nil
 }

@@ -3,48 +3,57 @@ package services
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/Authula/authula/util"
 )
 
-// ValidateRedirectTo validates a redirect URL against trusted origins
-func ValidateRedirectTo(redirectTo string, trustedOrigins []string) error {
-	if redirectTo == "" {
-		return fmt.Errorf("redirect_to is required")
+// ValidateRedirectURL validates an OAuth2 provider redirect URL registered with
+// the provider. Redirect URIs must be absolute, exact, and use HTTPS outside
+// localhost. Wildcards, fragments, credentials, and relative paths are rejected.
+func ValidateRedirectURL(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return fmt.Errorf("redirect_url is required")
+	}
+	if strings.Contains(raw, "*") {
+		return fmt.Errorf("redirect_url must not contain wildcards")
 	}
 
-	// Parse the redirect URL
-	u, err := url.Parse(redirectTo)
+	parsed, err := url.Parse(raw)
 	if err != nil {
-		return fmt.Errorf("invalid redirect_to URL: %w", err)
+		return fmt.Errorf("redirect_url must be a valid absolute URL")
 	}
-
-	// Redirect must be absolute URL
-	if u.Scheme == "" || u.Host == "" {
-		return fmt.Errorf("redirect_to must be an absolute URL")
+	if parsed.Opaque != "" || parsed.Scheme == "" || parsed.Host == "" {
+		return fmt.Errorf("redirect_url must be an absolute URL")
 	}
-
-	// Only allow HTTPS (except for localhost)
-	if u.Scheme != "https" {
-		if !util.IsLocalhost(u.Host) {
-			return fmt.Errorf("redirect_to must use HTTPS scheme (except for localhost)")
-		}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("redirect_url must use http or https")
 	}
-
-	// Must not contain credentials
-	if u.User != nil {
-		return fmt.Errorf("redirect_to must not contain credentials")
+	if parsed.User != nil {
+		return fmt.Errorf("redirect_url must not contain credentials")
 	}
-
-	// Validate against trusted origins
-	if len(trustedOrigins) == 0 {
-		return fmt.Errorf("no trusted origins configured")
+	if parsed.Fragment != "" || strings.Contains(raw, "#") {
+		return fmt.Errorf("redirect_url must not contain a fragment")
 	}
-
-	origin := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
-	if !util.IsTrustedOrigin(origin, trustedOrigins) {
-		return fmt.Errorf("redirect_to does not match any trusted origin")
+	if parsed.Scheme == "http" && !util.IsLocalhost(parsed.Host) {
+		return fmt.Errorf("redirect_url must use https except for localhost")
 	}
 
 	return nil
+}
+
+// ValidateRedirectTo validates a redirect destination and returns its normalised form.
+// Relative paths and absolute URLs on trusted origins are allowed.
+func ValidateRedirectTo(redirectTo string, trustedOrigins []string) (string, error) {
+	if redirectTo == "" {
+		return "/", nil
+	}
+
+	parsed, err := util.IsTrustedCallbackURL(redirectTo, trustedOrigins)
+	if err != nil {
+		return "", fmt.Errorf("invalid redirect_to: %w", err)
+	}
+
+	return parsed.String(), nil
 }

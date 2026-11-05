@@ -31,5 +31,7 @@ func (uc *RefreshTokenUseCaseImpl) RefreshTokens(ctx context.Context, refreshTok
 	return &RefreshTokenResult{
 		AccessToken:  result.AccessToken,
 		RefreshToken: result.RefreshToken,
+		TokenType:    result.TokenType,
+		ExpiresIn:    result.ExpiresIn,
 	}, nil
 }

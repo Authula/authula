@@ -5,19 +5,32 @@ import (
 
 	"github.com/Authula/authula/middleware"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/oauth2/constants"
 	"github.com/Authula/authula/plugins/oauth2/handlers"
 )
 
 func Routes(plugin *OAuth2Plugin) []models.Route {
-	useCases := BuildUseCases(plugin)
+	useCases := plugin.useCases
+
+	// Session SameSite is intentionally not used here. Strict cookies are not sent
+	// on the cross-site provider callback, so flow cookies are always Lax.
+	cookieOptions := handlers.CookieOptions{
+		Secure:   plugin.globalConfig.Session.Secure,
+		Domain:   plugin.globalConfig.Session.Domain,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   constants.FlowCookieTTL,
+	}
 
 	authorizeHandler := &handlers.AuthorizeHandler{
 		UseCase: useCases.AuthorizeUseCase,
+		Cookie:  cookieOptions,
+		Logger:  plugin.logger,
 	}
 
 	callbackHandler := &handlers.CallbackHandler{
 		UseCase: useCases.CallbackUseCase,
-		HMACKey: plugin.hmacKey,
+		Cookie:  cookieOptions,
+		Logger:  plugin.logger,
 	}
 
 	return []models.Route{
