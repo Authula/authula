@@ -12,8 +12,7 @@ type API struct {
 }
 
 func BuildAPI(plugin *OAuth2Plugin) *API {
-	useCases := BuildUseCases(plugin)
-	return &API{UseCases: useCases}
+	return &API{UseCases: plugin.useCases}
 }
 
 func BuildUseCases(p *OAuth2Plugin) *usecases.UseCases {

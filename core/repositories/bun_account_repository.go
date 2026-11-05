@@ -7,6 +7,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/util"
 )
 
 type BunAccountRepository struct {
@@ -58,6 +59,7 @@ func (r *BunAccountRepository) GetByUserIDAndProvider(ctx context.Context, userI
 }
 
 func (r *BunAccountRepository) GetByProviderAndAccountID(ctx context.Context, provider, accountID string) (*models.Account, error) {
+	accountID = normalizeEmailProviderAccountID(provider, accountID)
 	acc := new(models.Account)
 	err := r.db.NewSelect().
 		Model(acc).
@@ -71,6 +73,8 @@ func (r *BunAccountRepository) GetByProviderAndAccountID(ctx context.Context, pr
 }
 
 func (r *BunAccountRepository) Create(ctx context.Context, account *models.Account) (*models.Account, error) {
+	normalizeAccountEmail(account)
+
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := tx.NewInsert().
 			Model(account).
@@ -92,6 +96,8 @@ func (r *BunAccountRepository) Create(ctx context.Context, account *models.Accou
 	return account, nil
 }
 func (r *BunAccountRepository) Update(ctx context.Context, account *models.Account) (*models.Account, error) {
+	normalizeAccountEmail(account)
+
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := tx.NewUpdate().
 			Model(account).
@@ -134,4 +140,17 @@ func (r *BunAccountRepository) UpdateFields(ctx context.Context, userID string, 
 
 func (r *BunAccountRepository) WithTx(tx bun.IDB) AccountRepository {
 	return &BunAccountRepository{db: tx}
+}
+
+func normalizeAccountEmail(account *models.Account) {
+	if account != nil {
+		account.AccountID = normalizeEmailProviderAccountID(account.ProviderID, account.AccountID)
+	}
+}
+
+func normalizeEmailProviderAccountID(providerID, accountID string) string {
+	if providerID == models.AuthProviderEmail.String() {
+		return util.NormalizeEmail(accountID)
+	}
+	return accountID
 }

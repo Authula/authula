@@ -20,6 +20,7 @@ type UserService interface {
 type AccountService interface {
 	Create(ctx context.Context, userID string, accountID string, providerID string, password *string) (*models.Account, error)
 	CreateOAuth2(ctx context.Context, userID string, providerAccountID string, provider string, accessToken string, refreshToken *string, accessTokenExpiresAt *time.Time, refreshTokenExpiresAt *time.Time, scope *string) (*models.Account, error)
+	UpdateOAuth2Tokens(ctx context.Context, accountID string, accessToken string, refreshToken *string, accessTokenExpiresAt *time.Time, refreshTokenExpiresAt *time.Time, scope *string) (*models.Account, error)
 	GetByUserID(ctx context.Context, userID string) (*models.Account, error)
 	GetByUserIDAndProvider(ctx context.Context, userID string, provider string) (*models.Account, error)
 	GetByProviderAndAccountID(ctx context.Context, provider string, accountID string) (*models.Account, error)

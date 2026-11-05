@@ -2,7 +2,8 @@ package services
 
 import (
 	"context"
-	"errors"
+	"maps"
+	"strings"
 
 	"github.com/Authula/authula/core/repositories"
 	"github.com/Authula/authula/models"
@@ -21,9 +22,15 @@ func NewUserService(repo repositories.UserRepository, serviceHooks *models.CoreS
 }
 
 func (s *userService) Create(ctx context.Context, name string, email string, emailVerified bool, image *string, metadata map[string]any) (*models.User, error) {
+	email = util.NormalizeEmail(email)
+	name = strings.TrimSpace(name)
+	if email == "" {
+		return nil, ErrEmailRequired
+	}
+
 	existing, _ := s.repo.GetByEmail(ctx, email)
 	if existing != nil {
-		return nil, errors.New("email already in use")
+		return nil, ErrEmailInUse
 	}
 
 	user := &models.User{
@@ -66,10 +73,15 @@ func (s *userService) GetByID(ctx context.Context, id string) (*models.User, err
 }
 
 func (s *userService) GetByEmail(ctx context.Context, email string) (*models.User, error) {
-	return s.repo.GetByEmail(ctx, email)
+	return s.repo.GetByEmail(ctx, util.NormalizeEmail(email))
 }
 
 func (s *userService) Update(ctx context.Context, user *models.User) (*models.User, error) {
+	if user != nil {
+		user.Email = util.NormalizeEmail(user.Email)
+		user.Name = strings.TrimSpace(user.Name)
+	}
+
 	if s.serviceHooks != nil && s.serviceHooks.Users != nil {
 		if err := runHooks(s.serviceHooks.Users.BeforeUpdateHooks(), user); err != nil {
 			return nil, err
@@ -89,6 +101,13 @@ func (s *userService) Update(ctx context.Context, user *models.User) (*models.Us
 }
 
 func (s *userService) UpdateFields(ctx context.Context, id string, fields map[string]any) error {
+	if email, ok := fields["email"].(string); ok {
+		normalized := make(map[string]any, len(fields))
+		maps.Copy(normalized, fields)
+		normalized["email"] = util.NormalizeEmail(email)
+		fields = normalized
+	}
+
 	return s.repo.UpdateFields(ctx, id, fields)
 }
 

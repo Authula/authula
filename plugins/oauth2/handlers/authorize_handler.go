@@ -3,7 +3,6 @@ package handlers
 import (
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/oauth2/constants"
@@ -12,23 +11,23 @@ import (
 )
 
 type AuthorizeHandler struct {
-	UseCase *usecases.AuthorizeUseCase
-}
-
-func NewAuthorizeHandler(useCase *usecases.AuthorizeUseCase) *AuthorizeHandler {
-	return &AuthorizeHandler{UseCase: useCase}
+	UseCase usecases.AuthorizeUseCase
+	Cookie  CookieOptions
+	Logger  models.Logger
 }
 
 func (h *AuthorizeHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		reqCtx, _ := models.GetRequestContext(ctx)
+		reqCtx, ok := models.GetRequestContext(ctx)
+		if !ok || reqCtx == nil {
+			http.Error(w, "request context missing", http.StatusInternalServerError)
+			return
+		}
 
-		providerID := r.PathValue("provider")
+		providerID := strings.TrimSpace(r.PathValue("provider"))
 		if providerID == "" {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]string{
-				"message": "provider is required",
-			})
+			WriteError(reqCtx, h.Logger, constants.ErrProviderNotFound)
 			reqCtx.Handled = true
 			return
 		}
@@ -37,50 +36,32 @@ func (h *AuthorizeHandler) Handle() http.HandlerFunc {
 			ProviderID: providerID,
 			RedirectTo: r.URL.Query().Get("redirect_to"),
 		}
+		if reqCtx.Actor != nil && reqCtx.Actor.Type == models.ActorUser {
+			req.ActorID = reqCtx.Actor.ID
+		}
 
 		resp, err := h.UseCase.Authorize(ctx, req)
 		if err != nil {
-			reqCtx.SetJSONResponse(http.StatusBadRequest, map[string]string{
-				"message": err.Error(),
-			})
+			h.Cookie.clearFlowCookies(reqCtx.ResponseWriter)
+			WriteError(reqCtx, h.Logger, err)
 			reqCtx.Handled = true
 			return
 		}
 
-		secure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
-
-		http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
-			Name:     constants.CookieState,
-			Value:    resp.StateCookie,
-			Path:     "/",
-			MaxAge:   int(time.Minute.Seconds()) * 5,
-			HttpOnly: true,
-			Secure:   secure,
-			SameSite: http.SameSiteLaxMode,
-		})
-		http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
-			Name:     constants.CookieRedirectTo,
-			Value:    resp.RedirectCookie,
-			Path:     "/",
-			MaxAge:   int(time.Minute.Seconds()) * 5,
-			HttpOnly: true,
-			Secure:   secure,
-			SameSite: http.SameSiteLaxMode,
-		})
+		h.Cookie.set(reqCtx.ResponseWriter, constants.CookieState, resp.StateCookie)
+		h.Cookie.set(reqCtx.ResponseWriter, constants.CookieRedirectTo, resp.RedirectCookie)
 		if resp.VerifierCookie != nil {
-			http.SetCookie(reqCtx.ResponseWriter, &http.Cookie{
-				Name:     constants.CookieVerifier,
-				Value:    *resp.VerifierCookie,
-				Path:     "/",
-				MaxAge:   int(time.Minute.Seconds()) * 5,
-				HttpOnly: true,
-				Secure:   secure,
-				SameSite: http.SameSiteLaxMode,
-			})
+			h.Cookie.set(reqCtx.ResponseWriter, constants.CookieVerifier, *resp.VerifierCookie)
+		} else {
+			h.Cookie.clear(reqCtx.ResponseWriter, constants.CookieVerifier)
 		}
 
 		reqCtx.SetJSONResponse(http.StatusOK, &types.AuthorizeResponse{
 			AuthURL: resp.AuthorizationURL,
 		})
+		if reqCtx.ResponseHeaders == nil {
+			reqCtx.ResponseHeaders = make(http.Header)
+		}
+		reqCtx.ResponseHeaders.Set("Cache-Control", "no-store")
 	}
 }

@@ -1,9 +1,14 @@
 package types
 
+import "time"
+
+const defaultHTTPTimeout = 10 * time.Second
+
 // OAuth2PluginConfig represents the OAuth2 plugin configuration
 type OAuth2PluginConfig struct {
-	Enabled   bool                      `json:"enabled" toml:"enabled"`
-	Providers map[string]ProviderConfig `json:"providers" toml:"providers"`
+	Enabled     bool                      `json:"enabled" toml:"enabled"`
+	HTTPTimeout time.Duration             `json:"http_timeout" toml:"http_timeout"`
+	Providers   map[string]ProviderConfig `json:"providers" toml:"providers"`
 }
 
 // ApplyDefaults applies default values to the config
@@ -11,11 +16,15 @@ func (c *OAuth2PluginConfig) ApplyDefaults() {
 	if c.Providers == nil {
 		c.Providers = make(map[string]ProviderConfig)
 	}
+	if c.HTTPTimeout <= 0 {
+		c.HTTPTimeout = defaultHTTPTimeout
+	}
 }
 
 // ProviderConfig represents configuration for an OAuth2 provider
 type ProviderConfig struct {
-	Enabled      bool     `json:"enabled" toml:"enabled"`
+	// Enabled defaults to true when absent. Set it explicitly to false to disable a provider.
+	Enabled      *bool    `json:"enabled,omitempty" toml:"enabled,omitempty"`
 	ClientID     string   `json:"client_id" toml:"client_id"`
 	ClientSecret string   `json:"client_secret" toml:"client_secret"`
 	RedirectURL  string   `json:"redirect_url" toml:"redirect_url"`
@@ -28,4 +37,11 @@ type ProviderConfig struct {
 	EmailField   string   `json:"email_field" toml:"email_field"`
 	NameField    string   `json:"name_field" toml:"name_field"`
 	PictureField string   `json:"picture_field" toml:"picture_field"`
+	// EmailVerifiedField is the field that carries the provider's email verification flag.
+	EmailVerifiedField string `json:"email_verified_field" toml:"email_verified_field"`
+}
+
+// IsEnabled reports whether the provider is enabled. Absent means enabled.
+func (c ProviderConfig) IsEnabled() bool {
+	return c.Enabled == nil || *c.Enabled
 }
