@@ -23,6 +23,12 @@ const (
 	EnvMicrosoftClientID     = "MICROSOFT_CLIENT_ID"
 	EnvMicrosoftClientSecret = "MICROSOFT_CLIENT_SECRET"
 	EnvMicrosoftTenantID     = "MICROSOFT_TENANT_ID"
+	// Apple has no static client secret: it is an ES256 JWT signed with the
+	// team's .p8 key, so the team, key and key material are configured instead.
+	EnvAppleClientID   = "APPLE_CLIENT_ID"
+	EnvAppleTeamID     = "APPLE_TEAM_ID"
+	EnvAppleKeyID      = "APPLE_KEY_ID"
+	EnvApplePrivateKey = "APPLE_PRIVATE_KEY"
 
 	// POSTGRES
 

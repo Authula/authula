@@ -93,6 +93,11 @@ type ProviderConfig struct {
 	// Setting it to false is an explicit opt-out and is not OAuth 2.1 compliant.
 	PKCE     *bool   `json:"pkce,omitempty" toml:"pkce,omitempty"`
 	TenantID *string `json:"tenant_id,omitempty" toml:"tenant_id,omitempty"` // Microsoft only: common (default), organizations, consumers or a tenant ID
+	// Apple has no static client secret: it is an ES256 JWT signed with the
+	// team's .p8 key, so the team and key are configured instead.
+	TeamID     string `json:"team_id" toml:"team_id"`
+	KeyID      string `json:"key_id" toml:"key_id"`
+	PrivateKey string `json:"private_key" toml:"private_key"`
 }
 
 // IsEnabled reports whether the provider is enabled. Absent means enabled.

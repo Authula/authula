@@ -42,6 +42,7 @@ func statusFor(err error) (int, string) {
 		errors.Is(err, constants.ErrInvalidState),
 		errors.Is(err, constants.ErrStateProviderMismatch),
 		errors.Is(err, constants.ErrInvalidCode),
+		errors.Is(err, constants.ErrInvalidCallback),
 		errors.Is(err, constants.ErrPKCEVerifierMissing),
 		errors.Is(err, constants.ErrInvalidRedirectTo):
 		return http.StatusUnprocessableEntity, "invalid request"
