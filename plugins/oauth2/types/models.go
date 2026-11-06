@@ -34,23 +34,23 @@ const (
 type OAuthClient struct {
 	bun.BaseModel `bun:"table:oauth_clients"`
 
-	ID                 string     `json:"id" required:"true" nullable:"false" bun:"column:id,pk"`
-	ClientID           string     `json:"client_id" required:"true" nullable:"false" bun:"column:client_id,unique"`
-	ClientSecretHash   string     `json:"-" required:"true" nullable:"false" bun:"column:client_secret_hash"`
-	ClientSecretSalt   string     `json:"-" required:"true" nullable:"false" bun:"column:client_secret_salt"`
-	ClientSecretPrefix string     `json:"client_secret_prefix" required:"true" nullable:"false" bun:"column:client_secret_prefix"`
-	Name               string     `json:"name" required:"true" nullable:"false" bun:"column:name"`
-	RedirectURIs       []string   `json:"redirect_uris" required:"true" nullable:"false" bun:"column:redirect_uris"`
-	AllowedGrants      []string   `json:"allowed_grants" required:"true" nullable:"false" bun:"column:allowed_grants"`
-	AllowedScopes      []string   `json:"allowed_scopes" required:"true" nullable:"false" bun:"column:allowed_scopes"`
-	OwnerType          string     `json:"owner_type" required:"true" nullable:"false" bun:"column:owner_type"`
-	OwnerID            string     `json:"owner_id" required:"true" nullable:"false" bun:"column:owner_id"`
-	CreatorID          string     `json:"creator_id" required:"true" nullable:"false" bun:"column:creator_id"`
-	OrganizationID     *string    `json:"organization_id" nullable:"true" bun:"column:organization_id"`
-	IsActive           bool       `json:"is_active" required:"true" nullable:"false" bun:"column:is_active"`
-	DeletedAt          *time.Time `json:"deleted_at,omitempty" nullable:"true" bun:"column:deleted_at,nullzero"`
-	CreatedAt          time.Time  `json:"created_at" required:"true" nullable:"false" bun:"column:created_at,default:current_timestamp"`
-	UpdatedAt          time.Time  `json:"updated_at" required:"true" nullable:"false" bun:"column:updated_at,default:current_timestamp"`
+	ID                 string     `json:"id" bun:"column:id,pk" required:"true" nullable:"false"`
+	ClientID           string     `json:"client_id" bun:"column:client_id,unique" required:"true" nullable:"false"`
+	ClientSecretHash   string     `json:"-" bun:"column:client_secret_hash" required:"true" nullable:"false"`
+	ClientSecretSalt   string     `json:"-" bun:"column:client_secret_salt" required:"true" nullable:"false"`
+	ClientSecretPrefix string     `json:"client_secret_prefix" bun:"column:client_secret_prefix" required:"true" nullable:"false"`
+	Name               string     `json:"name" bun:"column:name" required:"true" nullable:"false"`
+	RedirectURIs       []string   `json:"redirect_uris" bun:"column:redirect_uris" required:"true" nullable:"false"`
+	AllowedGrants      []string   `json:"allowed_grants" bun:"column:allowed_grants" required:"true" nullable:"false"`
+	AllowedScopes      []string   `json:"allowed_scopes" bun:"column:allowed_scopes" required:"true" nullable:"false"`
+	OwnerType          string     `json:"owner_type" bun:"column:owner_type" required:"true" nullable:"false"`
+	OwnerID            string     `json:"owner_id" bun:"column:owner_id" required:"true" nullable:"false"`
+	CreatorID          string     `json:"creator_id" bun:"column:creator_id" required:"true" nullable:"false"`
+	OrganizationID     *string    `json:"organization_id" bun:"column:organization_id" nullable:"true"`
+	IsActive           bool       `json:"is_active" bun:"column:is_active" required:"true" nullable:"false"`
+	DeletedAt          *time.Time `json:"deleted_at,omitempty" bun:"column:deleted_at,nullzero" nullable:"true"`
+	CreatedAt          time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp" required:"true" nullable:"false"`
+	UpdatedAt          time.Time  `json:"updated_at" bun:"column:updated_at,default:current_timestamp" required:"true" nullable:"false"`
 }
 
 // OAuthAuthorizationCode is a single-use authorization code. Only the SHA-256
@@ -58,21 +58,21 @@ type OAuthClient struct {
 type OAuthAuthorizationCode struct {
 	bun.BaseModel `bun:"table:authorization_codes"`
 
-	ID                  string     `json:"id" required:"true" nullable:"false" bun:"column:id,pk"`
-	CodeHash            string     `json:"code_hash" required:"true" nullable:"false" bun:"column:code_hash,unique"`
-	ClientID            string     `json:"client_id" required:"true" nullable:"false" bun:"column:client_id"`
-	UserID              string     `json:"user_id" required:"true" nullable:"false" bun:"column:user_id"`
-	SessionID           string     `json:"session_id" required:"true" nullable:"false" bun:"column:session_id"`
-	ConsentID           string     `json:"consent_id" required:"true" nullable:"false" bun:"column:consent_id"`
-	RedirectURI         string     `json:"redirect_uri" required:"true" nullable:"false" bun:"column:redirect_uri"`
-	Scope               string     `json:"scope" required:"true" nullable:"false" bun:"column:scope"`
-	Nonce               *string    `json:"nonce" nullable:"true" bun:"column:nonce"`
-	CodeChallenge       string     `json:"code_challenge" required:"true" nullable:"false" bun:"column:code_challenge"`
-	CodeChallengeMethod string     `json:"code_challenge_method" required:"true" nullable:"false" bun:"column:code_challenge_method"`
-	AuthTime            time.Time  `json:"auth_time" required:"true" nullable:"false" bun:"column:auth_time"`
-	ExpiresAt           time.Time  `json:"expires_at" required:"true" nullable:"false" bun:"column:expires_at"`
-	ConsumedAt          *time.Time `json:"consumed_at,omitempty" nullable:"true" bun:"column:consumed_at,nullzero"`
-	CreatedAt           time.Time  `json:"created_at" required:"true" nullable:"false" bun:"column:created_at,default:current_timestamp"`
+	ID                  string     `json:"id" bun:"column:id,pk" required:"true" nullable:"false"`
+	CodeHash            string     `json:"code_hash" bun:"column:code_hash,unique" required:"true" nullable:"false"`
+	ClientID            string     `json:"client_id" bun:"column:client_id" required:"true" nullable:"false"`
+	UserID              string     `json:"user_id" bun:"column:user_id" required:"true" nullable:"false"`
+	SessionID           string     `json:"session_id" bun:"column:session_id" required:"true" nullable:"false"`
+	ConsentID           string     `json:"consent_id" bun:"column:consent_id" required:"true" nullable:"false"`
+	RedirectURI         string     `json:"redirect_uri" bun:"column:redirect_uri" required:"true" nullable:"false"`
+	Scope               string     `json:"scope" bun:"column:scope" required:"true" nullable:"false"`
+	Nonce               *string    `json:"nonce" bun:"column:nonce" nullable:"true"`
+	CodeChallenge       string     `json:"code_challenge" bun:"column:code_challenge" required:"true" nullable:"false"`
+	CodeChallengeMethod string     `json:"code_challenge_method" bun:"column:code_challenge_method" required:"true" nullable:"false"`
+	AuthTime            time.Time  `json:"auth_time" bun:"column:auth_time" required:"true" nullable:"false"`
+	ExpiresAt           time.Time  `json:"expires_at" bun:"column:expires_at" required:"true" nullable:"false"`
+	ConsumedAt          *time.Time `json:"consumed_at,omitempty" bun:"column:consumed_at,nullzero" nullable:"true"`
+	CreatedAt           time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp" required:"true" nullable:"false"`
 }
 
 // OAuthConsentRequest preserves an authorization request while the user is
@@ -80,23 +80,23 @@ type OAuthAuthorizationCode struct {
 type OAuthConsentRequest struct {
 	bun.BaseModel `bun:"table:oauth_consent_requests"`
 
-	ID                  string     `json:"id" required:"true" nullable:"false" bun:"column:id,pk"`
-	RequestHash         string     `json:"-" required:"true" nullable:"false" bun:"column:request_hash,unique"`
-	ClientID            string     `json:"client_id" required:"true" nullable:"false" bun:"column:client_id"`
-	UserID              string     `json:"user_id" required:"true" nullable:"false" bun:"column:user_id"`
-	SessionID           string     `json:"session_id" required:"true" nullable:"false" bun:"column:session_id"`
-	RedirectURI         string     `json:"redirect_uri" required:"true" nullable:"false" bun:"column:redirect_uri"`
-	Scope               string     `json:"scope" required:"true" nullable:"false" bun:"column:scope"`
-	State               *string    `json:"state" nullable:"true" bun:"column:state"`
-	Nonce               *string    `json:"nonce" nullable:"true" bun:"column:nonce"`
-	CodeChallenge       string     `json:"code_challenge" required:"true" nullable:"false" bun:"column:code_challenge"`
-	CodeChallengeMethod string     `json:"code_challenge_method" required:"true" nullable:"false" bun:"column:code_challenge_method"`
-	Prompt              string     `json:"prompt" nullable:"true" bun:"column:prompt"`
-	MaxAge              *int       `json:"max_age" nullable:"true" bun:"column:max_age"`
-	AuthTime            time.Time  `json:"auth_time" required:"true" nullable:"false" bun:"column:auth_time"`
-	ExpiresAt           time.Time  `json:"expires_at" required:"true" nullable:"false" bun:"column:expires_at"`
-	ConsumedAt          *time.Time `json:"consumed_at,omitempty" nullable:"true" bun:"column:consumed_at,nullzero"`
-	CreatedAt           time.Time  `json:"created_at" required:"true" nullable:"false" bun:"column:created_at,default:current_timestamp"`
+	ID                  string     `json:"id" bun:"column:id,pk" required:"true" nullable:"false"`
+	RequestHash         string     `json:"-" bun:"column:request_hash,unique" required:"true" nullable:"false"`
+	ClientID            string     `json:"client_id" bun:"column:client_id" required:"true" nullable:"false"`
+	UserID              string     `json:"user_id" bun:"column:user_id" required:"true" nullable:"false"`
+	SessionID           string     `json:"session_id" bun:"column:session_id" required:"true" nullable:"false"`
+	RedirectURI         string     `json:"redirect_uri" bun:"column:redirect_uri" required:"true" nullable:"false"`
+	Scope               string     `json:"scope" bun:"column:scope" required:"true" nullable:"false"`
+	State               *string    `json:"state" bun:"column:state" nullable:"true"`
+	Nonce               *string    `json:"nonce" bun:"column:nonce" nullable:"true"`
+	CodeChallenge       string     `json:"code_challenge" bun:"column:code_challenge" required:"true" nullable:"false"`
+	CodeChallengeMethod string     `json:"code_challenge_method" bun:"column:code_challenge_method" required:"true" nullable:"false"`
+	Prompt              string     `json:"prompt" bun:"column:prompt" nullable:"true"`
+	MaxAge              *int       `json:"max_age" bun:"column:max_age" nullable:"true"`
+	AuthTime            time.Time  `json:"auth_time" bun:"column:auth_time" required:"true" nullable:"false"`
+	ExpiresAt           time.Time  `json:"expires_at" bun:"column:expires_at" required:"true" nullable:"false"`
+	ConsumedAt          *time.Time `json:"consumed_at,omitempty" bun:"column:consumed_at,nullzero" nullable:"true"`
+	CreatedAt           time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp" required:"true" nullable:"false"`
 }
 
 // OAuthConsent records a user's grant of scopes to a client. Revoked rows are
@@ -104,14 +104,14 @@ type OAuthConsentRequest struct {
 type OAuthConsent struct {
 	bun.BaseModel `bun:"table:oauth_consents"`
 
-	ID        string     `json:"id" required:"true" nullable:"false" bun:"column:id,pk"`
-	UserID    string     `json:"user_id" required:"true" nullable:"false" bun:"column:user_id"`
-	ClientID  string     `json:"client_id" required:"true" nullable:"false" bun:"column:client_id"`
-	Scope     string     `json:"scope" required:"true" nullable:"false" bun:"column:scope"`
-	Source    string     `json:"source" required:"true" nullable:"false" bun:"column:source"`
-	RevokedAt *time.Time `json:"revoked_at,omitempty" nullable:"true" bun:"column:revoked_at,nullzero"`
-	CreatedAt time.Time  `json:"created_at" required:"true" nullable:"false" bun:"column:created_at,default:current_timestamp"`
-	UpdatedAt time.Time  `json:"updated_at" required:"true" nullable:"false" bun:"column:updated_at,default:current_timestamp"`
+	ID        string     `json:"id" bun:"column:id,pk" required:"true" nullable:"false"`
+	UserID    string     `json:"user_id" bun:"column:user_id" required:"true" nullable:"false"`
+	ClientID  string     `json:"client_id" bun:"column:client_id" required:"true" nullable:"false"`
+	Scope     string     `json:"scope" bun:"column:scope" required:"true" nullable:"false"`
+	Source    string     `json:"source" bun:"column:source" required:"true" nullable:"false"`
+	RevokedAt *time.Time `json:"revoked_at,omitempty" bun:"column:revoked_at,nullzero" nullable:"true"`
+	CreatedAt time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp" required:"true" nullable:"false"`
+	UpdatedAt time.Time  `json:"updated_at" bun:"column:updated_at,default:current_timestamp" required:"true" nullable:"false"`
 }
 
 // OAuthLoginTransaction preserves an authorize request across a login redirect
@@ -119,22 +119,22 @@ type OAuthConsent struct {
 type OAuthLoginTransaction struct {
 	bun.BaseModel `bun:"table:oauth_login_transactions"`
 
-	ID                  string     `json:"id" required:"true" nullable:"false" bun:"column:id,pk"`
-	TransactionHash     string     `json:"-" required:"true" nullable:"false" bun:"column:transaction_hash,unique"`
-	ClientID            string     `json:"client_id" required:"true" nullable:"false" bun:"column:client_id"`
-	RedirectURI         string     `json:"redirect_uri" required:"true" nullable:"false" bun:"column:redirect_uri"`
-	Scope               string     `json:"scope" required:"true" nullable:"false" bun:"column:scope"`
-	State               *string    `json:"state" nullable:"true" bun:"column:state"`
-	Nonce               *string    `json:"nonce" nullable:"true" bun:"column:nonce"`
-	CodeChallenge       string     `json:"code_challenge" required:"true" nullable:"false" bun:"column:code_challenge"`
-	CodeChallengeMethod string     `json:"code_challenge_method" required:"true" nullable:"false" bun:"column:code_challenge_method"`
-	Prompt              string     `json:"prompt" nullable:"true" bun:"column:prompt"`
-	MaxAge              *int       `json:"max_age" nullable:"true" bun:"column:max_age"`
-	AuthTime            time.Time  `json:"auth_time" required:"true" nullable:"false" bun:"column:auth_time"`
-	CompletedAt         *time.Time `json:"completed_at,omitempty" nullable:"true" bun:"column:completed_at,nullzero"`
-	ExpiresAt           time.Time  `json:"expires_at" required:"true" nullable:"false" bun:"column:expires_at"`
-	ConsumedAt          *time.Time `json:"consumed_at,omitempty" nullable:"true" bun:"column:consumed_at,nullzero"`
-	CreatedAt           time.Time  `json:"created_at" required:"true" nullable:"false" bun:"column:created_at,default:current_timestamp"`
+	ID                  string     `json:"id" bun:"column:id,pk" required:"true" nullable:"false"`
+	TransactionHash     string     `json:"-" bun:"column:transaction_hash,unique" required:"true" nullable:"false"`
+	ClientID            string     `json:"client_id" bun:"column:client_id" required:"true" nullable:"false"`
+	RedirectURI         string     `json:"redirect_uri" bun:"column:redirect_uri" required:"true" nullable:"false"`
+	Scope               string     `json:"scope" bun:"column:scope" required:"true" nullable:"false"`
+	State               *string    `json:"state" bun:"column:state" nullable:"true"`
+	Nonce               *string    `json:"nonce" bun:"column:nonce" nullable:"true"`
+	CodeChallenge       string     `json:"code_challenge" bun:"column:code_challenge" required:"true" nullable:"false"`
+	CodeChallengeMethod string     `json:"code_challenge_method" bun:"column:code_challenge_method" required:"true" nullable:"false"`
+	Prompt              string     `json:"prompt" bun:"column:prompt" nullable:"true"`
+	MaxAge              *int       `json:"max_age" bun:"column:max_age" nullable:"true"`
+	AuthTime            time.Time  `json:"auth_time" bun:"column:auth_time" required:"true" nullable:"false"`
+	CompletedAt         *time.Time `json:"completed_at,omitempty" bun:"column:completed_at,nullzero" nullable:"true"`
+	ExpiresAt           time.Time  `json:"expires_at" bun:"column:expires_at" required:"true" nullable:"false"`
+	ConsumedAt          *time.Time `json:"consumed_at,omitempty" bun:"column:consumed_at,nullzero" nullable:"true"`
+	CreatedAt           time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp" required:"true" nullable:"false"`
 }
 
 // OAuthFlowState replaces the outbound provider flow cookies. The stored PKCE
@@ -142,14 +142,14 @@ type OAuthLoginTransaction struct {
 type OAuthFlowState struct {
 	bun.BaseModel `bun:"table:oauth_flow_states"`
 
-	ID                    string     `json:"id" required:"true" nullable:"false" bun:"column:id,pk"`
-	StateHash             string     `json:"-" required:"true" nullable:"false" bun:"column:state_hash,unique"`
-	Provider              string     `json:"provider" required:"true" nullable:"false" bun:"column:provider"`
-	Purpose               string     `json:"purpose" required:"true" nullable:"false" bun:"column:purpose"`
-	UserID                *string    `json:"user_id" nullable:"true" bun:"column:user_id"`
-	RedirectTo            *string    `json:"redirect_to" nullable:"true" bun:"column:redirect_to"`
-	CodeVerifierEncrypted string     `json:"-" required:"true" nullable:"false" bun:"column:code_verifier_encrypted"`
-	ExpiresAt             time.Time  `json:"expires_at" required:"true" nullable:"false" bun:"column:expires_at"`
-	ConsumedAt            *time.Time `json:"consumed_at,omitempty" nullable:"true" bun:"column:consumed_at,nullzero"`
-	CreatedAt             time.Time  `json:"created_at" required:"true" nullable:"false" bun:"column:created_at,default:current_timestamp"`
+	ID                    string     `json:"id" bun:"column:id,pk" required:"true" nullable:"false"`
+	StateHash             string     `json:"-" bun:"column:state_hash,unique" required:"true" nullable:"false"`
+	Provider              string     `json:"provider" bun:"column:provider" required:"true" nullable:"false"`
+	Purpose               string     `json:"purpose" bun:"column:purpose" required:"true" nullable:"false"`
+	UserID                *string    `json:"user_id" bun:"column:user_id" nullable:"true"`
+	RedirectTo            *string    `json:"redirect_to" bun:"column:redirect_to" nullable:"true"`
+	CodeVerifierEncrypted string     `json:"-" bun:"column:code_verifier_encrypted" required:"true" nullable:"false"`
+	ExpiresAt             time.Time  `json:"expires_at" bun:"column:expires_at" required:"true" nullable:"false"`
+	ConsumedAt            *time.Time `json:"consumed_at,omitempty" bun:"column:consumed_at,nullzero" nullable:"true"`
+	CreatedAt             time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp" required:"true" nullable:"false"`
 }
