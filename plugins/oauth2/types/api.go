@@ -25,6 +25,9 @@ type CallbackRequest struct {
 	Code       string `query:"code" json:"code,omitempty" nullable:"true"`
 	State      string `query:"state" json:"state,omitempty" nullable:"true"`
 	Error      string `query:"error" json:"error,omitempty" nullable:"true"`
+	// User carries the form-posted user payload that some providers send on
+	// first consent only, outside the token.
+	User string `json:"user,omitempty" nullable:"true"`
 
 	// ActorID and SessionID are populated from the request context when a signed-in
 	// user starts a linking flow.

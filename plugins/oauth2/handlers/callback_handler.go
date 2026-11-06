@@ -43,11 +43,20 @@ func (h *CallbackHandler) Handle() http.HandlerFunc {
 			return
 		}
 
+		// Providers that return via a cross-site form POST put the response in
+		// the body; ParseForm also handles the query string for redirects.
+		if err := r.ParseForm(); err != nil {
+			WriteError(reqCtx, h.Logger, constants.ErrInvalidCallback)
+			reqCtx.Handled = true
+			return
+		}
+
 		req := &types.CallbackRequest{
 			ProviderID:  providerID,
-			Code:        r.URL.Query().Get("code"),
-			State:       r.URL.Query().Get("state"),
-			Error:       r.URL.Query().Get("error"),
+			Code:        r.Form.Get("code"),
+			State:       r.Form.Get("state"),
+			Error:       r.Form.Get("error"),
+			User:        r.Form.Get("user"),
 			StateCookie: stateCookie.Value,
 		}
 		if cookie, err := r.Cookie(constants.CookieRedirectTo); err == nil {

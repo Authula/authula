@@ -92,6 +92,11 @@ type ProviderConfig struct {
 	// PKCE controls whether this provider must use PKCE with S256. It defaults to true.
 	// Setting it to false is an explicit opt-out and is not OAuth 2.1 compliant.
 	PKCE *bool `json:"pkce,omitempty" toml:"pkce,omitempty"`
+	// Apple has no static client secret: it is an ES256 JWT signed with the
+	// team's .p8 key, so the team and key are configured instead.
+	TeamID     string `json:"team_id" toml:"team_id"`
+	KeyID      string `json:"key_id" toml:"key_id"`
+	PrivateKey string `json:"private_key" toml:"private_key"`
 }
 
 // IsEnabled reports whether the provider is enabled. Absent means enabled.

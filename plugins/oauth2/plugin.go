@@ -183,6 +183,11 @@ func getEnvKey(provider, suffix string) (string, bool) {
 		case "CLIENT_SECRET":
 			return env.EnvGoogleClientSecret, true
 		}
+	case "apple":
+		switch suffix {
+		case "CLIENT_ID":
+			return env.EnvAppleClientID, true
+		}
 	}
 	return "", false
 }
@@ -204,7 +209,7 @@ func (p *OAuth2Plugin) registerProviders() error {
 	for name := range configured {
 		names = append(names, name)
 	}
-	for _, builtIn := range []string{"discord", "github", "google"} {
+	for _, builtIn := range []string{"discord", "github", "google", "apple"} {
 		if _, exists := configured[builtIn]; !exists {
 			names = append(names, builtIn)
 		}
@@ -239,14 +244,36 @@ func (p *OAuth2Plugin) registerProviders() error {
 		clientSecretKey, _ := getEnvKey(name, "CLIENT_SECRET")
 		envClientID := strings.TrimSpace(os.Getenv(clientIDKey))
 		envClientSecret := strings.TrimSpace(os.Getenv(clientSecretKey))
-		if (envClientID == "") != (envClientSecret == "") {
+		if name != "apple" && (envClientID == "") != (envClientSecret == "") {
 			return fmt.Errorf("%w: provider %s", constants.ErrProviderConfigurationPartial, name)
+		}
+
+		if name == "apple" {
+			// Apple mints its client secret from the .p8 key, so the team and
+			// key replace the secret rather than accompany it.
+			if cfg.TeamID == "" {
+				cfg.TeamID = strings.TrimSpace(os.Getenv(env.EnvAppleTeamID))
+			}
+			if cfg.KeyID == "" {
+				cfg.KeyID = strings.TrimSpace(os.Getenv(env.EnvAppleKeyID))
+			}
+			if cfg.PrivateKey == "" {
+				cfg.PrivateKey = strings.TrimSpace(os.Getenv(env.EnvApplePrivateKey))
+			}
+
+			if envClientID != "" && (cfg.TeamID == "" || cfg.KeyID == "" || cfg.PrivateKey == "") {
+				return fmt.Errorf("%w: provider apple requires %s, %s and %s", constants.ErrProviderConfigurationPartial, env.EnvAppleTeamID, env.EnvAppleKeyID, env.EnvApplePrivateKey)
+			}
 		}
 
 		if envClientID != "" {
 			cfg.ClientID = envClientID
-			cfg.ClientSecret = envClientSecret
-			configuredProvider = true
+			if name == "apple" {
+				configuredProvider = true
+			} else {
+				cfg.ClientSecret = envClientSecret
+				configuredProvider = true
+			}
 		}
 		if !configuredProvider {
 			continue
@@ -282,6 +309,8 @@ func (p *OAuth2Plugin) registerBuiltInProvider(name string, cfg types.ProviderCo
 		provider = services.NewGitHubOAuth2Provider(cfg, options)
 	case "google":
 		provider = services.NewGoogleProvider(cfg, options)
+	case "apple":
+		provider = services.NewAppleProvider(cfg, options)
 	default:
 		return fmt.Errorf("%w: unsupported built-in provider %s", constants.ErrProviderConfigInvalid, name)
 	}
@@ -321,7 +350,12 @@ func (p *OAuth2Plugin) defaultRedirectURL(provider string) (string, error) {
 }
 
 func (p *OAuth2Plugin) validateProviderConfig(name string, cfg types.ProviderConfig) error {
-	if strings.TrimSpace(cfg.ClientID) == "" || strings.TrimSpace(cfg.ClientSecret) == "" || strings.TrimSpace(cfg.RedirectURL) == "" {
+	if name == "apple" {
+		if strings.TrimSpace(cfg.ClientID) == "" || strings.TrimSpace(cfg.RedirectURL) == "" ||
+			strings.TrimSpace(cfg.TeamID) == "" || strings.TrimSpace(cfg.KeyID) == "" || strings.TrimSpace(cfg.PrivateKey) == "" {
+			return fmt.Errorf("%w: provider apple is missing client_id, redirect_url, team_id, key_id or private_key", constants.ErrProviderConfigInvalid)
+		}
+	} else if strings.TrimSpace(cfg.ClientID) == "" || strings.TrimSpace(cfg.ClientSecret) == "" || strings.TrimSpace(cfg.RedirectURL) == "" {
 		return fmt.Errorf("%w: provider %s is missing client_id, client_secret or redirect_url", constants.ErrProviderConfigInvalid, name)
 	}
 	if err := services.ValidateRedirectURL(cfg.RedirectURL); err != nil {
