@@ -35,7 +35,7 @@ type OAuthClient struct {
 	bun.BaseModel `bun:"table:oauth_clients"`
 
 	ID                 string     `json:"id" required:"true" nullable:"false" bun:"column:id,pk"`
-	ClientID           string     `json:"client_id" required:"true" nullable:"false" bun:"column:client_id"`
+	ClientID           string     `json:"client_id" required:"true" nullable:"false" bun:"column:client_id,unique"`
 	ClientSecretHash   string     `json:"-" required:"true" nullable:"false" bun:"column:client_secret_hash"`
 	ClientSecretSalt   string     `json:"-" required:"true" nullable:"false" bun:"column:client_secret_salt"`
 	ClientSecretPrefix string     `json:"client_secret_prefix" required:"true" nullable:"false" bun:"column:client_secret_prefix"`
@@ -59,7 +59,7 @@ type OAuthAuthorizationCode struct {
 	bun.BaseModel `bun:"table:authorization_codes"`
 
 	ID                  string     `json:"id" required:"true" nullable:"false" bun:"column:id,pk"`
-	CodeHash            string     `json:"code_hash" required:"true" nullable:"false" bun:"column:code_hash"`
+	CodeHash            string     `json:"code_hash" required:"true" nullable:"false" bun:"column:code_hash,unique"`
 	ClientID            string     `json:"client_id" required:"true" nullable:"false" bun:"column:client_id"`
 	UserID              string     `json:"user_id" required:"true" nullable:"false" bun:"column:user_id"`
 	SessionID           string     `json:"session_id" required:"true" nullable:"false" bun:"column:session_id"`
@@ -81,7 +81,7 @@ type OAuthConsentRequest struct {
 	bun.BaseModel `bun:"table:oauth_consent_requests"`
 
 	ID                  string     `json:"id" required:"true" nullable:"false" bun:"column:id,pk"`
-	RequestHash         string     `json:"-" required:"true" nullable:"false" bun:"column:request_hash"`
+	RequestHash         string     `json:"-" required:"true" nullable:"false" bun:"column:request_hash,unique"`
 	ClientID            string     `json:"client_id" required:"true" nullable:"false" bun:"column:client_id"`
 	UserID              string     `json:"user_id" required:"true" nullable:"false" bun:"column:user_id"`
 	SessionID           string     `json:"session_id" required:"true" nullable:"false" bun:"column:session_id"`
@@ -120,7 +120,7 @@ type OAuthLoginTransaction struct {
 	bun.BaseModel `bun:"table:oauth_login_transactions"`
 
 	ID                  string     `json:"id" required:"true" nullable:"false" bun:"column:id,pk"`
-	TransactionHash     string     `json:"-" required:"true" nullable:"false" bun:"column:transaction_hash"`
+	TransactionHash     string     `json:"-" required:"true" nullable:"false" bun:"column:transaction_hash,unique"`
 	ClientID            string     `json:"client_id" required:"true" nullable:"false" bun:"column:client_id"`
 	RedirectURI         string     `json:"redirect_uri" required:"true" nullable:"false" bun:"column:redirect_uri"`
 	Scope               string     `json:"scope" required:"true" nullable:"false" bun:"column:scope"`
@@ -143,7 +143,7 @@ type OAuthFlowState struct {
 	bun.BaseModel `bun:"table:oauth_flow_states"`
 
 	ID                    string     `json:"id" required:"true" nullable:"false" bun:"column:id,pk"`
-	StateHash             string     `json:"-" required:"true" nullable:"false" bun:"column:state_hash"`
+	StateHash             string     `json:"-" required:"true" nullable:"false" bun:"column:state_hash,unique"`
 	Provider              string     `json:"provider" required:"true" nullable:"false" bun:"column:provider"`
 	Purpose               string     `json:"purpose" required:"true" nullable:"false" bun:"column:purpose"`
 	UserID                *string    `json:"user_id" nullable:"true" bun:"column:user_id"`
