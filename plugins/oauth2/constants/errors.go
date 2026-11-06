@@ -8,6 +8,7 @@ var (
 	ErrInvalidState                 = errors.New("invalid or expired oauth state")
 	ErrStateProviderMismatch        = errors.New("oauth state does not belong to this provider")
 	ErrInvalidCode                  = errors.New("missing oauth authorization code")
+	ErrInvalidCallback              = errors.New("invalid oauth callback request")
 	ErrPKCEVerifierMissing          = errors.New("missing oauth PKCE verifier")
 	ErrPKCEChallengeMissing         = errors.New("oauth authorization URL is missing a S256 PKCE challenge")
 	ErrEmailRequired                = errors.New("oauth provider did not return an email address")

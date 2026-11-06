@@ -12,8 +12,9 @@ import (
 func Routes(plugin *OAuth2Plugin) []models.Route {
 	useCases := plugin.useCases
 
-	// Session SameSite is intentionally not used here. Strict cookies are not sent
-	// on the cross-site provider callback, so flow cookies are always Lax.
+	// Session SameSite is intentionally not used here: flow cookies follow
+	// CookieOptions.flowCookieSameSite, which is None when Secure so that a
+	// cross-site form POST (Sign in with Apple) still carries the state cookie.
 	cookieOptions := handlers.CookieOptions{
 		Secure:   plugin.globalConfig.Session.Secure,
 		Domain:   plugin.globalConfig.Session.Domain,
@@ -44,6 +45,14 @@ func Routes(plugin *OAuth2Plugin) []models.Route {
 		},
 		{
 			Method: "GET",
+			Path:   "/oauth2/callback/{provider}",
+			Middleware: []func(http.Handler) http.Handler{
+				middleware.RequirePublicOrUserActor(),
+			},
+			Handler: callbackHandler.Handle(),
+		},
+		{
+			Method: "POST",
 			Path:   "/oauth2/callback/{provider}",
 			Middleware: []func(http.Handler) http.Handler{
 				middleware.RequirePublicOrUserActor(),
