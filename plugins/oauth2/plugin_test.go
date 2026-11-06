@@ -245,3 +245,13 @@ func TestRegisterProviders(t *testing.T) {
 		})
 	}
 }
+
+func TestOAuth2PluginImplementsMigrationInterface(t *testing.T) {
+	t.Parallel()
+
+	var plugin models.Plugin = New(types.OAuth2PluginConfig{})
+	migratable, ok := plugin.(models.PluginWithMigrations)
+	require.True(t, ok)
+	require.Len(t, migratable.Migrations("sqlite"), 1)
+	require.Nil(t, migratable.DependsOn())
+}
