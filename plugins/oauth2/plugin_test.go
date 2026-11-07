@@ -23,6 +23,9 @@ func clearProviderEnv(t *testing.T) {
 		env.EnvGithubClientSecret,
 		env.EnvDiscordClientID,
 		env.EnvDiscordClientSecret,
+		env.EnvMicrosoftClientID,
+		env.EnvMicrosoftClientSecret,
+		env.EnvMicrosoftTenantID,
 	} {
 		t.Setenv(key, "")
 	}
@@ -193,6 +196,38 @@ func TestRegisterProviders(t *testing.T) {
 				google, ok := plugin.providerRegistry.Get("google")
 				require.True(t, ok)
 				assert.False(t, google.RequiresPKCE())
+			},
+		},
+		{
+			name: "microsoft env credentials and tenant",
+			env: map[string]string{
+				env.EnvMicrosoftClientID:     "env-id",
+				env.EnvMicrosoftClientSecret: "env-secret",
+				env.EnvMicrosoftTenantID:     "organizations",
+			},
+			verify: func(t *testing.T, plugin *OAuth2Plugin) {
+				t.Helper()
+
+				microsoft, ok := plugin.providerRegistry.Get("microsoft")
+				require.True(t, ok)
+				_, ok = microsoft.(*services.MicrosoftOAuth2Provider)
+				assert.True(t, ok)
+				assert.Equal(t, "env-id", microsoft.GetConfig().ClientID)
+				assert.Equal(t, "https://api.example.com/auth/oauth2/callback/microsoft", microsoft.GetConfig().RedirectURL)
+				assert.Equal(t, "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize", microsoft.GetConfig().Endpoint.AuthURL)
+			},
+		},
+		{
+			name: "microsoft config tenant",
+			providers: map[string]types.ProviderConfig{
+				"microsoft": {ClientID: "config-id", ClientSecret: "config-secret", TenantID: "contoso.onmicrosoft.com"},
+			},
+			verify: func(t *testing.T, plugin *OAuth2Plugin) {
+				t.Helper()
+
+				microsoft, ok := plugin.providerRegistry.Get("microsoft")
+				require.True(t, ok)
+				assert.Equal(t, "https://login.microsoftonline.com/contoso.onmicrosoft.com/oauth2/v2.0/token", microsoft.GetConfig().Endpoint.TokenURL)
 			},
 		},
 		{
