@@ -92,7 +92,7 @@ type ProviderConfig struct {
 	// PKCE controls whether this provider must use PKCE with S256. It defaults to true.
 	// Setting it to false is an explicit opt-out and is not OAuth 2.1 compliant.
 	PKCE     *bool  `json:"pkce,omitempty" toml:"pkce,omitempty"`
-	TenantID string `json:"tenant_id" toml:"tenant_id"` // Microsoft only: common (default), organizations, consumers or a tenant ID
+	TenantID string `json:"tenant_id,omitempty" toml:"tenant_id,omitempty"` // Microsoft only: common (default), organizations, consumers or a tenant ID
 }
 
 // IsEnabled reports whether the provider is enabled. Absent means enabled.
