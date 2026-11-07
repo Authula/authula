@@ -210,7 +210,7 @@ func TestRegisterProviders(t *testing.T) {
 
 				microsoft, ok := plugin.providerRegistry.Get("microsoft")
 				require.True(t, ok)
-				_, ok = microsoft.(*services.MicrosoftProvider)
+				_, ok = microsoft.(*services.MicrosoftOAuth2Provider)
 				assert.True(t, ok)
 				assert.Equal(t, "env-id", microsoft.GetConfig().ClientID)
 				assert.Equal(t, "https://api.example.com/auth/oauth2/callback/microsoft", microsoft.GetConfig().RedirectURL)

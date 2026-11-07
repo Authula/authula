@@ -50,15 +50,15 @@ func TestMicrosoftUserInfo_MissingID(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestNewMicrosoftProvider_TenantEndpoint(t *testing.T) {
+func TestNewMicrosoftOAuth2Provider_TenantEndpoint(t *testing.T) {
 	t.Parallel()
 
 	cfg := types.ProviderConfig{ClientID: "id", ClientSecret: "secret", RedirectURL: "https://app/cb"}
-	require.True(t, strings.HasPrefix(NewMicrosoftProvider(cfg, nil).GetConfig().Endpoint.AuthURL,
+	require.True(t, strings.HasPrefix(NewMicrosoftOAuth2Provider(cfg, nil).GetConfig().Endpoint.AuthURL,
 		"https://login.microsoftonline.com/common/"))
 
 	cfg.TenantID = "organizations"
-	require.True(t, strings.HasPrefix(NewMicrosoftProvider(cfg, nil).GetConfig().Endpoint.TokenURL,
+	require.True(t, strings.HasPrefix(NewMicrosoftOAuth2Provider(cfg, nil).GetConfig().Endpoint.TokenURL,
 		"https://login.microsoftonline.com/organizations/"))
-	require.True(t, NewMicrosoftProvider(cfg, nil).RequiresPKCE())
+	require.True(t, NewMicrosoftOAuth2Provider(cfg, nil).RequiresPKCE())
 }

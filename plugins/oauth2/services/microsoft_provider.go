@@ -13,15 +13,15 @@ import (
 
 const defaultMicrosoftUserInfoURL = "https://graph.microsoft.com/v1.0/me"
 
-// MicrosoftProvider implements OAuth2Provider for Microsoft Entra ID (work/school and personal accounts)
-type MicrosoftProvider struct {
+// MicrosoftOAuth2Provider implements OAuth2Provider for Microsoft Entra ID (work/school and personal accounts)
+type MicrosoftOAuth2Provider struct {
 	*BaseProvider
 	userInfoURL string
 }
 
-// NewMicrosoftProvider creates a new Microsoft OAuth2 provider.
+// NewMicrosoftOAuth2Provider creates a new Microsoft OAuth2 provider.
 // cfg.TenantID may be "common" (default when empty), "organizations", "consumers" or a specific tenant ID/domain.
-func NewMicrosoftProvider(cfg types.ProviderConfig, opts *ProviderOptions) *MicrosoftProvider {
+func NewMicrosoftOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *MicrosoftOAuth2Provider {
 	defaults := ProviderDefaults{
 		Endpoint: endpoints.AzureAD(cfg.TenantID),
 		Scopes: []string{
@@ -34,14 +34,14 @@ func NewMicrosoftProvider(cfg types.ProviderConfig, opts *ProviderOptions) *Micr
 		UserInfoURL: defaultMicrosoftUserInfoURL,
 	}
 
-	return &MicrosoftProvider{
+	return &MicrosoftOAuth2Provider{
 		BaseProvider: NewBaseProvider("microsoft", ResolveOAuth2Config(cfg, defaults), opts, cfg.PKCEEnabled()),
 		userInfoURL:  ResolveUserInfoURL(cfg, defaultMicrosoftUserInfoURL),
 	}
 }
 
 // GetUserInfo fetches and normalizes Microsoft Graph user information
-func (p *MicrosoftProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
+func (p *MicrosoftOAuth2Provider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
 	info, err := FetchUserInfo(ctx, p.opts.httpClient(), p.opts.logger(), token, p.userInfoURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch Microsoft user info: %w", err)

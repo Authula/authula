@@ -293,7 +293,7 @@ func (p *OAuth2Plugin) registerBuiltInProvider(name string, cfg types.ProviderCo
 		if tenantID := strings.TrimSpace(os.Getenv(env.EnvMicrosoftTenantID)); tenantID != "" {
 			cfg.TenantID = tenantID
 		}
-		provider = services.NewMicrosoftProvider(cfg, options)
+		provider = services.NewMicrosoftOAuth2Provider(cfg, options)
 	default:
 		return fmt.Errorf("%w: unsupported built-in provider %s", constants.ErrProviderConfigInvalid, name)
 	}
