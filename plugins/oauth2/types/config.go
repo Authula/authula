@@ -2,13 +2,43 @@ package types
 
 import "time"
 
-const defaultHTTPTimeout = 10 * time.Second
+const (
+	defaultHTTPTimeout          = 10 * time.Second
+	defaultAuthorizationCodeTTL = 90 * time.Second
+	defaultConsentRequestTTL    = 10 * time.Minute
+	defaultIDTokenTTL           = 5 * time.Minute
+	defaultCleanupInterval      = time.Minute
+	defaultRateLimitWindow      = time.Minute
+	defaultRateLimitMax         = 60
+)
+
+func defaultAllowedScopes() []string {
+	return []string{ScopeOpenID, ScopeProfile, ScopeEmail}
+}
 
 // OAuth2PluginConfig represents the OAuth2 plugin configuration
 type OAuth2PluginConfig struct {
 	Enabled     bool                      `json:"enabled" toml:"enabled"`
 	HTTPTimeout time.Duration             `json:"http_timeout" toml:"http_timeout"`
 	Providers   map[string]ProviderConfig `json:"providers" toml:"providers"`
+
+	AuthorizationServerEnabled bool     `json:"authorization_server_enabled" toml:"authorization_server_enabled"`
+	ClientManagementEnabled    bool     `json:"client_management_enabled" toml:"client_management_enabled"`
+	LoginURL                   string   `json:"login_url" toml:"login_url"`
+	ConsentURL                 string   `json:"consent_url" toml:"consent_url"`
+	ConsentOrigins             []string `json:"consent_origins" toml:"consent_origins"`
+	AllowedScopes              []string `json:"allowed_scopes" toml:"allowed_scopes"`
+	AllowOrgClients            bool     `json:"allow_org_clients" toml:"allow_org_clients"`
+
+	AuthorizationCodeTTL time.Duration `json:"authorization_code_ttl" toml:"authorization_code_ttl"`
+	ConsentRequestTTL    time.Duration `json:"consent_request_ttl" toml:"consent_request_ttl"`
+	IDTokenTTL           time.Duration `json:"id_token_ttl" toml:"id_token_ttl"`
+
+	AutoCleanup     bool          `json:"auto_cleanup" toml:"auto_cleanup"`
+	CleanupInterval time.Duration `json:"cleanup_interval" toml:"cleanup_interval"`
+
+	RateLimitWindow time.Duration `json:"rate_limit_window" toml:"rate_limit_window"`
+	RateLimitMax    int           `json:"rate_limit_max" toml:"rate_limit_max"`
 }
 
 // ApplyDefaults applies default values to the config
@@ -18,6 +48,27 @@ func (c *OAuth2PluginConfig) ApplyDefaults() {
 	}
 	if c.HTTPTimeout <= 0 {
 		c.HTTPTimeout = defaultHTTPTimeout
+	}
+	if len(c.AllowedScopes) == 0 {
+		c.AllowedScopes = defaultAllowedScopes()
+	}
+	if c.AuthorizationCodeTTL <= 0 {
+		c.AuthorizationCodeTTL = defaultAuthorizationCodeTTL
+	}
+	if c.ConsentRequestTTL <= 0 {
+		c.ConsentRequestTTL = defaultConsentRequestTTL
+	}
+	if c.IDTokenTTL <= 0 {
+		c.IDTokenTTL = defaultIDTokenTTL
+	}
+	if c.CleanupInterval <= 0 {
+		c.CleanupInterval = defaultCleanupInterval
+	}
+	if c.RateLimitWindow <= 0 {
+		c.RateLimitWindow = defaultRateLimitWindow
+	}
+	if c.RateLimitMax <= 0 {
+		c.RateLimitMax = defaultRateLimitMax
 	}
 }
 

@@ -1,6 +1,7 @@
 package oauth2
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -8,12 +9,16 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 
+	"github.com/Authula/authula/core/cleanup"
 	"github.com/Authula/authula/env"
+	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/oauth2/constants"
+	"github.com/Authula/authula/plugins/oauth2/repositories"
 	"github.com/Authula/authula/plugins/oauth2/services"
 	"github.com/Authula/authula/plugins/oauth2/types"
 	"github.com/Authula/authula/plugins/oauth2/usecases"
@@ -36,6 +41,16 @@ type OAuth2Plugin struct {
 	hmacKey          []byte
 	useCases         *usecases.UseCases
 	Api              *API
+
+	oauthClientRepo       repositories.OAuthClientRepository
+	authorizationCodeRepo repositories.AuthorizationCodeRepository
+	consentRequestRepo    repositories.ConsentRequestRepository
+	consentRepo           repositories.ConsentRepository
+	loginTransactionRepo  repositories.LoginTransactionRepository
+	flowStateRepo         repositories.FlowStateRepository
+
+	stopCleanup chan struct{}
+	done        chan struct{}
 }
 
 func New(config types.OAuth2PluginConfig) *OAuth2Plugin {
@@ -76,6 +91,8 @@ func (p *OAuth2Plugin) Init(ctx *models.PluginContext) error {
 		return err
 	}
 
+	p.initializeRepositories()
+
 	p.httpClient = &http.Client{Timeout: p.pluginConfig.HTTPTimeout}
 	p.providerRegistry = services.NewProviderRegistry()
 	if err := p.registerProviders(); err != nil {
@@ -85,11 +102,34 @@ func (p *OAuth2Plugin) Init(ctx *models.PluginContext) error {
 	p.useCases = BuildUseCases(p)
 	p.Api = &API{UseCases: p.useCases}
 
+	if p.pluginConfig.AutoCleanup {
+		p.stopCleanup = make(chan struct{})
+		p.done = make(chan struct{})
+		go p.runCleanupLoop(p.pluginConfig.CleanupInterval)
+	}
+
 	return nil
+}
+
+func (p *OAuth2Plugin) initializeRepositories() {
+	p.oauthClientRepo = repositories.NewBunOAuthClientRepository(p.db)
+	p.authorizationCodeRepo = repositories.NewBunAuthorizationCodeRepository(p.db)
+	p.consentRequestRepo = repositories.NewBunConsentRequestRepository(p.db)
+	p.consentRepo = repositories.NewBunConsentRepository(p.db)
+	p.loginTransactionRepo = repositories.NewBunLoginTransactionRepository(p.db)
+	p.flowStateRepo = repositories.NewBunFlowStateRepository(p.db)
 }
 
 func (p *OAuth2Plugin) Routes() []models.Route {
 	return Routes(p)
+}
+
+func (p *OAuth2Plugin) Migrations(provider string) []migrations.Migration {
+	return oauth2MigrationsForProvider(provider)
+}
+
+func (p *OAuth2Plugin) DependsOn() []string {
+	return nil
 }
 
 func (p *OAuth2Plugin) initializeServices(ctx *models.PluginContext) error {
@@ -331,5 +371,29 @@ func validateEndpointURL(label, endpoint string) error {
 }
 
 func (p *OAuth2Plugin) Close() error {
+	if p.stopCleanup != nil {
+		close(p.stopCleanup)
+		<-p.done
+		p.stopCleanup = nil
+		p.done = nil
+	}
 	return nil
+}
+
+func (p *OAuth2Plugin) runCleanupLoop(interval time.Duration) {
+	cleanup.RunLoop(p.stopCleanup, p.done, interval, func(ctx context.Context) {
+		now := time.Now().UTC()
+		if _, err := p.authorizationCodeRepo.DeleteExpired(ctx, now); err != nil {
+			p.logger.Error("oauth2 authorization code cleanup failed", "error", err)
+		}
+		if _, err := p.consentRequestRepo.DeleteExpired(ctx, now); err != nil {
+			p.logger.Error("oauth2 consent request cleanup failed", "error", err)
+		}
+		if _, err := p.loginTransactionRepo.DeleteExpired(ctx, now); err != nil {
+			p.logger.Error("oauth2 login transaction cleanup failed", "error", err)
+		}
+		if _, err := p.flowStateRepo.DeleteExpired(ctx, now); err != nil {
+			p.logger.Error("oauth2 flow state cleanup failed", "error", err)
+		}
+	})
 }
