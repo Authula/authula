@@ -291,7 +291,7 @@ func (p *OAuth2Plugin) registerBuiltInProvider(name string, cfg types.ProviderCo
 		provider = services.NewGoogleProvider(cfg, options)
 	case "microsoft":
 		if tenantID := strings.TrimSpace(os.Getenv(env.EnvMicrosoftTenantID)); tenantID != "" {
-			cfg.TenantID = tenantID
+			cfg.TenantID = util.StringPtr(tenantID)
 		}
 		provider = services.NewMicrosoftOAuth2Provider(cfg, options)
 	default:

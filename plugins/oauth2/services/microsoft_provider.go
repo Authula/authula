@@ -20,10 +20,14 @@ type MicrosoftOAuth2Provider struct {
 }
 
 // NewMicrosoftOAuth2Provider creates a new Microsoft OAuth2 provider.
-// cfg.TenantID may be "common" (default when empty), "organizations", "consumers" or a specific tenant ID/domain.
 func NewMicrosoftOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *MicrosoftOAuth2Provider {
+	tenantID := util.Deref(cfg.TenantID)
+	if tenantID == "" {
+		tenantID = "common"
+	}
+
 	defaults := ProviderDefaults{
-		Endpoint: endpoints.AzureAD(cfg.TenantID),
+		Endpoint: endpoints.AzureAD(tenantID),
 		Scopes: []string{
 			"openid",
 			"profile",

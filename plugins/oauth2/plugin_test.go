@@ -12,6 +12,7 @@ import (
 	"github.com/Authula/authula/plugins/oauth2/constants"
 	"github.com/Authula/authula/plugins/oauth2/services"
 	"github.com/Authula/authula/plugins/oauth2/types"
+	"github.com/Authula/authula/util"
 )
 
 func clearProviderEnv(t *testing.T) {
@@ -220,7 +221,7 @@ func TestRegisterProviders(t *testing.T) {
 		{
 			name: "microsoft config tenant",
 			providers: map[string]types.ProviderConfig{
-				"microsoft": {ClientID: "config-id", ClientSecret: "config-secret", TenantID: "contoso.onmicrosoft.com"},
+				"microsoft": {ClientID: "config-id", ClientSecret: "config-secret", TenantID: util.StringPtr("contoso.onmicrosoft.com")},
 			},
 			verify: func(t *testing.T, plugin *OAuth2Plugin) {
 				t.Helper()

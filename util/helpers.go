@@ -25,6 +25,20 @@ func NormalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
+// StringPtr returns a pointer to the given string.
+func StringPtr(s string) *string {
+	return &s
+}
+
+// Deref returns the value pointed to by p, or the zero value of T if p is nil.
+func Deref[T any](p *T) T {
+	var zero T
+	if p != nil {
+		zero = *p
+	}
+	return zero
+}
+
 func CompareStringArrays(arr1 []string, arr2 []string) bool {
 	if len(arr1) != len(arr2) {
 		return false
