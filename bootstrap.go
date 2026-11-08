@@ -1,6 +1,8 @@
 package authula
 
 import (
+	"fmt"
+
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/uptrace/bun"
 
@@ -63,14 +65,17 @@ func InitEventBus(config *models.Config) (models.EventBus, error) {
 	return coreevents.NewEventBus(config, logger, pubsub), nil
 }
 
-func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.ServiceRegistry, logger models.Logger) *serviceinterfaces.CoreServices {
+func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.ServiceRegistry, logger models.Logger) (*serviceinterfaces.CoreServices, error) {
 	signer := coresecurity.NewHMACSigner(config.Secret)
 
 	userRepo := corerepositories.NewBunUserRepository(db)
 	accountRepo := corerepositories.NewBunAccountRepository(db)
 	sessionRepo := corerepositories.NewBunSessionRepository(db)
 	verificationRepo := corerepositories.NewBunVerificationRepository(db)
-	tokenRepo := corerepositories.NewCryptoTokenRepository(config.Secret)
+	tokenRepo, err := corerepositories.NewCryptoTokenRepository(config.Secret, config.Secrets)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize token repository: %w", err)
+	}
 
 	userService := coreservices.NewUserService(userRepo, config.CoreServiceHooks, logger)
 	accountService := coreservices.NewAccountService(config, accountRepo, tokenRepo, config.CoreServiceHooks, logger)
@@ -93,7 +98,7 @@ func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.
 		VerificationService: verificationService,
 		TokenService:        tokenService,
 		PasswordService:     passwordService,
-	}
+	}, nil
 }
 
 func InitCoreSystems(logger models.Logger, config *models.Config, coreServices *serviceinterfaces.CoreServices) []models.CoreSystem {

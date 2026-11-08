@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 	"github.com/Authula/authula/models"
 )
 
-const defaultSecret = "authula-secret-0123456789"
+const defaultSecret = "YXV0aHVsYS1kZXYta2V5LTAxMjM0NTY3ODlhYmNkZWY="
 
 type ConfigOption func(*models.Config)
 
@@ -115,9 +116,34 @@ func NewConfig(options ...ConfigOption) *models.Config {
 		panic(fmt.Errorf("invalid event bus configuration: %w", err))
 	}
 
+	// AUTHULA_SECRETS replaces the TOML secrets array when set. LookupEnv keeps
+	// an explicitly empty value distinct from an unset variable so that an empty
+	// value can clear the keyring.
+	if raw, ok := os.LookupEnv(env.EnvSecrets); ok {
+		secrets, err := parseSecretsEnv(raw)
+		if err != nil {
+			panic(fmt.Errorf("invalid %s environment variable: %w", env.EnvSecrets, err))
+		}
+		config.Secrets = secrets
+	}
+
+	config.Secret = strings.TrimSpace(config.Secret)
+
+	if err := validateSecrets(config.Secrets); err != nil {
+		panic(fmt.Errorf("invalid secrets configuration: %w", err))
+	}
+
 	// Validate production configuration
-	if os.Getenv(env.EnvGoEnvironment) == "production" && config.Secret == defaultSecret {
-		panic(fmt.Errorf("a custom secret must be set in production mode. Please set a custom secret via configuration or the %s environment variable", env.EnvSecret))
+	if os.Getenv(env.EnvGoEnvironment) == "production" {
+		if config.Secret == defaultSecret {
+			panic(fmt.Errorf("a custom secret must be set in production mode. Please set a custom secret via configuration or the %s environment variable", env.EnvSecret))
+		}
+
+		for _, secret := range config.Secrets {
+			if strings.TrimSpace(secret.Value) == defaultSecret {
+				panic(fmt.Errorf("versioned secrets must not use the public development default in production mode. Please set a custom secret via configuration or the %s environment variable", env.EnvSecrets))
+			}
+		}
 	}
 
 	return config
@@ -156,6 +182,15 @@ func WithSecret(secret string) ConfigOption {
 		} else if secret != "" {
 			c.Secret = secret
 		}
+	}
+}
+
+// WithSecrets sets the ordered token-encryption keyring. The first entry is the
+// current encryption key; the remaining entries are used for decryption only.
+// AUTHULA_SECRETS overrides this option when it is set.
+func WithSecrets(secrets []models.SecretConfig) ConfigOption {
+	return func(c *models.Config) {
+		c.Secrets = secrets
 	}
 }
 
@@ -330,6 +365,73 @@ func WithCoreServiceHooks(config *models.CoreServiceHooksConfig) ConfigOption {
 	return func(c *models.Config) {
 		c.CoreServiceHooks = config
 	}
+}
+
+// parseSecretsEnv parses AUTHULA_SECRETS in the form
+// "version:secret,version:secret". An empty value clears the keyring.
+func parseSecretsEnv(raw string) ([]models.SecretConfig, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, nil
+	}
+
+	entries := strings.Split(raw, ",")
+	secrets := make([]models.SecretConfig, 0, len(entries))
+	seen := make(map[int]struct{}, len(entries))
+
+	for i, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			return nil, fmt.Errorf("entry %d is empty", i+1)
+		}
+
+		versionValue, secretValue, ok := strings.Cut(entry, ":")
+		if !ok {
+			return nil, fmt.Errorf("entry %d must be in the form version:secret", i+1)
+		}
+
+		version, err := strconv.Atoi(strings.TrimSpace(versionValue))
+		if err != nil {
+			return nil, fmt.Errorf("entry %d has an invalid version: %w", i+1, err)
+		}
+		if version <= 0 {
+			return nil, fmt.Errorf("entry %d version must be positive, got %d", i+1, version)
+		}
+		if _, exists := seen[version]; exists {
+			return nil, fmt.Errorf("duplicate secret version %d", version)
+		}
+
+		value := strings.TrimSpace(secretValue)
+		if value == "" {
+			return nil, fmt.Errorf("entry %d has an empty value", i+1)
+		}
+
+		seen[version] = struct{}{}
+		secrets = append(secrets, models.SecretConfig{Version: version, Value: value})
+	}
+
+	return secrets, nil
+}
+
+// validateSecrets checks the final keyring structure after TOML options and
+// environment overrides have been applied.
+func validateSecrets(secrets []models.SecretConfig) error {
+	seen := make(map[int]struct{}, len(secrets))
+
+	for i, secret := range secrets {
+		if secret.Version <= 0 {
+			return fmt.Errorf("entry %d version must be positive, got %d", i+1, secret.Version)
+		}
+		if _, exists := seen[secret.Version]; exists {
+			return fmt.Errorf("duplicate secret version %d", secret.Version)
+		}
+		if strings.TrimSpace(secret.Value) == "" {
+			return fmt.Errorf("entry %d has an empty value", i+1)
+		}
+
+		seen[secret.Version] = struct{}{}
+	}
+
+	return nil
 }
 
 // normalizeCookieDomain strips a leading dot from the cookie domain and checks that a browser

@@ -86,7 +86,10 @@ func New(authConfig *AuthConfig) *Auth {
 
 	serviceRegistry := plugins.NewServiceRegistry()
 
-	coreServices := InitCoreServices(authConfig.Config, db, serviceRegistry, logger)
+	coreServices, err := InitCoreServices(authConfig.Config, db, serviceRegistry, logger)
+	if err != nil {
+		panic(fmt.Errorf("failed to initialize core services: %w", err))
+	}
 
 	pluginRegistry := plugins.NewPluginRegistry(
 		authConfig.Config,

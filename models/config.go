@@ -13,6 +13,7 @@ type Config struct {
 	BaseURL       string             `json:"base_url" toml:"base_url"`
 	BasePath      string             `json:"base_path" toml:"base_path"`
 	Secret        string             `json:"secret" toml:"secret"`
+	Secrets       []SecretConfig     `json:"secrets" toml:"secrets"`
 	DisabledPaths []string           `json:"disabled_paths" toml:"disabled_paths"`
 	Database      DatabaseConfig     `json:"database" toml:"database"`
 	Logger        LoggerConfig       `json:"logger" toml:"logger"`
@@ -32,6 +33,14 @@ type Config struct {
 	PreParsedConfigs map[string]any `json:"-" toml:"-"`
 	// CoreServiceHooks allows you to hook into the service layer to carry out custom logic for users, accounts, sessions, and verifications.
 	CoreServiceHooks *CoreServiceHooksConfig `json:"-" toml:"-"`
+}
+
+// SecretConfig is one entry in the token-encryption keyring. The first entry
+// is the current encryption key; the remaining entries are decrypt-only and
+// allow non-destructive key rotation.
+type SecretConfig struct {
+	Version int    `json:"version" toml:"version"`
+	Value   string `json:"value" toml:"value"`
 }
 
 type DatabaseConfig struct {
