@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Authula/authula/plugins/oauth2/types"
-	"github.com/Authula/authula/util"
 )
 
 func TestMicrosoftUserInfo(t *testing.T) {
@@ -58,7 +57,7 @@ func TestNewMicrosoftOAuth2Provider_TenantEndpoint(t *testing.T) {
 	require.True(t, strings.HasPrefix(NewMicrosoftOAuth2Provider(cfg, nil).GetConfig().Endpoint.AuthURL,
 		"https://login.microsoftonline.com/common/"))
 
-	cfg.TenantID = util.StringPtr("organizations")
+	cfg.TenantID = new("organizations")
 	require.True(t, strings.HasPrefix(NewMicrosoftOAuth2Provider(cfg, nil).GetConfig().Endpoint.TokenURL,
 		"https://login.microsoftonline.com/organizations/"))
 	require.True(t, NewMicrosoftOAuth2Provider(cfg, nil).RequiresPKCE())

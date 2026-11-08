@@ -21,7 +21,7 @@ type MicrosoftOAuth2Provider struct {
 
 // NewMicrosoftOAuth2Provider creates a new Microsoft OAuth2 provider.
 func NewMicrosoftOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *MicrosoftOAuth2Provider {
-	tenantID := util.Deref(cfg.TenantID)
+	tenantID := util.DerefPointer(cfg.TenantID)
 	if tenantID == "" {
 		tenantID = "common"
 	}
