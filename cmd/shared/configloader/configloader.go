@@ -37,6 +37,7 @@ func Load(path string) (*authulamodels.Config, bool, error) {
 		authulaconfig.WithDatabase(loaded.Database),
 		authulaconfig.WithLogger(loaded.Logger),
 		authulaconfig.WithSecret(loaded.Secret),
+		authulaconfig.WithSecrets(loaded.Secrets),
 		authulaconfig.WithSession(loaded.Session),
 		authulaconfig.WithVerification(loaded.Verification),
 		authulaconfig.WithSecurity(loaded.Security),

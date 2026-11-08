@@ -50,6 +50,7 @@ const (
 	EnvConfigPath         = "AUTHULA_CONFIG_PATH"
 	EnvBaseURL            = "AUTHULA_BASE_URL"
 	EnvSecret             = "AUTHULA_SECRET"
+	EnvSecrets            = "AUTHULA_SECRETS"
 	EnvDatabaseURL        = "AUTHULA_DATABASE_URL"
 	EnvCookieDomain       = "AUTHULA_COOKIE_DOMAIN"
 
