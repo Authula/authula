@@ -12,6 +12,7 @@ description: Orchestrate services and repositories through use cases to implemen
 - Keep handlers thin by moving logic into use cases if multiple services are needed/used
 - Encapsulate business logic and orchestration in a single place
 - Coordinate complex operations that require multiple steps and services
+- Contains authorization logic at this layer e.g. checking org permissions etc. whilst letting services and repositories handle purely application logic.
 
 ## Key principles
 
