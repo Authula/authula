@@ -51,10 +51,10 @@ func (p *MicrosoftOAuth2Provider) GetUserInfo(ctx context.Context, token *oauth2
 		return nil, fmt.Errorf("failed to fetch Microsoft user info: %w", err)
 	}
 
-	return microsoftUserInfo(info)
+	return mapToUserInfo(info)
 }
 
-func microsoftUserInfo(info map[string]any) (*types.UserInfo, error) {
+func mapToUserInfo(info map[string]any) (*types.UserInfo, error) {
 	// Graph "id" is the object ID (oid): stable and unique per user, unlike email or UPN.
 	id, err := GetIDField(info, "id")
 	if err != nil {

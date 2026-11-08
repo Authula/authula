@@ -33,7 +33,7 @@ func TestMicrosoftUserInfo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := microsoftUserInfo(tt.info)
+			got, err := mapToUserInfo(tt.info)
 			require.NoError(t, err)
 			require.Equal(t, "oid-1", got.ProviderAccountID)
 			require.Equal(t, tt.wantEmail, got.Email)
@@ -46,7 +46,7 @@ func TestMicrosoftUserInfo(t *testing.T) {
 func TestMicrosoftUserInfo_MissingID(t *testing.T) {
 	t.Parallel()
 
-	_, err := microsoftUserInfo(map[string]any{"mail": "alice@contoso.com"})
+	_, err := mapToUserInfo(map[string]any{"mail": "alice@contoso.com"})
 	require.Error(t, err)
 }
 
