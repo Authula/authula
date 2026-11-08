@@ -1,27 +1,35 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/oauth2/constants"
 	"github.com/Authula/authula/plugins/oauth2/types"
 	"github.com/Authula/authula/plugins/oauth2/usecases"
+	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type AuthorizeHandler struct {
-	UseCase usecases.AuthorizeUseCase
-	Cookie  CookieOptions
-	Logger  models.Logger
+	UseCase         usecases.AuthorizeUseCase
+	RateLimiter     rootservices.RateLimiterService
+	RateLimitWindow time.Duration
+	RateLimitMax    int
+	Cookie          CookieOptions
+	Logger          models.Logger
 }
 
 func (h *AuthorizeHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		reqCtx, ok := models.GetRequestContext(ctx)
-		if !ok || reqCtx == nil {
-			http.Error(w, "request context missing", http.StatusInternalServerError)
+		reqCtx, _ := models.GetRequestContext(ctx)
+
+		if !h.allowRequest(reqCtx) {
 			return
 		}
 
@@ -34,7 +42,7 @@ func (h *AuthorizeHandler) Handle() http.HandlerFunc {
 
 		req := &types.AuthorizeRequest{
 			ProviderID: providerID,
-			RedirectTo: r.URL.Query().Get("redirect_to"),
+			RedirectTo: util.GetQueryString(r, "redirect_to", ""),
 		}
 		if reqCtx.Actor != nil && reqCtx.Actor.Type == models.ActorUser {
 			req.ActorID = reqCtx.Actor.ID
@@ -42,19 +50,12 @@ func (h *AuthorizeHandler) Handle() http.HandlerFunc {
 
 		resp, err := h.UseCase.Authorize(ctx, req)
 		if err != nil {
-			h.Cookie.clearFlowCookies(reqCtx.ResponseWriter)
 			WriteError(reqCtx, h.Logger, err)
 			reqCtx.Handled = true
 			return
 		}
 
-		h.Cookie.set(reqCtx.ResponseWriter, constants.CookieState, resp.StateCookie)
-		h.Cookie.set(reqCtx.ResponseWriter, constants.CookieRedirectTo, resp.RedirectCookie)
-		if resp.VerifierCookie != nil {
-			h.Cookie.set(reqCtx.ResponseWriter, constants.CookieVerifier, *resp.VerifierCookie)
-		} else {
-			h.Cookie.clear(reqCtx.ResponseWriter, constants.CookieVerifier)
-		}
+		h.Cookie.setBinding(reqCtx.ResponseWriter, resp.Binding)
 
 		reqCtx.SetJSONResponse(http.StatusOK, &types.AuthorizeResponse{
 			AuthURL: resp.AuthorizationURL,
@@ -64,4 +65,37 @@ func (h *AuthorizeHandler) Handle() http.HandlerFunc {
 		}
 		reqCtx.ResponseHeaders.Set("Cache-Control", "no-store")
 	}
+}
+
+// allowRequest applies the shared rate limiter before any use-case work.
+func (h *AuthorizeHandler) allowRequest(reqCtx *models.RequestContext) bool {
+	key := "oauth2:authorize:" + reqCtx.ClientIP
+	allowed, count, resetAt, err := h.RateLimiter.CheckAndIncrement(reqCtx.Request.Context(), key, h.RateLimitWindow, h.RateLimitMax)
+	if err != nil {
+		h.Logger.Error("oauth2 authorize rate limit check failed", "error", err)
+		WriteError(reqCtx, h.Logger, fmt.Errorf("rate limiter unavailable: %w", err))
+		reqCtx.Handled = true
+		return false
+	}
+
+	reqCtx.ResponseWriter.Header().Set("X-RateLimit-Limit", strconv.Itoa(h.RateLimitMax))
+	remaining := max(h.RateLimitMax-count, 0)
+	reqCtx.ResponseWriter.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
+	reqCtx.ResponseWriter.Header().Set("X-RateLimit-Reset", strconv.FormatInt(resetAt.Unix(), 10))
+
+	if allowed {
+		return true
+	}
+
+	retryAfter := max(int(time.Until(resetAt).Seconds()), 1)
+	reqCtx.ResponseWriter.Header().Set("X-Retry-After", strconv.Itoa(retryAfter))
+	reqCtx.SetJSONResponse(http.StatusTooManyRequests, map[string]any{
+		"message":     "rate limit exceeded",
+		"retry_after": retryAfter,
+		"limit":       h.RateLimitMax,
+		"remaining":   0,
+	})
+	reqCtx.ResponseHeaders.Set("Cache-Control", "no-store")
+	reqCtx.Handled = true
+	return false
 }

@@ -149,8 +149,8 @@ func TestBunFlowStateRepository_Consume(t *testing.T) {
 				createTestFlowState("state-hash", testNow().Add(5*time.Minute)),
 			},
 			attempts: []consumeAttempt{
-				{stateHash: "state-hash", provider: "google", purpose: types.OAuthFlowPurposeAuthorization},
-				{stateHash: "state-hash", provider: "google", purpose: types.OAuthFlowPurposeAuthorization, wantNil: true},
+				{stateHash: "state-hash", provider: "google", purpose: types.OAuthFlowPurposeLogin},
+				{stateHash: "state-hash", provider: "google", purpose: types.OAuthFlowPurposeLogin, wantNil: true},
 			},
 		},
 		{
@@ -159,8 +159,8 @@ func TestBunFlowStateRepository_Consume(t *testing.T) {
 				createTestFlowState("state-hash", testNow().Add(5*time.Minute)),
 			},
 			attempts: []consumeAttempt{
-				{stateHash: "state-hash", provider: "github", purpose: types.OAuthFlowPurposeAuthorization, wantNil: true},
-				{stateHash: "state-hash", provider: "google", purpose: types.OAuthFlowPurposeAuthorization},
+				{stateHash: "state-hash", provider: "github", purpose: types.OAuthFlowPurposeLogin, wantNil: true},
+				{stateHash: "state-hash", provider: "google", purpose: types.OAuthFlowPurposeLogin},
 			},
 		},
 		{
@@ -169,8 +169,8 @@ func TestBunFlowStateRepository_Consume(t *testing.T) {
 				createTestFlowState("state-hash", testNow().Add(5*time.Minute)),
 			},
 			attempts: []consumeAttempt{
-				{stateHash: "state-hash", provider: "google", purpose: types.OAuthFlowPurposeCallback, wantNil: true},
-				{stateHash: "state-hash", provider: "google", purpose: types.OAuthFlowPurposeAuthorization},
+				{stateHash: "state-hash", provider: "google", purpose: types.OAuthFlowPurposeLink, wantNil: true},
+				{stateHash: "state-hash", provider: "google", purpose: types.OAuthFlowPurposeLogin},
 			},
 		},
 		{
@@ -179,13 +179,13 @@ func TestBunFlowStateRepository_Consume(t *testing.T) {
 				createTestFlowState("expired", testNow().Add(-time.Minute)),
 			},
 			attempts: []consumeAttempt{
-				{stateHash: "expired", provider: "google", purpose: types.OAuthFlowPurposeAuthorization, wantNil: true},
+				{stateHash: "expired", provider: "google", purpose: types.OAuthFlowPurposeLogin, wantNil: true},
 			},
 		},
 		{
 			name: "missing state is rejected",
 			attempts: []consumeAttempt{
-				{stateHash: "missing", provider: "google", purpose: types.OAuthFlowPurposeAuthorization, wantNil: true},
+				{stateHash: "missing", provider: "google", purpose: types.OAuthFlowPurposeLogin, wantNil: true},
 			},
 		},
 	}

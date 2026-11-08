@@ -13,11 +13,12 @@ import (
 	coreservices "github.com/Authula/authula/core/services"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/oauth2/services"
+	"github.com/Authula/authula/plugins/oauth2/repositories"
 	oauth2tests "github.com/Authula/authula/plugins/oauth2/tests"
 	"github.com/Authula/authula/plugins/oauth2/types"
 	"github.com/Authula/authula/plugins/oauth2/usecases"
 	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type callbackExecutor interface {
@@ -25,11 +26,11 @@ type callbackExecutor interface {
 }
 
 type callbackIntegrationFixture struct {
-	hmacKey        []byte
 	userService    rootservices.UserService
 	accountService rootservices.AccountService
 	sessionService rootservices.SessionService
 	tokenService   rootservices.TokenService
+	flowStateRepo  repositories.FlowStateRepository
 	accountRepo    corerepos.AccountRepository
 	tokenRepo      corerepos.TokenRepository
 	sessionID      string
@@ -41,7 +42,12 @@ func newCallbackIntegrationFixture(t *testing.T) *callbackIntegrationFixture {
 	ctx := context.Background()
 	db := internaltests.NewSQLiteIntegrationDB(t)
 
-	for _, model := range []any{(*models.User)(nil), (*models.Account)(nil), (*models.Session)(nil)} {
+	for _, model := range []any{
+		(*models.User)(nil),
+		(*models.Account)(nil),
+		(*models.Session)(nil),
+		(*types.OAuthFlowState)(nil),
+	} {
 		_, err := db.NewCreateTable().Model(model).IfNotExists().Exec(ctx)
 		require.NoError(t, err)
 	}
@@ -53,14 +59,28 @@ func newCallbackIntegrationFixture(t *testing.T) *callbackIntegrationFixture {
 	sessionRepo := corerepos.NewBunSessionRepository(db)
 
 	return &callbackIntegrationFixture{
-		hmacKey:        services.DeriveOAuthHMACKey("integration-secret"),
 		userService:    coreservices.NewUserService(userRepo, nil, &internaltests.MockLogger{}),
 		accountService: coreservices.NewAccountService(nil, accountRepo, tokenRepo, nil, &internaltests.MockLogger{}),
 		sessionService: coreservices.NewSessionService(sessionRepo, nil, nil, &internaltests.MockLogger{}),
 		tokenService:   coreservices.NewTokenService(tokenRepo),
+		flowStateRepo:  repositories.NewBunFlowStateRepository(db),
 		accountRepo:    accountRepo,
 		tokenRepo:      tokenRepo,
 	}
+}
+
+func (f *callbackIntegrationFixture) seedFlowState(t *testing.T, state string, binding string, purpose string, userID *string) {
+	t.Helper()
+
+	_, err := f.flowStateRepo.Create(context.Background(), &types.OAuthFlowState{
+		ID:        util.GenerateUUID(),
+		StateHash: util.HashWithSalt(state, binding),
+		Provider:  "google",
+		Purpose:   purpose,
+		UserID:    userID,
+		ExpiresAt: time.Now().UTC().Add(5 * time.Minute),
+	})
+	require.NoError(t, err)
 }
 
 func (f *callbackIntegrationFixture) newUseCase(provider *oauth2tests.MockProvider) callbackExecutor {
@@ -68,7 +88,7 @@ func (f *callbackIntegrationFixture) newUseCase(provider *oauth2tests.MockProvid
 		&models.Config{Session: models.SessionConfig{ExpiresIn: time.Hour}},
 		oauth2tests.NewRegistry(provider),
 		&internaltests.MockLogger{},
-		f.hmacKey,
+		f.flowStateRepo,
 		f.userService,
 		f.accountService,
 		f.sessionService,
@@ -104,18 +124,13 @@ func TestCallbackUseCase_SQLiteIntegration(t *testing.T) {
 					},
 				}
 
-				stateCookie, err := services.SignState(services.StatePayload{
-					State:    "state-1",
-					Provider: "google",
-					Purpose:  services.StatePurposeLogin,
-				}, f.hmacKey)
-				require.NoError(t, err)
+				f.seedFlowState(t, "state-1", "binding-1", types.OAuthFlowPurposeLogin, nil)
 
 				return provider, &types.CallbackRequest{
-					ProviderID:  "google",
-					Code:        "code-1",
-					State:       "state-1",
-					StateCookie: stateCookie,
+					ProviderID: "google",
+					Code:       "code-1",
+					State:      "state-1",
+					Binding:    "binding-1",
 				}
 			},
 			verify: func(t *testing.T, f *callbackIntegrationFixture, result *types.CallbackResult) {
@@ -172,21 +187,15 @@ func TestCallbackUseCase_SQLiteIntegration(t *testing.T) {
 					},
 				}
 
-				stateCookie, err := services.SignState(services.StatePayload{
-					State:    "state-link",
-					Provider: "google",
-					UserID:   user.ID,
-					Purpose:  services.StatePurposeLink,
-				}, f.hmacKey)
-				require.NoError(t, err)
+				f.seedFlowState(t, "state-link", "binding-link", types.OAuthFlowPurposeLink, &user.ID)
 
 				return provider, &types.CallbackRequest{
-					ProviderID:  "google",
-					Code:        "code-link",
-					State:       "state-link",
-					StateCookie: stateCookie,
-					ActorID:     user.ID,
-					SessionID:   session.ID,
+					ProviderID: "google",
+					Code:       "code-link",
+					State:      "state-link",
+					Binding:    "binding-link",
+					ActorID:    user.ID,
+					SessionID:  session.ID,
 				}
 			},
 			verify: func(t *testing.T, f *callbackIntegrationFixture, result *types.CallbackResult) {

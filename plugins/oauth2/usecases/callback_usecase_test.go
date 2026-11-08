@@ -15,9 +15,9 @@ import (
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/oauth2/constants"
-	"github.com/Authula/authula/plugins/oauth2/services"
 	oauth2tests "github.com/Authula/authula/plugins/oauth2/tests"
 	"github.com/Authula/authula/plugins/oauth2/types"
+	"github.com/Authula/authula/util"
 )
 
 type callbackFixture struct {
@@ -27,23 +27,27 @@ type callbackFixture struct {
 	accountService *internaltests.MockAccountService
 	sessionService *internaltests.MockSessionService
 	tokenService   *internaltests.MockTokenService
-	hmacKey        []byte
+	repo           *oauth2tests.FlowStateRepositoryFake
+	state          *types.OAuthFlowState
+
+	verifierMissing bool
+	verifierErr     error
 }
 
 func newCallbackFixture(t *testing.T, provider *oauth2tests.MockProvider) *callbackFixture {
 	t.Helper()
 
-	hmacKey := services.DeriveOAuthHMACKey("test-secret")
 	userService := &internaltests.MockUserService{}
 	accountService := &internaltests.MockAccountService{}
 	sessionService := &internaltests.MockSessionService{}
 	tokenService := &internaltests.MockTokenService{}
+	repo := oauth2tests.NewFlowStateRepositoryFake()
 
 	useCase := NewCallbackUseCase(
 		&models.Config{Session: models.SessionConfig{ExpiresIn: time.Hour}},
 		oauth2tests.NewRegistry(provider),
 		&internaltests.MockLogger{},
-		hmacKey,
+		repo,
 		userService,
 		accountService,
 		sessionService,
@@ -57,35 +61,42 @@ func newCallbackFixture(t *testing.T, provider *oauth2tests.MockProvider) *callb
 		accountService: accountService,
 		sessionService: sessionService,
 		tokenService:   tokenService,
-		hmacKey:        hmacKey,
+		repo:           repo,
 	}
 }
 
-func (f *callbackFixture) request(t *testing.T, purpose services.StatePurpose, actorID string) *types.CallbackRequest {
+func (f *callbackFixture) request(t *testing.T, purpose string, actorID string) *types.CallbackRequest {
 	t.Helper()
 
-	stateCookie, err := services.SignState(services.StatePayload{
-		State:    "state-1",
-		Provider: "google",
-		UserID:   actorID,
-		Purpose:  purpose,
-	}, f.hmacKey)
+	now := time.Now().UTC()
+	state := &types.OAuthFlowState{
+		ID:        "state-1",
+		StateHash: util.HashWithSalt("state-1", "binding-1"),
+		Provider:  "google",
+		Purpose:   purpose,
+		ExpiresAt: now.Add(5 * time.Minute),
+		CreatedAt: now,
+	}
+	if purpose == types.OAuthFlowPurposeLink {
+		state.UserID = &actorID
+	}
+	if f.provider.PKCE && !f.verifierMissing {
+		encrypted := "encrypted-verifier"
+		state.CodeVerifierEncrypted = &encrypted
+	}
+	_, err := f.repo.Create(context.Background(), state)
 	require.NoError(t, err)
+	f.state = state
 
 	req := &types.CallbackRequest{
-		ProviderID:  "google",
-		Code:        "code-1",
-		State:       "state-1",
-		StateCookie: stateCookie,
-		ActorID:     actorID,
+		ProviderID: "google",
+		Code:       "code-1",
+		State:      "state-1",
+		Binding:    "binding-1",
+		ActorID:    actorID,
 	}
-	if purpose == services.StatePurposeLink {
+	if purpose == types.OAuthFlowPurposeLink {
 		req.SessionID = "session-1"
-	}
-	if f.provider.PKCE {
-		verifierCookie, err := services.SignCookie("verifier-1", f.hmacKey)
-		require.NoError(t, err)
-		req.VerifierCookie = verifierCookie
 	}
 	return req
 }
@@ -112,7 +123,7 @@ func TestCallbackUseCase(t *testing.T) {
 	tests := []struct {
 		name              string
 		provider          *oauth2tests.MockProvider
-		purpose           services.StatePurpose
+		purpose           string
 		actorID           string
 		setup             func(*callbackFixture)
 		mutateRequest     func(*callbackFixture, *types.CallbackRequest)
@@ -123,6 +134,7 @@ func TestCallbackUseCase(t *testing.T) {
 		wantReusedSession bool
 		wantEmailVerified *bool
 		wantRedirectTo    string
+		wantRedirectError bool
 		wantPKCE          bool
 	}{
 		{
@@ -138,7 +150,7 @@ func TestCallbackUseCase(t *testing.T) {
 					Name:              "User",
 				},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				user := &models.User{ID: "user-1", Email: "user@example.com"}
 				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
@@ -149,6 +161,7 @@ func TestCallbackUseCase(t *testing.T) {
 				f.accountService.On("UpdateOAuth2Tokens", mock.Anything, "account-1", "new-access-token", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
 				f.tokenService.On("Generate").Return("plain-session-token", nil)
 				f.tokenService.On("Hash", "plain-session-token").Return("hashed-session-token")
+				f.tokenService.On("Decrypt", "encrypted-verifier").Return("verifier-1", nil).Once()
 				f.sessionService.On("Create", mock.Anything, "user-1", "hashed-session-token", mock.Anything, mock.Anything, time.Hour).Return(session, nil)
 			},
 			wantUserID:       "user-1",
@@ -167,7 +180,7 @@ func TestCallbackUseCase(t *testing.T) {
 					EmailVerified:     true,
 				},
 			},
-			purpose: services.StatePurposeLink,
+			purpose: types.OAuthFlowPurposeLink,
 			actorID: "user-1",
 			setup: func(f *callbackFixture) {
 				user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: true}
@@ -178,6 +191,7 @@ func TestCallbackUseCase(t *testing.T) {
 				f.userService.On("GetByID", mock.Anything, "user-1").Return(user, nil)
 				f.accountService.On("GetByUserIDAndProvider", mock.Anything, "user-1", "google").Return(nil, nil)
 				f.accountService.On("CreateOAuth2", mock.Anything, "user-1", "google-2", "google", "new-access-token", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(createdAccount, nil)
+				f.tokenService.On("Decrypt", "encrypted-verifier").Return("verifier-1", nil).Once()
 				f.sessionService.On("GetByID", mock.Anything, "session-1").Return(session, nil)
 			},
 			wantUserID:        "user-1",
@@ -195,7 +209,7 @@ func TestCallbackUseCase(t *testing.T) {
 					EmailVerified:     true,
 				},
 			},
-			purpose: services.StatePurposeLink,
+			purpose: types.OAuthFlowPurposeLink,
 			actorID: "user-1",
 			setup: func(f *callbackFixture) {
 				user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: false}
@@ -227,7 +241,7 @@ func TestCallbackUseCase(t *testing.T) {
 					EmailVerified:     true,
 				},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				owner := &models.User{ID: "owner-1", Email: "original@example.com"}
 				account := &models.Account{ID: "account-1", UserID: "owner-1", ProviderID: "google", AccountID: "google-1"}
@@ -254,7 +268,7 @@ func TestCallbackUseCase(t *testing.T) {
 					EmailVerified:     false,
 				},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				createdUser := &models.User{ID: "new-user", Email: "new@example.com", EmailVerified: false}
 				account := &models.Account{ID: "account-1", UserID: "new-user"}
@@ -283,7 +297,7 @@ func TestCallbackUseCase(t *testing.T) {
 					EmailVerified:     true,
 				},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: true}
 				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
@@ -308,7 +322,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "provider@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLink,
+			purpose: types.OAuthFlowPurposeLink,
 			actorID: "user-2",
 			setup: func(f *callbackFixture) {
 				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
@@ -323,7 +337,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1"},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			wantErr: constants.ErrEmailRequired,
 		},
 		{
@@ -333,7 +347,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			wantErr: constants.ErrProviderAccountIDRequired,
 		},
 		{
@@ -343,7 +357,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "<nil>", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			wantErr: constants.ErrProviderAccountIDRequired,
 		},
 		{
@@ -353,7 +367,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: false},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
 				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil)
@@ -371,7 +385,7 @@ func TestCallbackUseCase(t *testing.T) {
 					EmailVerified:     true,
 				},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				createdUser := &models.User{ID: "new-user", Email: "new@example.com"}
 
@@ -389,65 +403,101 @@ func TestCallbackUseCase(t *testing.T) {
 			provider: &oauth2tests.MockProvider{
 				ProviderName: "google",
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
 				req.Error = "access_denied"
 			},
 			wantErr: constants.ErrAccessDenied,
 		},
 		{
-			name: "unknown provider",
+			name: "provider error redirects to the stored redirect",
 			provider: &oauth2tests.MockProvider{
 				ProviderName: "google",
 			},
-			purpose: services.StatePurposeLogin,
-			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
-				req.ProviderID = "missing"
+			purpose: types.OAuthFlowPurposeLogin,
+			mutateRequest: func(f *callbackFixture, req *types.CallbackRequest) {
+				req.Error = "access_denied"
+				req.ErrorDescription = "user cancelled"
+				f.state.RedirectTo = new("/welcome")
 			},
-			wantErr: constants.ErrProviderNotFound,
+			wantRedirectError: true,
+			wantRedirectTo:    "/welcome",
 		},
 		{
-			name: "invalid state cookie",
+			name: "provider error with an untrusted redirect returns access denied",
 			provider: &oauth2tests.MockProvider{
 				ProviderName: "google",
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
+			mutateRequest: func(f *callbackFixture, req *types.CallbackRequest) {
+				req.Error = "access_denied"
+				f.state.RedirectTo = new("https://evil.example/callback")
+			},
+			wantErr: constants.ErrAccessDenied,
+		},
+		{
+			name: "missing state",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+			},
+			purpose: types.OAuthFlowPurposeLogin,
 			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
-				req.StateCookie = "not-a-cookie"
+				req.State = ""
 			},
 			wantErr: constants.ErrInvalidState,
 		},
 		{
-			name: "state value mismatch",
+			name: "missing binding",
 			provider: &oauth2tests.MockProvider{
 				ProviderName: "google",
 			},
-			purpose: services.StatePurposeLogin,
-			mutateRequest: func(f *callbackFixture, req *types.CallbackRequest) {
-				stateCookie, err := services.SignState(services.StatePayload{
-					State:    "other-state",
-					Provider: "google",
-					Purpose:  services.StatePurposeLogin,
-				}, f.hmacKey)
-				require.NoError(t, err)
-				req.StateCookie = stateCookie
+			purpose: types.OAuthFlowPurposeLogin,
+			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
+				req.Binding = ""
 			},
 			wantErr: constants.ErrInvalidState,
 		},
 		{
-			name: "invalid state purpose",
+			name: "unknown state",
 			provider: &oauth2tests.MockProvider{
 				ProviderName: "google",
 			},
-			purpose: services.StatePurposeLogin,
-			mutateRequest: func(f *callbackFixture, req *types.CallbackRequest) {
-				stateCookie, err := services.SignState(services.StatePayload{
-					State:    "state-1",
-					Provider: "google",
-					Purpose:  services.StatePurpose("invalid"),
-				}, f.hmacKey)
-				require.NoError(t, err)
-				req.StateCookie = stateCookie
+			purpose: types.OAuthFlowPurposeLogin,
+			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
+				req.State = "other-state"
+			},
+			wantErr: constants.ErrInvalidState,
+		},
+		{
+			name: "expired state",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+			},
+			purpose: types.OAuthFlowPurposeLogin,
+			mutateRequest: func(f *callbackFixture, _ *types.CallbackRequest) {
+				f.state.ExpiresAt = time.Now().UTC().Add(-time.Minute)
+			},
+			wantErr: constants.ErrInvalidState,
+		},
+		{
+			name: "already consumed state",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+			},
+			purpose: types.OAuthFlowPurposeLogin,
+			mutateRequest: func(f *callbackFixture, _ *types.CallbackRequest) {
+				f.state.ConsumedAt = new(time.Now().UTC())
+			},
+			wantErr: constants.ErrInvalidState,
+		},
+		{
+			name: "unknown purpose",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+			},
+			purpose: types.OAuthFlowPurposeLogin,
+			mutateRequest: func(f *callbackFixture, _ *types.CallbackRequest) {
+				f.state.Purpose = "invalid"
 			},
 			wantErr: constants.ErrInvalidState,
 		},
@@ -456,7 +506,7 @@ func TestCallbackUseCase(t *testing.T) {
 			provider: &oauth2tests.MockProvider{
 				ProviderName: "google",
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			actorID: "user-1",
 			wantErr: constants.ErrUnauthorized,
 		},
@@ -465,7 +515,7 @@ func TestCallbackUseCase(t *testing.T) {
 			provider: &oauth2tests.MockProvider{
 				ProviderName: "google",
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
 				req.Code = ""
 			},
@@ -477,7 +527,7 @@ func TestCallbackUseCase(t *testing.T) {
 				ProviderName: "google",
 				ExchangeErr:  errors.New("exchange failed"),
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			wantErr: constants.ErrProviderFailure,
 		},
 		{
@@ -487,7 +537,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfoErr:  errors.New("user info failed"),
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			wantErr: constants.ErrProviderFailure,
 		},
 		{
@@ -496,18 +546,19 @@ func TestCallbackUseCase(t *testing.T) {
 				ProviderName: "google",
 				Token:        &oauth2.Token{},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			wantErr: constants.ErrProviderFailure,
 		},
 		{
-			name: "invalid pkce verifier cookie",
+			name: "pkce decrypt failure",
 			provider: &oauth2tests.MockProvider{
 				ProviderName: "google",
 				PKCE:         true,
 			},
-			purpose: services.StatePurposeLogin,
-			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
-				req.VerifierCookie = "not-a-cookie"
+			purpose: types.OAuthFlowPurposeLogin,
+			setup: func(f *callbackFixture) {
+				f.verifierErr = errors.New("decrypt failed")
+				f.tokenService.On("Decrypt", "encrypted-verifier").Return("", f.verifierErr).Once()
 			},
 			wantErr: constants.ErrPKCEVerifierMissing,
 		},
@@ -518,7 +569,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, errors.New("lookup failed"))
 			},
@@ -531,7 +582,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
@@ -546,7 +597,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
@@ -561,7 +612,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
 				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(nil, errors.New("lookup failed"))
@@ -575,7 +626,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
 				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(nil, nil)
@@ -590,7 +641,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
 				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(nil, nil)
@@ -605,7 +656,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLink,
+			purpose: types.OAuthFlowPurposeLink,
 			actorID: "user-1",
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
@@ -620,7 +671,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLink,
+			purpose: types.OAuthFlowPurposeLink,
 			actorID: "user-1",
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
@@ -635,7 +686,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLink,
+			purpose: types.OAuthFlowPurposeLink,
 			actorID: "user-1",
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
@@ -651,7 +702,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLink,
+			purpose: types.OAuthFlowPurposeLink,
 			actorID: "user-1",
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil)
@@ -667,7 +718,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
@@ -683,7 +734,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
@@ -699,7 +750,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil).Once()
 				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil)
@@ -715,7 +766,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil).Once()
 				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil)
@@ -731,7 +782,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil).Once()
 				f.userService.On("GetByEmail", mock.Anything, "user@example.com").Return(&models.User{ID: "user-1", Email: "user@example.com"}, nil)
@@ -747,7 +798,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLink,
+			purpose: types.OAuthFlowPurposeLink,
 			actorID: "user-1",
 			setup: func(f *callbackFixture) {
 				f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(nil, nil).Once()
@@ -765,7 +816,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLink,
+			purpose: types.OAuthFlowPurposeLink,
 			actorID: "user-1",
 			setup: func(f *callbackFixture) {
 				user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: false}
@@ -790,7 +841,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLink,
+			purpose: types.OAuthFlowPurposeLink,
 			actorID: "user-1",
 			setup: func(f *callbackFixture) {
 				user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: true}
@@ -813,7 +864,7 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
+			purpose: types.OAuthFlowPurposeLogin,
 			setup: func(f *callbackFixture) {
 				user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: true}
 				account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
@@ -833,9 +884,9 @@ func TestCallbackUseCase(t *testing.T) {
 				Token:        newOAuthToken(),
 				UserInfo:     &types.UserInfo{ProviderAccountID: "google-1", Email: "user@example.com", EmailVerified: true},
 			},
-			purpose: services.StatePurposeLogin,
-			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
-				req.VerifierCookie = ""
+			purpose: types.OAuthFlowPurposeLogin,
+			setup: func(f *callbackFixture) {
+				f.verifierMissing = true
 			},
 			wantErr: constants.ErrPKCEVerifierMissing,
 		},
@@ -845,15 +896,9 @@ func TestCallbackUseCase(t *testing.T) {
 				ProviderName: "google",
 				Token:        newOAuthToken(),
 			},
-			purpose: services.StatePurposeLogin,
-			mutateRequest: func(f *callbackFixture, req *types.CallbackRequest) {
-				stateCookie, err := services.SignState(services.StatePayload{
-					State:    "state-1",
-					Provider: "github",
-					Purpose:  services.StatePurposeLogin,
-				}, f.hmacKey)
-				require.NoError(t, err)
-				req.StateCookie = stateCookie
+			purpose: types.OAuthFlowPurposeLogin,
+			mutateRequest: func(f *callbackFixture, _ *types.CallbackRequest) {
+				f.state.Provider = "github"
 			},
 			wantErr: constants.ErrStateProviderMismatch,
 		},
@@ -863,7 +908,7 @@ func TestCallbackUseCase(t *testing.T) {
 				ProviderName: "google",
 				Token:        newOAuthToken(),
 			},
-			purpose: services.StatePurposeLink,
+			purpose: types.OAuthFlowPurposeLink,
 			actorID: "user-1",
 			mutateRequest: func(_ *callbackFixture, req *types.CallbackRequest) {
 				req.ActorID = "user-2"
@@ -888,6 +933,16 @@ func TestCallbackUseCase(t *testing.T) {
 
 			result, err := f.useCase.Callback(context.Background(), req, nil, nil)
 
+			if tt.wantRedirectError {
+				require.Error(t, err)
+				require.Nil(t, result)
+				redirectErr := new(RedirectError)
+				require.ErrorAs(t, err, &redirectErr)
+				assert.Equal(t, tt.wantRedirectTo, redirectErr.RedirectTo)
+				assert.Equal(t, "access_denied", redirectErr.Code)
+				f.assertExpectations(t)
+				return
+			}
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				assert.Nil(t, result)
@@ -913,8 +968,10 @@ func TestCallbackUseCase(t *testing.T) {
 
 			if tt.wantPKCE {
 				assert.Len(t, tt.provider.ExchangeOpts, 1, "PKCE verifier must be passed to Exchange")
+				f.tokenService.AssertNumberOfCalls(t, "Decrypt", 1)
 			} else {
 				assert.Empty(t, tt.provider.ExchangeOpts)
+				f.tokenService.AssertNumberOfCalls(t, "Decrypt", 0)
 			}
 			if tt.wantEmailVerified != nil {
 				assert.Equal(t, *tt.wantEmailVerified, result.User.EmailVerified)
@@ -1094,43 +1151,30 @@ func TestCallbackUseCase_Redirect(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name   string
-		cookie func(*callbackFixture) string
-		want   string
+		name  string
+		state *types.OAuthFlowState
+		want  string
 	}{
 		{
-			name:   "missing redirect cookie",
-			cookie: func(*callbackFixture) string { return "" },
+			name: "nil state",
 		},
 		{
-			name: "relative redirect",
-			cookie: func(f *callbackFixture) string {
-				signed, err := services.SignCookie("/welcome", f.hmacKey)
-				require.NoError(t, err)
-				return signed
-			},
-			want: "/welcome",
+			name:  "missing redirect",
+			state: &types.OAuthFlowState{},
 		},
 		{
-			name: "trusted absolute redirect",
-			cookie: func(f *callbackFixture) string {
-				signed, err := services.SignCookie("https://app.example.com/welcome", f.hmacKey)
-				require.NoError(t, err)
-				return signed
-			},
-			want: "https://app.example.com/welcome",
+			name:  "relative redirect",
+			state: &types.OAuthFlowState{RedirectTo: new("/welcome")},
+			want:  "/welcome",
 		},
 		{
-			name:   "invalid signature",
-			cookie: func(*callbackFixture) string { return "not-a-cookie" },
+			name:  "trusted absolute redirect",
+			state: &types.OAuthFlowState{RedirectTo: new("https://app.example.com/welcome")},
+			want:  "https://app.example.com/welcome",
 		},
 		{
-			name: "untrusted redirect",
-			cookie: func(f *callbackFixture) string {
-				signed, err := services.SignCookie("https://evil.example/callback", f.hmacKey)
-				require.NoError(t, err)
-				return signed
-			},
+			name:  "untrusted redirect",
+			state: &types.OAuthFlowState{RedirectTo: new("https://evil.example/callback")},
 		},
 	}
 
@@ -1141,7 +1185,7 @@ func TestCallbackUseCase_Redirect(t *testing.T) {
 			f := newCallbackFixture(t, &oauth2tests.MockProvider{ProviderName: "google"})
 			f.useCase.GlobalConfig.Security.TrustedOrigins = []string{"https://app.example.com"}
 
-			got := f.useCase.redirectTo(&types.CallbackRequest{RedirectCookie: tt.cookie(f)})
+			got := f.useCase.redirectTo(tt.state)
 
 			assert.Equal(t, tt.want, got)
 		})

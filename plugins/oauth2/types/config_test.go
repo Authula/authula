@@ -76,6 +76,9 @@ func TestOAuth2PluginConfig_ApplyDefaults(t *testing.T) {
 	if config.ConsentRequestTTL != defaultConsentRequestTTL {
 		t.Fatalf("ConsentRequestTTL = %v, want %v", config.ConsentRequestTTL, defaultConsentRequestTTL)
 	}
+	if config.FlowStateTTL != defaultFlowStateTTL {
+		t.Fatalf("FlowStateTTL = %v, want %v", config.FlowStateTTL, defaultFlowStateTTL)
+	}
 	if config.IDTokenTTL != defaultIDTokenTTL {
 		t.Fatalf("IDTokenTTL = %v, want %v", config.IDTokenTTL, defaultIDTokenTTL)
 	}
@@ -103,6 +106,7 @@ func TestOAuth2PluginConfig_ApplyDefaultsPreservesExplicitValues(t *testing.T) {
 		AllowedScopes:        []string{"openid", "custom"},
 		AuthorizationCodeTTL: time.Minute,
 		ConsentRequestTTL:    2 * time.Minute,
+		FlowStateTTL:         6 * time.Minute,
 		IDTokenTTL:           3 * time.Minute,
 		CleanupInterval:      4 * time.Minute,
 		RateLimitWindow:      5 * time.Minute,
@@ -114,8 +118,8 @@ func TestOAuth2PluginConfig_ApplyDefaultsPreservesExplicitValues(t *testing.T) {
 		t.Fatalf("AllowedScopes = %v", config.AllowedScopes)
 	}
 	if config.AuthorizationCodeTTL != time.Minute || config.ConsentRequestTTL != 2*time.Minute ||
-		config.IDTokenTTL != 3*time.Minute || config.CleanupInterval != 4*time.Minute ||
-		config.RateLimitWindow != 5*time.Minute || config.RateLimitMax != 10 {
+		config.FlowStateTTL != 6*time.Minute || config.IDTokenTTL != 3*time.Minute ||
+		config.CleanupInterval != 4*time.Minute || config.RateLimitWindow != 5*time.Minute || config.RateLimitMax != 10 {
 		t.Fatalf("explicit config values were overwritten: %+v", config)
 	}
 }

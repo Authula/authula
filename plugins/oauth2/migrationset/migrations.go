@@ -155,7 +155,7 @@ func sqliteInitial() migrations.Migration {
 					purpose VARCHAR(32) NOT NULL,
 					user_id TEXT,
 					redirect_to TEXT,
-					code_verifier_encrypted TEXT NOT NULL,
+					code_verifier_encrypted TEXT,
 					expires_at TIMESTAMP NOT NULL,
 					consumed_at TIMESTAMP,
 					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -319,7 +319,7 @@ func postgresInitial() migrations.Migration {
 					purpose VARCHAR(32) NOT NULL,
 					user_id UUID,
 					redirect_to TEXT,
-					code_verifier_encrypted TEXT NOT NULL,
+					code_verifier_encrypted TEXT,
 					expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
 					consumed_at TIMESTAMP WITH TIME ZONE,
 					created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
@@ -472,7 +472,7 @@ func mysqlInitial() migrations.Migration {
 					purpose VARCHAR(32) NOT NULL,
 					user_id BINARY(16) NULL,
 					redirect_to TEXT NULL,
-					code_verifier_encrypted TEXT NOT NULL,
+					code_verifier_encrypted TEXT,
 					expires_at TIMESTAMP NOT NULL,
 					consumed_at TIMESTAMP NULL DEFAULT NULL,
 					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

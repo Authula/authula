@@ -21,20 +21,20 @@ type AuthorizeResponse struct {
 
 // CallbackRequest represents an OAuth2 callback request
 type CallbackRequest struct {
-	ProviderID string `path:"provider"`
-	Code       string `query:"code" json:"code,omitempty" nullable:"true"`
-	State      string `query:"state" json:"state,omitempty" nullable:"true"`
-	Error      string `query:"error" json:"error,omitempty" nullable:"true"`
+	ProviderID       string `path:"provider"`
+	Code             string `query:"code" json:"code,omitempty" nullable:"true"`
+	State            string `query:"state" json:"state,omitempty" nullable:"true"`
+	Error            string `query:"error" json:"error,omitempty" nullable:"true"`
+	ErrorDescription string `query:"error_description" json:"error_description,omitempty" nullable:"true"`
 
 	// ActorID and SessionID are populated from the request context when a signed-in
 	// user starts a linking flow.
 	ActorID   string `json:"-"`
 	SessionID string `json:"-"`
 
-	// Signed flow cookies are validated by the use case.
-	StateCookie    string `json:"-"`
-	RedirectCookie string `json:"-"`
-	VerifierCookie string `json:"-"`
+	// Binding is populated from the browser-binding cookie and is folded into the
+	// state lookup hash.
+	Binding string `json:"-"`
 }
 
 // CallbackResult represents the result of OAuth2 callback

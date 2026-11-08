@@ -36,9 +36,9 @@ type OAuth2Plugin struct {
 	accountService   rootservices.AccountService
 	sessionService   rootservices.SessionService
 	tokenService     rootservices.TokenService
+	rateLimiter      rootservices.RateLimiterService
 	providerRegistry *services.ProviderRegistry
 	httpClient       *http.Client
-	hmacKey          []byte
 	useCases         *usecases.UseCases
 	Api              *API
 
@@ -82,10 +82,6 @@ func (p *OAuth2Plugin) Init(ctx *models.PluginContext) error {
 		return fmt.Errorf("failed to load oauth2 config: %w", err)
 	}
 	p.pluginConfig.ApplyDefaults()
-
-	if strings.TrimSpace(p.globalConfig.Secret) == "" {
-		return constants.ErrOAuthSecretNotConfigured
-	}
 
 	if err := p.initializeServices(ctx); err != nil {
 		return err
@@ -155,7 +151,10 @@ func (p *OAuth2Plugin) initializeServices(ctx *models.PluginContext) error {
 		return fmt.Errorf("token service not available in service registry")
 	}
 
-	p.hmacKey = services.DeriveOAuthHMACKey(p.globalConfig.Secret)
+	p.rateLimiter, ok = ctx.ServiceRegistry.Get(models.ServiceRateLimit.String()).(rootservices.RateLimiterService)
+	if !ok {
+		return fmt.Errorf("rate limit service not available in service registry")
+	}
 
 	return nil
 }
@@ -326,7 +325,7 @@ func (p *OAuth2Plugin) defaultRedirectURL(provider string) (string, error) {
 	base.Fragment = ""
 
 	redirectURL := base.String()
-	if err := services.ValidateRedirectURL(redirectURL); err != nil {
+	if err := util.ValidateRedirectURL(redirectURL); err != nil {
 		return "", fmt.Errorf("%w: provider %s %v", constants.ErrProviderConfigInvalid, provider, err)
 	}
 	return redirectURL, nil
@@ -336,7 +335,7 @@ func (p *OAuth2Plugin) validateProviderConfig(name string, cfg types.ProviderCon
 	if strings.TrimSpace(cfg.ClientID) == "" || strings.TrimSpace(cfg.ClientSecret) == "" || strings.TrimSpace(cfg.RedirectURL) == "" {
 		return fmt.Errorf("%w: provider %s is missing client_id, client_secret or redirect_url", constants.ErrProviderConfigInvalid, name)
 	}
-	if err := services.ValidateRedirectURL(cfg.RedirectURL); err != nil {
+	if err := util.ValidateRedirectURL(cfg.RedirectURL); err != nil {
 		return fmt.Errorf("%w: provider %s: %v", constants.ErrProviderConfigInvalid, name, err)
 	}
 
