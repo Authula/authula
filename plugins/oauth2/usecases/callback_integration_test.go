@@ -35,8 +35,6 @@ type callbackIntegrationFixture struct {
 	sessionID      string
 }
 
-const integrationTokenKey = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
-
 func newCallbackIntegrationFixture(t *testing.T) *callbackIntegrationFixture {
 	t.Helper()
 
@@ -48,7 +46,7 @@ func newCallbackIntegrationFixture(t *testing.T) *callbackIntegrationFixture {
 		require.NoError(t, err)
 	}
 
-	tokenRepo, err := corerepos.NewCryptoTokenRepository(integrationTokenKey, nil)
+	tokenRepo, err := corerepos.NewCryptoTokenRepository(internaltests.MustDecodeKey(internaltests.EncryptionKeyOne), nil)
 	require.NoError(t, err)
 	accountRepo := corerepos.NewBunAccountRepository(db)
 	userRepo := corerepos.NewBunUserRepository(db)

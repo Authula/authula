@@ -14,9 +14,10 @@ type HMACSigner struct {
 	secret []byte
 }
 
-func NewHMACSigner(secret string) *HMACSigner {
+// NewHMACSigner creates a signer from an already-decoded 32-byte key.
+func NewHMACSigner(secret []byte) *HMACSigner {
 	return &HMACSigner{
-		secret: []byte(secret),
+		secret: secret,
 	}
 }
 

@@ -9,10 +9,13 @@ import (
 // Config holds the core configuration for Authula.
 type Config struct {
 	// Core identity
-	AppName       string             `json:"app_name" toml:"app_name"`
-	BaseURL       string             `json:"base_url" toml:"base_url"`
-	BasePath      string             `json:"base_path" toml:"base_path"`
-	Secret        string             `json:"secret" toml:"secret"`
+	AppName  string `json:"app_name" toml:"app_name"`
+	BaseURL  string `json:"base_url" toml:"base_url"`
+	BasePath string `json:"base_path" toml:"base_path"`
+	// Secret is the padded Base64 string
+	Secret string `json:"secret" toml:"secret"`
+	// SecretKey holds the raw decoded secret
+	SecretKey     []byte             `json:"-" toml:"-"`
 	Secrets       []SecretConfig     `json:"secrets" toml:"secrets"`
 	DisabledPaths []string           `json:"disabled_paths" toml:"disabled_paths"`
 	Database      DatabaseConfig     `json:"database" toml:"database"`
@@ -35,12 +38,30 @@ type Config struct {
 	CoreServiceHooks *CoreServiceHooksConfig `json:"-" toml:"-"`
 }
 
-// SecretConfig is one entry in the token-encryption keyring. The first entry
-// is the current encryption key; the remaining entries are decrypt-only and
-// allow non-destructive key rotation.
+// SecretConfig represents an entry in the encryption keyring.
 type SecretConfig struct {
-	Version int    `json:"version" toml:"version"`
-	Value   string `json:"value" toml:"value"`
+	Version int `json:"version" toml:"version"`
+	// Value is the Base64 string.
+	Value string `json:"value" toml:"value"`
+	// Key holds the decoded Value in bytes.
+	Key []byte `json:"-" toml:"-"`
+}
+
+// EncryptionKeys returns all the decoded encryption keys
+func (c *Config) EncryptionKeys() (current []byte, decryptors [][]byte) {
+	if len(c.Secrets) == 0 {
+		return c.SecretKey, nil
+	}
+
+	decryptors = make([][]byte, 0, len(c.Secrets)+1)
+	for i := range c.Secrets {
+		decryptors = append(decryptors, c.Secrets[i].Key)
+	}
+	if len(c.SecretKey) > 0 {
+		decryptors = append(decryptors, c.SecretKey)
+	}
+
+	return c.Secrets[0].Key, decryptors
 }
 
 type DatabaseConfig struct {

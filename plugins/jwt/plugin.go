@@ -86,7 +86,7 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 	jwksRepo := repositories.NewBunJWKSRepository(ctx.DB)
 	refreshTokenRepo := repositories.NewRefreshTokenRepository(ctx.DB)
 
-	p.keyService = jwtservices.NewKeyService(jwksRepo, p.Logger, p.tokenService, p.globalConfig.Secret)
+	p.keyService = jwtservices.NewKeyService(jwksRepo, p.Logger, p.tokenService)
 	p.cacheService = jwtservices.NewCacheService(jwksRepo, p.secondaryStorage, p.Logger, p.pluginConfig.JWKSCacheTTL)
 
 	if p.secondaryStorage == nil {
