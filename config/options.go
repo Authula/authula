@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Authula/authula/core/security"
 	"github.com/Authula/authula/env"
 	"github.com/Authula/authula/events"
 	"github.com/Authula/authula/models"
@@ -116,9 +117,7 @@ func NewConfig(options ...ConfigOption) *models.Config {
 		panic(fmt.Errorf("invalid event bus configuration: %w", err))
 	}
 
-	// AUTHULA_SECRETS replaces the TOML secrets array when set. LookupEnv keeps
-	// an explicitly empty value distinct from an unset variable so that an empty
-	// value can clear the keyring.
+	// This allows AUTHULA_SECRETS to override what's set in the config.toml even if the value is empty.
 	if raw, ok := os.LookupEnv(env.EnvSecrets); ok {
 		secrets, err := parseSecretsEnv(raw)
 		if err != nil {
@@ -127,11 +126,7 @@ func NewConfig(options ...ConfigOption) *models.Config {
 		config.Secrets = secrets
 	}
 
-	config.Secret = strings.TrimSpace(config.Secret)
-
-	if err := validateSecrets(config.Secrets); err != nil {
-		panic(fmt.Errorf("invalid secrets configuration: %w", err))
-	}
+	ValidateSecrets(config)
 
 	// Validate production configuration
 	if os.Getenv(env.EnvGoEnvironment) == "production" {
@@ -185,7 +180,7 @@ func WithSecret(secret string) ConfigOption {
 	}
 }
 
-// WithSecrets sets the ordered token-encryption keyring. The first entry is the
+// WithSecrets sets the ordered encryption keyring. The first entry is the
 // current encryption key; the remaining entries are used for decryption only.
 // AUTHULA_SECRETS overrides this option when it is set.
 func WithSecrets(secrets []models.SecretConfig) ConfigOption {
@@ -410,6 +405,40 @@ func parseSecretsEnv(raw string) ([]models.SecretConfig, error) {
 	}
 
 	return secrets, nil
+}
+
+// ValidateSecrets normalizes and validates the token-encryption secrets,
+// populating SecretKey and each SecretConfig.Key with decoded key material. It
+// panics on invalid configuration so startup fails before any consumer runs.
+// It is safe to call more than once; library callers that build a Config
+// directly should call it before instantiating Authula.
+func ValidateSecrets(config *models.Config) {
+	config.Secret = strings.TrimSpace(config.Secret)
+
+	if err := validateSecrets(config.Secrets); err != nil {
+		panic(fmt.Errorf("invalid secrets configuration: %w", err))
+	}
+
+	decodedSecret, err := security.DecodeSecret(config.Secret)
+	if err != nil {
+		panic(fmt.Errorf("invalid secret: %w", err))
+	}
+	config.SecretKey = decodedSecret
+
+	normalized := make([]models.SecretConfig, len(config.Secrets))
+	copy(normalized, config.Secrets)
+
+	for i := range normalized {
+		normalized[i].Value = strings.TrimSpace(normalized[i].Value)
+
+		key, err := security.DecodeSecret(normalized[i].Value)
+		if err != nil {
+			panic(fmt.Errorf("invalid secrets configuration: entry %d (version %d): %w", i+1, normalized[i].Version, err))
+		}
+		normalized[i].Key = key
+	}
+
+	config.Secrets = normalized
 }
 
 // validateSecrets checks the final keyring structure after TOML options and

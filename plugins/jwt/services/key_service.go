@@ -21,15 +21,13 @@ import (
 type keyService struct {
 	repo         repositories.JWKSRepository
 	logger       models.Logger
-	secret       string
 	tokenService coreservices.TokenService
 }
 
-func NewKeyService(repo repositories.JWKSRepository, logger models.Logger, tokenService coreservices.TokenService, secret string) KeyService {
+func NewKeyService(repo repositories.JWKSRepository, logger models.Logger, tokenService coreservices.TokenService) KeyService {
 	return &keyService{
 		repo:         repo,
 		logger:       logger,
-		secret:       secret,
 		tokenService: tokenService,
 	}
 }

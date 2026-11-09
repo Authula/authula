@@ -1,12 +1,16 @@
 package repositories
 
-import "errors"
+import (
+	"errors"
+
+	coresecurity "github.com/Authula/authula/core/security"
+)
 
 var (
-	// ErrInvalidSecret indicates that a token-encryption key is empty,
-	// contains whitespace, is not standard Base64, or does not decode to
-	// exactly 32 bytes.
-	ErrInvalidSecret = errors.New("invalid token repository secret")
+	// ErrInvalidSecret indicates that an encryption key is not exactly 32
+	// bytes. Config load validates and decodes secrets, so this only surfaces
+	// when a caller bypasses config validation.
+	ErrInvalidSecret = coresecurity.ErrInvalidSecret
 	// ErrInvalidEncryptedToken indicates that an encrypted value is not valid
 	// Base64url or is too short to contain a nonce and an authentication tag.
 	ErrInvalidEncryptedToken = errors.New("invalid encrypted token")
