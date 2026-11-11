@@ -20,6 +20,10 @@ const (
 	EnvGithubClientID     = "GITHUB_CLIENT_ID"
 	EnvGithubClientSecret = "GITHUB_CLIENT_SECRET"
 
+	EnvMicrosoftClientID     = "MICROSOFT_CLIENT_ID"
+	EnvMicrosoftClientSecret = "MICROSOFT_CLIENT_SECRET"
+	EnvMicrosoftTenantID     = "MICROSOFT_TENANT_ID"
+
 	// POSTGRES
 
 	EnvPostgresURL = "POSTGRES_URL"

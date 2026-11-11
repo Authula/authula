@@ -25,6 +25,15 @@ func NormalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
+// DerefPointer returns the value pointed to by p, or the zero value of T if p is nil.
+func DerefPointer[T any](p *T) T {
+	var zero T
+	if p != nil {
+		zero = *p
+	}
+	return zero
+}
+
 func CompareStringArrays(arr1 []string, arr2 []string) bool {
 	if len(arr1) != len(arr2) {
 		return false

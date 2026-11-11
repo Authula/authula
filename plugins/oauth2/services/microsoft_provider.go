@@ -1,0 +1,78 @@
+package services
+
+import (
+	"context"
+	"fmt"
+
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/endpoints"
+
+	"github.com/Authula/authula/plugins/oauth2/types"
+	"github.com/Authula/authula/util"
+)
+
+const defaultMicrosoftUserInfoURL = "https://graph.microsoft.com/v1.0/me"
+
+// MicrosoftOAuth2Provider implements OAuth2Provider for Microsoft Entra ID (work/school and personal accounts)
+type MicrosoftOAuth2Provider struct {
+	*BaseProvider
+	userInfoURL string
+}
+
+// NewMicrosoftOAuth2Provider creates a new Microsoft OAuth2 provider.
+func NewMicrosoftOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *MicrosoftOAuth2Provider {
+	tenantID := util.DerefPointer(cfg.TenantID)
+	if tenantID == "" {
+		tenantID = "common"
+	}
+
+	defaults := ProviderDefaults{
+		Endpoint: endpoints.AzureAD(tenantID),
+		Scopes: []string{
+			"openid",
+			"profile",
+			"email",
+			"offline_access",
+			"User.Read",
+		},
+		UserInfoURL: defaultMicrosoftUserInfoURL,
+	}
+
+	return &MicrosoftOAuth2Provider{
+		BaseProvider: NewBaseProvider("microsoft", ResolveOAuth2Config(cfg, defaults), opts, cfg.PKCEEnabled()),
+		userInfoURL:  ResolveUserInfoURL(cfg, defaultMicrosoftUserInfoURL),
+	}
+}
+
+// GetUserInfo fetches and normalizes Microsoft Graph user information
+func (p *MicrosoftOAuth2Provider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
+	info, err := FetchUserInfo(ctx, p.opts.httpClient(), p.opts.logger(), token, p.userInfoURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch Microsoft user info: %w", err)
+	}
+
+	return mapToUserInfo(info)
+}
+
+func mapToUserInfo(info map[string]any) (*types.UserInfo, error) {
+	// Graph "id" is the object ID (oid): stable and unique per user, unlike email or UPN.
+	id, err := GetIDField(info, "id")
+	if err != nil {
+		return nil, fmt.Errorf("invalid Microsoft account id: %w", err)
+	}
+
+	// Personal accounts often have no "mail"; their sign-in name is the email address.
+	email := GetStringField(info, "mail")
+	if email == "" {
+		email = GetStringField(info, "userPrincipalName")
+	}
+
+	return &types.UserInfo{
+		ProviderAccountID: id,
+		Email:             util.NormalizeEmail(email),
+		// Entra ID lets tenant admins set any mail/UPN without verifying it, so it must never be trusted for account linking.
+		EmailVerified: false,
+		Name:          GetStringField(info, "displayName"),
+		Raw:           info,
+	}, nil
+}
