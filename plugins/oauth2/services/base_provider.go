@@ -101,6 +101,22 @@ func FetchUserInfo(ctx context.Context, client *http.Client, logger models.Logge
 		return nil, fmt.Errorf("failed to create user info request: %w", err)
 	}
 
+	return fetchUserInfoResponse(client, logger, token, req)
+}
+
+// FetchUserInfoPost fetches and parses user info using a POST request with an
+// empty JSON object body. Some providers (e.g. Dropbox) require POST.
+func FetchUserInfoPost(ctx context.Context, client *http.Client, logger models.Logger, token *oauth2.Token, url string) (map[string]any, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader("{}"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user info request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	return fetchUserInfoResponse(client, logger, token, req)
+}
+
+func fetchUserInfoResponse(client *http.Client, logger models.Logger, token *oauth2.Token, req *http.Request) (map[string]any, error) {
 	token.SetAuthHeader(req)
 
 	resp, err := client.Do(req)

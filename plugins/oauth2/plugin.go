@@ -162,6 +162,13 @@ func getEnvKey(provider, suffix string) (string, bool) {
 		case "CLIENT_SECRET":
 			return env.EnvDiscordClientSecret, true
 		}
+	case "dropbox":
+		switch suffix {
+		case "CLIENT_ID":
+			return env.EnvDropboxClientID, true
+		case "CLIENT_SECRET":
+			return env.EnvDropboxClientSecret, true
+		}
 	case "github":
 		switch suffix {
 		case "CLIENT_ID":
@@ -204,7 +211,7 @@ func (p *OAuth2Plugin) registerProviders() error {
 	for name := range configured {
 		names = append(names, name)
 	}
-	for _, builtIn := range []string{"discord", "github", "google", "microsoft"} {
+	for _, builtIn := range []string{"discord", "dropbox", "github", "google", "microsoft"} {
 		if _, exists := configured[builtIn]; !exists {
 			names = append(names, builtIn)
 		}
@@ -278,6 +285,8 @@ func (p *OAuth2Plugin) registerBuiltInProvider(name string, cfg types.ProviderCo
 	switch name {
 	case "discord":
 		provider = services.NewDiscordOAuth2Provider(cfg, options)
+	case "dropbox":
+		provider = services.NewDropboxOAuth2Provider(cfg, options)
 	case "github":
 		provider = services.NewGitHubOAuth2Provider(cfg, options)
 	case "google":
