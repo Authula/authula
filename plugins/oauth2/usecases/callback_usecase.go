@@ -2,10 +2,12 @@ package usecases
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"golang.org/x/oauth2"
 
@@ -16,6 +18,8 @@ import (
 	"github.com/Authula/authula/plugins/oauth2/types"
 	rootservices "github.com/Authula/authula/services"
 )
+
+const maxUserNameLength = 100
 
 type callbackUseCase struct {
 	GlobalConfig     *models.Config
@@ -104,6 +108,9 @@ func (uc *callbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 		uc.Logger.Error("failed to get oauth user info", "provider", providerID, "error", err)
 		return nil, fmt.Errorf("%w: %v", constants.ErrProviderFailure, err)
 	}
+
+	uc.applyUserPayload(userInfo, req.User)
+
 	if err := validateUserInfo(userInfo); err != nil {
 		return nil, err
 	}
@@ -427,4 +434,55 @@ func fallbackName(info *types.UserInfo) string {
 		return local
 	}
 	return "User"
+}
+
+// applyUserPayload merges the user payload some providers post alongside the
+// callback, which they send on first consent only. Only the name is taken: the
+// payload is submitted by the browser and is not signed by the provider, so it
+// must never decide which account the login resolves to. A malformed payload is
+// logged rather than fatal, since the token already identifies the account.
+func (uc *callbackUseCase) applyUserPayload(userInfo *types.UserInfo, payload string) {
+	if payload == "" || userInfo == nil {
+		return
+	}
+
+	var user struct {
+		Name struct {
+			FirstName string `json:"firstName"`
+			LastName  string `json:"lastName"`
+		} `json:"name"`
+	}
+
+	if err := json.Unmarshal([]byte(payload), &user); err != nil {
+		uc.Logger.Warn("failed to parse provider user payload", "error", err)
+		return
+	}
+
+	if userInfo.Name == "" {
+		userInfo.Name = sanitizeName(user.Name.FirstName + " " + user.Name.LastName)
+	}
+}
+
+// sanitizeName drops control characters, collapses whitespace and caps the
+// length. Whitespace is mapped to a space before control characters are
+// removed so tab- and newline-separated words do not get glued together.
+func sanitizeName(name string) string {
+	printable := strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return ' '
+		}
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, name)
+
+	cleaned := strings.Join(strings.Fields(printable), " ")
+
+	runes := []rune(cleaned)
+	if len(runes) > maxUserNameLength {
+		return string(runes[:maxUserNameLength])
+	}
+
+	return cleaned
 }

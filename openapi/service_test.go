@@ -65,6 +65,10 @@ func TestOpenAPIService_AddOperation(t *testing.T) {
 		Title       string `json:"title"`
 		Description string `json:"description"`
 	}
+	type formTodoRequest struct {
+		Title       string `form:"title" json:"title"`
+		Description string `form:"description" json:"description"`
+	}
 	type createTodoResponse struct {
 		ID    string `json:"id"`
 		Title string `json:"title"`
@@ -161,6 +165,27 @@ func TestOpenAPIService_AddOperation(t *testing.T) {
 				components := spec["components"].(map[string]any)
 				schemas := components["schemas"].(map[string]any)
 				assert.NotEmpty(t, schemas, "request/response types should be in components/schemas")
+			},
+		},
+		{
+			name:   "documents a form-encoded request body",
+			method: http.MethodPost,
+			path:   "/api/callback",
+			opts: []openapi.OperationOption{
+				openapi.WithSummary("Provider callback"),
+				openapi.WithRequest(&formTodoRequest{}, openapi.WithFormContentType()),
+				openapi.WithResponseStatus(http.StatusOK, &messageResponse{}),
+			},
+			check: func(t *testing.T, spec map[string]any) {
+				postOp := spec["paths"].(map[string]any)["/api/callback"].(map[string]any)["post"].(map[string]any)
+				requestBody, ok := postOp["requestBody"].(map[string]any)
+				require.True(t, ok, "POST should have a request body")
+
+				content, ok := requestBody["content"].(map[string]any)
+				require.True(t, ok, "request body should declare a content type")
+
+				assert.Contains(t, content, "application/x-www-form-urlencoded")
+				assert.NotContains(t, content, "application/json", "a form post must not be documented as JSON")
 			},
 		},
 		{
