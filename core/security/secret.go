@@ -16,9 +16,7 @@ const SecretKeySize = 32
 // not standard padded Base64, or does not decode to exactly SecretKeySize bytes.
 var ErrInvalidSecret = errors.New("invalid secret")
 
-// DecodeSecret decodes a standard padded Base64 secret into exactly
-// SecretKeySize bytes. This is the only supported secret format: for example,
-// the output of `openssl rand -base64 32`.
+// DecodeSecret decodes a standard padded Base64 secret.
 func DecodeSecret(value string) ([]byte, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
