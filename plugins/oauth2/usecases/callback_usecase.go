@@ -390,6 +390,11 @@ func (uc *callbackUseCase) redirectTo(state *types.OAuthFlowState) string {
 
 	validated, err := util.ValidateRedirectTo(*state.RedirectTo, uc.GlobalConfig.Security.TrustedOrigins)
 	if err != nil {
+		uc.Logger.Warn(
+			"oauth redirect_to failed validation; redirect suppressed",
+			"provider", state.Provider,
+			"error", err,
+		)
 		return ""
 	}
 	return validated

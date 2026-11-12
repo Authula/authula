@@ -28,6 +28,7 @@ type callbackFixture struct {
 	sessionService *internaltests.MockSessionService
 	tokenService   *internaltests.MockTokenService
 	repo           *oauth2tests.FlowStateRepositoryFake
+	logger         *internaltests.LevelRecordingLogger
 	state          *types.OAuthFlowState
 
 	verifierMissing bool
@@ -42,11 +43,12 @@ func newCallbackFixture(t *testing.T, provider *oauth2tests.MockProvider) *callb
 	sessionService := &internaltests.MockSessionService{}
 	tokenService := &internaltests.MockTokenService{}
 	repo := oauth2tests.NewFlowStateRepositoryFake()
+	logger := &internaltests.LevelRecordingLogger{}
 
 	useCase := NewCallbackUseCase(
 		&models.Config{Session: models.SessionConfig{ExpiresIn: time.Hour}},
 		oauth2tests.NewRegistry(provider),
-		&internaltests.MockLogger{},
+		logger,
 		repo,
 		userService,
 		accountService,
@@ -62,6 +64,7 @@ func newCallbackFixture(t *testing.T, provider *oauth2tests.MockProvider) *callb
 		sessionService: sessionService,
 		tokenService:   tokenService,
 		repo:           repo,
+		logger:         logger,
 	}
 }
 
@@ -975,6 +978,83 @@ func TestCallbackUseCase(t *testing.T) {
 			}
 			if tt.wantEmailVerified != nil {
 				assert.Equal(t, *tt.wantEmailVerified, result.User.EmailVerified)
+			}
+
+			f.assertExpectations(t)
+		})
+	}
+}
+
+func TestCallbackUseCase_RedirectValidationIsApplied(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		trustedOrigins []string
+		redirectTo     *string
+		wantRedirectTo string
+		wantWarning    string
+	}{
+		{
+			name:           "relative redirect is returned",
+			redirectTo:     new("/welcome"),
+			wantRedirectTo: "/welcome",
+		},
+		{
+			name:           "trusted absolute redirect is returned",
+			trustedOrigins: []string{"https://app.example.com"},
+			redirectTo:     new("https://app.example.com/welcome"),
+			wantRedirectTo: "https://app.example.com/welcome",
+		},
+		{
+			name:           "untrusted redirect is dropped and logged",
+			trustedOrigins: []string{"https://app.example.com"},
+			redirectTo:     new("https://evil.example/callback"),
+			wantWarning:    "oauth redirect_to failed validation; redirect suppressed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			provider := &oauth2tests.MockProvider{
+				ProviderName: "google",
+				Token:        newOAuthToken(),
+				UserInfo: &types.UserInfo{
+					ProviderAccountID: "google-1",
+					Email:             "user@example.com",
+					EmailVerified:     true,
+				},
+			}
+			f := newCallbackFixture(t, provider)
+			f.useCase.GlobalConfig.Security.TrustedOrigins = tt.trustedOrigins
+
+			user := &models.User{ID: "user-1", Email: "user@example.com", EmailVerified: true}
+			account := &models.Account{ID: "account-1", UserID: "user-1", ProviderID: "google", AccountID: "google-1"}
+			session := &models.Session{ID: "session-new", UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}
+
+			f.accountService.On("GetByProviderAndAccountID", mock.Anything, "google", "google-1").Return(account, nil)
+			f.userService.On("GetByID", mock.Anything, "user-1").Return(user, nil)
+			f.accountService.On("UpdateOAuth2Tokens", mock.Anything, "account-1", "new-access-token", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(account, nil)
+			f.tokenService.On("Generate").Return("session-token", nil)
+			f.tokenService.On("Hash", "session-token").Return("hashed")
+			f.sessionService.On("Create", mock.Anything, "user-1", "hashed", mock.Anything, mock.Anything, time.Hour).Return(session, nil)
+
+			req := f.request(t, types.OAuthFlowPurposeLogin, "")
+			f.state.RedirectTo = tt.redirectTo
+
+			result, err := f.useCase.Callback(context.Background(), req, nil, nil)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.NotNil(t, result.User)
+			require.NotNil(t, result.Session)
+			assert.Equal(t, tt.wantRedirectTo, result.RedirectTo)
+
+			if tt.wantWarning != "" {
+				assert.Contains(t, f.logger.Messages(), tt.wantWarning)
+			} else {
+				assert.NotContains(t, f.logger.Messages(), "oauth redirect_to failed validation; redirect suppressed")
 			}
 
 			f.assertExpectations(t)
