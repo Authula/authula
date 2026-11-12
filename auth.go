@@ -8,6 +8,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	authulaconfig "github.com/Authula/authula/config"
 	"github.com/Authula/authula/core"
 	"github.com/Authula/authula/internal/migrationmanager"
 	"github.com/Authula/authula/internal/plugins"
@@ -54,6 +55,8 @@ func New(authConfig *AuthConfig) *Auth {
 	if authConfig == nil || authConfig.Config == nil {
 		panic("auth config and auth config config must not be nil")
 	}
+
+	authulaconfig.ValidateSecrets(authConfig.Config)
 
 	util.InitValidator()
 

@@ -66,13 +66,13 @@ func InitEventBus(config *models.Config) (models.EventBus, error) {
 }
 
 func InitCoreServices(config *models.Config, db bun.IDB, serviceRegistry models.ServiceRegistry, logger models.Logger) (*serviceinterfaces.CoreServices, error) {
-	signer := coresecurity.NewHMACSigner(config.Secret)
+	signer := coresecurity.NewHMACSigner(config.SecretKey)
 
 	userRepo := corerepositories.NewBunUserRepository(db)
 	accountRepo := corerepositories.NewBunAccountRepository(db)
 	sessionRepo := corerepositories.NewBunSessionRepository(db)
 	verificationRepo := corerepositories.NewBunVerificationRepository(db)
-	tokenRepo, err := corerepositories.NewCryptoTokenRepository(config.Secret, config.Secrets)
+	tokenRepo, err := corerepositories.NewCryptoTokenRepository(config.EncryptionKeys())
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize token repository: %w", err)
 	}

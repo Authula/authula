@@ -32,8 +32,6 @@ type BaseTestFixture struct {
 	idAliases           map[string]string
 }
 
-const integrationTestSecret = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
-
 func NewBaseTestFixture(t *testing.T, options ...config.ConfigOption) *BaseTestFixture {
 	t.Helper()
 
@@ -41,7 +39,7 @@ func NewBaseTestFixture(t *testing.T, options ...config.ConfigOption) *BaseTestF
 
 	defaultOptions := []config.ConfigOption{
 		config.WithBasePath("/auth"),
-		config.WithSecret(integrationTestSecret),
+		config.WithSecret(EncryptionKeyOne),
 		config.WithDatabase(models.DatabaseConfig{Provider: provider}),
 		config.WithEventBus(models.EventBusConfig{Provider: events.ProviderGoChannel}),
 	}
@@ -51,7 +49,7 @@ func NewBaseTestFixture(t *testing.T, options ...config.ConfigOption) *BaseTestF
 	serviceRegistry := coreplugins.NewServiceRegistry()
 	userRepo := corerepos.NewBunUserRepository(db)
 	userService := coreservices.NewUserService(userRepo, nil, &MockLogger{})
-	tokenRepo, err := corerepos.NewCryptoTokenRepository(cfg.Secret, cfg.Secrets)
+	tokenRepo, err := corerepos.NewCryptoTokenRepository(cfg.EncryptionKeys())
 	if err != nil {
 		t.Fatalf("failed to initialize token repository: %v", err)
 	}
@@ -60,7 +58,7 @@ func NewBaseTestFixture(t *testing.T, options ...config.ConfigOption) *BaseTestF
 	sessionRepo := corerepos.NewBunSessionRepository(db)
 	sessionService := coreservices.NewSessionService(sessionRepo, nil, nil, &MockLogger{})
 	verificationRepo := corerepos.NewBunVerificationRepository(db)
-	tokenSigner := coresecurity.NewHMACSigner(cfg.Secret)
+	tokenSigner := coresecurity.NewHMACSigner(cfg.SecretKey)
 	verificationService := coreservices.NewVerificationService(verificationRepo, tokenSigner, nil, &MockLogger{})
 	tokenService := coreservices.NewTokenService(tokenRepo)
 

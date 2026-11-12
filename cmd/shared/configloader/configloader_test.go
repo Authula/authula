@@ -1,11 +1,13 @@
 package configloader
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/Authula/authula/env"
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,14 +31,14 @@ func TestLoadPassesSecretsToConfig(t *testing.T) {
 	unsetEnvForTest(t, env.EnvSecrets)
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	require.NoError(t, os.WriteFile(path, []byte(util.Dedent(`
-		secret = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+	require.NoError(t, os.WriteFile(path, []byte(util.Dedent(fmt.Sprintf(`
+		secret = "%s"
 
 		secrets = [
-			{ version = 2, value = "ZmVkY2JhOTg3NjU0MzIxMGZlZGNiYTk4NzY1NDMyMTA=" },
-			{ version = 1, value = "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=" },
+			{ version = 2, value = "%s" },
+			{ version = 1, value = "%s" },
 		]
-	`)), 0o600))
+	`, internaltests.EncryptionKeyOne, internaltests.EncryptionKeyTwo, internaltests.EncryptionKeyThree))), 0o600))
 
 	config, exists, err := Load(path)
 	require.NoError(t, err)
@@ -44,9 +46,9 @@ func TestLoadPassesSecretsToConfig(t *testing.T) {
 
 	require.Len(t, config.Secrets, 2)
 	assert.Equal(t, 2, config.Secrets[0].Version)
-	assert.Equal(t, "ZmVkY2JhOTg3NjU0MzIxMGZlZGNiYTk4NzY1NDMyMTA=", config.Secrets[0].Value)
+	assert.Equal(t, internaltests.EncryptionKeyTwo, config.Secrets[0].Value)
 	assert.Equal(t, 1, config.Secrets[1].Version)
-	assert.Equal(t, "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=", config.Secrets[1].Value)
+	assert.Equal(t, internaltests.EncryptionKeyThree, config.Secrets[1].Value)
 }
 
 func TestLoadRejectsInvalidSecrets(t *testing.T) {

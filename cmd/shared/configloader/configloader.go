@@ -32,12 +32,12 @@ func Load(path string) (*authulamodels.Config, bool, error) {
 
 	return authulaconfig.NewConfig(
 		authulaconfig.WithAppName(loaded.AppName),
+		authulaconfig.WithSecret(loaded.Secret),
+		authulaconfig.WithSecrets(loaded.Secrets),
 		authulaconfig.WithBaseURL(loaded.BaseURL),
 		authulaconfig.WithBasePath(loaded.BasePath),
 		authulaconfig.WithDatabase(loaded.Database),
 		authulaconfig.WithLogger(loaded.Logger),
-		authulaconfig.WithSecret(loaded.Secret),
-		authulaconfig.WithSecrets(loaded.Secrets),
 		authulaconfig.WithSession(loaded.Session),
 		authulaconfig.WithVerification(loaded.Verification),
 		authulaconfig.WithSecurity(loaded.Security),
