@@ -36,7 +36,6 @@ type OAuth2Plugin struct {
 	accountService   rootservices.AccountService
 	sessionService   rootservices.SessionService
 	tokenService     rootservices.TokenService
-	rateLimiter      rootservices.RateLimiterService
 	providerRegistry *services.ProviderRegistry
 	httpClient       *http.Client
 	useCases         *usecases.UseCases
@@ -149,11 +148,6 @@ func (p *OAuth2Plugin) initializeServices(ctx *models.PluginContext) error {
 	p.tokenService, ok = ctx.ServiceRegistry.Get(models.ServiceToken.String()).(rootservices.TokenService)
 	if !ok {
 		return fmt.Errorf("token service not available in service registry")
-	}
-
-	p.rateLimiter, ok = ctx.ServiceRegistry.Get(models.ServiceRateLimit.String()).(rootservices.RateLimiterService)
-	if !ok {
-		return fmt.Errorf("rate limit service not available in service registry")
 	}
 
 	return nil

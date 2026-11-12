@@ -32,7 +32,9 @@ func newAuthorizeFixture(t *testing.T, provider *oauth2tests.MockProvider) *auth
 	t.Helper()
 
 	repo := oauth2tests.NewFlowStateRepositoryFake()
-	tokenService := coreservices.NewTokenService(corerepos.NewCryptoTokenRepository("test-secret"))
+	tokenRepo, err := corerepos.NewCryptoTokenRepository(internaltests.MustDecodeKey(internaltests.EncryptionKeyOne), nil)
+	require.NoError(t, err)
+	tokenService := coreservices.NewTokenService(tokenRepo)
 	useCase := NewAuthorizeUseCase(
 		oauth2tests.NewRegistry(provider),
 		&internaltests.MockLogger{},

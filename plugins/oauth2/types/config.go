@@ -9,8 +9,6 @@ const (
 	defaultFlowStateTTL         = 5 * time.Minute
 	defaultIDTokenTTL           = 5 * time.Minute
 	defaultCleanupInterval      = time.Minute
-	defaultRateLimitWindow      = time.Minute
-	defaultRateLimitMax         = 60
 )
 
 func defaultAllowedScopes() []string {
@@ -38,9 +36,6 @@ type OAuth2PluginConfig struct {
 
 	AutoCleanup     bool          `json:"auto_cleanup" toml:"auto_cleanup"`
 	CleanupInterval time.Duration `json:"cleanup_interval" toml:"cleanup_interval"`
-
-	RateLimitWindow time.Duration `json:"rate_limit_window" toml:"rate_limit_window"`
-	RateLimitMax    int           `json:"rate_limit_max" toml:"rate_limit_max"`
 }
 
 // ApplyDefaults applies default values to the config
@@ -68,12 +63,6 @@ func (c *OAuth2PluginConfig) ApplyDefaults() {
 	}
 	if c.CleanupInterval <= 0 {
 		c.CleanupInterval = defaultCleanupInterval
-	}
-	if c.RateLimitWindow <= 0 {
-		c.RateLimitWindow = defaultRateLimitWindow
-	}
-	if c.RateLimitMax <= 0 {
-		c.RateLimitMax = defaultRateLimitMax
 	}
 }
 

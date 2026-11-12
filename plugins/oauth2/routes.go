@@ -20,12 +20,9 @@ func Routes(plugin *OAuth2Plugin) []models.Route {
 	}
 
 	authorizeHandler := &handlers.AuthorizeHandler{
-		UseCase:         useCases.AuthorizeUseCase,
-		RateLimiter:     plugin.rateLimiter,
-		RateLimitWindow: plugin.pluginConfig.RateLimitWindow,
-		RateLimitMax:    plugin.pluginConfig.RateLimitMax,
-		Cookie:          cookieOptions,
-		Logger:          plugin.logger,
+		UseCase: useCases.AuthorizeUseCase,
+		Cookie:  cookieOptions,
+		Logger:  plugin.logger,
 	}
 
 	callbackHandler := &handlers.CallbackHandler{
