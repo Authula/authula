@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/totp/constants"
@@ -117,9 +119,14 @@ func (s *VerifyTOTPHandlerSuite) TestVerifyTOTPHandler_Table() {
 				m.withCookie = true
 				m.requestBody, _ = json.Marshal(types.VerifyTOTPRequest{Code: "123456"})
 				m.tokenSvc.On("Hash", m.pendingRaw).Return("hashed-token")
-				m.verifSvc.On("GetByToken", mock.Anything, "hashed-token").Return(nil, nil)
+				m.verifSvc.On("GetByToken", mock.Anything, "hashed-token").
+					Return(nil, fmt.Errorf("verification not found: %w", coreerrors.ErrNotFound))
 			},
 			expectedStatus: http.StatusUnauthorized,
+			checkResponse: func(t *testing.T, _ *httptest.ResponseRecorder, reqCtx *models.RequestContext) {
+				assert.Contains(t, string(reqCtx.ResponseBody), constants.ErrInvalidPendingToken.Error())
+				assert.NotContains(t, string(reqCtx.ResponseBody), coreerrors.ErrNotFound.Error(), "a missing row must never surface as a raw not-found")
+			},
 		},
 		{
 			name: "totp_not_enabled",

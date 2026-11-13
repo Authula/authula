@@ -2,11 +2,13 @@ package usecases
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 )
 
@@ -75,7 +77,8 @@ func TestVerifyUseCase_Verify(t *testing.T) {
 			token: "invalid-token",
 			setup: func(t *testing.T, uc *VerifyUseCaseImpl, userSvc *mockUserService, verificationSvc *mockVerificationService, tokenSvc *mockTokenService, verification *models.Verification) {
 				tokenSvc.On("Hash", "invalid-token").Return("hashed-invalid-token").Once()
-				verificationSvc.On("GetByToken", mock.Anything, "hashed-invalid-token").Return(nil, nil).Once()
+				verificationSvc.On("GetByToken", mock.Anything, "hashed-invalid-token").
+					Return(nil, fmt.Errorf("verification not found: %w", coreerrors.ErrNotFound)).Once()
 
 				t.Cleanup(func() {
 					verificationSvc.AssertExpectations(t)
@@ -84,6 +87,7 @@ func TestVerifyUseCase_Verify(t *testing.T) {
 			},
 			assertResult: func(t *testing.T, code string, err error) {
 				assert.EqualError(t, err, "invalid or expired token")
+				assert.NotErrorIs(t, err, coreerrors.ErrNotFound, "a missing row must surface as invalid-or-expired, never as a raw not-found")
 				assert.Empty(t, code)
 			},
 		},

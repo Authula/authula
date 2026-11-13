@@ -3,8 +3,10 @@ package usecases
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/core/types"
 	inttests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
@@ -74,6 +76,23 @@ func TestGetMeUseCase(t *testing.T) {
 			user:       expectedUser,
 			sessionErr: errors.New("session lookup failed"),
 			wantErr:    "session lookup failed",
+		},
+		{
+			name:       "treats a missing session for the known id as no session",
+			sessionID:  new("session-123"),
+			user:       expectedUser,
+			sessionErr: fmt.Errorf("session session-123 not found: %w", coreerrors.ErrNotFound),
+			want: &types.GetMeResult{
+				User: expectedUser,
+			},
+		},
+		{
+			name:       "treats a missing latest session as no session",
+			user:       expectedUser,
+			sessionErr: fmt.Errorf("session not found: %w", coreerrors.ErrNotFound),
+			want: &types.GetMeResult{
+				User: expectedUser,
+			},
 		},
 		{
 			name:       "returns user lookup error when both fail",

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/services"
 	"github.com/Authula/authula/util"
@@ -134,6 +135,9 @@ func (p *SessionPlugin) validateSessionCookie(r *http.Request) (*models.Session,
 	}
 
 	session, err := p.sessionService.GetByToken(r.Context(), p.tokenService.Hash(cookie.Value))
+	if errors.Is(err, coreerrors.ErrNotFound) {
+		return nil, "", fmt.Errorf("session not found")
+	}
 	if err != nil {
 		return nil, "", err
 	}

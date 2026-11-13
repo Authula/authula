@@ -2,12 +2,14 @@ package usecases
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
 	"github.com/Authula/authula/plugins/email-password/types"
@@ -27,10 +29,12 @@ func TestVerifyEmailUseCase(t *testing.T) {
 			name: "invalid token returns error",
 			setup: func(f *emailPasswordTestFixture) {
 				f.tokenSvc.On("Hash", "token-123").Return("hashed-token").Once()
-				f.verificationSvc.On("GetByToken", mock.Anything, "hashed-token").Return(nil, nil).Once()
+				f.verificationSvc.On("GetByToken", mock.Anything, "hashed-token").
+					Return(nil, fmt.Errorf("verification not found: %w", coreerrors.ErrNotFound)).Once()
 			},
 			assert: func(t *testing.T, vt models.VerificationType, err error) {
 				require.ErrorIs(t, err, constants.ErrInvalidOrExpiredToken)
+				require.NotErrorIs(t, err, coreerrors.ErrNotFound, "a missing row must surface as invalid-or-expired, never as a raw not-found")
 				require.Empty(t, vt)
 			},
 		},

@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	coreservices "github.com/Authula/authula/core/services"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
@@ -956,7 +958,8 @@ func TestCallbackUseCase_CurrentSession(t *testing.T) {
 			sessionID: "session-1",
 			actorID:   "user-1",
 			setup: func(f *callbackFixture) {
-				f.sessionService.On("GetByID", mock.Anything, "session-1").Return(nil, nil)
+				f.sessionService.On("GetByID", mock.Anything, "session-1").
+					Return(nil, fmt.Errorf("session session-1 not found: %w", coreerrors.ErrNotFound))
 			},
 			wantErr: constants.ErrSessionNotFound,
 		},

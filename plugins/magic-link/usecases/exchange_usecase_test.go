@@ -3,12 +3,14 @@ package usecases
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/magic-link/types"
 )
@@ -119,7 +121,8 @@ func TestExchangeUseCase(t *testing.T) {
 			token: "raw-token",
 			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
 				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
-				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(nil, nil).Once()
+				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").
+					Return(nil, fmt.Errorf("verification not found: %w", coreerrors.ErrNotFound)).Once()
 
 				t.Cleanup(func() {
 					h.verificationSvc.AssertExpectations(t)
@@ -128,6 +131,7 @@ func TestExchangeUseCase(t *testing.T) {
 			},
 			assertResult: func(t *testing.T, result *types.MagicLinkExchangeResult, err error) {
 				assert.EqualError(t, err, "invalid or expired token")
+				assert.NotErrorIs(t, err, coreerrors.ErrNotFound, "a missing row must surface as invalid-or-expired, never as a raw not-found")
 				assert.Nil(t, result)
 			},
 		},

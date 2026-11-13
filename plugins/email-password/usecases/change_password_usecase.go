@@ -2,10 +2,12 @@ package usecases
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	emailconstants "github.com/Authula/authula/core/email/constants"
 	emailtmpl "github.com/Authula/authula/core/email/template"
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
 	"github.com/Authula/authula/plugins/email-password/services"
@@ -73,6 +75,9 @@ func (uc *changePasswordUseCase) ChangePassword(ctx context.Context, tokenValue 
 
 	hashedToken := uc.TokenService.Hash(tokenValue)
 	verification, err := uc.VerificationService.GetByToken(ctx, hashedToken)
+	if errors.Is(err, coreerrors.ErrNotFound) {
+		return constants.ErrInvalidOrExpiredToken
+	}
 	if err != nil {
 		return err
 	}

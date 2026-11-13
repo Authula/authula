@@ -3,11 +3,13 @@ package usecases
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/totp/constants"
 	"github.com/Authula/authula/plugins/totp/types"
@@ -86,11 +88,13 @@ func TestVerifyBackupCodeUseCase(t *testing.T) {
 			pendingToken: "pending-token",
 			setup: func(t *testing.T, f *testFixture) (string, *string, *string) {
 				f.tokenSvc.On("Hash", "pending-token").Return("hashed-pending-token").Once()
-				f.verifSvc.On("GetByToken", mock.Anything, "hashed-pending-token").Return(nil, nil).Once()
+				f.verifSvc.On("GetByToken", mock.Anything, "hashed-pending-token").
+					Return(nil, fmt.Errorf("verification not found: %w", coreerrors.ErrNotFound)).Once()
 				return "bad", nil, nil
 			},
 			assert: func(t *testing.T, result *types.VerifyResult, err error, f *testFixture) {
 				require.ErrorIs(t, err, constants.ErrInvalidPendingToken)
+				require.NotErrorIs(t, err, coreerrors.ErrNotFound, "a missing row must surface as an invalid pending token, never as a raw not-found")
 				require.Nil(t, result)
 			},
 		},

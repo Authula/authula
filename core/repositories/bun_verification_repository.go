@@ -3,10 +3,12 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 )
 
@@ -31,7 +33,7 @@ func (r *BunVerificationRepository) GetByToken(ctx context.Context, token string
 	v := new(models.Verification)
 	err := r.db.NewSelect().Model(v).Where("token = ?", token).Scan(ctx)
 	if err == sql.ErrNoRows {
-		return nil, nil
+		return nil, fmt.Errorf("verification not found: %w", coreerrors.ErrNotFound)
 	}
 	return v, err
 }

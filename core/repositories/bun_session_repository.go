@@ -3,10 +3,12 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 )
 
@@ -22,7 +24,7 @@ func (r *BunSessionRepository) GetByID(ctx context.Context, id string) (*models.
 	s := new(models.Session)
 	err := r.db.NewSelect().Model(s).Where("id = ?", id).Scan(ctx)
 	if err == sql.ErrNoRows {
-		return nil, nil
+		return nil, fmt.Errorf("session %s not found: %w", id, coreerrors.ErrNotFound)
 	}
 	return s, err
 }
@@ -31,7 +33,7 @@ func (r *BunSessionRepository) GetByToken(ctx context.Context, token string) (*m
 	s := new(models.Session)
 	err := r.db.NewSelect().Model(s).Where("token = ?", token).Scan(ctx)
 	if err == sql.ErrNoRows {
-		return nil, nil
+		return nil, fmt.Errorf("session not found: %w", coreerrors.ErrNotFound)
 	}
 	return s, err
 }

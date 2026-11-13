@@ -7,10 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
 	_ "modernc.org/sqlite"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/internal/sqlitedsn"
 	"github.com/Authula/authula/models"
 )
@@ -51,6 +54,87 @@ var testUUIDCounter = 0
 func generateTestUUID() string {
 	testUUIDCounter++
 	return "test-uuid-" + string(rune(testUUIDCounter))
+}
+
+// Not parallel: generateTestUUID shares a package-level counter.
+func TestBunSessionRepository_GetByID(t *testing.T) {
+	tests := []struct {
+		name      string
+		id        string
+		wantFound bool
+	}{
+		{name: "returns the session for a known id", id: "known-session", wantFound: true},
+		{name: "reports not found for an unknown id", id: "missing-session"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			is := assert.New(t)
+			must := require.New(t)
+
+			repo := NewBunSessionRepository(newTestSessionDB(t))
+			ctx := context.Background()
+
+			session := createTestSession("user1", time.Now().UTC().Add(time.Hour))
+			session.ID = "known-session"
+			_, err := repo.Create(ctx, session)
+			must.NoError(err)
+
+			got, err := repo.GetByID(ctx, tt.id)
+
+			if tt.wantFound {
+				must.NoError(err)
+				must.NotNil(got)
+				is.Equal("known-session", got.ID)
+				return
+			}
+
+			is.Nil(got)
+			is.Error(err, "a missing session must not be reported as (nil, nil)")
+			is.ErrorIs(err, coreerrors.ErrNotFound)
+		})
+	}
+}
+
+// Not parallel: generateTestUUID shares a package-level counter.
+func TestBunSessionRepository_GetByToken(t *testing.T) {
+	tests := []struct {
+		name      string
+		token     string
+		wantFound bool
+	}{
+		{name: "returns the session for a known token", token: "hashed-known", wantFound: true},
+		{name: "reports not found for an unknown token", token: "hashed-missing"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			is := assert.New(t)
+			must := require.New(t)
+
+			repo := NewBunSessionRepository(newTestSessionDB(t))
+			ctx := context.Background()
+
+			session := createTestSession("user1", time.Now().UTC().Add(time.Hour))
+			session.Token = "hashed-known"
+			_, err := repo.Create(ctx, session)
+			must.NoError(err)
+
+			got, err := repo.GetByToken(ctx, tt.token)
+
+			if tt.wantFound {
+				must.NoError(err)
+				must.NotNil(got)
+				is.Equal(session.ID, got.ID)
+				is.Equal("hashed-known", got.Token)
+				return
+			}
+
+			is.Nil(got)
+			is.Error(err, "a missing session must not be reported as (nil, nil)")
+			is.ErrorIs(err, coreerrors.ErrNotFound)
+		})
+	}
 }
 
 func TestBunSessionRepository_DeleteExpired(t *testing.T) {

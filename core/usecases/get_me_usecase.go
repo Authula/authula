@@ -2,8 +2,10 @@ package usecases
 
 import (
 	"context"
+	"errors"
 	"sync"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/core/types"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/services"
@@ -36,6 +38,9 @@ func (uc *GetMeUseCase) GetMe(ctx context.Context, userID string, sessionID *str
 			session, sessErr = uc.SessionService.GetByID(ctx, *sessionID)
 		} else {
 			session, sessErr = uc.SessionService.GetByUserID(ctx, userID)
+		}
+		if errors.Is(sessErr, coreerrors.ErrNotFound) {
+			session, sessErr = nil, nil
 		}
 		if sessErr != nil {
 			uc.Logger.Error("failed to get session: %v", sessErr)

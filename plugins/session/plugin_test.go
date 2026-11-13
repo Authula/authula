@@ -2,6 +2,7 @@ package session
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 )
@@ -267,6 +269,173 @@ func TestSessionPlugin_CookieDomain(t *testing.T) {
 	}
 }
 
+func TestSessionPlugin_ValidateSessionCookie(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+
+	tests := []struct {
+		name          string
+		cookie        *http.Cookie
+		setup         func(*internaltests.MockTokenService, *internaltests.MockSessionService)
+		wantErr       string
+		wantSessionID string
+		wantRawToken  string
+	}{
+		{
+			name:   "unknown token becomes a plain session-not-found error",
+			cookie: &http.Cookie{Name: testCookieName, Value: "plaintext"},
+			setup: func(tokenSvc *internaltests.MockTokenService, sessionSvc *internaltests.MockSessionService) {
+				tokenSvc.On("Hash", "plaintext").Return("hashed").Once()
+				sessionSvc.On("GetByToken", mock.Anything, "hashed").
+					Return(nil, fmt.Errorf("session not found: %w", coreerrors.ErrNotFound)).Once()
+			},
+			wantErr: "session not found",
+		},
+		{
+			name:   "unexpected lookup failure is returned unchanged",
+			cookie: &http.Cookie{Name: testCookieName, Value: "plaintext"},
+			setup: func(tokenSvc *internaltests.MockTokenService, sessionSvc *internaltests.MockSessionService) {
+				tokenSvc.On("Hash", "plaintext").Return("hashed").Once()
+				sessionSvc.On("GetByToken", mock.Anything, "hashed").Return(nil, errors.New("lookup failed")).Once()
+			},
+			wantErr: "lookup failed",
+		},
+		{
+			name:   "known token returns the session with the raw cookie value",
+			cookie: &http.Cookie{Name: testCookieName, Value: "plaintext"},
+			setup: func(tokenSvc *internaltests.MockTokenService, sessionSvc *internaltests.MockSessionService) {
+				tokenSvc.On("Hash", "plaintext").Return("hashed").Once()
+				sessionSvc.On("GetByToken", mock.Anything, "hashed").
+					Return(&models.Session{ID: "s1", UserID: "u1", ExpiresAt: now.Add(testExpiresIn)}, nil).Once()
+			},
+			wantSessionID: "s1",
+			wantRawToken:  "plaintext",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			is := assert.New(t)
+			must := require.New(t)
+
+			mockTokenSvc := new(internaltests.MockTokenService)
+			mockSessionSvc := new(internaltests.MockSessionService)
+			tt.setup(mockTokenSvc, mockSessionSvc)
+			plugin := newTestPlugin(mockSessionSvc, mockTokenSvc)
+
+			r := httptest.NewRequest(http.MethodGet, "/me", nil)
+			r.AddCookie(tt.cookie)
+
+			session, rawToken, err := plugin.validateSessionCookie(r)
+
+			if tt.wantErr != "" {
+				must.Error(err)
+				is.Equal(tt.wantErr, err.Error())
+				// A not-found session is an authentication failure, not a 404: the
+				// error must not carry the repository sentinel into the HTTP layer.
+				is.NotErrorIs(err, coreerrors.ErrNotFound)
+				is.Nil(session)
+				is.Empty(rawToken)
+			} else {
+				must.NoError(err)
+				must.NotNil(session)
+				is.Equal(tt.wantSessionID, session.ID)
+				is.Equal(tt.wantRawToken, rawToken)
+			}
+
+			mockTokenSvc.AssertExpectations(t)
+			mockSessionSvc.AssertExpectations(t)
+		})
+	}
+}
+
+func TestSessionPlugin_AuthMiddleware(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		cookie         *http.Cookie
+		setup          func(*internaltests.MockTokenService, *internaltests.MockSessionService)
+		wantStatus     int
+		wantNextCalled bool
+		wantUserID     string
+	}{
+		{
+			name:   "cookie with no session row is rejected as unauthorized",
+			cookie: &http.Cookie{Name: testCookieName, Value: "plaintext"},
+			setup: func(tokenSvc *internaltests.MockTokenService, sessionSvc *internaltests.MockSessionService) {
+				tokenSvc.On("Hash", "plaintext").Return("hashed").Once()
+				sessionSvc.On("GetByToken", mock.Anything, "hashed").
+					Return(nil, fmt.Errorf("session not found: %w", coreerrors.ErrNotFound)).Once()
+			},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:   "unexpected session lookup failure is rejected as unauthorized",
+			cookie: &http.Cookie{Name: testCookieName, Value: "plaintext"},
+			setup: func(tokenSvc *internaltests.MockTokenService, sessionSvc *internaltests.MockSessionService) {
+				tokenSvc.On("Hash", "plaintext").Return("hashed").Once()
+				sessionSvc.On("GetByToken", mock.Anything, "hashed").Return(nil, errors.New("lookup failed")).Once()
+			},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:       "missing cookie is rejected as unauthorized",
+			setup:      func(*internaltests.MockTokenService, *internaltests.MockSessionService) {},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:   "valid session reaches the next handler",
+			cookie: &http.Cookie{Name: testCookieName, Value: "plaintext"},
+			setup: func(tokenSvc *internaltests.MockTokenService, sessionSvc *internaltests.MockSessionService) {
+				tokenSvc.On("Hash", "plaintext").Return("hashed").Once()
+				sessionSvc.On("GetByToken", mock.Anything, "hashed").
+					Return(&models.Session{ID: "s1", UserID: "u1", ExpiresAt: time.Now().UTC().Add(testExpiresIn)}, nil).Once()
+			},
+			wantStatus:     http.StatusNoContent,
+			wantNextCalled: true,
+			wantUserID:     "u1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			is := assert.New(t)
+
+			mockTokenSvc := new(internaltests.MockTokenService)
+			mockSessionSvc := new(internaltests.MockSessionService)
+			tt.setup(mockTokenSvc, mockSessionSvc)
+			plugin := newTestPlugin(mockSessionSvc, mockTokenSvc)
+
+			r := httptest.NewRequest(http.MethodGet, "/me", nil)
+			if tt.cookie != nil {
+				r.AddCookie(tt.cookie)
+			}
+			w := httptest.NewRecorder()
+
+			nextCalled := false
+			var gotUserID string
+			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				nextCalled = true
+				gotUserID, _ = r.Context().Value(models.ContextUserID).(string)
+				w.WriteHeader(http.StatusNoContent)
+			})
+
+			plugin.AuthMiddleware()(next).ServeHTTP(w, r)
+
+			is.Equal(tt.wantStatus, w.Code)
+			is.Equal(tt.wantNextCalled, nextCalled)
+			if tt.wantNextCalled {
+				is.Equal(tt.wantUserID, gotUserID)
+			}
+
+			mockTokenSvc.AssertExpectations(t)
+			mockSessionSvc.AssertExpectations(t)
+		})
+	}
+}
+
 func TestSessionPlugin_ValidateSessionHook(t *testing.T) {
 	t.Parallel()
 
@@ -289,6 +458,17 @@ func TestSessionPlugin_ValidateSessionHook(t *testing.T) {
 		},
 		{
 			name:   "unknown token returns unauthorized without touching the cookie",
+			cookie: &http.Cookie{Name: testCookieName, Value: "plaintext"},
+			setup: func(tokenSvc *internaltests.MockTokenService, sessionSvc *internaltests.MockSessionService) {
+				tokenSvc.On("Hash", "plaintext").Return("hashed").Once()
+				sessionSvc.On("GetByToken", mock.Anything, "hashed").
+					Return(nil, fmt.Errorf("session not found: %w", coreerrors.ErrNotFound)).Once()
+			},
+			wantHandled: true,
+			wantStatus:  http.StatusUnauthorized,
+		},
+		{
+			name:   "nil session without an error is still rejected as unauthorized",
 			cookie: &http.Cookie{Name: testCookieName, Value: "plaintext"},
 			setup: func(tokenSvc *internaltests.MockTokenService, sessionSvc *internaltests.MockSessionService) {
 				tokenSvc.On("Hash", "plaintext").Return("hashed").Once()
