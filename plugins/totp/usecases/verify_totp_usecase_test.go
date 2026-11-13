@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/totp/constants"
 	"github.com/Authula/authula/plugins/totp/types"
@@ -123,7 +122,7 @@ func TestVerifyTOTPUseCase(t *testing.T) {
 			pendingToken: "pending-token",
 			setup: func(t *testing.T, f *testFixture) (string, *string, *string) {
 				f.tokenSvc.On("Hash", "pending-token").Return("hashed-pending-token").Once()
-				verif := &models.Verification{ID: "verif-1", UserID: internaltests.PtrString("user-1"), Type: models.TypeEmailVerification}
+				verif := &models.Verification{ID: "verif-1", UserID: new("user-1"), Type: models.TypeEmailVerification}
 				f.verifSvc.On("GetByToken", mock.Anything, "hashed-pending-token").Return(verif, nil).Once()
 				return "000000", nil, nil
 			},
@@ -137,7 +136,7 @@ func TestVerifyTOTPUseCase(t *testing.T) {
 			pendingToken: "pending-token",
 			setup: func(t *testing.T, f *testFixture) (string, *string, *string) {
 				f.tokenSvc.On("Hash", "pending-token").Return("hashed-pending-token").Once()
-				verif := &models.Verification{ID: "verif-1", UserID: internaltests.PtrString("user-1"), Type: models.TypeTOTPPendingAuth}
+				verif := &models.Verification{ID: "verif-1", UserID: new("user-1"), Type: models.TypeTOTPPendingAuth}
 				f.verifSvc.On("GetByToken", mock.Anything, "hashed-pending-token").Return(verif, nil).Once()
 				f.verifSvc.On("IsExpired", verif).Return(true).Once()
 				return "000000", nil, nil

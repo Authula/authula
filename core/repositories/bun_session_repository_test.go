@@ -12,6 +12,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/Authula/authula/internal/sqlitedsn"
+	internaltestsutils "github.com/Authula/authula/internal/tests/utils"
 	"github.com/Authula/authula/models"
 )
 
@@ -36,21 +37,13 @@ func newTestSessionDB(t *testing.T) bun.IDB {
 // Helper function to create a test session
 func createTestSession(userID string, expiresAt time.Time) *models.Session {
 	return &models.Session{
-		ID:        generateTestUUID(),
+		ID:        internaltestsutils.GenerateUUID().String(),
 		UserID:    userID,
-		Token:     "hashed_token_" + generateTestUUID(),
+		Token:     internaltestsutils.GenerateHashedToken(),
 		ExpiresAt: expiresAt,
 		IPAddress: nil,
 		UserAgent: nil,
 	}
-}
-
-// Helper function to generate test UUIDs
-var testUUIDCounter = 0
-
-func generateTestUUID() string {
-	testUUIDCounter++
-	return "test-uuid-" + string(rune(testUUIDCounter))
 }
 
 func TestBunSessionRepository_DeleteExpired(t *testing.T) {

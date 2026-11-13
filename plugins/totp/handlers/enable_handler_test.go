@@ -55,7 +55,7 @@ func (s *EnableHandlerSuite) TestEnableHandler_Table() {
 	tests := []enableHandlerTestCase{
 		{
 			name:   "usecase_already_enabled",
-			userID: internaltests.PtrString(uid),
+			userID: new(uid),
 			prepare: func(m *enableHandlerFixture) {
 				m.resetRepoExpectations()
 				m.repo.On("GetByUserID", mock.Anything, uid).Return(&types.TOTPRecord{UserID: uid, Enabled: true}, nil)
@@ -67,7 +67,7 @@ func (s *EnableHandlerSuite) TestEnableHandler_Table() {
 		},
 		{
 			name:   "existing_but_not_enabled_allows_retry",
-			userID: internaltests.PtrString(uid),
+			userID: new(uid),
 			prepare: func(m *enableHandlerFixture) {
 				m.resetRepoExpectations()
 				m.repo.On("GetByUserID", mock.Anything, uid).Return(&types.TOTPRecord{UserID: uid, Enabled: false}, nil)
@@ -83,7 +83,7 @@ func (s *EnableHandlerSuite) TestEnableHandler_Table() {
 		},
 		{
 			name:   "success_skip_verification",
-			userID: internaltests.PtrString(uid),
+			userID: new(uid),
 			prepare: func(m *enableHandlerFixture) {
 				m.config.SkipVerificationOnEnable = true
 				m.resetRepoExpectations()
@@ -103,7 +103,7 @@ func (s *EnableHandlerSuite) TestEnableHandler_Table() {
 		},
 		{
 			name:           "success_with_pending_token",
-			userID:         internaltests.PtrString(uid),
+			userID:         new(uid),
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder, reqCtx *models.RequestContext) {
 				pendingCookie := totptests.CookieFromRecorder(w, constants.CookieTOTPPending)

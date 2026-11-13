@@ -55,7 +55,7 @@ func setupValidVerification(
 	tokenSvc.On("Hash", rawToken).Return(hashedToken)
 	verif := &models.Verification{
 		ID:     "verif-id",
-		UserID: internaltests.PtrString(userID),
+		UserID: new(userID),
 		Type:   models.TypeTOTPPendingAuth,
 	}
 	verifSvc.On("GetByToken", mock.Anything, hashedToken).Return(verif, nil)
@@ -112,7 +112,7 @@ func (s *GenerateBackupCodesHandlerSuite) TestGenerateBackupCodesHandler_Table()
 		},
 		{
 			name:   "usecase_not_enabled",
-			userID: internaltests.PtrString(uid),
+			userID: new(uid),
 			prepare: func(m *generateBackupCodesFixture) {
 				m.repo.On("GetByUserID", mock.Anything, uid).Return(nil, nil)
 			},
@@ -123,7 +123,7 @@ func (s *GenerateBackupCodesHandlerSuite) TestGenerateBackupCodesHandler_Table()
 		},
 		{
 			name:   "success",
-			userID: internaltests.PtrString(uid),
+			userID: new(uid),
 			prepare: func(m *generateBackupCodesFixture) {
 				m.repo.On("GetByUserID", mock.Anything, uid).Return(&types.TOTPRecord{
 					UserID:      uid,

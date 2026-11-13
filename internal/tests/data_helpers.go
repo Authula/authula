@@ -11,10 +11,6 @@ import (
 	"github.com/Authula/authula/models"
 )
 
-func PtrString(s string) *string {
-	return &s
-}
-
 func MarshalToJSON(t *testing.T, payload any) []byte {
 	t.Helper()
 

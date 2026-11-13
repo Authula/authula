@@ -46,7 +46,7 @@ func (s *DisableHandlerSuite) TestDisableHandler_Table() {
 	tests := []disableHandlerTestCase{
 		{
 			name:   "usecase_not_enabled",
-			userID: internaltests.PtrString(uid),
+			userID: new(uid),
 			prepare: func(m *disableHandlerFixture) {
 				m.repo.On("GetByUserID", mock.Anything, uid).Return(nil, nil)
 			},
@@ -57,7 +57,7 @@ func (s *DisableHandlerSuite) TestDisableHandler_Table() {
 		},
 		{
 			name:   "success",
-			userID: internaltests.PtrString(uid),
+			userID: new(uid),
 			prepare: func(m *disableHandlerFixture) {
 				m.repo.On("GetByUserID", mock.Anything, uid).Return(&types.TOTPRecord{UserID: uid}, nil)
 				m.repo.On("DeleteByUserID", mock.Anything, uid).Return(nil)

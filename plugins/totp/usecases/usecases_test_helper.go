@@ -62,7 +62,7 @@ func mustGenerateTOTPCode(t *testing.T, svc *services.TOTPService, secret string
 
 func (f *testFixture) expectValidPendingToken(userID, verificationID, pendingToken string) {
 	f.tokenSvc.On("Hash", pendingToken).Return("hashed-" + pendingToken).Once()
-	verif := &models.Verification{ID: verificationID, UserID: internaltests.PtrString(userID), Type: models.TypeTOTPPendingAuth}
+	verif := &models.Verification{ID: verificationID, UserID: new(userID), Type: models.TypeTOTPPendingAuth}
 	f.verifSvc.On("GetByToken", mock.Anything, "hashed-"+pendingToken).Return(verif, nil).Once()
 	f.verifSvc.On("IsExpired", verif).Return(false).Once()
 }
