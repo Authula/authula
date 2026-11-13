@@ -142,8 +142,8 @@ func createTestFlowState(stateHash string, expiresAt time.Time) *types.OAuthFlow
 		ID:                    "state-" + stateHash,
 		StateHash:             stateHash,
 		Provider:              "google",
-		Purpose:               types.OAuthFlowPurposeAuthorization,
-		CodeVerifierEncrypted: "encrypted-verifier",
+		Purpose:               types.OAuthFlowPurposeLogin,
+		CodeVerifierEncrypted: new("encrypted-verifier"),
 		ExpiresAt:             expiresAt,
 		CreatedAt:             testNow(),
 	}

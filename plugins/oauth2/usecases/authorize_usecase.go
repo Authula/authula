@@ -5,13 +5,17 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"golang.org/x/oauth2"
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/oauth2/constants"
+	"github.com/Authula/authula/plugins/oauth2/repositories"
 	"github.com/Authula/authula/plugins/oauth2/services"
 	"github.com/Authula/authula/plugins/oauth2/types"
+	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 // authorizeUseCase handles the authorization flow initiation
@@ -19,20 +23,26 @@ type authorizeUseCase struct {
 	ProviderRegistry *services.ProviderRegistry
 	Logger           models.Logger
 	TrustedOrigins   []string
-	HMACKey          []byte
+	FlowStateRepo    repositories.FlowStateRepository
+	TokenService     rootservices.TokenService
+	FlowStateTTL     time.Duration
 }
 
 func NewAuthorizeUseCase(
 	registry *services.ProviderRegistry,
 	logger models.Logger,
 	trustedOrigins []string,
-	hmacKey []byte,
+	flowStateRepo repositories.FlowStateRepository,
+	tokenService rootservices.TokenService,
+	flowStateTTL time.Duration,
 ) *authorizeUseCase {
 	return &authorizeUseCase{
 		ProviderRegistry: registry,
 		Logger:           logger,
 		TrustedOrigins:   trustedOrigins,
-		HMACKey:          hmacKey,
+		FlowStateRepo:    flowStateRepo,
+		TokenService:     tokenService,
+		FlowStateTTL:     flowStateTTL,
 	}
 }
 
@@ -43,55 +53,50 @@ func (uc *authorizeUseCase) Authorize(ctx context.Context, req *types.AuthorizeR
 		return nil, constants.ErrProviderNotFound
 	}
 
-	redirectTo, err := services.ValidateRedirectTo(req.RedirectTo, uc.TrustedOrigins)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", constants.ErrInvalidRedirectTo, err)
+	var redirectTo *string
+	if strings.TrimSpace(req.RedirectTo) != "" {
+		normalized, err := util.ValidateRedirectTo(req.RedirectTo, uc.TrustedOrigins)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", constants.ErrInvalidRedirectTo, err)
+		}
+		redirectTo = &normalized
 	}
 
-	state, err := services.GenerateRandomString(32)
+	state, err := util.GenerateRandomString(32)
 	if err != nil {
 		uc.Logger.Error("failed to generate oauth state", "error", err)
 		return nil, fmt.Errorf("failed to generate state")
 	}
 
-	purpose := services.StatePurposeLogin
+	binding, err := util.GenerateRandomString(32)
+	if err != nil {
+		uc.Logger.Error("failed to generate oauth binding", "error", err)
+		return nil, fmt.Errorf("failed to generate binding")
+	}
+
+	purpose := types.OAuthFlowPurposeLogin
+	var userID *string
 	if req.ActorID != "" {
-		purpose = services.StatePurposeLink
+		purpose = types.OAuthFlowPurposeLink
+		userID = &req.ActorID
 	}
 
-	signedState, err := services.SignState(services.StatePayload{
-		State:    state,
-		Provider: providerID,
-		UserID:   req.ActorID,
-		Purpose:  purpose,
-	}, uc.HMACKey)
-	if err != nil {
-		uc.Logger.Error("failed to sign oauth state", "error", err)
-		return nil, fmt.Errorf("failed to sign state")
-	}
-
-	signedRedirectTo, err := services.SignCookie(redirectTo, uc.HMACKey)
-	if err != nil {
-		uc.Logger.Error("failed to sign redirect URL", "error", err)
-		return nil, fmt.Errorf("failed to sign redirect URL")
-	}
-
-	var verifierCookie *string
+	var encryptedVerifier *string
 	authOptions := make([]oauth2.AuthCodeOption, 0, 1)
 	if oauthProvider.RequiresPKCE() {
-		verifier, err := services.GeneratePKCEVerifier()
+		verifier, err := util.GenerateRandomString(43)
 		if err != nil {
 			uc.Logger.Error("failed to generate PKCE verifier", "error", err)
 			return nil, fmt.Errorf("failed to generate PKCE verifier")
 		}
 
-		signedVerifier, err := services.SignCookie(verifier, uc.HMACKey)
+		encrypted, err := uc.TokenService.Encrypt(verifier)
 		if err != nil {
-			uc.Logger.Error("failed to sign PKCE verifier", "error", err)
-			return nil, fmt.Errorf("failed to sign PKCE verifier")
+			uc.Logger.Error("failed to encrypt PKCE verifier", "error", err)
+			return nil, fmt.Errorf("failed to encrypt PKCE verifier")
 		}
 
-		verifierCookie = &signedVerifier
+		encryptedVerifier = &encrypted
 		authOptions = append(authOptions, oauth2.S256ChallengeOption(verifier))
 	}
 
@@ -101,11 +106,26 @@ func (uc *authorizeUseCase) Authorize(ctx context.Context, req *types.AuthorizeR
 		return nil, err
 	}
 
+	now := time.Now().UTC()
+	flowState := &types.OAuthFlowState{
+		ID:                    util.GenerateUUID(),
+		StateHash:             util.HashWithSalt(state, binding),
+		Provider:              providerID,
+		Purpose:               purpose,
+		UserID:                userID,
+		RedirectTo:            redirectTo,
+		CodeVerifierEncrypted: encryptedVerifier,
+		ExpiresAt:             now.Add(uc.FlowStateTTL),
+	}
+
+	if _, err := uc.FlowStateRepo.Create(ctx, flowState); err != nil {
+		uc.Logger.Error("failed to persist oauth flow state", "provider", providerID, "error", err)
+		return nil, fmt.Errorf("failed to persist oauth flow state: %w", err)
+	}
+
 	return &AuthorizeResult{
 		AuthorizationURL: authorizationURL,
-		StateCookie:      signedState,
-		VerifierCookie:   verifierCookie,
-		RedirectCookie:   signedRedirectTo,
+		Binding:          binding,
 	}, nil
 }
 

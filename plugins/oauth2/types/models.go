@@ -21,8 +21,8 @@ const (
 
 	CodeChallengeMethodS256 = "S256"
 
-	OAuthFlowPurposeAuthorization = "authorization"
-	OAuthFlowPurposeCallback      = "callback"
+	OAuthFlowPurposeLogin = "login"
+	OAuthFlowPurposeLink  = "link"
 
 	ScopeOpenID  = "openid"
 	ScopeProfile = "profile"
@@ -137,8 +137,8 @@ type OAuthLoginTransaction struct {
 	CreatedAt           time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp" required:"true" nullable:"false"`
 }
 
-// OAuthFlowState replaces the outbound provider flow cookies. The stored PKCE
-// verifier is encrypted with the JWT token service, not hashed.
+// OAuthFlowState stores a single-use outbound provider flow. The stored PKCE
+// verifier is encrypted with the token service, not hashed.
 type OAuthFlowState struct {
 	bun.BaseModel `bun:"table:oauth_flow_states"`
 
@@ -148,7 +148,7 @@ type OAuthFlowState struct {
 	Purpose               string     `json:"purpose" bun:"column:purpose" required:"true" nullable:"false"`
 	UserID                *string    `json:"user_id" bun:"column:user_id" nullable:"true"`
 	RedirectTo            *string    `json:"redirect_to" bun:"column:redirect_to" nullable:"true"`
-	CodeVerifierEncrypted string     `json:"-" bun:"column:code_verifier_encrypted" required:"true" nullable:"false"`
+	CodeVerifierEncrypted *string    `json:"-" bun:"column:code_verifier_encrypted" nullable:"true"`
 	ExpiresAt             time.Time  `json:"expires_at" bun:"column:expires_at" required:"true" nullable:"false"`
 	ConsumedAt            *time.Time `json:"consumed_at,omitempty" bun:"column:consumed_at,nullzero" nullable:"true"`
 	CreatedAt             time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp" required:"true" nullable:"false"`

@@ -21,7 +21,6 @@ var (
 	ErrProviderFailure              = errors.New("oauth provider request failed")
 	ErrInvalidRedirectTo            = errors.New("invalid redirect_to")
 	ErrSessionNotFound              = errors.New("session not found")
-	ErrOAuthSecretNotConfigured     = errors.New("oauth2 requires a non-empty application secret")
 	ErrProviderConfigInvalid        = errors.New("invalid oauth provider configuration")
 	ErrProviderConfigurationPartial = errors.New("partial oauth provider credentials")
 )

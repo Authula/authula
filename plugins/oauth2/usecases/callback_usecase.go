@@ -12,16 +12,18 @@ import (
 	coreservices "github.com/Authula/authula/core/services"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/oauth2/constants"
+	"github.com/Authula/authula/plugins/oauth2/repositories"
 	"github.com/Authula/authula/plugins/oauth2/services"
 	"github.com/Authula/authula/plugins/oauth2/types"
 	rootservices "github.com/Authula/authula/services"
+	"github.com/Authula/authula/util"
 )
 
 type callbackUseCase struct {
 	GlobalConfig     *models.Config
 	ProviderRegistry *services.ProviderRegistry
 	Logger           models.Logger
-	HMACKey          []byte
+	FlowStateRepo    repositories.FlowStateRepository
 	UserService      rootservices.UserService
 	AccountService   rootservices.AccountService
 	SessionService   rootservices.SessionService
@@ -32,7 +34,7 @@ func NewCallbackUseCase(
 	globalConfig *models.Config,
 	registry *services.ProviderRegistry,
 	logger models.Logger,
-	hmacKey []byte,
+	flowStateRepo repositories.FlowStateRepository,
 	userService rootservices.UserService,
 	accountService rootservices.AccountService,
 	sessionService rootservices.SessionService,
@@ -42,7 +44,7 @@ func NewCallbackUseCase(
 		GlobalConfig:     globalConfig,
 		ProviderRegistry: registry,
 		Logger:           logger,
-		HMACKey:          hmacKey,
+		FlowStateRepo:    flowStateRepo,
 		UserService:      userService,
 		AccountService:   accountService,
 		SessionService:   sessionService,
@@ -51,46 +53,76 @@ func NewCallbackUseCase(
 }
 
 func (uc *callbackUseCase) Callback(ctx context.Context, req *types.CallbackRequest, ipAddress *string, userAgent *string) (*types.CallbackResult, error) {
-	if req.Error != "" {
-		uc.Logger.Warn("oauth provider returned an error", "provider", req.ProviderID, "error", req.Error)
-		return nil, constants.ErrAccessDenied
-	}
-
 	providerID := strings.ToLower(strings.TrimSpace(req.ProviderID))
-	oauthProvider, exists := uc.ProviderRegistry.Get(providerID)
-	if !exists {
-		return nil, constants.ErrProviderNotFound
+
+	if strings.TrimSpace(req.State) == "" || strings.TrimSpace(req.Binding) == "" {
+		return nil, constants.ErrInvalidState
 	}
 
-	state, err := services.ParseState(req.StateCookie, uc.HMACKey, constants.FlowCookieTTL)
+	stateHash := util.HashWithSalt(req.State, req.Binding)
+	state, err := uc.FlowStateRepo.GetByStateHash(ctx, stateHash)
 	if err != nil {
-		uc.Logger.Warn("invalid oauth state", "provider", providerID, "error", err)
+		uc.Logger.Error("failed to load oauth flow state", "provider", providerID, "error", err)
+		return nil, fmt.Errorf("failed to load oauth flow state: %w", err)
+	}
+	if state == nil {
+		uc.Logger.Warn("oauth flow state not found", "provider", providerID)
 		return nil, constants.ErrInvalidState
 	}
 	if state.Provider != providerID {
 		return nil, constants.ErrStateProviderMismatch
 	}
-	if state.State != req.State {
+
+	consumed, err := uc.FlowStateRepo.Consume(ctx, stateHash, state.Provider, state.Purpose, time.Now().UTC())
+	if err != nil {
+		uc.Logger.Error("failed to consume oauth flow state", "provider", providerID, "error", err)
+		return nil, fmt.Errorf("failed to consume oauth flow state: %w", err)
+	}
+	if consumed == nil {
+		uc.Logger.Warn("oauth flow state is expired or already consumed", "provider", providerID)
 		return nil, constants.ErrInvalidState
 	}
 
-	switch state.Purpose {
-	case services.StatePurposeLink:
-		if req.ActorID == "" || state.UserID == "" || state.UserID != req.ActorID {
+	switch consumed.Purpose {
+	case types.OAuthFlowPurposeLink, types.OAuthFlowPurposeLogin:
+	default:
+		return nil, constants.ErrInvalidState
+	}
+
+	if req.Error != "" {
+		uc.Logger.Warn("oauth provider returned an error", "provider", providerID, "error", req.Error)
+		if redirectTo := uc.redirectTo(consumed); redirectTo != "" {
+			return nil, &RedirectError{
+				RedirectTo:  redirectTo,
+				Code:        "access_denied",
+				Description: req.ErrorDescription,
+			}
+		}
+		return nil, constants.ErrAccessDenied
+	}
+
+	switch consumed.Purpose {
+	case types.OAuthFlowPurposeLink:
+		if req.ActorID == "" || consumed.UserID == nil || *consumed.UserID != req.ActorID {
 			return nil, constants.ErrUnauthorized
 		}
-	case services.StatePurposeLogin:
+	case types.OAuthFlowPurposeLogin:
 		if req.ActorID != "" {
 			// A signed-in browser must restart the flow as an explicit link.
 			return nil, constants.ErrUnauthorized
 		}
 	}
 
+	oauthProvider, exists := uc.ProviderRegistry.Get(providerID)
+	if !exists {
+		return nil, constants.ErrProviderNotFound
+	}
+
 	if req.Code == "" {
 		return nil, constants.ErrInvalidCode
 	}
 
-	token, err := uc.exchange(ctx, oauthProvider, req)
+	token, err := uc.exchange(ctx, oauthProvider, req, consumed)
 	if err != nil {
 		if errors.Is(err, constants.ErrPKCEVerifierMissing) {
 			return nil, err
@@ -108,7 +140,7 @@ func (uc *callbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 		return nil, err
 	}
 
-	user, existingAccount, created, err := uc.resolveUser(ctx, providerID, userInfo, state, req)
+	user, existingAccount, created, err := uc.resolveUser(ctx, providerID, userInfo, consumed, req)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +152,7 @@ func (uc *callbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 		return nil, err
 	}
 
-	if state.Purpose == services.StatePurposeLink && userInfo.EmailVerified && user.Email == userInfo.Email && !user.EmailVerified {
+	if consumed.Purpose == types.OAuthFlowPurposeLink && userInfo.EmailVerified && user.Email == userInfo.Email && !user.EmailVerified {
 		user.EmailVerified = true
 		updated, updateErr := uc.UserService.Update(ctx, user)
 		if updateErr != nil {
@@ -133,7 +165,7 @@ func (uc *callbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 
 	result := &types.CallbackResult{User: user}
 
-	if state.Purpose == services.StatePurposeLink {
+	if consumed.Purpose == types.OAuthFlowPurposeLink {
 		session, err := uc.currentSession(ctx, req)
 		if err != nil {
 			return nil, err
@@ -149,18 +181,18 @@ func (uc *callbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 		result.SessionToken = sessionToken
 	}
 
-	result.RedirectTo = uc.redirectTo(req)
+	result.RedirectTo = uc.redirectTo(consumed)
 
 	return result, nil
 }
 
-func (uc *callbackUseCase) exchange(ctx context.Context, provider types.OAuth2Provider, req *types.CallbackRequest) (*oauth2.Token, error) {
+func (uc *callbackUseCase) exchange(ctx context.Context, provider types.OAuth2Provider, req *types.CallbackRequest, state *types.OAuthFlowState) (*oauth2.Token, error) {
 	options := make([]oauth2.AuthCodeOption, 0, 1)
 	if provider.RequiresPKCE() {
-		if req.VerifierCookie == "" {
+		if state.CodeVerifierEncrypted == nil || strings.TrimSpace(*state.CodeVerifierEncrypted) == "" {
 			return nil, constants.ErrPKCEVerifierMissing
 		}
-		verifier, err := services.ValidateCookie(req.VerifierCookie, uc.HMACKey, constants.FlowCookieTTL)
+		verifier, err := uc.TokenService.Decrypt(*state.CodeVerifierEncrypted)
 		if err != nil || verifier == "" {
 			return nil, constants.ErrPKCEVerifierMissing
 		}
@@ -190,7 +222,7 @@ func validateUserInfo(info *types.UserInfo) error {
 	return nil
 }
 
-func (uc *callbackUseCase) resolveUser(ctx context.Context, providerID string, userInfo *types.UserInfo, state *services.StatePayload, req *types.CallbackRequest) (*models.User, *models.Account, bool, error) {
+func (uc *callbackUseCase) resolveUser(ctx context.Context, providerID string, userInfo *types.UserInfo, state *types.OAuthFlowState, req *types.CallbackRequest) (*models.User, *models.Account, bool, error) {
 	existingAccount, err := uc.AccountService.GetByProviderAndAccountID(ctx, providerID, userInfo.ProviderAccountID)
 	if err != nil {
 		return nil, nil, false, fmt.Errorf("failed to check existing account: %w", err)
@@ -211,7 +243,7 @@ func (uc *callbackUseCase) resolveUser(ctx context.Context, providerID string, u
 		return user, existingAccount, false, nil
 	}
 
-	if state.Purpose == services.StatePurposeLink {
+	if state.Purpose == types.OAuthFlowPurposeLink {
 		user, err := uc.resolveLinkUser(ctx, providerID, req.ActorID)
 		return user, nil, false, err
 	}
@@ -351,18 +383,18 @@ func (uc *callbackUseCase) deleteOrphanUser(ctx context.Context, userID string) 
 	}
 }
 
-func (uc *callbackUseCase) redirectTo(req *types.CallbackRequest) string {
-	if req.RedirectCookie == "" {
+func (uc *callbackUseCase) redirectTo(state *types.OAuthFlowState) string {
+	if state == nil || state.RedirectTo == nil || strings.TrimSpace(*state.RedirectTo) == "" {
 		return ""
 	}
 
-	raw, err := services.ValidateCookie(req.RedirectCookie, uc.HMACKey, constants.FlowCookieTTL)
+	validated, err := util.ValidateRedirectTo(*state.RedirectTo, uc.GlobalConfig.Security.TrustedOrigins)
 	if err != nil {
-		return ""
-	}
-
-	validated, err := services.ValidateRedirectTo(raw, uc.GlobalConfig.Security.TrustedOrigins)
-	if err != nil {
+		uc.Logger.Warn(
+			"oauth redirect_to failed validation; redirect suppressed",
+			"provider", state.Provider,
+			"error", err,
+		)
 		return ""
 	}
 	return validated

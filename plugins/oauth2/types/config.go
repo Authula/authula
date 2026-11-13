@@ -6,10 +6,9 @@ const (
 	defaultHTTPTimeout          = 10 * time.Second
 	defaultAuthorizationCodeTTL = 90 * time.Second
 	defaultConsentRequestTTL    = 10 * time.Minute
+	defaultFlowStateTTL         = 5 * time.Minute
 	defaultIDTokenTTL           = 5 * time.Minute
 	defaultCleanupInterval      = time.Minute
-	defaultRateLimitWindow      = time.Minute
-	defaultRateLimitMax         = 60
 )
 
 func defaultAllowedScopes() []string {
@@ -32,13 +31,11 @@ type OAuth2PluginConfig struct {
 
 	AuthorizationCodeTTL time.Duration `json:"authorization_code_ttl" toml:"authorization_code_ttl"`
 	ConsentRequestTTL    time.Duration `json:"consent_request_ttl" toml:"consent_request_ttl"`
+	FlowStateTTL         time.Duration `json:"flow_state_ttl" toml:"flow_state_ttl"`
 	IDTokenTTL           time.Duration `json:"id_token_ttl" toml:"id_token_ttl"`
 
 	AutoCleanup     bool          `json:"auto_cleanup" toml:"auto_cleanup"`
 	CleanupInterval time.Duration `json:"cleanup_interval" toml:"cleanup_interval"`
-
-	RateLimitWindow time.Duration `json:"rate_limit_window" toml:"rate_limit_window"`
-	RateLimitMax    int           `json:"rate_limit_max" toml:"rate_limit_max"`
 }
 
 // ApplyDefaults applies default values to the config
@@ -58,17 +55,14 @@ func (c *OAuth2PluginConfig) ApplyDefaults() {
 	if c.ConsentRequestTTL <= 0 {
 		c.ConsentRequestTTL = defaultConsentRequestTTL
 	}
+	if c.FlowStateTTL <= 0 {
+		c.FlowStateTTL = defaultFlowStateTTL
+	}
 	if c.IDTokenTTL <= 0 {
 		c.IDTokenTTL = defaultIDTokenTTL
 	}
 	if c.CleanupInterval <= 0 {
 		c.CleanupInterval = defaultCleanupInterval
-	}
-	if c.RateLimitWindow <= 0 {
-		c.RateLimitWindow = defaultRateLimitWindow
-	}
-	if c.RateLimitMax <= 0 {
-		c.RateLimitMax = defaultRateLimitMax
 	}
 }
 

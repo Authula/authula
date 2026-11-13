@@ -1,16 +1,15 @@
-package services
+package util
 
 import (
 	"fmt"
 	"net/url"
 	"strings"
-
-	"github.com/Authula/authula/util"
 )
 
-// ValidateRedirectURL validates an OAuth2 provider redirect URL registered with
-// the provider. Redirect URIs must be absolute, exact, and use HTTPS outside
-// localhost. Wildcards, fragments, credentials, and relative paths are rejected.
+// ValidateRedirectURL validates a provider redirect URL registered with an
+// external provider. Redirect URIs must be absolute, exact, and use HTTPS
+// outside localhost. Wildcards, fragments, credentials, and relative paths are
+// rejected.
 func ValidateRedirectURL(raw string) error {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -36,21 +35,22 @@ func ValidateRedirectURL(raw string) error {
 	if parsed.Fragment != "" || strings.Contains(raw, "#") {
 		return fmt.Errorf("redirect_url must not contain a fragment")
 	}
-	if parsed.Scheme == "http" && !util.IsLocalhost(parsed.Host) {
+	if parsed.Scheme == "http" && !IsLocalhost(parsed.Host) {
 		return fmt.Errorf("redirect_url must use https except for localhost")
 	}
 
 	return nil
 }
 
-// ValidateRedirectTo validates a redirect destination and returns its normalised form.
-// Relative paths and absolute URLs on trusted origins are allowed.
+// ValidateRedirectTo validates a redirect destination and returns its
+// normalised form. Relative paths and absolute URLs on trusted origins are
+// allowed.
 func ValidateRedirectTo(redirectTo string, trustedOrigins []string) (string, error) {
 	if redirectTo == "" {
 		return "/", nil
 	}
 
-	parsed, err := util.IsTrustedCallbackURL(redirectTo, trustedOrigins)
+	parsed, err := IsTrustedCallbackURL(redirectTo, trustedOrigins)
 	if err != nil {
 		return "", fmt.Errorf("invalid redirect_to: %w", err)
 	}

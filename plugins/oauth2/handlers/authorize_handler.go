@@ -8,6 +8,7 @@ import (
 	"github.com/Authula/authula/plugins/oauth2/constants"
 	"github.com/Authula/authula/plugins/oauth2/types"
 	"github.com/Authula/authula/plugins/oauth2/usecases"
+	"github.com/Authula/authula/util"
 )
 
 type AuthorizeHandler struct {
@@ -19,11 +20,7 @@ type AuthorizeHandler struct {
 func (h *AuthorizeHandler) Handle() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		reqCtx, ok := models.GetRequestContext(ctx)
-		if !ok || reqCtx == nil {
-			http.Error(w, "request context missing", http.StatusInternalServerError)
-			return
-		}
+		reqCtx, _ := models.GetRequestContext(ctx)
 
 		providerID := strings.TrimSpace(r.PathValue("provider"))
 		if providerID == "" {
@@ -34,7 +31,7 @@ func (h *AuthorizeHandler) Handle() http.HandlerFunc {
 
 		req := &types.AuthorizeRequest{
 			ProviderID: providerID,
-			RedirectTo: r.URL.Query().Get("redirect_to"),
+			RedirectTo: util.GetQueryString(r, "redirect_to", ""),
 		}
 		if reqCtx.Actor != nil && reqCtx.Actor.Type == models.ActorUser {
 			req.ActorID = reqCtx.Actor.ID
@@ -42,19 +39,12 @@ func (h *AuthorizeHandler) Handle() http.HandlerFunc {
 
 		resp, err := h.UseCase.Authorize(ctx, req)
 		if err != nil {
-			h.Cookie.clearFlowCookies(reqCtx.ResponseWriter)
 			WriteError(reqCtx, h.Logger, err)
 			reqCtx.Handled = true
 			return
 		}
 
-		h.Cookie.set(reqCtx.ResponseWriter, constants.CookieState, resp.StateCookie)
-		h.Cookie.set(reqCtx.ResponseWriter, constants.CookieRedirectTo, resp.RedirectCookie)
-		if resp.VerifierCookie != nil {
-			h.Cookie.set(reqCtx.ResponseWriter, constants.CookieVerifier, *resp.VerifierCookie)
-		} else {
-			h.Cookie.clear(reqCtx.ResponseWriter, constants.CookieVerifier)
-		}
+		h.Cookie.setBinding(reqCtx.ResponseWriter, resp.Binding)
 
 		reqCtx.SetJSONResponse(http.StatusOK, &types.AuthorizeResponse{
 			AuthURL: resp.AuthorizationURL,

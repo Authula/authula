@@ -21,6 +21,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 			openapi.WithResponseStatus(http.StatusOK, &types.AuthorizeResponse{}),
 			openapi.WithResponseStatus(http.StatusNotFound, &types.ErrorResponse{}),
 			openapi.WithResponseStatus(http.StatusUnprocessableEntity, &types.ErrorResponse{}),
+			openapi.WithResponseStatus(http.StatusTooManyRequests, &types.ErrorResponse{}),
 			openapi.WithResponseStatus(http.StatusInternalServerError, &types.ErrorResponse{}),
 		),
 		svc.AddOperation(
