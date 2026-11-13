@@ -14,11 +14,6 @@ import (
 	"github.com/Authula/authula/plugins/admin/usecases"
 )
 
-func PtrString(t *testing.T, s string) *string {
-	t.Helper()
-	return &s
-}
-
 func PtrTime(t *testing.T, offset int) *time.Time {
 	t.Helper()
 	tm := time.Now().Add(time.Duration(offset) * time.Second).UTC()

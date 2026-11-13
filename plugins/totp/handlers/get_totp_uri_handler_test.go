@@ -49,7 +49,7 @@ func (s *GetTOTPURIHandlerSuite) TestGetTOTPURIHandler_Table() {
 	tests := []getTOTPURITestCase{
 		{
 			name:   "usecase_not_enabled",
-			userID: internaltests.PtrString(uid),
+			userID: new(uid),
 			prepare: func(m *getTOTPURIFixture) {
 				m.repo.On("GetByUserID", mock.Anything, uid).Return(nil, nil)
 			},
@@ -60,7 +60,7 @@ func (s *GetTOTPURIHandlerSuite) TestGetTOTPURIHandler_Table() {
 		},
 		{
 			name:   "success",
-			userID: internaltests.PtrString(uid),
+			userID: new(uid),
 			prepare: func(m *getTOTPURIFixture) {
 				plainSecret, err := m.totpSvc.GenerateSecret()
 				require.NoError(s.T(), err)
