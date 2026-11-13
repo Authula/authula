@@ -13,7 +13,7 @@ import (
 
 const defaultGoogleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
-type GoogleProvider struct {
+type GoogleOAuth2Provider struct {
 	*BaseProvider
 	userInfoURL string
 	fields      providerFields
@@ -29,8 +29,8 @@ var googleDefaults = ProviderDefaults{
 	UserInfoURL: defaultGoogleUserInfoURL,
 }
 
-func NewGoogleProvider(cfg types.ProviderConfig, opts *ProviderOptions) *GoogleProvider {
-	return &GoogleProvider{
+func NewGoogleOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *GoogleOAuth2Provider {
+	return &GoogleOAuth2Provider{
 		BaseProvider: NewBaseProvider("google", ResolveOAuth2Config(cfg, googleDefaults), opts, cfg.PKCEEnabled()),
 		userInfoURL:  ResolveUserInfoURL(cfg, defaultGoogleUserInfoURL),
 		fields: providerFields{
@@ -43,7 +43,7 @@ func NewGoogleProvider(cfg types.ProviderConfig, opts *ProviderOptions) *GoogleP
 	}
 }
 
-func (p *GoogleProvider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
+func (p *GoogleOAuth2Provider) GetUserInfo(ctx context.Context, token *oauth2.Token) (*types.UserInfo, error) {
 	info, err := FetchUserInfo(ctx, p.opts.httpClient(), p.opts.logger(), token, p.userInfoURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch Google user info: %w", err)

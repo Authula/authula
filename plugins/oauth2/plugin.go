@@ -281,7 +281,7 @@ func (p *OAuth2Plugin) registerBuiltInProvider(name string, cfg types.ProviderCo
 	case "github":
 		provider = services.NewGitHubOAuth2Provider(cfg, options)
 	case "google":
-		provider = services.NewGoogleProvider(cfg, options)
+		provider = services.NewGoogleOAuth2Provider(cfg, options)
 	case "microsoft":
 		if tenantID := strings.TrimSpace(os.Getenv(env.EnvMicrosoftTenantID)); tenantID != "" {
 			cfg.TenantID = new(tenantID)

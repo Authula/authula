@@ -90,7 +90,7 @@ func TestGoogleProviderGetUserInfo(t *testing.T) {
 			}))
 			t.Cleanup(server.Close)
 
-			provider := NewGoogleProvider(testProviderConfig(server.URL), newTestProviderOptions(server))
+			provider := NewGoogleOAuth2Provider(testProviderConfig(server.URL), newTestProviderOptions(server))
 			info, err := provider.GetUserInfo(context.Background(), &oauth2.Token{AccessToken: "token"})
 
 			if tt.wantErr {
@@ -316,9 +316,9 @@ func TestProvidersRequirePKCEByDefault(t *testing.T) {
 		name     string
 		provider func() types.OAuth2Provider
 	}{
-		{name: "google", provider: func() types.OAuth2Provider { return NewGoogleProvider(cfg, nil) }},
-		{name: "github", provider: func() types.OAuth2Provider { return NewGitHubOAuth2Provider(cfg, nil) }},
 		{name: "discord", provider: func() types.OAuth2Provider { return NewDiscordOAuth2Provider(cfg, nil) }},
+		{name: "github", provider: func() types.OAuth2Provider { return NewGitHubOAuth2Provider(cfg, nil) }},
+		{name: "google", provider: func() types.OAuth2Provider { return NewGoogleOAuth2Provider(cfg, nil) }},
 		{name: "generic", provider: func() types.OAuth2Provider { return NewGenericOAuth2Provider("custom", cfg, nil) }},
 	}
 
@@ -353,7 +353,7 @@ func TestProviderPKCEOptOutLogsWarning(t *testing.T) {
 			cfg.PKCE = tt.pkce
 
 			logger := &internaltests.LevelRecordingLogger{}
-			provider := NewGoogleProvider(cfg, &ProviderOptions{Logger: logger})
+			provider := NewGoogleOAuth2Provider(cfg, &ProviderOptions{Logger: logger})
 
 			require.Equal(t, tt.wantPKCE, provider.RequiresPKCE())
 
