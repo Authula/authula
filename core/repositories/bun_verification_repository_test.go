@@ -34,6 +34,8 @@ func newTestVerificationDB(t *testing.T) bun.IDB {
 }
 
 func TestBunVerificationRepository_GetByToken(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		token     string
@@ -45,6 +47,8 @@ func TestBunVerificationRepository_GetByToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			is := assert.New(t)
 			must := require.New(t)
 
