@@ -132,14 +132,14 @@ func (p *NotionOAuth2Provider) Exchange(ctx context.Context, code string, _ ...o
 // GetUserInfo maps the owner object returned with the token. Notion exposes no
 // endpoint for the authorizing person, so this performs no HTTP request.
 func (p *NotionOAuth2Provider) GetUserInfo(_ context.Context, token *oauth2.Token) (*types.UserInfo, error) {
-	raw := token.Extra("owner")
-	if raw == nil {
+	rawOwner := token.Extra("owner")
+	if rawOwner == nil {
 		return nil, fmt.Errorf("failed to get Notion user info: token response is missing owner")
 	}
 
-	owner, ok := raw.(map[string]any)
+	owner, ok := rawOwner.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("failed to get Notion user info: owner has unexpected type %T", raw)
+		return nil, fmt.Errorf("failed to get Notion user info: owner has unexpected type %T", rawOwner)
 	}
 
 	// A workspace-owned token carries no person: there is no id and no email to
@@ -163,12 +163,26 @@ func (p *NotionOAuth2Provider) GetUserInfo(_ context.Context, token *oauth2.Toke
 		return nil, fmt.Errorf("failed to get Notion user info: user is missing the person object")
 	}
 
+	cleanRaw := make(map[string]any)
+	// Extract non-sensitive properties from Notion's response from the root of the response object.
+	keysToKeep := []string{
+		"bot_id",
+		"duplicated_template_id",
+		"owner",
+		"workspace_id", "workspace_name", "workspace_icon",
+	}
+	for _, key := range keysToKeep {
+		if val := token.Extra(key); val != nil {
+			cleanRaw[key] = val
+		}
+	}
+
 	return &types.UserInfo{
 		ProviderAccountID: id,
 		Email:             util.NormalizeEmail(GetStringField(person, "email")),
 		EmailVerified:     GetBoolField(person, "email_verified"),
 		Name:              GetStringField(user, "name"),
 		Picture:           GetStringField(user, "avatar_url"),
-		Raw:               owner,
+		Raw:               cleanRaw,
 	}, nil
 }
