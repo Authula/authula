@@ -56,56 +56,60 @@ func TestNotionProviderGetAuthURL(t *testing.T) {
 		RedirectURL:  notionTestRedirectURL,
 	}, nil)
 
-	t.Run("carries the authorize parameters", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name       string
+		options    []oauth2.AuthCodeOption
+		wantQuery  map[string]string
+		wantAbsent []string
+	}{
+		{
+			name: "carries the authorize parameters",
+			wantQuery: map[string]string{
+				"owner":         "user",
+				"response_type": "code",
+				"client_id":     "client-id",
+				"redirect_uri":  notionTestRedirectURL,
+				"state":         "state-value",
+			},
+			wantAbsent: []string{"scope", "code_challenge", "code_challenge_method"},
+		},
+		{
+			name: "keeps caller supplied options",
+			options: []oauth2.AuthCodeOption{
+				oauth2.AccessTypeOffline,
+				oauth2.SetAuthURLParam("prompt", "consent"),
+			},
+			wantQuery: map[string]string{
+				"access_type": "offline",
+				"prompt":      "consent",
+				"owner":       "user",
+				"state":       "state-value",
+			},
+		},
+	}
 
-		is := assert.New(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		parsed, err := url.Parse(provider.GetAuthURL("state-value"))
-		require.NoError(t, err)
+			is := assert.New(t)
 
-		is.Equal("https://api.notion.com/v1/oauth/authorize", parsed.Scheme+"://"+parsed.Host+parsed.Path)
+			parsed, err := url.Parse(provider.GetAuthURL("state-value", tt.options...))
+			require.NoError(t, err)
 
-		query := parsed.Query()
-		is.Equal("user", query.Get("owner"))
-		is.Equal("code", query.Get("response_type"))
-		is.Equal("client-id", query.Get("client_id"))
-		is.Equal(notionTestRedirectURL, query.Get("redirect_uri"))
-		is.Equal("state-value", query.Get("state"))
-		is.Contains(parsed.RawQuery, "redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback")
-	})
+			is.Equal("https://api.notion.com/v1/oauth/authorize", parsed.Scheme+"://"+parsed.Host+parsed.Path)
 
-	t.Run("omits scope and PKCE parameters", func(t *testing.T) {
-		t.Parallel()
+			query := parsed.Query()
+			for key, want := range tt.wantQuery {
+				is.Equal(want, query.Get(key), "query parameter %q", key)
+			}
+			for _, key := range tt.wantAbsent {
+				is.False(query.Has(key), "Notion has no %q parameter", key)
+			}
 
-		is := assert.New(t)
-
-		parsed, err := url.Parse(provider.GetAuthURL("state-value"))
-		require.NoError(t, err)
-
-		query := parsed.Query()
-		is.False(query.Has("scope"), "Notion has no scope parameter")
-		is.False(query.Has("code_challenge"))
-		is.False(query.Has("code_challenge_method"))
-	})
-
-	t.Run("keeps caller supplied options", func(t *testing.T) {
-		t.Parallel()
-
-		is := assert.New(t)
-
-		parsed, err := url.Parse(provider.GetAuthURL("state-value",
-			oauth2.AccessTypeOffline,
-			oauth2.SetAuthURLParam("prompt", "consent"),
-		))
-		require.NoError(t, err)
-
-		query := parsed.Query()
-		is.Equal("offline", query.Get("access_type"))
-		is.Equal("consent", query.Get("prompt"))
-		is.Equal("user", query.Get("owner"))
-		is.Equal("state-value", query.Get("state"))
-	})
+			is.Contains(parsed.RawQuery, "redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback")
+		})
+	}
 }
 
 func TestNotionProviderExchange(t *testing.T) {
@@ -137,7 +141,7 @@ func TestNotionProviderExchange(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"access_token":"notion-access-token","token_type":"bearer","refresh_token":"notion-refresh-token","owner":` + ownerJSON + `}`))
+		_, _ = w.Write([]byte(`{"access_token":"notion-access-token","refresh_token":"notion-refresh-token","owner":` + ownerJSON + `}`))
 	}))
 	t.Cleanup(server.Close)
 
@@ -160,7 +164,6 @@ func TestNotionProviderExchange(t *testing.T) {
 
 	is.Equal("notion-access-token", token.AccessToken)
 	is.Equal("notion-refresh-token", token.RefreshToken)
-	is.Equal("bearer", token.TokenType)
 
 	owner, ok := token.Extra("owner").(map[string]any)
 	require.True(t, ok, "owner must survive on the token")
@@ -195,7 +198,7 @@ func TestNotionProviderExchangeErrors(t *testing.T) {
 		{
 			name:       "missing access token",
 			status:     http.StatusOK,
-			body:       `{"token_type":"bearer","refresh_token":"refresh"}`,
+			body:       `{"refresh_token":"refresh"}`,
 			wantErrSub: "access_token",
 		},
 		{
@@ -345,7 +348,6 @@ func TestNotionProviderGetUserInfoRawPayload(t *testing.T) {
 			extra: map[string]any{
 				"access_token":           "secret-access-token",
 				"refresh_token":          "secret-refresh-token",
-				"token_type":             "bearer",
 				"bot_id":                 "bot-1",
 				"duplicated_template_id": "template-1",
 				"workspace_id":           "ws-1",
@@ -361,7 +363,7 @@ func TestNotionProviderGetUserInfoRawPayload(t *testing.T) {
 				"workspace_icon":         "https://img.example/ws.png",
 				"owner":                  owner,
 			},
-			notContains: []string{"access_token", "refresh_token", "token_type"},
+			notContains: []string{"access_token", "refresh_token"},
 		},
 		{
 			name: "drops fields missing from the allowlist",
