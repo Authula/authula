@@ -31,6 +31,8 @@ func clearProviderEnv(t *testing.T) {
 		env.EnvMicrosoftClientID,
 		env.EnvMicrosoftClientSecret,
 		env.EnvMicrosoftTenantID,
+		env.EnvNotionClientID,
+		env.EnvNotionClientSecret,
 	} {
 		t.Setenv(key, "")
 	}
@@ -251,6 +253,27 @@ func TestRegisterProviders(t *testing.T) {
 				microsoft, ok := plugin.providerRegistry.Get("microsoft")
 				require.True(t, ok)
 				assert.Equal(t, "https://login.microsoftonline.com/contoso.onmicrosoft.com/oauth2/v2.0/token", microsoft.GetConfig().Endpoint.TokenURL)
+			},
+		},
+		{
+			name: "notion env credentials",
+			env: map[string]string{
+				env.EnvNotionClientID:     "env-id",
+				env.EnvNotionClientSecret: "env-secret",
+			},
+			verify: func(t *testing.T, plugin *OAuth2Plugin) {
+				t.Helper()
+
+				notion, ok := plugin.providerRegistry.Get("notion")
+				require.True(t, ok)
+				_, ok = notion.(*services.NotionOAuth2Provider)
+				assert.True(t, ok)
+				assert.Equal(t, "env-id", notion.GetConfig().ClientID)
+				assert.Equal(t, "env-secret", notion.GetConfig().ClientSecret)
+				assert.Equal(t, "https://api.notion.com/v1/oauth/authorize", notion.GetConfig().Endpoint.AuthURL)
+				assert.Equal(t, "https://api.notion.com/v1/oauth/token", notion.GetConfig().Endpoint.TokenURL)
+				assert.Equal(t, "https://api.example.com/auth/oauth2/callback/notion", notion.GetConfig().RedirectURL)
+				assert.False(t, notion.RequiresPKCE())
 			},
 		},
 		{

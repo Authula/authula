@@ -190,6 +190,13 @@ func getEnvKey(provider, suffix string) (string, bool) {
 		case "CLIENT_SECRET":
 			return env.EnvMicrosoftClientSecret, true
 		}
+	case "notion":
+		switch suffix {
+		case "CLIENT_ID":
+			return env.EnvNotionClientID, true
+		case "CLIENT_SECRET":
+			return env.EnvNotionClientSecret, true
+		}
 	}
 	return "", false
 }
@@ -211,7 +218,7 @@ func (p *OAuth2Plugin) registerProviders() error {
 	for name := range configured {
 		names = append(names, name)
 	}
-	for _, builtIn := range []string{"discord", "dropbox", "github", "google", "microsoft"} {
+	for _, builtIn := range []string{"discord", "dropbox", "github", "google", "microsoft", "notion"} {
 		if _, exists := configured[builtIn]; !exists {
 			names = append(names, builtIn)
 		}
@@ -296,6 +303,8 @@ func (p *OAuth2Plugin) registerBuiltInProvider(name string, cfg types.ProviderCo
 			cfg.TenantID = new(tenantID)
 		}
 		provider = services.NewMicrosoftOAuth2Provider(cfg, options)
+	case "notion":
+		provider = services.NewNotionOAuth2Provider(cfg, options)
 	default:
 		return fmt.Errorf("%w: unsupported built-in provider %s", constants.ErrProviderConfigInvalid, name)
 	}

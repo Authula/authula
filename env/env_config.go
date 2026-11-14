@@ -27,6 +27,9 @@ const (
 	EnvMicrosoftClientSecret = "MICROSOFT_CLIENT_SECRET"
 	EnvMicrosoftTenantID     = "MICROSOFT_TENANT_ID"
 
+	EnvNotionClientID     = "NOTION_CLIENT_ID"
+	EnvNotionClientSecret = "NOTION_CLIENT_SECRET"
+
 	// POSTGRES
 
 	EnvPostgresURL = "POSTGRES_URL"
