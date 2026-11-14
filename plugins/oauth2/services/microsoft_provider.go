@@ -39,7 +39,7 @@ func NewMicrosoftOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions)
 	}
 
 	return &MicrosoftOAuth2Provider{
-		BaseProvider: NewBaseProvider("microsoft", ResolveOAuth2Config(cfg, defaults), opts, cfg.PKCEEnabled()),
+		BaseProvider: NewBaseProvider("microsoft", ResolveOAuth2Config(cfg, defaults), opts, cfg.PKCEEnabled(), ResolveAuthURLParams(cfg, defaults)),
 		userInfoURL:  ResolveUserInfoURL(cfg, defaultMicrosoftUserInfoURL),
 	}
 }

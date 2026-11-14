@@ -43,7 +43,7 @@ var notionDefaults = ProviderDefaults{
 // NewNotionOAuth2Provider creates a new Notion OAuth2 provider.
 func NewNotionOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *NotionOAuth2Provider {
 	return &NotionOAuth2Provider{
-		BaseProvider: NewBaseProvider("notion", ResolveOAuth2Config(cfg, notionDefaults), opts, false),
+		BaseProvider: NewBaseProvider("notion", ResolveOAuth2Config(cfg, notionDefaults), opts, false, ResolveAuthURLParams(cfg, notionDefaults)),
 		clientID:     cfg.ClientID,
 		clientSecret: cfg.ClientSecret,
 	}

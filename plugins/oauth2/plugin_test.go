@@ -2,6 +2,7 @@ package oauth2
 
 import (
 	"fmt"
+	"net/url"
 	"testing"
 
 	"github.com/BurntSushi/toml"
@@ -203,6 +204,48 @@ func TestRegisterProviders(t *testing.T) {
 				google, ok := plugin.providerRegistry.Get("google")
 				require.True(t, ok)
 				assert.False(t, google.RequiresPKCE())
+			},
+		},
+		{
+			name: "reserved auth url param is rejected",
+			providers: map[string]types.ProviderConfig{
+				"google": {
+					ClientID:      "config-id",
+					ClientSecret:  "config-secret",
+					AuthURLParams: map[string]string{"state": "fixed"},
+				},
+			},
+			wantErr: constants.ErrProviderConfigInvalid,
+		},
+		{
+			name: "blank auth url param is rejected",
+			providers: map[string]types.ProviderConfig{
+				"google": {
+					ClientID:      "config-id",
+					ClientSecret:  "config-secret",
+					AuthURLParams: map[string]string{"   ": "value"},
+				},
+			},
+			wantErr: constants.ErrProviderConfigInvalid,
+		},
+		{
+			name: "auth url params are applied to the authorization url",
+			providers: map[string]types.ProviderConfig{
+				"google": {
+					ClientID:      "config-id",
+					ClientSecret:  "config-secret",
+					AuthURLParams: map[string]string{"prompt": "consent"},
+				},
+			},
+			verify: func(t *testing.T, plugin *OAuth2Plugin) {
+				t.Helper()
+
+				google, ok := plugin.providerRegistry.Get("google")
+				require.True(t, ok)
+
+				parsed, err := url.Parse(google.GetAuthURL("state-value"))
+				require.NoError(t, err)
+				assert.Equal(t, "consent", parsed.Query().Get("prompt"))
 			},
 		},
 		{

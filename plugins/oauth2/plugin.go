@@ -350,6 +350,9 @@ func (p *OAuth2Plugin) validateProviderConfig(name string, cfg types.ProviderCon
 	if err := util.ValidateRedirectURL(cfg.RedirectURL); err != nil {
 		return fmt.Errorf("%w: provider %s: %v", constants.ErrProviderConfigInvalid, name, err)
 	}
+	if err := services.ValidateAuthURLParams(cfg.AuthURLParams); err != nil {
+		return fmt.Errorf("%w: provider %s: %v", constants.ErrProviderConfigInvalid, name, err)
+	}
 
 	for label, endpoint := range map[string]string{
 		"auth_url":      cfg.AuthURL,

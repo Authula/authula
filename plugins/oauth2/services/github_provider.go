@@ -40,7 +40,7 @@ type githubEmail struct {
 
 func NewGitHubOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *GitHubOAuth2Provider {
 	return &GitHubOAuth2Provider{
-		BaseProvider: NewBaseProvider("github", ResolveOAuth2Config(cfg, githubDefaults), opts, cfg.PKCEEnabled()),
+		BaseProvider: NewBaseProvider("github", ResolveOAuth2Config(cfg, githubDefaults), opts, cfg.PKCEEnabled(), ResolveAuthURLParams(cfg, githubDefaults)),
 		userInfoURL:  ResolveUserInfoURL(cfg, defaultGitHubUserInfoURL),
 		emailsURL:    defaultGitHubEmailsURL,
 		fields: providerFields{
