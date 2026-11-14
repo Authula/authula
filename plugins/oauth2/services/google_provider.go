@@ -31,7 +31,7 @@ var googleDefaults = ProviderDefaults{
 
 func NewGoogleOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *GoogleOAuth2Provider {
 	return &GoogleOAuth2Provider{
-		BaseProvider: NewBaseProvider("google", ResolveOAuth2Config(cfg, googleDefaults), opts, cfg.PKCEEnabled()),
+		BaseProvider: NewBaseProvider("google", ResolveOAuth2Config(cfg, googleDefaults), opts, cfg.PKCEEnabled(), ResolveAuthURLParams(cfg, googleDefaults)),
 		userInfoURL:  ResolveUserInfoURL(cfg, defaultGoogleUserInfoURL),
 		fields: providerFields{
 			userID:        defaultField(cfg.UserIDField, "id"),

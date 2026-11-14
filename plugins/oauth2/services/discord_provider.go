@@ -27,7 +27,7 @@ var discordDefaults = ProviderDefaults{
 
 func NewDiscordOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *DiscordOAuth2Provider {
 	return &DiscordOAuth2Provider{
-		BaseProvider: NewBaseProvider("discord", ResolveOAuth2Config(cfg, discordDefaults), opts, cfg.PKCEEnabled()),
+		BaseProvider: NewBaseProvider("discord", ResolveOAuth2Config(cfg, discordDefaults), opts, cfg.PKCEEnabled(), ResolveAuthURLParams(cfg, discordDefaults)),
 		userInfoURL:  ResolveUserInfoURL(cfg, defaultDiscordUserInfoURL),
 		fields: providerFields{
 			userID:        defaultField(cfg.UserIDField, "id"),

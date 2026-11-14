@@ -43,14 +43,15 @@ func (o *ProviderOptions) logger() models.Logger {
 
 // BaseProvider provides common functionality for OAuth2 providers
 type BaseProvider struct {
-	config *oauth2.Config
-	name   string
-	opts   ProviderOptions
-	pkce   bool
+	config        *oauth2.Config
+	name          string
+	opts          ProviderOptions
+	pkce          bool
+	authURLParams map[string]string
 }
 
 // NewBaseProvider creates a new base provider
-func NewBaseProvider(name string, config *oauth2.Config, opts *ProviderOptions, pkce bool) *BaseProvider {
+func NewBaseProvider(name string, config *oauth2.Config, opts *ProviderOptions, pkce bool, authURLParams map[string]string) *BaseProvider {
 	var options ProviderOptions
 	if opts != nil {
 		options = *opts
@@ -62,10 +63,11 @@ func NewBaseProvider(name string, config *oauth2.Config, opts *ProviderOptions, 
 		)
 	}
 	return &BaseProvider{
-		config: config,
-		name:   name,
-		opts:   options,
-		pkce:   pkce,
+		config:        config,
+		name:          name,
+		opts:          options,
+		pkce:          pkce,
+		authURLParams: authURLParams,
 	}
 }
 
@@ -74,9 +76,16 @@ func (p *BaseProvider) GetConfig() *oauth2.Config {
 	return p.config
 }
 
-// GetAuthURL returns the authorization URL
+// GetAuthURL returns the authorization URL.
 func (p *BaseProvider) GetAuthURL(state string, opts ...oauth2.AuthCodeOption) string {
-	return p.config.AuthCodeURL(state, opts...)
+	options := make([]oauth2.AuthCodeOption, 0, len(p.authURLParams)+len(opts))
+	// Configured parameters are applied
+	// first so that trusted internal options, such as PKCE, take precedence.
+	for key, value := range p.authURLParams {
+		options = append(options, oauth2.SetAuthURLParam(key, value))
+	}
+	options = append(options, opts...)
+	return p.config.AuthCodeURL(state, options...)
 }
 
 // Exchange exchanges the authorization code for a token

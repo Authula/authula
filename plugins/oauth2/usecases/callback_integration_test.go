@@ -34,6 +34,7 @@ type callbackIntegrationFixture struct {
 	accountRepo    corerepos.AccountRepository
 	tokenRepo      corerepos.TokenRepository
 	sessionID      string
+	tokenExpiry    time.Time
 }
 
 func newCallbackIntegrationFixture(t *testing.T) *callbackIntegrationFixture {
@@ -125,6 +126,7 @@ func TestCallbackUseCase_SQLiteIntegration(t *testing.T) {
 				}
 
 				f.seedFlowState(t, "state-1", "binding-1", types.OAuthFlowPurposeLogin, nil)
+				f.tokenExpiry = provider.Token.Expiry
 
 				return provider, &types.CallbackRequest{
 					ProviderID: "google",
@@ -155,6 +157,10 @@ func TestCallbackUseCase_SQLiteIntegration(t *testing.T) {
 				decryptedRefresh, err := f.tokenRepo.Decrypt(*stored.RefreshToken)
 				require.NoError(t, err)
 				assert.Equal(t, "plain-refresh-token", decryptedRefresh)
+
+				require.NotNil(t, stored.AccessTokenExpiresAt)
+				assert.WithinDuration(t, f.tokenExpiry, *stored.AccessTokenExpiresAt, time.Second)
+				assert.Nil(t, stored.RefreshTokenExpiresAt)
 			},
 		},
 		{

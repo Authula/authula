@@ -87,6 +87,11 @@ type ProviderConfig struct {
 	// Setting it to false is an explicit opt-out and is not OAuth 2.1 compliant.
 	PKCE     *bool   `json:"pkce,omitempty" toml:"pkce,omitempty"`
 	TenantID *string `json:"tenant_id,omitempty" toml:"tenant_id,omitempty"` // Microsoft only: common (default), organizations, consumers or a tenant ID
+	// AuthURLParams are extra query parameters appended to the provider's
+	// authorization URL. Provider configuration overrides provider defaults.
+	// Empty values remove a default parameter. Protocol-managed parameters are
+	// rejected during configuration validation.
+	AuthURLParams map[string]string `json:"auth_url_params,omitempty" toml:"auth_url_params,omitempty"`
 }
 
 // IsEnabled reports whether the provider is enabled. Absent means enabled.

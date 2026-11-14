@@ -29,7 +29,7 @@ var dropboxDefaults = ProviderDefaults{
 // NewDropboxOAuth2Provider creates a new Dropbox OAuth2 provider.
 func NewDropboxOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *DropboxOAuth2Provider {
 	return &DropboxOAuth2Provider{
-		BaseProvider: NewBaseProvider("dropbox", ResolveOAuth2Config(cfg, dropboxDefaults), opts, cfg.PKCEEnabled()),
+		BaseProvider: NewBaseProvider("dropbox", ResolveOAuth2Config(cfg, dropboxDefaults), opts, cfg.PKCEEnabled(), ResolveAuthURLParams(cfg, dropboxDefaults)),
 		userInfoURL:  ResolveUserInfoURL(cfg, defaultDropboxUserInfoURL),
 	}
 }
