@@ -23,6 +23,8 @@ func clearProviderEnv(t *testing.T) {
 		env.EnvGithubClientSecret,
 		env.EnvDiscordClientID,
 		env.EnvDiscordClientSecret,
+		env.EnvDropboxClientID,
+		env.EnvDropboxClientSecret,
 		env.EnvMicrosoftClientID,
 		env.EnvMicrosoftClientSecret,
 		env.EnvMicrosoftTenantID,
@@ -196,6 +198,24 @@ func TestRegisterProviders(t *testing.T) {
 				google, ok := plugin.providerRegistry.Get("google")
 				require.True(t, ok)
 				assert.False(t, google.RequiresPKCE())
+			},
+		},
+		{
+			name: "dropbox env credentials",
+			env: map[string]string{
+				env.EnvDropboxClientID:     "env-id",
+				env.EnvDropboxClientSecret: "env-secret",
+			},
+			verify: func(t *testing.T, plugin *OAuth2Plugin) {
+				t.Helper()
+
+				dropbox, ok := plugin.providerRegistry.Get("dropbox")
+				require.True(t, ok)
+				_, ok = dropbox.(*services.DropboxOAuth2Provider)
+				assert.True(t, ok)
+				assert.Equal(t, "env-id", dropbox.GetConfig().ClientID)
+				assert.Equal(t, "https://api.example.com/auth/oauth2/callback/dropbox", dropbox.GetConfig().RedirectURL)
+				assert.Equal(t, []string{"openid", "profile", "email"}, dropbox.GetConfig().Scopes)
 			},
 		},
 		{

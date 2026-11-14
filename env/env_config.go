@@ -17,6 +17,9 @@ const (
 	EnvDiscordClientID     = "DISCORD_CLIENT_ID"
 	EnvDiscordClientSecret = "DISCORD_CLIENT_SECRET"
 
+	EnvDropboxClientID     = "DROPBOX_CLIENT_ID"
+	EnvDropboxClientSecret = "DROPBOX_CLIENT_SECRET"
+
 	EnvGithubClientID     = "GITHUB_CLIENT_ID"
 	EnvGithubClientSecret = "GITHUB_CLIENT_SECRET"
 

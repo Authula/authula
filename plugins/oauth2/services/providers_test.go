@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -307,6 +308,117 @@ func TestGenericProviderFieldMapping(t *testing.T) {
 	}
 }
 
+func TestDropboxProviderGetUserInfo(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		status       int
+		body         string
+		wantID       string
+		wantEmail    string
+		wantName     string
+		wantVerified bool
+		wantErr      bool
+	}{
+		{
+			name:         "combines given name and family name",
+			status:       http.StatusOK,
+			body:         `{"sub": "dbid:123", "email": "User@Example.com", "email_verified": true, "given_name": "Jane", "family_name": "Doe"}`,
+			wantID:       "dbid:123",
+			wantEmail:    "user@example.com",
+			wantName:     "Jane Doe",
+			wantVerified: true,
+		},
+		{
+			name:         "prefers the name claim when present",
+			status:       http.StatusOK,
+			body:         `{"sub": "dbid:456", "email": "jane@example.com", "email_verified": true, "name": "Jane Q. Doe", "given_name": "Jane", "family_name": "Doe"}`,
+			wantID:       "dbid:456",
+			wantEmail:    "jane@example.com",
+			wantName:     "Jane Q. Doe",
+			wantVerified: true,
+		},
+		{
+			name:      "unverified email",
+			status:    http.StatusOK,
+			body:      `{"sub": "dbid:789", "email": "jane@example.com", "email_verified": false, "name": "Jane"}`,
+			wantID:    "dbid:789",
+			wantEmail: "jane@example.com",
+			wantName:  "Jane",
+		},
+		{
+			name:    "missing sub",
+			status:  http.StatusOK,
+			body:    `{"email": "jane@example.com", "email_verified": true, "name": "Jane"}`,
+			wantErr: true,
+		},
+		{
+			name:    "non 200",
+			status:  http.StatusInternalServerError,
+			wantErr: true,
+		},
+		{
+			name:    "malformed json",
+			status:  http.StatusOK,
+			body:    `{`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.status)
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			t.Cleanup(server.Close)
+
+			provider := NewDropboxOAuth2Provider(testProviderConfig(server.URL), newTestProviderOptions(server))
+			info, err := provider.GetUserInfo(context.Background(), &oauth2.Token{AccessToken: "token"})
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.wantID, info.ProviderAccountID)
+			require.Equal(t, tt.wantEmail, info.Email)
+			require.Equal(t, tt.wantName, info.Name)
+			require.Equal(t, tt.wantVerified, info.EmailVerified)
+			require.Empty(t, info.Picture)
+		})
+	}
+}
+
+func TestFetchUserInfoPost(t *testing.T) {
+	t.Parallel()
+
+	var gotMethod, gotContentType, gotAuthorization, gotBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotContentType = r.Header.Get("Content-Type")
+		gotAuthorization = r.Header.Get("Authorization")
+
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		gotBody = string(body)
+
+		_, _ = w.Write([]byte(`{"sub": "dbid:123"}`))
+	}))
+	t.Cleanup(server.Close)
+
+	info, err := FetchUserInfoPost(context.Background(), server.Client(), nil, &oauth2.Token{AccessToken: "secret-token"}, server.URL)
+	require.NoError(t, err)
+	require.Equal(t, "dbid:123", info["sub"])
+	require.Equal(t, http.MethodPost, gotMethod)
+	require.Equal(t, "{}", gotBody)
+	require.Equal(t, "application/json", gotContentType)
+	require.Equal(t, "Bearer secret-token", gotAuthorization)
+}
+
 func TestProvidersRequirePKCEByDefault(t *testing.T) {
 	t.Parallel()
 
@@ -317,6 +429,7 @@ func TestProvidersRequirePKCEByDefault(t *testing.T) {
 		provider func() types.OAuth2Provider
 	}{
 		{name: "discord", provider: func() types.OAuth2Provider { return NewDiscordOAuth2Provider(cfg, nil) }},
+		{name: "dropbox", provider: func() types.OAuth2Provider { return NewDropboxOAuth2Provider(cfg, nil) }},
 		{name: "github", provider: func() types.OAuth2Provider { return NewGitHubOAuth2Provider(cfg, nil) }},
 		{name: "google", provider: func() types.OAuth2Provider { return NewGoogleOAuth2Provider(cfg, nil) }},
 		{name: "generic", provider: func() types.OAuth2Provider { return NewGenericOAuth2Provider("custom", cfg, nil) }},
