@@ -231,7 +231,7 @@ func TestNotionProviderExchangeErrors(t *testing.T) {
 	}
 }
 
-func TestNotionProviderGetUserInfo(t *testing.T) {
+func TestNotionProviderGetUserInfoMakesNoHttpRequest(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -257,7 +257,7 @@ func TestNotionProviderGetUserInfo(t *testing.T) {
 	is.Equal(owner, info.Raw)
 }
 
-func TestNotionProviderGetUserInfoCases(t *testing.T) {
+func TestNotionProviderGetUserInfo(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {

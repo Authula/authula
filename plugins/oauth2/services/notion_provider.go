@@ -18,7 +18,6 @@ const (
 	notionAuthURL  = "https://api.notion.com/v1/oauth/authorize"
 	notionTokenURL = "https://api.notion.com/v1/oauth/token"
 
-	// notionAPIVersion is sent on the token request. The endpoint's OpenAPI
 	// declaration marks Notion-Version required, although the authorization
 	// guide's example omits it; sending it is the safe side of that ambiguity.
 	notionAPIVersion = "2026-03-11"
@@ -46,7 +45,6 @@ var notionDefaults = ProviderDefaults{
 
 // NewNotionOAuth2Provider creates a new Notion OAuth2 provider.
 //
-// PKCE is forced off: Notion documents no code_challenge support, and the
 // exchange is built by hand below, so a challenge would never be answered.
 func NewNotionOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *NotionOAuth2Provider {
 	return &NotionOAuth2Provider{
