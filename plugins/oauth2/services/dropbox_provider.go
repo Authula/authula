@@ -20,10 +20,15 @@ type DropboxOAuth2Provider struct {
 	userInfoURL string
 }
 
+// dropboxDefaults requests offline access so the token endpoint returns a
+// refresh token. Operators can override or remove it with auth_url_params.
 var dropboxDefaults = ProviderDefaults{
 	Endpoint:    endpoints.Dropbox,
 	Scopes:      []string{"openid", "profile", "email"},
 	UserInfoURL: defaultDropboxUserInfoURL,
+	AuthURLParams: map[string]string{
+		"token_access_type": "offline",
+	},
 }
 
 // NewDropboxOAuth2Provider creates a new Dropbox OAuth2 provider.
