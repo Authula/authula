@@ -24,6 +24,11 @@ var dropboxDefaults = ProviderDefaults{
 	Endpoint:    endpoints.Dropbox,
 	Scopes:      []string{"openid", "profile", "email"},
 	UserInfoURL: defaultDropboxUserInfoURL,
+	AuthURLParams: map[string]string{
+		// Requests offline access so the token endpoint returns a
+		// refresh token.
+		"token_access_type": "offline",
+	},
 }
 
 // NewDropboxOAuth2Provider creates a new Dropbox OAuth2 provider.

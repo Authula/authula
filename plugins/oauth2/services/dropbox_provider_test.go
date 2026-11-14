@@ -95,6 +95,103 @@ func TestNewDropboxOAuth2Provider(t *testing.T) {
 	}
 }
 
+func TestDropboxProviderGetAuthURLOfflineAccess(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		cfg         types.ProviderConfig
+		options     []oauth2.AuthCodeOption
+		wantAuthURL string
+		wantValues  []string
+		wantAbsent  bool
+		wantPKCE    bool
+	}{
+		{
+			name: "requests offline access by default",
+			cfg: types.ProviderConfig{
+				ClientID:     "client-id",
+				ClientSecret: "client-secret",
+				RedirectURL:  "https://app.example.com/callback",
+			},
+			wantAuthURL: endpoints.Dropbox.AuthURL,
+			wantValues:  []string{"offline"},
+		},
+		{
+			name: "keeps offline access when auth_url is overridden",
+			cfg: types.ProviderConfig{
+				ClientID:     "client-id",
+				ClientSecret: "client-secret",
+				RedirectURL:  "https://app.example.com/callback",
+				AuthURL:      "https://auth.example.com/authorize",
+			},
+			wantAuthURL: "https://auth.example.com/authorize",
+			wantValues:  []string{"offline"},
+		},
+		{
+			name: "operator override replaces the default",
+			cfg: types.ProviderConfig{
+				ClientID:     "client-id",
+				ClientSecret: "client-secret",
+				RedirectURL:  "https://app.example.com/callback",
+				AuthURLParams: map[string]string{
+					"token_access_type": "online",
+				},
+			},
+			wantAuthURL: endpoints.Dropbox.AuthURL,
+			wantValues:  []string{"online"},
+		},
+		{
+			name: "empty operator value removes the parameter",
+			cfg: types.ProviderConfig{
+				ClientID:     "client-id",
+				ClientSecret: "client-secret",
+				RedirectURL:  "https://app.example.com/callback",
+				AuthURLParams: map[string]string{
+					"token_access_type": "",
+				},
+			},
+			wantAuthURL: endpoints.Dropbox.AuthURL,
+			wantAbsent:  true,
+		},
+		{
+			name: "offline access coexists with PKCE",
+			cfg: types.ProviderConfig{
+				ClientID:     "client-id",
+				ClientSecret: "client-secret",
+				RedirectURL:  "https://app.example.com/callback",
+			},
+			options:     []oauth2.AuthCodeOption{oauth2.S256ChallengeOption("verifier")},
+			wantAuthURL: endpoints.Dropbox.AuthURL,
+			wantValues:  []string{"offline"},
+			wantPKCE:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			provider := NewDropboxOAuth2Provider(tt.cfg, nil)
+			authURL := parseAuthURL(t, provider.GetAuthURL("state", tt.options...))
+			query := authURL.Query()
+
+			require.Equal(t, tt.wantAuthURL, authURL.Scheme+"://"+authURL.Host+authURL.Path)
+
+			if tt.wantAbsent {
+				require.NotContains(t, query, "token_access_type")
+			} else {
+				require.Equal(t, tt.wantValues, query["token_access_type"])
+			}
+
+			if tt.wantPKCE {
+				require.NotEmpty(t, query.Get("code_challenge"))
+				require.Equal(t, "S256", query.Get("code_challenge_method"))
+			}
+		})
+	}
+}
+
 func TestDropboxProviderGetUserInfo(t *testing.T) {
 	t.Parallel()
 
