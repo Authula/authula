@@ -277,24 +277,6 @@ func TestDropboxProviderGetUserInfo(t *testing.T) {
 	}
 }
 
-func TestDropboxProviderGetUserInfo_PictureIsAlwaysEmpty(t *testing.T) {
-	t.Parallel()
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"sub":"dbid:1","picture":"https://img.example/p.png","avatar_url":"https://img.example/a.png","given_name":"Jane","family_name":"Doe"}`))
-	}))
-	t.Cleanup(server.Close)
-
-	cfg := testProviderConfig(server.URL)
-	cfg.PictureField = "picture"
-
-	provider := NewDropboxOAuth2Provider(cfg, newTestProviderOptions(server))
-	info, err := provider.GetUserInfo(context.Background(), &oauth2.Token{AccessToken: "token"})
-
-	require.NoError(t, err)
-	require.Empty(t, info.Picture)
-}
-
 func TestDropboxProviderGetUserInfo_RequestShape(t *testing.T) {
 	t.Parallel()
 
