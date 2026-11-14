@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -254,7 +255,7 @@ func TestNotionProviderGetUserInfoMakesNoHttpRequest(t *testing.T) {
 	is.True(info.EmailVerified)
 	is.Equal("Alice", info.Name)
 	is.Equal("https://img.example/a.png", info.Picture)
-	is.Equal(owner, info.Raw)
+	is.Equal(map[string]any{"owner": owner}, info.Raw)
 }
 
 func TestNotionProviderGetUserInfo(t *testing.T) {
@@ -324,6 +325,78 @@ func TestNotionProviderGetUserInfo(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantVerified, info.EmailVerified)
 			assert.Equal(t, "alice@example.com", info.Email)
+		})
+	}
+}
+
+func TestNotionProviderGetUserInfoRawPayload(t *testing.T) {
+	t.Parallel()
+
+	owner := notionOwner(map[string]any{"email": "alice@example.com", "email_verified": true})
+
+	tests := []struct {
+		name        string
+		extra       map[string]any
+		wantRaw     map[string]any
+		notContains []string
+	}{
+		{
+			name: "keeps only allowlisted fields",
+			extra: map[string]any{
+				"access_token":           "secret-access-token",
+				"refresh_token":          "secret-refresh-token",
+				"token_type":             "bearer",
+				"bot_id":                 "bot-1",
+				"duplicated_template_id": "template-1",
+				"workspace_id":           "ws-1",
+				"workspace_name":         "Alice Workspace",
+				"workspace_icon":         "https://img.example/ws.png",
+				"owner":                  owner,
+			},
+			wantRaw: map[string]any{
+				"bot_id":                 "bot-1",
+				"duplicated_template_id": "template-1",
+				"workspace_id":           "ws-1",
+				"workspace_name":         "Alice Workspace",
+				"workspace_icon":         "https://img.example/ws.png",
+				"owner":                  owner,
+			},
+			notContains: []string{"access_token", "refresh_token", "token_type"},
+		},
+		{
+			name: "drops fields missing from the allowlist",
+			extra: map[string]any{
+				"access_token":      "secret-access-token",
+				"refresh_token":     "secret-refresh-token",
+				"some_future_field": "secret-future-value",
+				"owner":             owner,
+			},
+			wantRaw:     map[string]any{"owner": owner},
+			notContains: []string{"some_future_field"},
+		},
+	}
+
+	provider := NewNotionOAuth2Provider(types.ProviderConfig{
+		ClientID:     "client-id",
+		ClientSecret: "client-secret",
+		RedirectURL:  notionTestRedirectURL,
+	}, nil)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			is := assert.New(t)
+
+			info, err := provider.GetUserInfo(context.Background(), (&oauth2.Token{}).WithExtra(tt.extra))
+			require.NoError(t, err)
+
+			is.Equal(tt.wantRaw, info.Raw)
+			for _, key := range tt.notContains {
+				_, ok := info.Raw[key]
+				is.False(ok, "raw payload must not carry %q", key)
+			}
+			is.NotContains(fmt.Sprint(info.Raw), "secret-", "raw payload must never carry a credential value")
 		})
 	}
 }
