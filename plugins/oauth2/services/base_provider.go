@@ -105,7 +105,7 @@ func FetchUserInfo(ctx context.Context, client *http.Client, logger models.Logge
 }
 
 // FetchUserInfoPost fetches and parses user info using a POST request with an
-// empty JSON object body. Some providers (e.g. Dropbox) require POST.
+// empty JSON object body.
 func FetchUserInfoPost(ctx context.Context, client *http.Client, logger models.Logger, token *oauth2.Token, url string) (map[string]any, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader("{}"))
 	if err != nil {

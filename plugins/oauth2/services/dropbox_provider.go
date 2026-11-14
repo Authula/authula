@@ -18,7 +18,6 @@ const defaultDropboxUserInfoURL = "https://api.dropboxapi.com/2/openid/userinfo"
 type DropboxOAuth2Provider struct {
 	*BaseProvider
 	userInfoURL string
-	fields      providerFields
 }
 
 var dropboxDefaults = ProviderDefaults{
@@ -32,13 +31,6 @@ func NewDropboxOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *
 	return &DropboxOAuth2Provider{
 		BaseProvider: NewBaseProvider("dropbox", ResolveOAuth2Config(cfg, dropboxDefaults), opts, cfg.PKCEEnabled()),
 		userInfoURL:  ResolveUserInfoURL(cfg, defaultDropboxUserInfoURL),
-		fields: providerFields{
-			userID:        defaultField(cfg.UserIDField, "sub"),
-			email:         defaultField(cfg.EmailField, "email"),
-			name:          defaultField(cfg.NameField, "name"),
-			picture:       cfg.PictureField,
-			emailVerified: defaultField(cfg.EmailVerifiedField, "email_verified"),
-		},
 	}
 }
 
@@ -49,23 +41,19 @@ func (p *DropboxOAuth2Provider) GetUserInfo(ctx context.Context, token *oauth2.T
 		return nil, fmt.Errorf("failed to fetch Dropbox user info: %w", err)
 	}
 
-	id, err := GetIDField(info, p.fields.userID)
+	id, err := GetIDField(info, "sub")
 	if err != nil {
 		return nil, fmt.Errorf("invalid Dropbox account id: %w", err)
 	}
 
-	name := GetStringField(info, p.fields.name)
-	if name == "" {
-		// Dropbox OIDC may omit "name"; fall back to the structured name claims.
-		name = strings.TrimSpace(GetStringField(info, "given_name") + " " + GetStringField(info, "family_name"))
-	}
+	// Dropbox makes given_name and family_name optional and either may be null.
+	name := strings.TrimSpace(GetStringField(info, "given_name") + " " + GetStringField(info, "family_name"))
 
 	return &types.UserInfo{
 		ProviderAccountID: id,
-		Email:             util.NormalizeEmail(GetStringField(info, p.fields.email)),
-		EmailVerified:     GetBoolField(info, p.fields.emailVerified),
+		Email:             util.NormalizeEmail(GetStringField(info, "email")),
+		EmailVerified:     GetBoolField(info, "email_verified"),
 		Name:              name,
-		Picture:           GetStringField(info, p.fields.picture),
 		Raw:               info,
 	}, nil
 }
