@@ -15,11 +15,8 @@ import (
 )
 
 const (
-	notionAuthURL  = "https://api.notion.com/v1/oauth/authorize"
-	notionTokenURL = "https://api.notion.com/v1/oauth/token"
-
-	// declaration marks Notion-Version required, although the authorization
-	// guide's example omits it; sending it is the safe side of that ambiguity.
+	notionAuthURL    = "https://api.notion.com/v1/oauth/authorize"
+	notionTokenURL   = "https://api.notion.com/v1/oauth/token"
 	notionAPIVersion = "2026-03-11"
 )
 
@@ -44,8 +41,6 @@ var notionDefaults = ProviderDefaults{
 }
 
 // NewNotionOAuth2Provider creates a new Notion OAuth2 provider.
-//
-// exchange is built by hand below, so a challenge would never be answered.
 func NewNotionOAuth2Provider(cfg types.ProviderConfig, opts *ProviderOptions) *NotionOAuth2Provider {
 	return &NotionOAuth2Provider{
 		BaseProvider: NewBaseProvider("notion", ResolveOAuth2Config(cfg, notionDefaults), opts, false),
