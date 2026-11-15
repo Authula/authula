@@ -22,6 +22,8 @@ func TestStatusFor(t *testing.T) {
 		expectedOK   bool
 	}{
 		{name: "unauthorized", err: coreerrors.ErrUnauthorized, expectedCode: http.StatusUnauthorized, expectedOK: true},
+		{name: "session not found is unauthorized", err: coreerrors.ErrSessionNotFound, expectedCode: http.StatusUnauthorized, expectedOK: true},
+		{name: "verification not found is bad request", err: coreerrors.ErrVerificationNotFound, expectedCode: http.StatusBadRequest, expectedOK: true},
 		{name: "forbidden", err: coreerrors.ErrForbidden, expectedCode: http.StatusForbidden, expectedOK: true},
 		{name: "insufficient permissions maps to forbidden", err: coreerrors.ErrInsufficientPermissions, expectedCode: http.StatusForbidden, expectedOK: true},
 		{name: "not found", err: coreerrors.ErrNotFound, expectedCode: http.StatusNotFound, expectedOK: true},
@@ -29,6 +31,7 @@ func TestStatusFor(t *testing.T) {
 		{name: "bad request", err: coreerrors.ErrBadRequest, expectedCode: http.StatusBadRequest, expectedOK: true},
 		{name: "unprocessable entity", err: coreerrors.ErrUnprocessableEntity, expectedCode: http.StatusUnprocessableEntity, expectedOK: true},
 		{name: "wrapped sentinel is recognized", err: fmt.Errorf("authorizing: %w", coreerrors.ErrInsufficientPermissions), expectedCode: http.StatusForbidden, expectedOK: true},
+		{name: "wrapped session sentinel is recognized", err: fmt.Errorf("loading session: %w", coreerrors.ErrSessionNotFound), expectedCode: http.StatusUnauthorized, expectedOK: true},
 		{name: "unknown error is not recognized", err: errors.New("boom"), expectedOK: false},
 		{name: "nil is not recognized", err: nil, expectedOK: false},
 	}
@@ -71,6 +74,36 @@ func TestHandleError(t *testing.T) {
 			reqCtx := &models.RequestContext{}
 
 			coreerrors.HandleError(tt.err, reqCtx)
+
+			require.True(t, reqCtx.Handled)
+			require.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
+			require.JSONEq(t, fmt.Sprintf(`{"message":%q}`, tt.expectedMessage), string(reqCtx.ResponseBody))
+		})
+	}
+}
+
+func TestHandleErrorWithFallback(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		err             error
+		fallbackStatus  int
+		expectedStatus  int
+		expectedMessage string
+	}{
+		{name: "recognised sentinel keeps its status", err: coreerrors.ErrSessionNotFound, fallbackStatus: http.StatusInternalServerError, expectedStatus: http.StatusUnauthorized, expectedMessage: "session not found"},
+		{name: "unknown error uses the fallback", err: errors.New("some error"), fallbackStatus: http.StatusInternalServerError, expectedStatus: http.StatusInternalServerError, expectedMessage: "some error"},
+		{name: "fallback can be bad request", err: errors.New("some error"), fallbackStatus: http.StatusBadRequest, expectedStatus: http.StatusBadRequest, expectedMessage: "some error"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			reqCtx := &models.RequestContext{}
+
+			coreerrors.HandleErrorWithFallback(tt.err, reqCtx, tt.fallbackStatus)
 
 			require.True(t, reqCtx.Handled)
 			require.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
