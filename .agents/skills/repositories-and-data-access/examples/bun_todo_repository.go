@@ -18,6 +18,8 @@ type ITodoRepository interface {
 	WithTx(tx bun.IDB) ITodoRepository
 }
 
+var ErrTodoNotFound = errors.New("todo not found")
+
 type Todo struct {
 	ID        string `bun:"id,pk,column:id"`
 	UserID    string `bun:"user_id,column:user_id"`
@@ -42,10 +44,10 @@ func (r *bunTodoRepository) Create(ctx context.Context, todo *Todo) (*Todo, erro
 func (r *bunTodoRepository) GetByID(ctx context.Context, id string) (*Todo, error) {
 	todo := &Todo{}
 	err := r.db.NewSelect().Model(todo).Where("id = ?", id).Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrTodoNotFound
+	}
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
 		return nil, err
 	}
 	return todo, nil

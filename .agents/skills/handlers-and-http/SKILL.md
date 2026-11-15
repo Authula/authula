@@ -19,7 +19,7 @@ description: Implement HTTP handlers that parse requests, invoke use cases, and 
 1. **Thin handlers**: Business logic lives in services, not handlers. Always remember to only extract and validate request data, invoke the appropriate service or use case, and format the response. Avoid embedding business logic directly in the handler to maintain separation of concerns and improve testability.
 2. **Service coordination**: Handlers invoke services which are interfaces
 3. **HTTP boundaries**: Handle only HTTP serialization and status codes, as well as request parsing and validation.
-4. **Error mapping**: Map domain errors returned from services to HTTP status codes via `constants/errors.go`.
+4. **Error mapping**: Map domain errors returned from services to HTTP status codes via `constants/errors.go` and `coreerrors.StatusFor`.
 5. **Context propagation**: Pass request context to services
 
 ## Pattern
@@ -31,7 +31,7 @@ Handlers are the HTTP boundary:
 - Parse and validate request. Always include a `Validate()` method on request structs to clean up input but do not trim sensitive fields like passwords, tokens, etc. Before trimming fields on the request struct, check that pointer fields are not nil to avoid dereferencing nil pointers. For example, if you have a request struct with a pointer field like `Email *string`, you should check if `Email` is not nil before calling `strings.TrimSpace()` on it within the `Validate()` method. This ensures that you don't encounter a runtime panic due to dereferencing a nil pointer.
 - Invoke use case/service
 - Map response to HTTP (status code, headers, JSON) using `reqCtx.SetJSONResponse`.
-- Handle errors consistently
+- Handle errors consistently. Use `coreerrors.HandleError` for the default 400 fallback, or `coreerrors.HandleErrorWithFallback` when unexpected failures should be 500. A missing session maps to 401; a missing verification maps to 400.
 - Always make use of the code within the `internal/` folder as there are utilities for request parsing, response formatting, and error handling. Avoid reinventing the wheel by utilising these utilities to ensure consistency across handlers.
 
 ## Example
@@ -54,5 +54,5 @@ See [examples/todo_handlers.go](examples/todo_handlers.go) for:
 ## References
 
 - [plugins/email-password/handlers/](../../../plugins/email-password/handlers/) - Handler examples
-- [internal/handlers/](../../../internal/handlers/) - Core handler examples
+- [core/handlers/](../../../core/handlers/) - Core handler examples
 - [internal/router/](../../../internal/router/) - HTTP utilities
