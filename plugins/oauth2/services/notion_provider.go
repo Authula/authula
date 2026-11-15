@@ -121,6 +121,7 @@ func (p *NotionOAuth2Provider) Exchange(ctx context.Context, code string, _ ...o
 	}
 
 	token := &oauth2.Token{
+		TokenType:    GetStringField(raw, "token_type"),
 		AccessToken:  accessToken,
 		RefreshToken: GetStringField(raw, "refresh_token"),
 	}
@@ -162,13 +163,18 @@ func (p *NotionOAuth2Provider) GetUserInfo(_ context.Context, token *oauth2.Toke
 		return nil, fmt.Errorf("failed to get Notion user info: user is missing the person object")
 	}
 
+	// Notion returns the authorizing user with the token, so the documented
+	// response fields that are safe to store are copied off the token. The
+	// credentials (access_token, token_type, refresh_token) stay out of Raw.
 	cleanRaw := make(map[string]any)
-	// Extract non-sensitive properties from Notion's response from the root of the response object.
 	keysToKeep := []string{
 		"bot_id",
 		"duplicated_template_id",
 		"owner",
-		"workspace_id", "workspace_name", "workspace_icon",
+		"request_id",
+		"workspace_icon",
+		"workspace_id",
+		"workspace_name",
 	}
 	for _, key := range keysToKeep {
 		if val := token.Extra(key); val != nil {

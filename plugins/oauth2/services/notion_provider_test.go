@@ -20,6 +20,115 @@ import (
 
 const notionTestRedirectURL = "https://app.example.com/callback"
 
+// notionTokenResponse mirrors the documented Notion token response. Optional
+// fields are omitted when empty so tests can model partial responses.
+type notionTokenResponse struct {
+	AccessToken          string            `json:"access_token"`
+	TokenType            string            `json:"token_type,omitempty"`
+	RefreshToken         string            `json:"refresh_token,omitempty"`
+	BotID                string            `json:"bot_id,omitempty"`
+	WorkspaceIcon        string            `json:"workspace_icon,omitempty"`
+	WorkspaceName        string            `json:"workspace_name,omitempty"`
+	WorkspaceID          string            `json:"workspace_id,omitempty"`
+	Owner                *notionTokenOwner `json:"owner,omitempty"`
+	DuplicatedTemplateID string            `json:"duplicated_template_id,omitempty"`
+	RequestID            string            `json:"request_id,omitempty"`
+}
+
+type notionTokenOwner struct {
+	Type string          `json:"type,omitempty"`
+	User notionTokenUser `json:"user"`
+}
+
+type notionTokenUser struct {
+	Type      string            `json:"type,omitempty"`
+	Person    notionTokenPerson `json:"person"`
+	Name      string            `json:"name,omitempty"`
+	AvatarURL string            `json:"avatar_url,omitempty"`
+	ID        string            `json:"id,omitempty"`
+	Object    string            `json:"object,omitempty"`
+}
+
+type notionTokenPerson struct {
+	Email         string `json:"email,omitempty"`
+	EmailVerified bool   `json:"email_verified"`
+}
+
+func newNotionTokenResponse() notionTokenResponse {
+	return notionTokenResponse{
+		AccessToken:   "notion-access-token",
+		TokenType:     "bearer",
+		RefreshToken:  "notion-refresh-token",
+		BotID:         "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+		WorkspaceIcon: "https://img.example/ws.png",
+		WorkspaceName: "My Workspace",
+		WorkspaceID:   "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+		Owner: &notionTokenOwner{
+			Type: "user",
+			User: notionTokenUser{
+				Type: "person",
+				Person: notionTokenPerson{
+					Email:         "john.doe@example.com",
+					EmailVerified: true,
+				},
+				Name:      "John Doe",
+				AvatarURL: "https://img.example/a.png",
+				ID:        "notion-user-1",
+				Object:    "user",
+			},
+		},
+		DuplicatedTemplateID: "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+		RequestID:            "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+	}
+}
+
+// asMap returns the response the way oauth2.Token keeps token extras.
+func (r notionTokenResponse) asMap(t *testing.T) map[string]any {
+	t.Helper()
+
+	data, err := json.Marshal(r)
+	require.NoError(t, err)
+
+	var fields map[string]any
+	require.NoError(t, json.Unmarshal(data, &fields))
+	return fields
+}
+
+// ownerObject is the decoded owner object expected in UserInfo.Raw.
+func (r notionTokenResponse) ownerObject() map[string]any {
+	if r.Owner == nil {
+		return nil
+	}
+
+	return map[string]any{
+		"type": r.Owner.Type,
+		"user": map[string]any{
+			"type": r.Owner.User.Type,
+			"person": map[string]any{
+				"email":          r.Owner.User.Person.Email,
+				"email_verified": r.Owner.User.Person.EmailVerified,
+			},
+			"name":       r.Owner.User.Name,
+			"avatar_url": r.Owner.User.AvatarURL,
+			"id":         r.Owner.User.ID,
+			"object":     r.Owner.User.Object,
+		},
+	}
+}
+
+// rawUserInfo is the allowlisted payload expected in UserInfo.Raw.
+func (r notionTokenResponse) rawUserInfo() map[string]any {
+	return map[string]any{
+		"bot_id":                 r.BotID,
+		"duplicated_template_id": r.DuplicatedTemplateID,
+		"owner":                  r.ownerObject(),
+		"request_id":             r.RequestID,
+		"workspace_icon":         r.WorkspaceIcon,
+		"workspace_id":           r.WorkspaceID,
+		"workspace_name":         r.WorkspaceName,
+	}
+}
+
 func newNotionTestProvider(server *httptest.Server) *NotionOAuth2Provider {
 	return NewNotionOAuth2Provider(types.ProviderConfig{
 		ClientID:     "client-id",
@@ -35,7 +144,7 @@ func notionOwner(person map[string]any) map[string]any {
 		"user": map[string]any{
 			"object":     "user",
 			"id":         "notion-user-1",
-			"name":       "Alice",
+			"name":       "John Doe",
 			"avatar_url": "https://img.example/a.png",
 			"type":       "person",
 			"person":     person,
@@ -115,7 +224,7 @@ func TestNotionProviderGetAuthURL(t *testing.T) {
 func TestNotionProviderExchange(t *testing.T) {
 	t.Parallel()
 
-	const ownerJSON = `{"type":"user","user":{"object":"user","id":"notion-user-1","name":"Alice","avatar_url":"https://img.example/a.png","type":"person","person":{"email":"alice@example.com","email_verified":true}}}`
+	documented := newNotionTokenResponse()
 
 	type capturedRequest struct {
 		method  string
@@ -124,53 +233,144 @@ func TestNotionProviderExchange(t *testing.T) {
 		body    map[string]string
 	}
 
-	captured := make(chan capturedRequest, 1)
+	tests := []struct {
+		name         string
+		response     notionTokenResponse
+		wantType     string
+		wantRefresh  string
+		wantExtras   map[string]any
+		wantNoExtras []string
+	}{
+		{
+			name:        "documented payload",
+			response:    documented,
+			wantType:    documented.TokenType,
+			wantRefresh: documented.RefreshToken,
+			wantExtras:  documented.asMap(t),
+		},
+		{
+			name:         "only the access token",
+			response:     notionTokenResponse{AccessToken: "notion-access-token"},
+			wantExtras:   map[string]any{"access_token": "notion-access-token"},
+			wantNoExtras: []string{"owner", "refresh_token", "token_type", "workspace_id"},
+		},
+	}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body map[string]string
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		captured <- capturedRequest{
-			method:  r.Method,
-			path:    r.URL.Path,
-			headers: r.Header.Clone(),
-			body:    body,
-		}
+			captured := make(chan capturedRequest, 1)
 
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"access_token":"notion-access-token","refresh_token":"notion-refresh-token","owner":` + ownerJSON + `}`))
-	}))
-	t.Cleanup(server.Close)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var body map[string]string
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
 
-	token, err := newNotionTestProvider(server).Exchange(context.Background(), "auth-code")
-	require.NoError(t, err)
+				captured <- capturedRequest{
+					method:  r.Method,
+					path:    r.URL.Path,
+					headers: r.Header.Clone(),
+					body:    body,
+				}
 
-	got := <-captured
-	is := assert.New(t)
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(tt.response)
+			}))
+			t.Cleanup(server.Close)
 
-	is.Equal(http.MethodPost, got.method)
-	is.Equal("/v1/oauth/token", got.path)
-	is.Equal("Basic "+base64.StdEncoding.EncodeToString([]byte("client-id:client-secret")), got.headers.Get("Authorization"))
-	is.Equal("application/json", got.headers.Get("Content-Type"))
-	is.Equal("application/json", got.headers.Get("Accept"))
-	is.Equal("2026-03-11", got.headers.Get("Notion-Version"))
+			token, err := newNotionTestProvider(server).Exchange(context.Background(), "auth-code")
+			require.NoError(t, err)
 
-	is.Equal("authorization_code", got.body["grant_type"])
-	is.Equal("auth-code", got.body["code"])
-	is.Equal(notionTestRedirectURL, got.body["redirect_uri"])
+			got := <-captured
+			is := assert.New(t)
 
-	is.Equal("notion-access-token", token.AccessToken)
-	is.Equal("notion-refresh-token", token.RefreshToken)
+			is.Equal(http.MethodPost, got.method)
+			is.Equal("/v1/oauth/token", got.path)
+			is.Equal("Basic "+base64.StdEncoding.EncodeToString([]byte("client-id:client-secret")), got.headers.Get("Authorization"))
+			is.Equal("application/json", got.headers.Get("Content-Type"))
+			is.Equal("application/json", got.headers.Get("Accept"))
+			is.Equal("2026-03-11", got.headers.Get("Notion-Version"))
 
-	owner, ok := token.Extra("owner").(map[string]any)
-	require.True(t, ok, "owner must survive on the token")
-	is.Equal("user", owner["type"])
-	user, ok := owner["user"].(map[string]any)
-	require.True(t, ok)
-	is.Equal("notion-user-1", user["id"])
+			is.Equal("authorization_code", got.body["grant_type"])
+			is.Equal("auth-code", got.body["code"])
+			is.Equal(notionTestRedirectURL, got.body["redirect_uri"])
+
+			is.Equal(tt.response.AccessToken, token.AccessToken)
+			is.Equal(tt.wantType, token.TokenType)
+			is.Equal(tt.wantRefresh, token.RefreshToken)
+
+			for key, want := range tt.wantExtras {
+				is.Equal(want, token.Extra(key), "token must keep %q", key)
+			}
+			for _, key := range tt.wantNoExtras {
+				is.Nil(token.Extra(key), "token must not carry %q", key)
+			}
+		})
+	}
+}
+
+func TestNotionProviderExchangeThenGetUserInfo(t *testing.T) {
+	t.Parallel()
+
+	documented := newNotionTokenResponse()
+
+	tests := []struct {
+		name         string
+		mutate       func(*notionTokenResponse)
+		wantEmail    string
+		wantVerified bool
+	}{
+		{
+			name:         "documented payload",
+			wantEmail:    documented.Owner.User.Person.Email,
+			wantVerified: documented.Owner.User.Person.EmailVerified,
+		},
+		{
+			name: "normalizes an unverified email",
+			mutate: func(response *notionTokenResponse) {
+				response.Owner.User.Person.Email = "  John.Doe@Example.COM  "
+				response.Owner.User.Person.EmailVerified = false
+			},
+			wantEmail:    "john.doe@example.com",
+			wantVerified: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			response := newNotionTokenResponse()
+			if tt.mutate != nil {
+				tt.mutate(&response)
+			}
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(response)
+			}))
+			t.Cleanup(server.Close)
+
+			provider := newNotionTestProvider(server)
+
+			token, err := provider.Exchange(context.Background(), "auth-code")
+			require.NoError(t, err)
+
+			info, err := provider.GetUserInfo(context.Background(), token)
+			require.NoError(t, err)
+
+			is := assert.New(t)
+			is.Equal(response.Owner.User.ID, info.ProviderAccountID)
+			is.Equal(tt.wantEmail, info.Email)
+			is.Equal(tt.wantVerified, info.EmailVerified)
+			is.Equal(response.Owner.User.Name, info.Name)
+			is.Equal(response.Owner.User.AvatarURL, info.Picture)
+			is.Equal(response.rawUserInfo(), info.Raw)
+		})
+	}
 }
 
 func TestNotionProviderExchangeErrors(t *testing.T) {
@@ -256,7 +456,7 @@ func TestNotionProviderGetUserInfoMakesNoHttpRequest(t *testing.T) {
 	is.Equal("notion-user-1", info.ProviderAccountID)
 	is.Equal("alice@example.com", info.Email)
 	is.True(info.EmailVerified)
-	is.Equal("Alice", info.Name)
+	is.Equal("John Doe", info.Name)
 	is.Equal("https://img.example/a.png", info.Picture)
 	is.Equal(map[string]any{"owner": owner}, info.Raw)
 }
@@ -272,7 +472,7 @@ func TestNotionProviderGetUserInfo(t *testing.T) {
 	}{
 		{
 			name:         "unverified email",
-			token:        notionToken(notionOwner(map[string]any{"email": "alice@example.com", "email_verified": false})),
+			token:        notionToken(notionOwner(map[string]any{"email": "john.doe@example.com", "email_verified": false})),
 			wantVerified: false,
 		},
 		{
@@ -302,7 +502,7 @@ func TestNotionProviderGetUserInfo(t *testing.T) {
 			name: "user without id",
 			token: notionToken(map[string]any{
 				"type": "user",
-				"user": map[string]any{"person": map[string]any{"email": "alice@example.com"}},
+				"user": map[string]any{"person": map[string]any{"email": "john.doe@example.com"}},
 			}),
 			wantErrSub: "invalid Notion account id",
 		},
@@ -327,7 +527,7 @@ func TestNotionProviderGetUserInfo(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantVerified, info.EmailVerified)
-			assert.Equal(t, "alice@example.com", info.Email)
+			assert.Equal(t, "john.doe@example.com", info.Email)
 		})
 	}
 }
@@ -335,7 +535,8 @@ func TestNotionProviderGetUserInfo(t *testing.T) {
 func TestNotionProviderGetUserInfoRawPayload(t *testing.T) {
 	t.Parallel()
 
-	owner := notionOwner(map[string]any{"email": "alice@example.com", "email_verified": true})
+	owner := notionOwner(map[string]any{"email": "john.doe@example.com", "email_verified": true})
+	fixture := newNotionTokenResponse()
 
 	tests := []struct {
 		name        string
@@ -344,26 +545,10 @@ func TestNotionProviderGetUserInfoRawPayload(t *testing.T) {
 		notContains []string
 	}{
 		{
-			name: "keeps only allowlisted fields",
-			extra: map[string]any{
-				"access_token":           "secret-access-token",
-				"refresh_token":          "secret-refresh-token",
-				"bot_id":                 "bot-1",
-				"duplicated_template_id": "template-1",
-				"workspace_id":           "ws-1",
-				"workspace_name":         "Alice Workspace",
-				"workspace_icon":         "https://img.example/ws.png",
-				"owner":                  owner,
-			},
-			wantRaw: map[string]any{
-				"bot_id":                 "bot-1",
-				"duplicated_template_id": "template-1",
-				"workspace_id":           "ws-1",
-				"workspace_name":         "Alice Workspace",
-				"workspace_icon":         "https://img.example/ws.png",
-				"owner":                  owner,
-			},
-			notContains: []string{"access_token", "refresh_token"},
+			name:        "keeps only the documented non-credential fields",
+			extra:       fixture.asMap(t),
+			wantRaw:     fixture.rawUserInfo(),
+			notContains: []string{"access_token", "refresh_token", "token_type"},
 		},
 		{
 			name: "drops fields missing from the allowlist",
