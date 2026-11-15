@@ -57,3 +57,6 @@ events.db*
 .gemini/skills
 .qwen/skills
 .opencode/skills
+
+coverage.out
+coverage.html

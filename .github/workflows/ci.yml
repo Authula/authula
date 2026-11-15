@@ -47,10 +47,12 @@ jobs:
         run: make test-coverage
 
       - name: Upload results to Codecov
+        if: success() && hashFiles('coverage.out') != ''
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.out
+          fail_ci_if_error: false
 
   lint:
     name: Lint
