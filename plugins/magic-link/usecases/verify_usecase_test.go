@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 )
 
@@ -76,6 +77,23 @@ func TestVerifyUseCase_Verify(t *testing.T) {
 			setup: func(t *testing.T, uc *VerifyUseCaseImpl, userSvc *mockUserService, verificationSvc *mockVerificationService, tokenSvc *mockTokenService, verification *models.Verification) {
 				tokenSvc.On("Hash", "invalid-token").Return("hashed-invalid-token").Once()
 				verificationSvc.On("GetByToken", mock.Anything, "hashed-invalid-token").Return(nil, nil).Once()
+
+				t.Cleanup(func() {
+					verificationSvc.AssertExpectations(t)
+					tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, code string, err error) {
+				assert.EqualError(t, err, "invalid or expired token")
+				assert.Empty(t, code)
+			},
+		},
+		{
+			name:  "verification repository reports not found",
+			token: "invalid-token",
+			setup: func(t *testing.T, uc *VerifyUseCaseImpl, userSvc *mockUserService, verificationSvc *mockVerificationService, tokenSvc *mockTokenService, verification *models.Verification) {
+				tokenSvc.On("Hash", "invalid-token").Return("hashed-invalid-token").Once()
+				verificationSvc.On("GetByToken", mock.Anything, "hashed-invalid-token").Return(nil, coreerrors.ErrVerificationNotFound).Once()
 
 				t.Cleanup(func() {
 					verificationSvc.AssertExpectations(t)
