@@ -96,24 +96,6 @@ func (m *capturingMailer) SendEmail(ctx context.Context, to string, subject stri
 	return m.err
 }
 
-type capturingEventBus struct {
-	called chan models.Event
-	err    error
-}
-
-func (b *capturingEventBus) Publish(event models.Event) error {
-	if b.called != nil {
-		b.called <- event
-	}
-	return b.err
-}
-
-func (b *capturingEventBus) Close() error { return nil }
-func (b *capturingEventBus) Subscribe(topic string, handler models.EventHandler) (models.SubscriptionID, error) {
-	return 0, nil
-}
-func (b *capturingEventBus) Unsubscribe(topic string, id models.SubscriptionID) {}
-
 func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T) {
 	t.Parallel()
 
@@ -133,9 +115,9 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 		setup                func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationInvitationRepository, *orgtests.MockOrganizationMemberRepository, *orgtests.MockOrganizationInvitationHooks)
 		userSetup            func(*internaltests.MockUserService)
 		mailerFactory        func() (*capturingMailer, chan invitationEmailCall)
-		eventBusFactory      func() (*capturingEventBus, chan models.Event)
+		eventBusFactory      func() (*internaltests.RecordingEventBus, <-chan models.Event)
 		pluginConfig         func(*types.OrganizationsPluginConfig, *bool)
-		verify               func(*testing.T, *types.OrganizationInvitation, *testInvitationLogger, chan invitationEmailCall, chan models.Event, bool)
+		verify               func(*testing.T, *types.OrganizationInvitation, *testInvitationLogger, chan invitationEmailCall, <-chan models.Event, bool)
 		expectErr            error
 	}{
 		{
@@ -370,11 +352,11 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				mailerCalls := make(chan invitationEmailCall, 1)
 				return &capturingMailer{called: mailerCalls}, mailerCalls
 			},
-			eventBusFactory: func() (*capturingEventBus, chan models.Event) {
-				eventCalls := make(chan models.Event, 1)
-				return &capturingEventBus{called: eventCalls}, eventCalls
+			eventBusFactory: func() (*internaltests.RecordingEventBus, <-chan models.Event) {
+				eventBus := internaltests.NewRecordingEventBus(1)
+				return eventBus, eventBus.Events()
 			},
-			verify: func(t *testing.T, invitation *types.OrganizationInvitation, logger *testInvitationLogger, mailerCalls chan invitationEmailCall, eventCalls chan models.Event, callbackCalled bool) {
+			verify: func(t *testing.T, invitation *types.OrganizationInvitation, logger *testInvitationLogger, mailerCalls chan invitationEmailCall, eventCalls <-chan models.Event, callbackCalled bool) {
 				require.False(t, callbackCalled)
 				require.Eventually(t, func() bool { return len(mailerCalls) > 0 }, time.Second, 10*time.Millisecond)
 				require.Eventually(t, func() bool { return len(eventCalls) > 0 }, time.Second, 10*time.Millisecond)
@@ -405,7 +387,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				invRepo.On("GetByOrganizationIDAndEmail", mock.Anything, "org-1", "user@example.com", types.OrganizationInvitationStatusPending).Return(nil, nil).Once()
 				invRepo.On("Create", mock.Anything, mock.AnythingOfType("*types.OrganizationInvitation")).Return(&types.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1", InviterID: "user-1", Email: "user@example.com", Role: "member", Status: types.OrganizationInvitationStatusPending, ExpiresAt: time.Now().UTC().Add(36 * time.Hour)}, nil).Once()
 			},
-			verify: func(t *testing.T, invitation *types.OrganizationInvitation, logger *testInvitationLogger, _ chan invitationEmailCall, _ chan models.Event, callbackCalled bool) {
+			verify: func(t *testing.T, invitation *types.OrganizationInvitation, logger *testInvitationLogger, _ chan invitationEmailCall, _ <-chan models.Event, callbackCalled bool) {
 				require.NotNil(t, invitation)
 				require.False(t, callbackCalled)
 				require.Empty(t, logger.errors)
@@ -440,11 +422,11 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 					return nil
 				}
 			},
-			eventBusFactory: func() (*capturingEventBus, chan models.Event) {
-				eventCalls := make(chan models.Event, 1)
-				return &capturingEventBus{called: eventCalls}, eventCalls
+			eventBusFactory: func() (*internaltests.RecordingEventBus, <-chan models.Event) {
+				eventBus := internaltests.NewRecordingEventBus(1)
+				return eventBus, eventBus.Events()
 			},
-			verify: func(t *testing.T, invitation *types.OrganizationInvitation, logger *testInvitationLogger, _ chan invitationEmailCall, eventCalls chan models.Event, callbackCalled bool) {
+			verify: func(t *testing.T, invitation *types.OrganizationInvitation, logger *testInvitationLogger, _ chan invitationEmailCall, eventCalls <-chan models.Event, callbackCalled bool) {
 				require.NotNil(t, invitation)
 				require.True(t, callbackCalled)
 				require.Empty(t, logger.warnings)
@@ -477,7 +459,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 					return errors.New("callback error")
 				}
 			},
-			verify: func(t *testing.T, invitation *types.OrganizationInvitation, logger *testInvitationLogger, mailerCalls chan invitationEmailCall, _ chan models.Event, callbackCalled bool) {
+			verify: func(t *testing.T, invitation *types.OrganizationInvitation, logger *testInvitationLogger, mailerCalls chan invitationEmailCall, _ <-chan models.Event, callbackCalled bool) {
 				require.NotNil(t, invitation)
 				require.True(t, callbackCalled)
 				require.Eventually(t, func() bool { return len(mailerCalls) > 0 }, time.Second, 10*time.Millisecond)
@@ -515,7 +497,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				mailerCalls := make(chan invitationEmailCall, 1)
 				return &capturingMailer{called: mailerCalls}, mailerCalls
 			},
-			verify: func(t *testing.T, invitation *types.OrganizationInvitation, logger *testInvitationLogger, mailerCalls chan invitationEmailCall, _ chan models.Event, callbackCalled bool) {
+			verify: func(t *testing.T, invitation *types.OrganizationInvitation, logger *testInvitationLogger, mailerCalls chan invitationEmailCall, _ <-chan models.Event, callbackCalled bool) {
 				require.NotNil(t, invitation)
 				require.True(t, callbackCalled)
 				require.Empty(t, mailerCalls)
@@ -559,7 +541,7 @@ func TestOrganizationInvitationService_CreateOrganizationInvitation(t *testing.T
 				mailerCalls = calls
 			}
 			var eventBus models.EventBus
-			var eventCalls chan models.Event
+			var eventCalls <-chan models.Event
 			if tt.eventBusFactory != nil {
 				eventBusImpl, calls := tt.eventBusFactory()
 				eventBus = eventBusImpl
