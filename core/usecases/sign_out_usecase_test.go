@@ -87,6 +87,15 @@ func TestSignOutUseCase(t *testing.T) {
 			wantErr: coreerrors.ErrNotFound,
 		},
 		{
+			name:               "returns not found when the session repository reports ErrSessionNotFound",
+			currentSessionID:   new(currentSessionID),
+			requestedSessionID: new(requestedSessionID),
+			configure: func(sessionService *inttests.MockSessionService) {
+				sessionService.On("GetByID", ctx, requestedSessionID).Return((*models.Session)(nil), coreerrors.ErrSessionNotFound).Once()
+			},
+			wantErr: coreerrors.ErrNotFound,
+		},
+		{
 			name:               "returns forbidden when the requested session belongs to another user",
 			currentSessionID:   new(currentSessionID),
 			requestedSessionID: new(requestedSessionID),

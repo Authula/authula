@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/core/types"
 	"github.com/Authula/authula/core/usecases"
 	"github.com/Authula/authula/models"
@@ -24,10 +25,7 @@ func (h *GetMeHandler) Handle() http.HandlerFunc {
 
 		result, err := h.UseCase.GetMe(ctx, reqCtx.Actor.ID, sessionID)
 		if err != nil {
-			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
-				"message": err.Error(),
-			})
-			reqCtx.Handled = true
+			coreerrors.HandleErrorWithFallback(err, reqCtx, http.StatusInternalServerError)
 			return
 		}
 

@@ -5028,7 +5028,14 @@
       "GetMeResponse": {
         "properties": {
           "session": {
-            "$ref": "#/components/schemas/Session"
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Session"
+              }
+            ]
           },
           "user": {
             "$ref": "#/components/schemas/User"

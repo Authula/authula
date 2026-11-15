@@ -14,7 +14,7 @@ type GetMeResult struct {
 
 type GetMeResponse struct {
 	User    *models.User    `json:"user" required:"true" nullable:"false"`
-	Session *models.Session `json:"session" required:"true" nullable:"false"`
+	Session *models.Session `json:"session" required:"true" nullable:"true"`
 }
 
 type SignOutRequest struct {
