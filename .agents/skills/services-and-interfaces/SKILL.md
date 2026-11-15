@@ -20,6 +20,7 @@ description: Define and implement services that encapsulate business logic with 
 5. **Context-aware**: All public methods accept `context.Context`
 6. **Interface return types**: Constructors return interfaces, not concrete types
 7. **Single File Exports**: Each service implementation is in its own file. However, all service interfaces are exported from `interfaces.go` under the `services/` folder.
+8. **Sentinel pass-through**: Services delegate data access and pass repository sentinels through unchanged. Callers test them with `errors.Is`.
 
 ## Pattern
 
@@ -50,5 +51,5 @@ See [examples/todo_service.go](examples/todo_service.go) for:
 ## References
 
 - [services/core.go](../../../services/core.go) - Core service interfaces
-- [internal/services/user_service.go](../../../internal/services/user_service.go)
-- [internal/services/account_service.go](../../../internal/services/account_service.go)
+- [core/services/user_service.go](../../../core/services/user_service.go)
+- [core/services/account_service.go](../../../core/services/account_service.go)

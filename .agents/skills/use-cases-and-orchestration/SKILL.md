@@ -21,6 +21,7 @@ description: Orchestrate services and repositories through use cases to implemen
 3. **Dependency injection**: Services passed at construction
 4. **Pure domain**: No HTTP, no routing, just business logic delegated to services. Usecases simply orchestrate services and handle validation, errors, and return domain models
 5. **Testable**: Can be tested independently by mocking services as services are interfaces
+6. **Error translation**: Translate repository sentinels into domain errors at this boundary. Do not leak `sql` errors or raw not-found sentinels to handlers. Test them with `errors.Is`.
 
 ## Pattern
 
@@ -50,6 +51,6 @@ See [examples/todo_usecases.go](examples/todo_usecases.go) for:
 
 ## References
 
-- [internal/usecases/](../../../internal/usecases/) - Core use cases
+- [core/usecases/](../../../core/usecases/) - Core use cases
 - [plugins/email-password/usecases/](../../../plugins/email-password/usecases/) - Plugin use case examples
 - [plugins/email-password/types/](../../../plugins/email-password/types/) - Request/response types

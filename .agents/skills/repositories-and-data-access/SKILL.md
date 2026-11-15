@@ -28,7 +28,8 @@ Repositories are data access only:
 - Implement with Bun in `bun_*.go` files
 - Accept `bun.IDB` at construction (not concrete `*bun.DB`)
 - Return interfaces from constructors
-- Missing records return `nil, nil` for single queries; empty slice for batch queries
+- Single-record getters return an exported sentinel error when no row matches (for the core session and verification repositories, `coreerrors.ErrSessionNotFound` and `coreerrors.ErrVerificationNotFound`). Do not return `(nil, nil)`. Batch queries return an empty slice.
+- Return `nil, err` for database failures; never return a zero-value record alongside an error.
 
 ## Example
 
@@ -40,14 +41,15 @@ See [examples/bun_todo_repository.go](examples/bun_todo_repository.go) for:
 
 ## Common mistakes
 
-1. Returning errors for missing records (use nil instead)
+1. Returning `(nil, nil)` for a missing record and forcing every caller to nil-check
 2. Forgetting `WithTx()` method
 3. Putting business logic in repositories
 4. Not passing context to Scan/Exec
 5. Repository-to-repository calls instead of service orchestration
+6. Returning a non-nil zero-value record together with an error
 
 ## References
 
-- [internal/repositories/interfaces.go](../../../internal/repositories/interfaces.go) - Core repository interfaces
-- [internal/repositories/bun_user_repository.go](../../../internal/repositories/bun_user_repository.go)
-- [internal/repositories/bun_account_repository.go](../../../internal/repositories/bun_account_repository.go)
+- [core/repositories/interfaces.go](../../../core/repositories/interfaces.go) - Core repository interfaces
+- [core/repositories/bun_user_repository.go](../../../core/repositories/bun_user_repository.go)
+- [core/repositories/bun_account_repository.go](../../../core/repositories/bun_account_repository.go)
