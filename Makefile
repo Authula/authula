@@ -124,9 +124,6 @@ quick-check: format vet test # Run quick checks (format, vet, fast tests)
 
 ci: clean install check # CI pipeline (clean, install, check)
 
-# Integration testing
-integration-test: docker-down docker-up docker-test # Run integration tests with Docker
-
 # Migration commands
 migrate-help: # Show migration CLI help
 	@$(MIGRATE_CMD) --help
