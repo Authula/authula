@@ -5,6 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/core/types"
 	inttests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
@@ -26,6 +29,11 @@ func TestGetMeUseCase(t *testing.T) {
 		UserID: userID,
 		Token:  "token-123",
 	}
+	otherUsersSession := &models.Session{
+		ID:     "session-456",
+		UserID: "someone-else",
+		Token:  "token-456",
+	}
 
 	tests := []struct {
 		name       string
@@ -36,15 +44,12 @@ func TestGetMeUseCase(t *testing.T) {
 		sessionErr error
 		want       *types.GetMeResult
 		wantErr    string
+		wantErrIs  error
 	}{
 		{
-			name:    "returns user and most recent session when no session id is known",
-			user:    expectedUser,
-			session: expectedSession,
-			want: &types.GetMeResult{
-				User:    expectedUser,
-				Session: expectedSession,
-			},
+			name: "returns the user without a session for stateless credentials",
+			user: expectedUser,
+			want: &types.GetMeResult{User: expectedUser},
 		},
 		{
 			name:      "returns the authenticating session when its id is known",
@@ -57,7 +62,28 @@ func TestGetMeUseCase(t *testing.T) {
 			},
 		},
 		{
-			name:       "returns session lookup error for a known session id",
+			name:       "returns unauthorized when the session no longer exists",
+			sessionID:  new("session-123"),
+			user:       expectedUser,
+			sessionErr: coreerrors.ErrSessionNotFound,
+			wantErrIs:  coreerrors.ErrUnauthorized,
+		},
+		{
+			name:      "returns unauthorized when the session lookup returns nil without an error",
+			sessionID: new("session-123"),
+			user:      expectedUser,
+			session:   nil,
+			wantErrIs: coreerrors.ErrUnauthorized,
+		},
+		{
+			name:      "returns unauthorized when the session belongs to another user",
+			sessionID: new("session-456"),
+			user:      expectedUser,
+			session:   otherUsersSession,
+			wantErrIs: coreerrors.ErrUnauthorized,
+		},
+		{
+			name:       "returns an unrelated session lookup error",
 			sessionID:  new("session-123"),
 			user:       expectedUser,
 			sessionErr: errors.New("session lookup failed"),
@@ -66,20 +92,12 @@ func TestGetMeUseCase(t *testing.T) {
 		{
 			name:    "returns user lookup error",
 			userErr: errors.New("user lookup failed"),
-			session: expectedSession,
 			wantErr: "user lookup failed",
 		},
 		{
-			name:       "returns session lookup error",
-			user:       expectedUser,
-			sessionErr: errors.New("session lookup failed"),
-			wantErr:    "session lookup failed",
-		},
-		{
-			name:       "returns user lookup error when both fail",
-			userErr:    errors.New("user lookup failed"),
-			sessionErr: errors.New("session lookup failed"),
-			wantErr:    "user lookup failed",
+			name:      "returns unauthorized when the user no longer exists",
+			sessionID: new("session-123"),
+			wantErrIs: coreerrors.ErrUnauthorized,
 		},
 	}
 
@@ -93,8 +111,6 @@ func TestGetMeUseCase(t *testing.T) {
 			userService.On("GetByID", ctx, userID).Return(tt.user, tt.userErr).Once()
 			if tt.sessionID != nil {
 				sessionService.On("GetByID", ctx, *tt.sessionID).Return(tt.session, tt.sessionErr).Once()
-			} else {
-				sessionService.On("GetByUserID", ctx, userID).Return(tt.session, tt.sessionErr).Once()
 			}
 
 			uc := &GetMeUseCase{
@@ -105,35 +121,23 @@ func TestGetMeUseCase(t *testing.T) {
 
 			result, err := uc.GetMe(ctx, userID, tt.sessionID)
 
-			if tt.wantErr != "" {
-				if err == nil {
-					t.Fatalf("expected error %q, got nil", tt.wantErr)
-				}
-				if err.Error() != tt.wantErr {
-					t.Fatalf("expected error %q, got %q", tt.wantErr, err.Error())
-				}
-				if result != nil {
-					t.Fatalf("expected nil result on error, got %#v", result)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("expected no error, got %v", err)
-				}
-				if result == nil {
-					t.Fatal("expected result, got nil")
-				} else {
-					got := *result
-					if got.User != tt.want.User {
-						t.Fatalf("expected user %#v, got %#v", tt.want.User, got.User)
-					}
-					if got.Session != tt.want.Session {
-						t.Fatalf("expected session %#v, got %#v", tt.want.Session, got.Session)
-					}
-				}
+			switch {
+			case tt.wantErrIs != nil:
+				require.ErrorIs(t, err, tt.wantErrIs)
+				require.Nil(t, result)
+			case tt.wantErr != "":
+				require.EqualError(t, err, tt.wantErr)
+				require.Nil(t, result)
+			default:
+				require.NoError(t, err)
+				require.Equal(t, tt.want, result)
 			}
 
 			userService.AssertExpectations(t)
 			sessionService.AssertExpectations(t)
+			if tt.sessionID == nil {
+				sessionService.AssertNotCalled(t, "GetByUserID", ctx, userID)
+			}
 		})
 	}
 }

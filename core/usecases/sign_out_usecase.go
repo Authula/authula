@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"errors"
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/core/types"
@@ -54,6 +55,9 @@ func (uc *SignOutUseCase) signOutRequestedSession(
 ) (*types.SignOutResult, error) {
 	session, err := uc.SessionService.GetByID(ctx, requestedSessionID)
 	if err != nil {
+		if errors.Is(err, coreerrors.ErrSessionNotFound) {
+			return nil, coreerrors.ErrNotFound
+		}
 		uc.Logger.Error("failed to get session", "error", err, "session_id", requestedSessionID)
 		return nil, err
 	}
