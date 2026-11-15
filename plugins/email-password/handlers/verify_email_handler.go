@@ -66,10 +66,7 @@ func (h *VerifyEmailHandler) Handler() http.HandlerFunc {
 
 		verificationType, err := h.VerifyEmailUseCase.VerifyEmail(ctx, request.Token)
 		if err != nil {
-			reqCtx.SetJSONResponse(http.StatusInternalServerError, map[string]any{
-				"message": err.Error(),
-			})
-			reqCtx.Handled = true
+			writeUseCaseError(reqCtx, err)
 			return
 		}
 
