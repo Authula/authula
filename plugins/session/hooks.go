@@ -63,23 +63,8 @@ func (p *SessionPlugin) validateSessionHook(reqCtx *models.RequestContext) error
 		return nil
 	}
 
-	cookie, err := reqCtx.Request.Cookie(p.globalConfig.Session.CookieName)
+	session, sessionToken, err := p.validateSessionCookie(reqCtx.Request)
 	if err != nil {
-		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]string{"message": "Unauthorized"})
-		reqCtx.Handled = true
-		return nil
-	}
-
-	sessionToken := cookie.Value
-	hashedToken := p.tokenService.Hash(sessionToken)
-	session, err := p.sessionService.GetByToken(reqCtx.Request.Context(), hashedToken)
-	if err != nil || session == nil {
-		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]string{"message": "Unauthorized"})
-		reqCtx.Handled = true
-		return nil
-	}
-
-	if session.ExpiresAt.Before(time.Now().UTC()) {
 		reqCtx.SetJSONResponse(http.StatusUnauthorized, map[string]string{"message": "Unauthorized"})
 		reqCtx.Handled = true
 		return nil
@@ -104,22 +89,9 @@ func (p *SessionPlugin) validateSessionHookOptional(reqCtx *models.RequestContex
 		return nil
 	}
 
-	cookie, err := reqCtx.Request.Cookie(p.globalConfig.Session.CookieName)
+	session, sessionToken, err := p.validateSessionCookie(reqCtx.Request)
 	if err != nil {
-		// No cookie, skip silently
-		return nil
-	}
-
-	sessionToken := cookie.Value
-	hashedToken := p.tokenService.Hash(sessionToken)
-	session, err := p.sessionService.GetByToken(reqCtx.Request.Context(), hashedToken)
-	if err != nil || session == nil {
-		// Invalid session, skip silently
-		return nil
-	}
-
-	if session.ExpiresAt.Before(time.Now().UTC()) {
-		// Expired session, skip silently
+		// No cookie or invalid session, skip silently
 		return nil
 	}
 
