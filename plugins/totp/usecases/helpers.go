@@ -2,8 +2,10 @@ package usecases
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/totp/constants"
 	"github.com/Authula/authula/plugins/totp/types"
@@ -48,6 +50,9 @@ func resolvePendingToken(
 	hashedToken := tokenService.Hash(rawToken)
 	verification, err := verificationService.GetByToken(ctx, hashedToken)
 	if err != nil {
+		if errors.Is(err, coreerrors.ErrVerificationNotFound) {
+			return "", "", constants.ErrInvalidPendingToken
+		}
 		return "", "", err
 	}
 	if verification == nil || verification.UserID == nil {
