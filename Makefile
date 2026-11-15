@@ -51,12 +51,13 @@ test: # Run all tests
 	@echo "Running tests..."
 	@CGO_ENABLED=1 go test -race -v ./...
 
-test-coverage: # Run tests with coverage report
+test-coverage: # Run all tests once and write aggregated coverage
 	@echo "Running tests with coverage..."
-	@CGO_ENABLED=1 go test -race -v -coverprofile=coverage.out ./...
+	@rm -f coverage.out coverage.html
+	@CGO_ENABLED=1 go test -race -covermode=atomic -coverprofile=coverage.out ./...
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
-	@go tool cover -func=coverage.out | grep total | awk '{print "Total coverage: " $$3}'
+	@go tool cover -func=coverage.out | awk '/^total:/ {print "Total coverage: " $$3}'
 
 # Dependency management
 install: # Install dependencies
