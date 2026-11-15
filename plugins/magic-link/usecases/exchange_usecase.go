@@ -2,8 +2,10 @@ package usecases
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/magic-link/types"
 	rootservices "github.com/Authula/authula/services"
@@ -29,6 +31,9 @@ func (uc *ExchangeUseCaseImpl) Exchange(
 	hashedToken := uc.TokenService.Hash(token)
 	verification, err := uc.VerificationService.GetByToken(ctx, hashedToken)
 	if err != nil {
+		if errors.Is(err, coreerrors.ErrVerificationNotFound) {
+			return nil, fmt.Errorf("invalid or expired token")
+		}
 		return nil, err
 	}
 

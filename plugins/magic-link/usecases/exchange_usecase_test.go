@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/magic-link/types"
 )
@@ -120,6 +121,23 @@ func TestExchangeUseCase(t *testing.T) {
 			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
 				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
 				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(nil, nil).Once()
+
+				t.Cleanup(func() {
+					h.verificationSvc.AssertExpectations(t)
+					h.tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, result *types.MagicLinkExchangeResult, err error) {
+				assert.EqualError(t, err, "invalid or expired token")
+				assert.Nil(t, result)
+			},
+		},
+		{
+			name:  "verification repository reports not found",
+			token: "raw-token",
+			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
+				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
+				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(nil, coreerrors.ErrVerificationNotFound).Once()
 
 				t.Cleanup(func() {
 					h.verificationSvc.AssertExpectations(t)
