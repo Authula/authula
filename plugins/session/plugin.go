@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/services"
 	"github.com/Authula/authula/util"
@@ -138,7 +139,7 @@ func (p *SessionPlugin) validateSessionCookie(r *http.Request) (*models.Session,
 		return nil, "", err
 	}
 	if session == nil {
-		return nil, "", fmt.Errorf("session not found")
+		return nil, "", coreerrors.ErrSessionNotFound
 	}
 
 	if session.ExpiresAt.Before(time.Now().UTC()) {

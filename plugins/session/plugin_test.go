@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 )
@@ -293,6 +294,16 @@ func TestSessionPlugin_ValidateSessionHook(t *testing.T) {
 			setup: func(tokenSvc *internaltests.MockTokenService, sessionSvc *internaltests.MockSessionService) {
 				tokenSvc.On("Hash", "plaintext").Return("hashed").Once()
 				sessionSvc.On("GetByToken", mock.Anything, "hashed").Return(nil, nil).Once()
+			},
+			wantHandled: true,
+			wantStatus:  http.StatusUnauthorized,
+		},
+		{
+			name:   "ErrSessionNotFound returns unauthorized without touching the cookie",
+			cookie: &http.Cookie{Name: testCookieName, Value: "plaintext"},
+			setup: func(tokenSvc *internaltests.MockTokenService, sessionSvc *internaltests.MockSessionService) {
+				tokenSvc.On("Hash", "plaintext").Return("hashed").Once()
+				sessionSvc.On("GetByToken", mock.Anything, "hashed").Return(nil, coreerrors.ErrSessionNotFound).Once()
 			},
 			wantHandled: true,
 			wantStatus:  http.StatusUnauthorized,
