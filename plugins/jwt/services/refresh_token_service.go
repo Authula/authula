@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/constants"
 	"github.com/Authula/authula/plugins/jwt/events"
@@ -95,6 +96,10 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 
 	session, err := s.sessionService.GetByID(ctx, record.SessionID)
 	if err != nil {
+		if errors.Is(err, coreerrors.ErrSessionNotFound) {
+			s.logger.Warn("refresh token belongs to a missing session", "session_id", record.SessionID)
+			return nil, constants.ErrInvalidRefreshToken
+		}
 		s.logger.Error("session lookup failed", "session_id", record.SessionID, "error", err)
 		return nil, constants.ErrInvalidRefreshToken
 	}
