@@ -3,10 +3,12 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/uptrace/bun"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 )
 
@@ -21,19 +23,25 @@ func NewBunVerificationRepository(db bun.IDB) VerificationRepository {
 func (r *BunVerificationRepository) GetByID(ctx context.Context, id string) (*models.Verification, error) {
 	v := new(models.Verification)
 	err := r.db.NewSelect().Model(v).Where("id = ?", id).Scan(ctx)
-	if err == sql.ErrNoRows {
-		return nil, nil
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, coreerrors.ErrVerificationNotFound
 	}
-	return v, err
+	if err != nil {
+		return nil, err
+	}
+	return v, nil
 }
 
 func (r *BunVerificationRepository) GetByToken(ctx context.Context, token string) (*models.Verification, error) {
 	v := new(models.Verification)
 	err := r.db.NewSelect().Model(v).Where("token = ?", token).Scan(ctx)
-	if err == sql.ErrNoRows {
-		return nil, nil
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, coreerrors.ErrVerificationNotFound
 	}
-	return v, err
+	if err != nil {
+		return nil, err
+	}
+	return v, nil
 }
 
 func (r *BunVerificationRepository) Create(ctx context.Context, verification *models.Verification) (*models.Verification, error) {

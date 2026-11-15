@@ -3,383 +3,921 @@ package repositories
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
 	_ "modernc.org/sqlite"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/internal/sqlitedsn"
-	internaltestsutils "github.com/Authula/authula/internal/tests/utils"
 	"github.com/Authula/authula/models"
 )
 
-// Helper function to create an in-memory SQLite database for testing
+const (
+	failSessionDeleteTrigger = `CREATE TRIGGER fail_session_delete
+		BEFORE DELETE ON sessions
+		BEGIN
+			SELECT RAISE(ABORT, 'session delete blocked');
+		END;`
+
+	failSessionUpdateTrigger = `CREATE TRIGGER fail_session_update
+		BEFORE UPDATE ON sessions
+		BEGIN
+			SELECT RAISE(ABORT, 'session update blocked');
+		END;`
+
+	deleteSessionAfterInsertTrigger = `CREATE TRIGGER delete_session_after_insert
+		AFTER INSERT ON sessions
+		BEGIN
+			DELETE FROM sessions WHERE id = NEW.id;
+		END;`
+)
+
+// newTestSessionDB creates an in-memory SQLite database with the session table.
 func newTestSessionDB(t *testing.T) bun.IDB {
+	t.Helper()
+
 	sqldb, err := sql.Open("sqlite", sqlitedsn.Build(":memory:"))
-	if err != nil {
-		t.Fatalf("failed to create test database: %v", err)
-	}
+	require.NoError(t, err)
+
+	// In-memory SQLite databases are per connection. A single connection keeps
+	// every query, including transactions, on the same database.
+	sqldb.SetMaxOpenConns(1)
 
 	db := bun.NewDB(sqldb, sqlitedialect.New())
 
-	// Create the Session table
 	ctx := context.Background()
-	if _, err := db.NewCreateTable().Model(&models.Session{}).Exec(ctx); err != nil {
-		t.Fatalf("failed to create Session table: %v", err)
-	}
+	_, err = db.NewCreateTable().Model(&models.Session{}).Exec(ctx)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
 
 	return db
 }
 
-// Helper function to create a test session
-func createTestSession(userID string, expiresAt time.Time) *models.Session {
+func newTestSession(id, userID string, createdAt, expiresAt time.Time) *models.Session {
 	return &models.Session{
-		ID:        internaltestsutils.GenerateUUID().String(),
+		ID:        id,
 		UserID:    userID,
-		Token:     internaltestsutils.GenerateHashedToken(),
+		Token:     "token-" + id,
 		ExpiresAt: expiresAt,
-		IPAddress: nil,
-		UserAgent: nil,
+		CreatedAt: createdAt,
+	}
+}
+
+func createTestSessions(t *testing.T, ctx context.Context, repo SessionRepository, sessions ...*models.Session) {
+	t.Helper()
+
+	for _, session := range sessions {
+		// Clone so parallel subtests never mutate the same fixture model.
+		clone := *session
+		_, err := repo.Create(ctx, &clone)
+		require.NoError(t, err)
+	}
+}
+
+func execTestSQL(t *testing.T, ctx context.Context, db bun.IDB, query string) {
+	t.Helper()
+
+	_, err := db.ExecContext(ctx, query)
+	require.NoError(t, err)
+}
+
+func blockSessionDeletes(t *testing.T, ctx context.Context, db bun.IDB) {
+	t.Helper()
+	execTestSQL(t, ctx, db, failSessionDeleteTrigger)
+}
+
+func blockSessionUpdates(t *testing.T, ctx context.Context, db bun.IDB) {
+	t.Helper()
+	execTestSQL(t, ctx, db, failSessionUpdateTrigger)
+}
+
+func deleteSessionAfterInsert(t *testing.T, ctx context.Context, db bun.IDB) {
+	t.Helper()
+	execTestSQL(t, ctx, db, deleteSessionAfterInsertTrigger)
+}
+
+func sessionIDs(t *testing.T, ctx context.Context, db bun.IDB, userID *string) []string {
+	t.Helper()
+
+	var sessions []*models.Session
+	query := db.NewSelect().Model(&sessions)
+	if userID != nil {
+		query = query.Where("user_id = ?", *userID)
+	}
+	require.NoError(t, query.Scan(ctx))
+
+	ids := make([]string, 0, len(sessions))
+	for _, session := range sessions {
+		ids = append(ids, session.ID)
+	}
+	return ids
+}
+
+func cancelledContext() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	return ctx
+}
+
+func TestBunSessionRepository_Getters(t *testing.T) {
+	t.Parallel()
+
+	type getter func(SessionRepository, context.Context, string) (*models.Session, error)
+
+	const (
+		newerID    = "session-newer"
+		newerToken = "token-" + newerID
+	)
+
+	tests := []struct {
+		name          string
+		get           getter
+		key           string
+		cancelContext bool
+		wantID        string
+		wantErr       error
+	}{
+		{
+			name:   "GetByID returns the matching session",
+			get:    SessionRepository.GetByID,
+			key:    newerID,
+			wantID: newerID,
+		},
+		{
+			name:    "GetByID returns ErrSessionNotFound for an unknown id",
+			get:     SessionRepository.GetByID,
+			key:     "missing",
+			wantErr: coreerrors.ErrSessionNotFound,
+		},
+		{
+			name:          "GetByID returns a query error",
+			get:           SessionRepository.GetByID,
+			key:           newerID,
+			cancelContext: true,
+			wantErr:       context.Canceled,
+		},
+		{
+			name:   "GetByToken returns the matching session",
+			get:    SessionRepository.GetByToken,
+			key:    newerToken,
+			wantID: newerID,
+		},
+		{
+			name:    "GetByToken returns ErrSessionNotFound for an unknown token",
+			get:     SessionRepository.GetByToken,
+			key:     "missing",
+			wantErr: coreerrors.ErrSessionNotFound,
+		},
+		{
+			name:          "GetByToken returns a query error",
+			get:           SessionRepository.GetByToken,
+			key:           newerToken,
+			cancelContext: true,
+			wantErr:       context.Canceled,
+		},
+		{
+			name:   "GetByUserID returns the newest session",
+			get:    SessionRepository.GetByUserID,
+			key:    "user-1",
+			wantID: newerID,
+		},
+		{
+			name:    "GetByUserID returns ErrSessionNotFound when the user has no sessions",
+			get:     SessionRepository.GetByUserID,
+			key:     "user-without-sessions",
+			wantErr: coreerrors.ErrSessionNotFound,
+		},
+		{
+			name:          "GetByUserID returns a query error",
+			get:           SessionRepository.GetByUserID,
+			key:           "user-1",
+			cancelContext: true,
+			wantErr:       context.Canceled,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			db := newTestSessionDB(t)
+			repo := NewBunSessionRepository(db)
+
+			now := time.Now().UTC()
+			createTestSessions(t, ctx, repo,
+				newTestSession("session-older", "user-1", now.Add(-time.Hour), now.Add(time.Hour)),
+				newTestSession(newerID, "user-1", now, now.Add(time.Hour)),
+			)
+
+			if tt.cancelContext {
+				ctx = cancelledContext()
+			}
+
+			got, err := tt.get(repo, ctx, tt.key)
+
+			if tt.wantErr != nil {
+				require.Nil(t, got)
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			require.Equal(t, tt.wantID, got.ID)
+		})
+	}
+}
+
+func TestBunSessionRepository_Create(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+
+	newSession := func(id string) *models.Session {
+		session := newTestSession(id, "user-1", now, now.Add(time.Hour))
+		session.IPAddress = new("127.0.0.1")
+		session.UserAgent = new("test-agent")
+		return session
+	}
+
+	tests := []struct {
+		name             string
+		seed             func() []*models.Session
+		session          func() *models.Session
+		prepare          func(*testing.T, context.Context, bun.IDB)
+		wantErr          bool
+		wantErrIs        error
+		wantPersisted    bool
+		wantRemainingIDs []string
+	}{
+		{
+			name:             "creates and reloads the session",
+			session:          func() *models.Session { return newSession("session-1") },
+			wantPersisted:    true,
+			wantRemainingIDs: []string{"session-1"},
+		},
+		{
+			name: "returns an error when the insert fails",
+			seed: func() []*models.Session {
+				return []*models.Session{newSession("session-duplicate")}
+			},
+			session:          func() *models.Session { return newSession("session-duplicate") },
+			wantErr:          true,
+			wantRemainingIDs: []string{"session-duplicate"},
+		},
+		{
+			name:             "returns an error when the reload fails after insert",
+			session:          func() *models.Session { return newSession("session-reload") },
+			prepare:          deleteSessionAfterInsert,
+			wantErrIs:        sql.ErrNoRows,
+			wantRemainingIDs: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			db := newTestSessionDB(t)
+			repo := NewBunSessionRepository(db)
+
+			if tt.seed != nil {
+				createTestSessions(t, ctx, repo, tt.seed()...)
+			}
+			if tt.prepare != nil {
+				tt.prepare(t, ctx, db)
+			}
+
+			session := tt.session()
+			got, err := repo.Create(ctx, session)
+
+			if tt.wantErrIs != nil {
+				require.ErrorIs(t, err, tt.wantErrIs)
+			} else if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Same(t, session, got)
+
+			if tt.wantPersisted {
+				reloaded, err := repo.GetByID(ctx, session.ID)
+				require.NoError(t, err)
+				require.Equal(t, session.ID, reloaded.ID)
+				require.Equal(t, session.UserID, reloaded.UserID)
+				require.Equal(t, session.Token, reloaded.Token)
+				require.WithinDuration(t, session.ExpiresAt, reloaded.ExpiresAt, time.Millisecond)
+				require.Equal(t, session.IPAddress, reloaded.IPAddress)
+				require.Equal(t, session.UserAgent, reloaded.UserAgent)
+			}
+
+			require.ElementsMatch(t, tt.wantRemainingIDs, sessionIDs(t, ctx, db, nil))
+		})
+	}
+}
+
+func TestBunSessionRepository_Update(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	oldExpiry := now.Add(time.Hour)
+	newExpiry := now.Add(2 * time.Hour)
+
+	newSeed := func() *models.Session {
+		session := newTestSession("session-1", "user-1", now.Add(-time.Hour), oldExpiry)
+		session.IPAddress = new("127.0.0.1")
+		session.UserAgent = new("old-agent")
+		return session
+	}
+	newUpdate := func() *models.Session {
+		session := newTestSession("session-1", "user-1", now.Add(-time.Hour), newExpiry)
+		session.Token = "token-updated"
+		session.IPAddress = new("10.0.0.1")
+		session.UserAgent = new("new-agent")
+		return session
+	}
+	newMissingUpdate := func() *models.Session {
+		return newTestSession("session-missing", "user-1", now, newExpiry)
+	}
+
+	tests := []struct {
+		name          string
+		seed          func() *models.Session
+		session       func() *models.Session
+		prepare       func(*testing.T, context.Context, bun.IDB)
+		wantErr       bool
+		wantErrIs     error
+		wantReload    bool
+		wantToken     string
+		wantUserAgent *string
+	}{
+		{
+			name:          "updates and reloads the session",
+			seed:          newSeed,
+			session:       newUpdate,
+			wantReload:    true,
+			wantToken:     "token-updated",
+			wantUserAgent: new("new-agent"),
+		},
+		{
+			name:          "returns an error when the update fails",
+			seed:          newSeed,
+			session:       newUpdate,
+			prepare:       blockSessionUpdates,
+			wantErr:       true,
+			wantReload:    true,
+			wantToken:     "token-session-1",
+			wantUserAgent: new("old-agent"),
+		},
+		{
+			name:      "returns an error when the session does not exist",
+			session:   newMissingUpdate,
+			wantErrIs: sql.ErrNoRows,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			db := newTestSessionDB(t)
+			repo := NewBunSessionRepository(db)
+
+			if tt.seed != nil {
+				createTestSessions(t, ctx, repo, tt.seed())
+			}
+			if tt.prepare != nil {
+				tt.prepare(t, ctx, db)
+			}
+
+			session := tt.session()
+			got, err := repo.Update(ctx, session)
+
+			if tt.wantErrIs != nil {
+				require.ErrorIs(t, err, tt.wantErrIs)
+			} else if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Same(t, session, got)
+
+			if tt.wantReload {
+				reloaded, err := repo.GetByID(ctx, session.ID)
+				require.NoError(t, err)
+				require.Equal(t, tt.wantToken, reloaded.Token)
+				require.Equal(t, tt.wantUserAgent, reloaded.UserAgent)
+			}
+		})
+	}
+}
+
+func TestBunSessionRepository_Delete(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+
+	tests := []struct {
+		name             string
+		seed             func() []*models.Session
+		id               string
+		prepare          func(*testing.T, context.Context, bun.IDB)
+		wantErr          bool
+		wantRemainingIDs []string
+	}{
+		{
+			name: "deletes the requested session",
+			seed: func() []*models.Session {
+				return []*models.Session{
+					newTestSession("session-1", "user-1", now, now.Add(time.Hour)),
+					newTestSession("session-2", "user-1", now, now.Add(time.Hour)),
+				}
+			},
+			id:               "session-1",
+			wantRemainingIDs: []string{"session-2"},
+		},
+		{
+			name: "is a no-op when the session does not exist",
+			seed: func() []*models.Session {
+				return []*models.Session{newTestSession("session-1", "user-1", now, now.Add(time.Hour))}
+			},
+			id:               "missing",
+			wantRemainingIDs: []string{"session-1"},
+		},
+		{
+			name: "returns an error when the delete fails",
+			seed: func() []*models.Session {
+				return []*models.Session{
+					newTestSession("session-1", "user-1", now, now.Add(time.Hour)),
+					newTestSession("session-2", "user-1", now, now.Add(time.Hour)),
+				}
+			},
+			id:               "session-1",
+			prepare:          blockSessionDeletes,
+			wantErr:          true,
+			wantRemainingIDs: []string{"session-1", "session-2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			db := newTestSessionDB(t)
+			repo := NewBunSessionRepository(db)
+
+			createTestSessions(t, ctx, repo, tt.seed()...)
+			if tt.prepare != nil {
+				tt.prepare(t, ctx, db)
+			}
+
+			err := repo.Delete(ctx, tt.id)
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.ElementsMatch(t, tt.wantRemainingIDs, sessionIDs(t, ctx, db, nil))
+		})
+	}
+}
+
+func TestBunSessionRepository_DeleteByUserID(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	newSeed := func() []*models.Session {
+		return []*models.Session{
+			newTestSession("user-1-a", "user-1", now, now.Add(time.Hour)),
+			newTestSession("user-1-b", "user-1", now, now.Add(time.Hour)),
+			newTestSession("user-2-a", "user-2", now, now.Add(time.Hour)),
+		}
+	}
+
+	tests := []struct {
+		name             string
+		seed             func() []*models.Session
+		userID           string
+		prepare          func(*testing.T, context.Context, bun.IDB)
+		wantErr          bool
+		wantRemainingIDs []string
+	}{
+		{
+			name:             "deletes all sessions for the user",
+			seed:             newSeed,
+			userID:           "user-1",
+			wantRemainingIDs: []string{"user-2-a"},
+		},
+		{
+			name:             "is a no-op when the user has no sessions",
+			seed:             newSeed,
+			userID:           "user-3",
+			wantRemainingIDs: []string{"user-1-a", "user-1-b", "user-2-a"},
+		},
+		{
+			name:             "returns an error when the delete fails",
+			seed:             newSeed,
+			userID:           "user-1",
+			prepare:          blockSessionDeletes,
+			wantErr:          true,
+			wantRemainingIDs: []string{"user-1-a", "user-1-b", "user-2-a"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			db := newTestSessionDB(t)
+			repo := NewBunSessionRepository(db)
+
+			createTestSessions(t, ctx, repo, tt.seed()...)
+			if tt.prepare != nil {
+				tt.prepare(t, ctx, db)
+			}
+
+			err := repo.DeleteByUserID(ctx, tt.userID)
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.ElementsMatch(t, tt.wantRemainingIDs, sessionIDs(t, ctx, db, nil))
+		})
 	}
 }
 
 func TestBunSessionRepository_DeleteExpired(t *testing.T) {
-	db := newTestSessionDB(t)
-	repo := NewBunSessionRepository(db)
-	ctx := context.Background()
+	t.Parallel()
 
 	now := time.Now().UTC()
 
-	// Create some sessions with different expiration times
-	expiredSession1 := createTestSession("user1", now.Add(-1*time.Hour))    // Expired
-	expiredSession2 := createTestSession("user2", now.Add(-30*time.Minute)) // Expired
-	activeSession1 := createTestSession("user1", now.Add(1*time.Hour))      // Not expired
-	activeSession2 := createTestSession("user3", now.Add(2*time.Hour))      // Not expired
-
-	// Insert all sessions
-	for _, session := range []*models.Session{expiredSession1, expiredSession2, activeSession1, activeSession2} {
-		_, err := repo.Create(ctx, session)
-		if err != nil {
-			t.Fatalf("failed to create session: %v", err)
-		}
+	tests := []struct {
+		name             string
+		sessions         []*models.Session
+		prepare          func(*testing.T, context.Context, bun.IDB)
+		wantErr          bool
+		wantRemainingIDs []string
+	}{
+		{
+			name: "deletes only expired sessions",
+			sessions: []*models.Session{
+				newTestSession("expired-1", "user-1", now.Add(-2*time.Hour), now.Add(-time.Hour)),
+				newTestSession("expired-2", "user-2", now.Add(-2*time.Hour), now.Add(-30*time.Minute)),
+				newTestSession("active-1", "user-1", now.Add(-time.Hour), now.Add(time.Hour)),
+				newTestSession("active-2", "user-3", now.Add(-time.Hour), now.Add(2*time.Hour)),
+			},
+			wantRemainingIDs: []string{"active-1", "active-2"},
+		},
+		{
+			name: "keeps all sessions when none are expired",
+			sessions: []*models.Session{
+				newTestSession("active-1", "user-1", now.Add(-time.Hour), now.Add(time.Hour)),
+				newTestSession("active-2", "user-2", now.Add(-time.Hour), now.Add(2*time.Hour)),
+			},
+			wantRemainingIDs: []string{"active-1", "active-2"},
+		},
+		{
+			name: "deletes all sessions when all are expired",
+			sessions: []*models.Session{
+				newTestSession("expired-1", "user-1", now.Add(-3*time.Hour), now.Add(-time.Hour)),
+				newTestSession("expired-2", "user-2", now.Add(-2*time.Hour), now.Add(-30*time.Minute)),
+				newTestSession("expired-3", "user-3", now.Add(-time.Hour), now.Add(-5*time.Minute)),
+			},
+			wantRemainingIDs: []string{},
+		},
+		{
+			name: "returns an error when the delete fails",
+			sessions: []*models.Session{
+				newTestSession("expired-1", "user-1", now.Add(-2*time.Hour), now.Add(-time.Hour)),
+				newTestSession("active-1", "user-1", now.Add(-time.Hour), now.Add(time.Hour)),
+			},
+			prepare:          blockSessionDeletes,
+			wantErr:          true,
+			wantRemainingIDs: []string{"expired-1", "active-1"},
+		},
 	}
 
-	// Verify all 4 sessions exist
-	allSessions := []*models.Session{}
-	err := db.NewSelect().Model(&allSessions).Scan(ctx)
-	if err != nil {
-		t.Fatalf("failed to query sessions: %v", err)
-	}
-	if len(allSessions) != 4 {
-		t.Fatalf("expected 4 sessions, got %d", len(allSessions))
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	// Delete expired sessions
-	err = repo.DeleteExpired(ctx)
-	if err != nil {
-		t.Fatalf("expected no error on DeleteExpired, got %v", err)
-	}
+			ctx := context.Background()
+			db := newTestSessionDB(t)
+			repo := NewBunSessionRepository(db)
 
-	// Verify only 2 sessions remain (the active ones)
-	remainingSessions := []*models.Session{}
-	err = db.NewSelect().Model(&remainingSessions).Scan(ctx)
-	if err != nil {
-		t.Fatalf("failed to query remaining sessions: %v", err)
-	}
-	if len(remainingSessions) != 2 {
-		t.Fatalf("expected 2 remaining sessions, got %d", len(remainingSessions))
-	}
+			createTestSessions(t, ctx, repo, tt.sessions...)
+			if tt.prepare != nil {
+				tt.prepare(t, ctx, db)
+			}
 
-	// Verify the remaining sessions are the active ones
-	for _, session := range remainingSessions {
-		if session.ExpiresAt.Before(now) {
-			t.Fatalf("expected remaining sessions to be active, but found expired session with ID %s", session.ID)
-		}
-	}
-}
+			err := repo.DeleteExpired(ctx)
 
-func TestBunSessionRepository_DeleteExpired_NoExpired(t *testing.T) {
-	db := newTestSessionDB(t)
-	repo := NewBunSessionRepository(db)
-	ctx := context.Background()
-
-	now := time.Now().UTC()
-
-	// Create only active sessions
-	activeSession1 := createTestSession("user1", now.Add(1*time.Hour))
-	activeSession2 := createTestSession("user2", now.Add(2*time.Hour))
-
-	// Insert all sessions
-	for _, session := range []*models.Session{activeSession1, activeSession2} {
-		_, err := repo.Create(ctx, session)
-		if err != nil {
-			t.Fatalf("failed to create session: %v", err)
-		}
-	}
-
-	// Delete expired sessions (should delete none)
-	err := repo.DeleteExpired(ctx)
-	if err != nil {
-		t.Fatalf("expected no error on DeleteExpired, got %v", err)
-	}
-
-	// Verify all 2 sessions still exist
-	remainingSessions := []*models.Session{}
-	err = db.NewSelect().Model(&remainingSessions).Scan(ctx)
-	if err != nil {
-		t.Fatalf("failed to query remaining sessions: %v", err)
-	}
-	if len(remainingSessions) != 2 {
-		t.Fatalf("expected 2 remaining sessions, got %d", len(remainingSessions))
-	}
-}
-
-func TestBunSessionRepository_DeleteExpired_AllExpired(t *testing.T) {
-	db := newTestSessionDB(t)
-	repo := NewBunSessionRepository(db)
-	ctx := context.Background()
-
-	now := time.Now().UTC()
-
-	// Create only expired sessions
-	expiredSession1 := createTestSession("user1", now.Add(-1*time.Hour))
-	expiredSession2 := createTestSession("user2", now.Add(-30*time.Minute))
-	expiredSession3 := createTestSession("user3", now.Add(-5*time.Minute))
-
-	// Insert all sessions
-	for _, session := range []*models.Session{expiredSession1, expiredSession2, expiredSession3} {
-		_, err := repo.Create(ctx, session)
-		if err != nil {
-			t.Fatalf("failed to create session: %v", err)
-		}
-	}
-
-	// Delete expired sessions (should delete all)
-	err := repo.DeleteExpired(ctx)
-	if err != nil {
-		t.Fatalf("expected no error on DeleteExpired, got %v", err)
-	}
-
-	// Verify no sessions remain
-	remainingSessions := []*models.Session{}
-	err = db.NewSelect().Model(&remainingSessions).Scan(ctx)
-	if err != nil {
-		t.Fatalf("failed to query remaining sessions: %v", err)
-	}
-	if len(remainingSessions) != 0 {
-		t.Fatalf("expected 0 remaining sessions, got %d", len(remainingSessions))
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.ElementsMatch(t, tt.wantRemainingIDs, sessionIDs(t, ctx, db, nil))
+		})
 	}
 }
 
 func TestBunSessionRepository_DeleteOldestByUserID(t *testing.T) {
-	db := newTestSessionDB(t)
-	repo := NewBunSessionRepository(db)
-	ctx := context.Background()
+	t.Parallel()
 
-	userID := "user1"
-
-	// Create 5 sessions for the same user - insert one at a time with delays
-	createdIDs := []string{}
-	for i := 1; i <= 5; i++ {
-		session := &models.Session{
-			ID:        fmt.Sprintf("sess%d", i),
-			UserID:    userID,
-			Token:     fmt.Sprintf("token%d", i),
-			ExpiresAt: time.Now().UTC().Add(time.Duration(i) * time.Hour),
-		}
-		_, err := repo.Create(ctx, session)
-		if err != nil {
-			t.Fatalf("failed to create session: %v", err)
-		}
-		createdIDs = append(createdIDs, session.ID)
-		// Small delay to ensure different timestamps
-		time.Sleep(10 * time.Millisecond)
+	now := time.Now().UTC()
+	sessionAt := func(id, userID string, offset time.Duration) *models.Session {
+		return newTestSession(id, userID, now.Add(offset), now.Add(time.Hour))
 	}
 
-	// Verify 5 sessions exist
-	var before []*models.Session
-	err := db.NewSelect().Model(&before).Where("user_id = ?", userID).Order("created_at ASC").Scan(ctx)
-	if err != nil {
-		t.Fatalf("failed to query sessions: %v", err)
-	}
-	if len(before) != 5 {
-		t.Fatalf("expected 5 sessions before cleanup, got %d", len(before))
+	tests := []struct {
+		name             string
+		sessions         []*models.Session
+		userID           string
+		keep             int
+		otherUserID      string
+		prepare          func(*testing.T, context.Context, bun.IDB)
+		cancelContext    bool
+		wantErr          bool
+		wantRemainingIDs []string
+		wantOtherUserIDs []string
+	}{
+		{
+			name: "deletes oldest sessions and keeps newest",
+			sessions: []*models.Session{
+				sessionAt("sess-1", "user-1", 1*time.Minute),
+				sessionAt("sess-2", "user-1", 2*time.Minute),
+				sessionAt("sess-3", "user-1", 3*time.Minute),
+				sessionAt("sess-4", "user-1", 4*time.Minute),
+				sessionAt("sess-5", "user-1", 5*time.Minute),
+			},
+			userID:           "user-1",
+			keep:             2,
+			wantRemainingIDs: []string{"sess-4", "sess-5"},
+		},
+		{
+			name: "keeps all sessions when below the limit",
+			sessions: []*models.Session{
+				sessionAt("sess-1", "user-1", 1*time.Minute),
+				sessionAt("sess-2", "user-1", 2*time.Minute),
+			},
+			userID:           "user-1",
+			keep:             5,
+			wantRemainingIDs: []string{"sess-1", "sess-2"},
+		},
+		{
+			name: "deletes all sessions when keep is zero",
+			sessions: []*models.Session{
+				sessionAt("sess-1", "user-1", 1*time.Minute),
+				sessionAt("sess-2", "user-1", 2*time.Minute),
+				sessionAt("sess-3", "user-1", 3*time.Minute),
+			},
+			userID:           "user-1",
+			keep:             0,
+			wantRemainingIDs: []string{},
+		},
+		{
+			name: "deletes all sessions when keep is negative",
+			sessions: []*models.Session{
+				sessionAt("sess-1", "user-1", 1*time.Minute),
+				sessionAt("sess-2", "user-1", 2*time.Minute),
+			},
+			userID:           "user-1",
+			keep:             -1,
+			wantRemainingIDs: []string{},
+		},
+		{
+			name: "is a no-op when the user has no sessions",
+			sessions: []*models.Session{
+				sessionAt("other-1", "user-2", 1*time.Minute),
+			},
+			userID:           "user-1",
+			keep:             5,
+			otherUserID:      "user-2",
+			wantRemainingIDs: []string{},
+			wantOtherUserIDs: []string{"other-1"},
+		},
+		{
+			name: "only deletes the requested user's sessions",
+			sessions: []*models.Session{
+				sessionAt("sess-1", "user-1", 1*time.Minute),
+				sessionAt("sess-2", "user-1", 2*time.Minute),
+				sessionAt("sess-3", "user-1", 3*time.Minute),
+				sessionAt("other-1", "user-2", 4*time.Minute),
+				sessionAt("other-2", "user-2", 5*time.Minute),
+				sessionAt("other-3", "user-2", 6*time.Minute),
+			},
+			userID:           "user-1",
+			keep:             1,
+			otherUserID:      "user-2",
+			wantRemainingIDs: []string{"sess-3"},
+			wantOtherUserIDs: []string{"other-1", "other-2", "other-3"},
+		},
+		{
+			name: "returns an error when the session query fails",
+			sessions: []*models.Session{
+				sessionAt("sess-1", "user-1", 1*time.Minute),
+				sessionAt("sess-2", "user-1", 2*time.Minute),
+			},
+			userID:           "user-1",
+			keep:             1,
+			cancelContext:    true,
+			wantErr:          true,
+			wantRemainingIDs: []string{"sess-1", "sess-2"},
+		},
+		{
+			name: "returns an error when the delete fails",
+			sessions: []*models.Session{
+				sessionAt("sess-1", "user-1", 1*time.Minute),
+				sessionAt("sess-2", "user-1", 2*time.Minute),
+				sessionAt("sess-3", "user-1", 3*time.Minute),
+			},
+			userID:           "user-1",
+			keep:             1,
+			prepare:          blockSessionDeletes,
+			wantErr:          true,
+			wantRemainingIDs: []string{"sess-1", "sess-2", "sess-3"},
+		},
+		{
+			name: "returns an error when deleting all fails",
+			sessions: []*models.Session{
+				sessionAt("sess-1", "user-1", 1*time.Minute),
+				sessionAt("sess-2", "user-1", 2*time.Minute),
+			},
+			userID:           "user-1",
+			keep:             0,
+			prepare:          blockSessionDeletes,
+			wantErr:          true,
+			wantRemainingIDs: []string{"sess-1", "sess-2"},
+		},
 	}
 
-	// The first two (oldest) created should be sess1 and sess2
-	// The last two (newest) created should be sess4 and sess5
-	newestTwoCreated := [2]string{createdIDs[3], createdIDs[4]}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	// Delete oldest 3, keep newest 2
-	err = repo.DeleteOldestByUserID(ctx, userID, 2)
-	if err != nil {
-		t.Fatalf("expected no error on DeleteOldestByUserID, got %v", err)
-	}
+			ctx := context.Background()
+			db := newTestSessionDB(t)
+			repo := NewBunSessionRepository(db)
 
-	// Verify only 2 sessions remain
-	var after []*models.Session
-	err = db.NewSelect().Model(&after).Where("user_id = ?", userID).Order("created_at ASC").Scan(ctx)
-	if err != nil {
-		t.Fatalf("failed to query remaining sessions: %v", err)
-	}
-	if len(after) != 2 {
-		remainingIDs := make([]string, 0)
-		for _, s := range after {
-			remainingIDs = append(remainingIDs, s.ID)
-		}
-		t.Fatalf("expected 2 remaining sessions, got %d. Remaining: %v", len(after), remainingIDs)
-	}
-
-	// Verify the remaining sessions are the newest ones
-	for _, session := range after {
-		found := false
-		for _, newestID := range newestTwoCreated {
-			if session.ID == newestID {
-				found = true
-				break
+			createTestSessions(t, ctx, repo, tt.sessions...)
+			if tt.prepare != nil {
+				tt.prepare(t, ctx, db)
 			}
-		}
-		if !found {
-			t.Fatalf("expected remaining sessions to be %v, but found %s", newestTwoCreated, session.ID)
-		}
+
+			callCtx := ctx
+			if tt.cancelContext {
+				callCtx = cancelledContext()
+			}
+
+			err := repo.DeleteOldestByUserID(callCtx, tt.userID, tt.keep)
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.ElementsMatch(t, tt.wantRemainingIDs, sessionIDs(t, ctx, db, &tt.userID))
+
+			if tt.otherUserID != "" {
+				require.ElementsMatch(t, tt.wantOtherUserIDs, sessionIDs(t, ctx, db, &tt.otherUserID))
+			}
+		})
 	}
 }
 
-func TestBunSessionRepository_DeleteOldestByUserID_KeepAllWhenBelowLimit(t *testing.T) {
-	db := newTestSessionDB(t)
-	repo := NewBunSessionRepository(db)
-	ctx := context.Background()
+func TestBunSessionRepository_GetDistinctUserIDs(t *testing.T) {
+	t.Parallel()
 
-	userID := "user1"
 	now := time.Now().UTC()
-
-	// Create only 2 sessions for the user
-	sessions := []*models.Session{
-		createTestSession(userID, now.Add(1*time.Hour)),
-		createTestSession(userID, now.Add(2*time.Hour)),
-	}
-
-	for _, session := range sessions {
-		_, err := repo.Create(ctx, session)
-		if err != nil {
-			t.Fatalf("failed to create session: %v", err)
+	newSessions := func() []*models.Session {
+		return []*models.Session{
+			newTestSession("sess-1", "user-1", now, now.Add(time.Hour)),
+			newTestSession("sess-2", "user-1", now, now.Add(time.Hour)),
+			newTestSession("sess-3", "user-2", now, now.Add(time.Hour)),
+			newTestSession("sess-4", "user-3", now, now.Add(time.Hour)),
+			newTestSession("sess-5", "user-3", now, now.Add(time.Hour)),
 		}
 	}
 
-	// Try to delete oldest, but keep 5 (more than exists)
-	err := repo.DeleteOldestByUserID(ctx, userID, 5)
-	if err != nil {
-		t.Fatalf("expected no error on DeleteOldestByUserID, got %v", err)
+	tests := []struct {
+		name          string
+		sessions      func() []*models.Session
+		cancelContext bool
+		wantUserIDs   []string
+		wantErrIs     error
+	}{
+		{
+			name:        "returns each user id once",
+			sessions:    newSessions,
+			wantUserIDs: []string{"user-1", "user-2", "user-3"},
+		},
+		{
+			name:        "returns an empty list when there are no sessions",
+			wantUserIDs: []string{},
+		},
+		{
+			name:          "returns an error when the query fails",
+			sessions:      newSessions,
+			cancelContext: true,
+			wantErrIs:     context.Canceled,
+		},
 	}
 
-	// Verify all 2 sessions still exist
-	remainingSessions := []*models.Session{}
-	err = db.NewSelect().Model(&remainingSessions).Where("user_id = ?", userID).Scan(ctx)
-	if err != nil {
-		t.Fatalf("failed to query remaining sessions: %v", err)
-	}
-	if len(remainingSessions) != 2 {
-		t.Fatalf("expected 2 remaining sessions, got %d", len(remainingSessions))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			db := newTestSessionDB(t)
+			repo := NewBunSessionRepository(db)
+
+			if tt.sessions != nil {
+				createTestSessions(t, ctx, repo, tt.sessions()...)
+			}
+			if tt.cancelContext {
+				ctx = cancelledContext()
+			}
+
+			got, err := repo.GetDistinctUserIDs(ctx)
+
+			if tt.wantErrIs != nil {
+				require.ErrorIs(t, err, tt.wantErrIs)
+				require.Empty(t, got)
+				return
+			}
+
+			require.NoError(t, err)
+			require.ElementsMatch(t, tt.wantUserIDs, got)
+		})
 	}
 }
 
-func TestBunSessionRepository_DeleteOldestByUserID_DeleteAllWhenKeepIsZero(t *testing.T) {
-	db := newTestSessionDB(t)
-	repo := NewBunSessionRepository(db)
-	ctx := context.Background()
+func TestBunSessionRepository_WithTx(t *testing.T) {
+	t.Parallel()
 
-	userID := "user1"
-	now := time.Now().UTC()
-
-	// Create 3 sessions for the user
-	sessions := []*models.Session{
-		createTestSession(userID, now.Add(1*time.Hour)),
-		createTestSession(userID, now.Add(2*time.Hour)),
-		createTestSession(userID, now.Add(3*time.Hour)),
+	tests := []struct {
+		name   string
+		commit bool
+	}{
+		{name: "commits writes through the transaction", commit: true},
+		{name: "rolls back writes through the transaction", commit: false},
 	}
 
-	for _, session := range sessions {
-		_, err := repo.Create(ctx, session)
-		if err != nil {
-			t.Fatalf("failed to create session: %v", err)
-		}
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	// Delete all sessions (keep 0)
-	err := repo.DeleteOldestByUserID(ctx, userID, 0)
-	if err != nil {
-		t.Fatalf("expected no error on DeleteOldestByUserID, got %v", err)
-	}
+			ctx := context.Background()
+			db := newTestSessionDB(t)
+			repo := NewBunSessionRepository(db)
 
-	// Verify no sessions remain for this user
-	remainingSessions := []*models.Session{}
-	err = db.NewSelect().Model(&remainingSessions).Where("user_id = ?", userID).Scan(ctx)
-	if err != nil {
-		t.Fatalf("failed to query remaining sessions: %v", err)
-	}
-	if len(remainingSessions) != 0 {
-		t.Fatalf("expected 0 remaining sessions for user, got %d", len(remainingSessions))
-	}
-}
+			tx, err := db.BeginTx(ctx, nil)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				_ = tx.Rollback()
+			})
 
-func TestBunSessionRepository_DeleteOldestByUserID_MultipleUsers(t *testing.T) {
-	db := newTestSessionDB(t)
-	repo := NewBunSessionRepository(db)
-	ctx := context.Background()
+			txRepo := repo.WithTx(tx)
+			require.NotNil(t, txRepo)
 
-	user1ID := "user1"
-	user2ID := "user2"
-	now := time.Now().UTC()
+			now := time.Now().UTC()
+			session := newTestSession("session-tx", "user-1", now, now.Add(time.Hour))
+			created, err := txRepo.Create(ctx, session)
+			require.NoError(t, err)
+			require.Equal(t, session.ID, created.ID)
 
-	// Create 3 sessions for user1 with good spacing
-	for i := 0; i < 3; i++ {
-		session := createTestSession(user1ID, now.Add(time.Duration(i+1)*time.Hour))
-		_, err := repo.Create(ctx, session)
-		if err != nil {
-			t.Fatalf("failed to create session: %v", err)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+			if tt.commit {
+				require.NoError(t, tx.Commit())
+			} else {
+				require.NoError(t, tx.Rollback())
+			}
 
-	// Small gap between users
-	time.Sleep(50 * time.Millisecond)
+			got, err := repo.GetByID(ctx, session.ID)
+			if tt.commit {
+				require.NoError(t, err)
+				require.NotNil(t, got)
+				require.Equal(t, session.ID, got.ID)
+				return
+			}
 
-	// Create 3 sessions for user2 - use later timestamps to distinguish
-	for i := range 3 {
-		session := createTestSession(user2ID, now.Add(time.Duration(i+10)*time.Hour))
-		_, err := repo.Create(ctx, session)
-		if err != nil {
-			t.Fatalf("failed to create session: %v", err)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	// Delete oldest for user1 only, keep 1
-	err := repo.DeleteOldestByUserID(ctx, user1ID, 1)
-	if err != nil {
-		t.Fatalf("expected no error on DeleteOldestByUserID, got %v", err)
-	}
-
-	// Verify user1 has only 1 session
-	user1Sessions := []*models.Session{}
-	err = db.NewSelect().Model(&user1Sessions).Where("user_id = ?", user1ID).Scan(ctx)
-	if err != nil {
-		t.Fatalf("failed to query user1 sessions: %v", err)
-	}
-	if len(user1Sessions) != 1 {
-		t.Fatalf("expected 1 session for user1, got %d (IDs: ", len(user1Sessions))
-	}
-
-	// Verify user2 still has 3 sessions (unchanged)
-	user2Sessions := []*models.Session{}
-	err = db.NewSelect().Model(&user2Sessions).Where("user_id = ?", user2ID).Scan(ctx)
-	if err != nil {
-		t.Fatalf("failed to query user2 sessions: %v", err)
-	}
-	if len(user2Sessions) != 3 {
-		t.Fatalf("expected 3 sessions for user2, got %d", len(user2Sessions))
+			require.Nil(t, got)
+			require.ErrorIs(t, err, coreerrors.ErrSessionNotFound)
+		})
 	}
 }
