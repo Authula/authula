@@ -11,8 +11,6 @@ import (
 // Transaction represents a database transaction interface
 type Transaction any
 
-// Repository interfaces for data access - these will be implemented by plugins
-
 type UserRepository interface {
 	GetAll(ctx context.Context, cursor *string, limit int) ([]models.User, *string, error)
 	GetByID(ctx context.Context, id string) (*models.User, error)

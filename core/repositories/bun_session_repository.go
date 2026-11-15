@@ -3,10 +3,12 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/uptrace/bun"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 )
 
@@ -21,28 +23,37 @@ func NewBunSessionRepository(db bun.IDB) SessionRepository {
 func (r *BunSessionRepository) GetByID(ctx context.Context, id string) (*models.Session, error) {
 	s := new(models.Session)
 	err := r.db.NewSelect().Model(s).Where("id = ?", id).Scan(ctx)
-	if err == sql.ErrNoRows {
-		return nil, nil
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, coreerrors.ErrSessionNotFound
 	}
-	return s, err
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (r *BunSessionRepository) GetByToken(ctx context.Context, token string) (*models.Session, error) {
 	s := new(models.Session)
 	err := r.db.NewSelect().Model(s).Where("token = ?", token).Scan(ctx)
-	if err == sql.ErrNoRows {
-		return nil, nil
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, coreerrors.ErrSessionNotFound
 	}
-	return s, err
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (r *BunSessionRepository) GetByUserID(ctx context.Context, userID string) (*models.Session, error) {
 	s := new(models.Session)
 	err := r.db.NewSelect().Model(s).Where("user_id = ?", userID).Order("created_at DESC").Scan(ctx)
-	if err == sql.ErrNoRows {
-		return nil, nil
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, coreerrors.ErrSessionNotFound
 	}
-	return s, err
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (r *BunSessionRepository) Create(ctx context.Context, session *models.Session) (*models.Session, error) {
