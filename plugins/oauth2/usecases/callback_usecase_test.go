@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	coreservices "github.com/Authula/authula/core/services"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
@@ -1094,6 +1095,15 @@ func TestCallbackUseCase_CurrentSession(t *testing.T) {
 			actorID:   "user-1",
 			setup: func(f *callbackFixture) {
 				f.sessionService.On("GetByID", mock.Anything, "session-1").Return(nil, nil)
+			},
+			wantErr: constants.ErrSessionNotFound,
+		},
+		{
+			name:      "session repository reports ErrSessionNotFound",
+			sessionID: "session-1",
+			actorID:   "user-1",
+			setup: func(f *callbackFixture) {
+				f.sessionService.On("GetByID", mock.Anything, "session-1").Return(nil, coreerrors.ErrSessionNotFound)
 			},
 			wantErr: constants.ErrSessionNotFound,
 		},

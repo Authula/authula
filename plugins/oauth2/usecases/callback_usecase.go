@@ -9,6 +9,7 @@ import (
 
 	"golang.org/x/oauth2"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	coreservices "github.com/Authula/authula/core/services"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/oauth2/constants"
@@ -345,6 +346,9 @@ func (uc *callbackUseCase) currentSession(ctx context.Context, req *types.Callba
 
 	session, err := uc.SessionService.GetByID(ctx, req.SessionID)
 	if err != nil {
+		if errors.Is(err, coreerrors.ErrSessionNotFound) {
+			return nil, constants.ErrSessionNotFound
+		}
 		return nil, fmt.Errorf("failed to load current session: %w", err)
 	}
 	if session == nil || session.UserID != req.ActorID || !session.ExpiresAt.After(time.Now()) {
