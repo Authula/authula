@@ -10,6 +10,7 @@ import (
 
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
+	"github.com/Authula/authula/plugins/email-password/constants"
 	plugintests "github.com/Authula/authula/plugins/email-password/tests"
 )
 
@@ -29,6 +30,9 @@ func TestVerifyEmailHandler(t *testing.T) {
 		{name: "usecase_error", path: "/email-password/verify-email?token=token-1", prepare: func(m *plugintests.MockVerifyEmailUseCase) {
 			m.On("VerifyEmail", mock.Anything, "token-1").Return(models.VerificationType(""), errors.New("some error")).Once()
 		}, expectedStatus: http.StatusInternalServerError},
+		{name: "invalid_or_expired_token", path: "/email-password/verify-email?token=token-1", prepare: func(m *plugintests.MockVerifyEmailUseCase) {
+			m.On("VerifyEmail", mock.Anything, "token-1").Return(models.VerificationType(""), constants.ErrInvalidOrExpiredToken).Once()
+		}, expectedStatus: http.StatusBadRequest},
 		{name: "success_without_callback", path: "/email-password/verify-email?token=token-1", prepare: func(m *plugintests.MockVerifyEmailUseCase) {
 			m.On("VerifyEmail", mock.Anything, "token-1").Return(models.TypeEmailVerification, nil).Once()
 		}, expectedStatus: http.StatusOK},

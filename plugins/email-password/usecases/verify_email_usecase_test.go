@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
 	"github.com/Authula/authula/plugins/email-password/types"
@@ -28,6 +29,17 @@ func TestVerifyEmailUseCase(t *testing.T) {
 			setup: func(f *emailPasswordTestFixture) {
 				f.tokenSvc.On("Hash", "token-123").Return("hashed-token").Once()
 				f.verificationSvc.On("GetByToken", mock.Anything, "hashed-token").Return(nil, nil).Once()
+			},
+			assert: func(t *testing.T, vt models.VerificationType, err error) {
+				require.ErrorIs(t, err, constants.ErrInvalidOrExpiredToken)
+				require.Empty(t, vt)
+			},
+		},
+		{
+			name: "verification repository reports not found",
+			setup: func(f *emailPasswordTestFixture) {
+				f.tokenSvc.On("Hash", "token-123").Return("hashed-token").Once()
+				f.verificationSvc.On("GetByToken", mock.Anything, "hashed-token").Return(nil, coreerrors.ErrVerificationNotFound).Once()
 			},
 			assert: func(t *testing.T, vt models.VerificationType, err error) {
 				require.ErrorIs(t, err, constants.ErrInvalidOrExpiredToken)

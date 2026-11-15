@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	internaltests "github.com/Authula/authula/internal/tests"
+	"github.com/Authula/authula/plugins/email-password/constants"
 	plugintests "github.com/Authula/authula/plugins/email-password/tests"
 	"github.com/Authula/authula/plugins/email-password/types"
 )
@@ -29,6 +30,9 @@ func TestChangePasswordHandler(t *testing.T) {
 		{name: "usecase_error", withContext: true, body: internaltests.MarshalToJSON(t, types.ChangePasswordRequest{Token: "token", Password: "password123"}), prepare: func(m *plugintests.MockChangePasswordUseCase) {
 			m.On("ChangePassword", mock.Anything, "token", "password123").Return(errors.New("some error")).Once()
 		}, expectedStatus: http.StatusInternalServerError},
+		{name: "invalid_or_expired_token", withContext: true, body: internaltests.MarshalToJSON(t, types.ChangePasswordRequest{Token: "token", Password: "password123"}), prepare: func(m *plugintests.MockChangePasswordUseCase) {
+			m.On("ChangePassword", mock.Anything, "token", "password123").Return(constants.ErrInvalidOrExpiredToken).Once()
+		}, expectedStatus: http.StatusBadRequest},
 		{name: "success", withContext: true, body: internaltests.MarshalToJSON(t, types.ChangePasswordRequest{Token: "token", Password: "password123"}), prepare: func(m *plugintests.MockChangePasswordUseCase) {
 			m.On("ChangePassword", mock.Anything, "token", "password123").Return(nil).Once()
 		}, expectedStatus: http.StatusOK},

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
 )
@@ -16,17 +17,29 @@ func TestChangePasswordUseCase(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name   string
-		setup  func(*emailPasswordTestFixture)
-		assert func(*testing.T, error)
+		name     string
+		password string
+		setup    func(*emailPasswordTestFixture)
+		assert   func(*testing.T, error)
 	}{
 		{
-			name:   "invalid length returns error",
-			setup:  func(f *emailPasswordTestFixture) {},
-			assert: func(t *testing.T, err error) { require.ErrorIs(t, err, constants.ErrInvalidPasswordLength) },
+			name:     "invalid length returns error",
+			password: "short",
+			setup:    func(f *emailPasswordTestFixture) {},
+			assert:   func(t *testing.T, err error) { require.ErrorIs(t, err, constants.ErrInvalidPasswordLength) },
 		},
 		{
-			name: "updates password on valid token",
+			name:     "verification repository reports not found",
+			password: "NewPassword1!",
+			setup: func(f *emailPasswordTestFixture) {
+				f.tokenSvc.On("Hash", "token-123").Return("hashed-token").Once()
+				f.verificationSvc.On("GetByToken", mock.Anything, "hashed-token").Return(nil, coreerrors.ErrVerificationNotFound).Once()
+			},
+			assert: func(t *testing.T, err error) { require.ErrorIs(t, err, constants.ErrInvalidOrExpiredToken) },
+		},
+		{
+			name:     "updates password on valid token",
+			password: "NewPassword1!",
 			setup: func(f *emailPasswordTestFixture) {
 				verification := &models.Verification{ID: "verif-1", Type: models.TypePasswordResetRequest, UserID: func() *string { s := "user-1"; return &s }(), ExpiresAt: time.Now().Add(time.Hour)}
 				f.tokenSvc.On("Hash", "token-123").Return("hashed-token").Once()
@@ -50,10 +63,7 @@ func TestChangePasswordUseCase(t *testing.T) {
 			if tc.setup != nil {
 				tc.setup(f)
 			}
-			password := "short"
-			if tc.name == "updates password on valid token" {
-				password = "NewPassword1!"
-			}
+			password := tc.password
 			err := f.changePasswordUseCase().ChangePassword(context.Background(), "token-123", password)
 			tc.assert(t, err)
 			f.accountSvc.AssertExpectations(t)
