@@ -5,9 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 
-	"github.com/Authula/authula/internal/tests"
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/repositories"
 	"github.com/Authula/authula/plugins/admin/types"
@@ -15,7 +17,7 @@ import (
 
 func setupSessionRepo(t *testing.T) (*repositories.BunSessionStateRepository, *bun.DB, func()) {
 	t.Helper()
-	db, _ := tests.NewIntegrationTestDBFromEnv(t)
+	db, _ := internaltests.NewIntegrationTestDBFromEnv(t)
 
 	ctx := context.Background()
 	if _, err := db.NewCreateTable().Model((*types.AdminSessionState)(nil)).IfNotExists().Exec(ctx); err != nil {
@@ -28,6 +30,47 @@ func setupSessionRepo(t *testing.T) (*repositories.BunSessionStateRepository, *b
 	repo := repositories.NewBunSessionStateRepository(db)
 	cleanup := func() { _ = db.Close() }
 	return repo, db, cleanup
+}
+
+func TestBunSessionStateRepository_CreateAndUpdate(t *testing.T) {
+	t.Parallel()
+
+	db := internaltests.NewSQLiteIntegrationDB(t)
+	ctx := context.Background()
+	_, err := db.NewCreateTable().Model((*types.AdminSessionState)(nil)).IfNotExists().Exec(ctx)
+	require.NoError(t, err)
+
+	repo := repositories.NewBunSessionStateRepository(db)
+
+	state := &types.AdminSessionState{SessionID: "s1"}
+	require.NoError(t, repo.Create(ctx, state))
+
+	got, err := repo.GetBySessionID(ctx, "s1")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Nil(t, got.RevokedAt)
+
+	require.Error(t, repo.Create(ctx, &types.AdminSessionState{SessionID: "s1"}))
+
+	now := time.Now().UTC()
+	require.NoError(t, repo.Update(ctx, &types.AdminSessionState{
+		SessionID:              "s1",
+		RevokedAt:              &now,
+		RevokedReason:          new("reason"),
+		RevokedByUserID:        new("actor"),
+		ImpersonatorUserID:     new("actor"),
+		ImpersonationReason:    new("impersonation"),
+		ImpersonationExpiresAt: &now,
+	}))
+
+	got, err = repo.GetBySessionID(ctx, "s1")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.NotNil(t, got.RevokedAt)
+	require.NotNil(t, got.RevokedReason)
+	assert.Equal(t, "reason", *got.RevokedReason)
+	require.NotNil(t, got.RevokedByUserID)
+	assert.Equal(t, "actor", *got.RevokedByUserID)
 }
 
 func TestBunSessionStateRepository_GetBySessionID(t *testing.T) {
@@ -302,4 +345,33 @@ func TestBunSessionStateRepository_GetByUserID(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBunSessionStateRepository_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	db := internaltests.NewSQLiteIntegrationDB(t)
+	repo := repositories.NewBunSessionStateRepository(db)
+	ctx := context.Background()
+
+	got, err := repo.GetBySessionID(ctx, "s1")
+	assert.Error(t, err)
+	assert.Nil(t, got)
+
+	assert.Error(t, repo.Upsert(ctx, &types.AdminSessionState{SessionID: "s1"}))
+	assert.Error(t, repo.Create(ctx, &types.AdminSessionState{SessionID: "s1"}))
+	assert.Error(t, repo.Update(ctx, &types.AdminSessionState{SessionID: "s1"}))
+	assert.Error(t, repo.Delete(ctx, "s1"))
+
+	rows, err := repo.GetRevoked(ctx)
+	assert.Error(t, err)
+	assert.Nil(t, rows)
+
+	exists, err := repo.SessionExists(ctx, "s1")
+	assert.Error(t, err)
+	assert.False(t, exists)
+
+	userSessions, err := repo.GetByUserID(ctx, "u1")
+	assert.Error(t, err)
+	assert.Nil(t, userSessions)
 }
