@@ -142,34 +142,58 @@ func assertTableMissing(t *testing.T, ctx context.Context, db *bun.DB, table str
 	require.Error(t, err)
 }
 
+func pluginIDs(registered []models.Plugin) []string {
+	ids := make([]string, 0, len(registered))
+	for _, plugin := range registered {
+		ids = append(ids, plugin.Metadata().ID)
+	}
+	return ids
+}
+
 func TestPluginRegistry_Register(t *testing.T) {
 	t.Parallel()
 
-	t.Run("preserves registration order", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name      string
+		pluginIDs []string
+		wantIDs   []string
+		wantErr   string
+	}{
+		{
+			name:      "preserves registration order",
+			pluginIDs: []string{"alpha", "beta"},
+			wantIDs:   []string{"alpha", "beta"},
+		},
+		{
+			name:      "rejects duplicate plugin IDs",
+			pluginIDs: []string{"alpha", "alpha"},
+			wantIDs:   []string{"alpha"},
+			wantErr:   `plugin with ID "alpha" is already registered`,
+		},
+	}
 
-		registry := plugins.NewPluginRegistry(nil, &internaltests.MockLogger{}, nil, nil, nil, nil)
-		alpha := newFakePlugin("alpha")
-		beta := newFakePlugin("beta")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		require.NoError(t, registry.Register(alpha))
-		require.NoError(t, registry.Register(beta))
+			registry := plugins.NewPluginRegistry(nil, &internaltests.MockLogger{}, nil, nil, nil, nil)
 
-		assert.Equal(t, []models.Plugin{alpha, beta}, registry.Plugins())
-	})
+			var err error
+			for _, pluginID := range tt.pluginIDs {
+				if err = registry.Register(newFakePlugin(pluginID)); err != nil {
+					break
+				}
+			}
 
-	t.Run("rejects duplicate plugin IDs", func(t *testing.T) {
-		t.Parallel()
-
-		registry := plugins.NewPluginRegistry(nil, &internaltests.MockLogger{}, nil, nil, nil, nil)
-
-		require.NoError(t, registry.Register(newFakePlugin("alpha")))
-		err := registry.Register(newFakePlugin("alpha"))
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), `plugin with ID "alpha" is already registered`)
-		assert.Len(t, registry.Plugins(), 1)
-	})
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantIDs, pluginIDs(registry.Plugins()))
+		})
+	}
 }
 
 func TestPluginRegistry_InitAll(t *testing.T) {
@@ -289,144 +313,215 @@ func TestPluginRegistry_SetConfigProvider(t *testing.T) {
 
 	first := configWithPlugins("sqlite", models.PluginsConfig{"alpha": map[string]any{"enabled": true}})
 	second := configWithPlugins("sqlite", models.PluginsConfig{"alpha": map[string]any{"enabled": false}})
-	registry := plugins.NewPluginRegistry(first, &internaltests.MockLogger{}, nil, nil, nil, nil)
-	plugin := newFakePlugin("alpha")
-	require.NoError(t, registry.Register(plugin))
 
-	assert.Same(t, first, registry.GetConfig())
+	tests := []struct {
+		name          string
+		provider      func() *models.Config
+		wantConfig    *models.Config
+		wantInitCalls int
+	}{
+		{
+			name:          "replaces the config provider",
+			provider:      func() *models.Config { return second },
+			wantConfig:    second,
+			wantInitCalls: 0,
+		},
+		{
+			name:          "ignores a nil provider",
+			provider:      nil,
+			wantConfig:    first,
+			wantInitCalls: 1,
+		},
+	}
 
-	registry.SetConfigProvider(func() *models.Config { return second })
-	assert.Same(t, second, registry.GetConfig())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	require.NoError(t, registry.InitAll())
-	initCalls, _ := plugin.stats()
-	assert.Zero(t, initCalls)
-}
+			registry := plugins.NewPluginRegistry(first, &internaltests.MockLogger{}, nil, nil, nil, nil)
+			plugin := newFakePlugin("alpha")
+			require.NoError(t, registry.Register(plugin))
 
-func TestPluginRegistry_SetConfigProviderIgnoresNil(t *testing.T) {
-	t.Parallel()
+			registry.SetConfigProvider(tt.provider)
 
-	cfg := configWithPlugins("sqlite", nil)
-	registry := plugins.NewPluginRegistry(cfg, &internaltests.MockLogger{}, nil, nil, nil, nil)
-
-	registry.SetConfigProvider(nil)
-
-	assert.Same(t, cfg, registry.GetConfig())
+			assert.Same(t, tt.wantConfig, registry.GetConfig())
+			require.NoError(t, registry.InitAll())
+			initCalls, _ := plugin.stats()
+			assert.Equal(t, tt.wantInitCalls, initCalls)
+		})
+	}
 }
 
 func TestPluginRegistry_RunMigrationsWithoutManager(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	tests := []struct {
+		name        string
+		newRegistry func(t *testing.T) *plugins.PluginRegistry
+		wantErr     string
+	}{
+		{
+			name: "nil migration manager is a no-op",
+			newRegistry: func(t *testing.T) *plugins.PluginRegistry {
+				return plugins.NewPluginRegistry(configWithPlugins("sqlite", nil), &internaltests.MockLogger{}, nil, nil, nil, nil)
+			},
+		},
+		{
+			name: "manager without migrator is a no-op",
+			newRegistry: func(t *testing.T) *plugins.PluginRegistry {
+				return plugins.NewPluginRegistry(
+					configWithPlugins("sqlite", nil),
+					&internaltests.MockLogger{},
+					nil,
+					migrationmanager.NewManager(nil),
+					nil,
+					nil,
+				)
+			},
+		},
+		{
+			name: "nil config returns an error",
+			newRegistry: func(t *testing.T) *plugins.PluginRegistry {
+				registry, _, _ := newSQLiteRegistry(t)
+				registry.SetConfigProvider(func() *models.Config { return nil })
+				return registry
+			},
+			wantErr: "config provider returned nil config",
+		},
+	}
 
-	t.Run("nil migration manager is a no-op", func(t *testing.T) {
-		t.Parallel()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		registry := plugins.NewPluginRegistry(configWithPlugins("sqlite", nil), &internaltests.MockLogger{}, nil, nil, nil, nil)
-		require.NoError(t, registry.RunMigrations(ctx))
-	})
+			registry := tt.newRegistry(t)
 
-	t.Run("manager without migrator is a no-op", func(t *testing.T) {
-		t.Parallel()
+			err := registry.RunMigrations(context.Background())
 
-		registry := plugins.NewPluginRegistry(
-			configWithPlugins("sqlite", nil),
-			&internaltests.MockLogger{},
-			nil,
-			migrationmanager.NewManager(nil),
-			nil,
-			nil,
-		)
-		require.NoError(t, registry.RunMigrations(ctx))
-	})
-
-	t.Run("nil config returns an error", func(t *testing.T) {
-		t.Parallel()
-
-		registry, _, _ := newSQLiteRegistry(t)
-		registry.SetConfigProvider(func() *models.Config { return nil })
-
-		err := registry.RunMigrations(ctx)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "config provider returned nil config")
-	})
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
-func TestPluginRegistry_RunMigrationsAppliesEnabledPlugins(t *testing.T) {
+func TestPluginRegistry_RunMigrations(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	registry, db, _ := newSQLiteRegistry(t)
-	registry.SetConfigProvider(func() *models.Config {
-		return configWithPlugins("sqlite", models.PluginsConfig{
-			"widgets":  map[string]any{"enabled": true},
-			"disabled": map[string]any{"enabled": false},
+	tests := []struct {
+		name              string
+		pluginsConfig     models.PluginsConfig
+		plugins           []*fakePlugin
+		wantTables        []string
+		wantMissingTables []string
+	}{
+		{
+			name: "applies migrations for enabled plugins only",
+			pluginsConfig: models.PluginsConfig{
+				"widgets":  map[string]any{"enabled": true},
+				"disabled": map[string]any{"enabled": false},
+			},
+			plugins: []*fakePlugin{
+				newMigratableFakePlugin("widgets", sqliteTableMigrations("20260101000000_widgets", "plugin_items")),
+				newMigratableFakePlugin("disabled", sqliteTableMigrations("20260102000000_disabled", "disabled_items")),
+			},
+			wantTables:        []string{"plugin_items"},
+			wantMissingTables: []string{"disabled_items"},
+		},
+		{
+			name: "skips migrations for disabled plugins",
+			pluginsConfig: models.PluginsConfig{
+				"widgets": map[string]any{"enabled": false},
+			},
+			plugins: []*fakePlugin{
+				newMigratableFakePlugin("widgets", sqliteTableMigrations("20260101000000_widgets", "plugin_items")),
+			},
+			wantMissingTables: []string{"plugin_items"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			registry, db, _ := newSQLiteRegistry(t)
+			registry.SetConfigProvider(func() *models.Config {
+				return configWithPlugins("sqlite", tt.pluginsConfig)
+			})
+			for _, plugin := range tt.plugins {
+				require.NoError(t, registry.Register(plugin))
+			}
+
+			require.NoError(t, registry.RunMigrations(ctx))
+
+			for _, table := range tt.wantTables {
+				assertTableExists(t, ctx, db, table)
+			}
+			for _, table := range tt.wantMissingTables {
+				assertTableMissing(t, ctx, db, table)
+			}
 		})
-	})
-	require.NoError(t, registry.Register(newMigratableFakePlugin("widgets", sqliteTableMigrations("20260101000000_widgets", "plugin_items"))))
-	require.NoError(t, registry.Register(newMigratableFakePlugin("disabled", sqliteTableMigrations("20260102000000_disabled", "disabled_items"))))
-
-	require.NoError(t, registry.RunMigrations(ctx))
-
-	assertTableExists(t, ctx, db, "plugin_items")
-	assertTableMissing(t, ctx, db, "disabled_items")
-}
-
-func TestPluginRegistry_RunMigrationsSkipsDisabledPlugins(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	registry, db, _ := newSQLiteRegistry(t)
-	registry.SetConfigProvider(func() *models.Config {
-		return configWithPlugins("sqlite", models.PluginsConfig{
-			"widgets": map[string]any{"enabled": false},
-		})
-	})
-	require.NoError(t, registry.Register(newMigratableFakePlugin("widgets", sqliteTableMigrations("20260101000000_widgets", "plugin_items"))))
-
-	require.NoError(t, registry.RunMigrations(ctx))
-
-	assertTableMissing(t, ctx, db, "plugin_items")
+	}
 }
 
 func TestPluginRegistry_DropMigrationsWithoutManager(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	tests := []struct {
+		name        string
+		newRegistry func(t *testing.T) *plugins.PluginRegistry
+		wantErr     string
+	}{
+		{
+			name: "nil migration manager is a no-op",
+			newRegistry: func(t *testing.T) *plugins.PluginRegistry {
+				return plugins.NewPluginRegistry(configWithPlugins("sqlite", nil), &internaltests.MockLogger{}, nil, nil, nil, nil)
+			},
+		},
+		{
+			name: "manager without migrator is a no-op",
+			newRegistry: func(t *testing.T) *plugins.PluginRegistry {
+				return plugins.NewPluginRegistry(
+					configWithPlugins("sqlite", nil),
+					&internaltests.MockLogger{},
+					nil,
+					migrationmanager.NewManager(nil),
+					nil,
+					nil,
+				)
+			},
+		},
+		{
+			name: "nil config returns an error",
+			newRegistry: func(t *testing.T) *plugins.PluginRegistry {
+				registry, _, _ := newSQLiteRegistry(t)
+				registry.SetConfigProvider(func() *models.Config { return nil })
+				return registry
+			},
+			wantErr: "config provider returned nil config",
+		},
+	}
 
-	t.Run("nil migration manager is a no-op", func(t *testing.T) {
-		t.Parallel()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		registry := plugins.NewPluginRegistry(configWithPlugins("sqlite", nil), &internaltests.MockLogger{}, nil, nil, nil, nil)
-		require.NoError(t, registry.DropMigrations(ctx))
-	})
+			registry := tt.newRegistry(t)
 
-	t.Run("manager without migrator is a no-op", func(t *testing.T) {
-		t.Parallel()
+			err := registry.DropMigrations(context.Background())
 
-		registry := plugins.NewPluginRegistry(
-			configWithPlugins("sqlite", nil),
-			&internaltests.MockLogger{},
-			nil,
-			migrationmanager.NewManager(nil),
-			nil,
-			nil,
-		)
-		require.NoError(t, registry.DropMigrations(ctx))
-	})
-
-	t.Run("nil config returns an error", func(t *testing.T) {
-		t.Parallel()
-
-		registry, _, _ := newSQLiteRegistry(t)
-		registry.SetConfigProvider(func() *models.Config { return nil })
-
-		err := registry.DropMigrations(ctx)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "config provider returned nil config")
-	})
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestPluginRegistry_DropMigrationsIgnoresEnablement(t *testing.T) {
@@ -493,12 +588,32 @@ func TestPluginRegistry_CloseAll(t *testing.T) {
 func TestPluginRegistry_GetPlugin(t *testing.T) {
 	t.Parallel()
 
-	registry := plugins.NewPluginRegistry(nil, &internaltests.MockLogger{}, nil, nil, nil, nil)
-	alpha := newFakePlugin("alpha")
-	require.NoError(t, registry.Register(alpha))
+	tests := []struct {
+		name      string
+		pluginID  string
+		wantFound bool
+	}{
+		{name: "returns the registered plugin", pluginID: "alpha", wantFound: true},
+		{name: "returns nil for an unknown plugin", pluginID: "missing"},
+	}
 
-	assert.Same(t, alpha, registry.GetPlugin("alpha"))
-	assert.Nil(t, registry.GetPlugin("missing"))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			registry := plugins.NewPluginRegistry(nil, &internaltests.MockLogger{}, nil, nil, nil, nil)
+			alpha := newFakePlugin("alpha")
+			require.NoError(t, registry.Register(alpha))
+
+			got := registry.GetPlugin(tt.pluginID)
+
+			if tt.wantFound {
+				assert.Same(t, alpha, got)
+			} else {
+				assert.Nil(t, got)
+			}
+		})
+	}
 }
 
 func TestPluginRegistry_GetConfigReflectsRegisteredConfig(t *testing.T) {
