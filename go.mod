@@ -12,6 +12,7 @@ require (
 	github.com/ThreeDotsLabs/watermill-redisstream v1.4.5
 	github.com/ThreeDotsLabs/watermill-sql/v3 v3.1.0
 	github.com/ThreeDotsLabs/watermill-sqlite/wmsqlitezombiezen v0.1.2
+	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/go-playground/validator/v10 v10.30.4
 	github.com/go-sql-driver/mysql v1.10.1
@@ -164,6 +165,7 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.70.0 // indirect

@@ -32,6 +32,8 @@ github.com/ThreeDotsLabs/watermill-sqlite/test v0.1.1 h1:bYzMJz8m+fY56z5tfpseTNI
 github.com/ThreeDotsLabs/watermill-sqlite/test v0.1.1/go.mod h1:FZC2Afdhlqp8dtaqHxrSmHqWBC2az3mDbAq6D/fdCT8=
 github.com/ThreeDotsLabs/watermill-sqlite/wmsqlitezombiezen v0.1.2 h1:22sRqgmkgOPK917+p17I6yxyeEjPZHDgI2jVx921h4Q=
 github.com/ThreeDotsLabs/watermill-sqlite/wmsqlitezombiezen v0.1.2/go.mod h1:hAS4p6c6pXWZicLcD5Fy0KY1sZ3/k9ZSLI1YHs1xPIk=
+github.com/alicebob/miniredis/v2 v2.40.0 h1:6IgTQbvm2JiMYZ8yur/acNJzVjtSOWCelxXbk/LUBXc=
+github.com/alicebob/miniredis/v2 v2.40.0/go.mod h1:TcL7YfarKPGDAthEtl5NBeHZfeUQj6OXMm/+iu5cLMM=
 github.com/andybalholm/brotli v1.2.2 h1:HzTuoo2ErYQqf5qvcJInB8uvqSVxRttzkFexPWtnceM=
 github.com/andybalholm/brotli v1.2.2/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/bool64/dev v0.2.43 h1:yQ7qiZVef6WtCl2vDYU0Y+qSq+0aBrQzY8KXkklk9cQ=
@@ -366,6 +368,8 @@ github.com/yudai/gojsondiff v1.0.0/go.mod h1:AY32+k2cwILAkW1fbgxQ5mUmMiZFgLIV+FB
 github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 h1:BHyfKlQyqbsFN5p3IfnEUduWvb9is428/nNb5L3U01M=
 github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82/go.mod h1:lgjkn3NuSvDfVJdfcVVdX+jpBxNmX4rDAzaS45IcYoM=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
+github.com/yuin/gopher-lua v1.1.1 h1:kYKnWBjvbNP4XLT3+bPEwAXJx262OhaHDWDVOPjL46M=
+github.com/yuin/gopher-lua v1.1.1/go.mod h1:GBR0iDaNXjAgGg9zfCvksxSRnQx76gclCIb7kdAd1Pw=
 github.com/yusufpapurcu/wmi v1.2.4 h1:zFUKzehAFReQwLys1b/iSMl+JQGSCSjtVqQn9bBrPo0=
 github.com/yusufpapurcu/wmi v1.2.4/go.mod h1:SBZ9tNy3G9/m5Oi98Zks0QjeHVDvuK0qfxQmPyzfmi0=
 github.com/zeebo/xxh3 v1.1.0 h1:s7DLGDK45Dyfg7++yxI0khrfwq9661w9EN78eP/UZVs=
