@@ -3,7 +3,101 @@ package types
 import (
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 )
+
+func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
+	t.Parallel()
+
+	defaults := JWTPluginConfig{
+		KeyRotationInterval:    30 * 24 * time.Hour,
+		KeyRotationGracePeriod: time.Hour,
+		ExpiresIn:              15 * time.Minute,
+		RefreshExpiresIn:       7 * 24 * time.Hour,
+		JWKSCacheTTL:           24 * time.Hour,
+		RefreshGracePeriod:     10 * time.Second,
+	}
+
+	tests := []struct {
+		name   string
+		config JWTPluginConfig
+		want   JWTPluginConfig
+	}{
+		{
+			name:   "zero_config_gets_every_default",
+			config: JWTPluginConfig{},
+			want:   defaults,
+		},
+		{
+			name: "custom_values_are_preserved",
+			config: JWTPluginConfig{
+				Enabled:                true,
+				KeyRotationInterval:    48 * time.Hour,
+				KeyRotationGracePeriod: 5 * time.Minute,
+				ExpiresIn:              30 * time.Minute,
+				RefreshExpiresIn:       14 * 24 * time.Hour,
+				JWKSCacheTTL:           2 * time.Hour,
+				RefreshGracePeriod:     time.Minute,
+				Issuer:                 "https://auth.example.com",
+				Audience:               "my-service",
+			},
+			want: JWTPluginConfig{
+				Enabled:                true,
+				KeyRotationInterval:    48 * time.Hour,
+				KeyRotationGracePeriod: 5 * time.Minute,
+				ExpiresIn:              30 * time.Minute,
+				RefreshExpiresIn:       14 * 24 * time.Hour,
+				JWKSCacheTTL:           2 * time.Hour,
+				RefreshGracePeriod:     time.Minute,
+				Issuer:                 "https://auth.example.com",
+				Audience:               "my-service",
+			},
+		},
+		{
+			name: "partial_config_fills_only_missing_fields",
+			config: JWTPluginConfig{
+				ExpiresIn:    5 * time.Minute,
+				JWKSCacheTTL: time.Hour,
+			},
+			want: JWTPluginConfig{
+				KeyRotationInterval:    defaults.KeyRotationInterval,
+				KeyRotationGracePeriod: defaults.KeyRotationGracePeriod,
+				ExpiresIn:              5 * time.Minute,
+				RefreshExpiresIn:       defaults.RefreshExpiresIn,
+				JWKSCacheTTL:           time.Hour,
+				RefreshGracePeriod:     defaults.RefreshGracePeriod,
+			},
+		},
+		{
+			name: "negative_durations_are_treated_as_configured",
+			config: JWTPluginConfig{
+				ExpiresIn:          -time.Minute,
+				RefreshGracePeriod: -time.Second,
+			},
+			want: JWTPluginConfig{
+				KeyRotationInterval:    defaults.KeyRotationInterval,
+				KeyRotationGracePeriod: defaults.KeyRotationGracePeriod,
+				ExpiresIn:              -time.Minute,
+				RefreshExpiresIn:       defaults.RefreshExpiresIn,
+				JWKSCacheTTL:           defaults.JWKSCacheTTL,
+				RefreshGracePeriod:     -time.Second,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			config := tt.config
+			config.ApplyDefaults()
+
+			require.Equal(t, tt.want, config)
+		})
+	}
+}
 
 func TestJWTPluginConfig_ApplyDefaultsFromGlobal(t *testing.T) {
 	t.Parallel()
