@@ -84,24 +84,56 @@ func assertTableMissing(t *testing.T, ctx context.Context, db *bun.DB, table str
 	require.Error(t, err)
 }
 
-func TestNewManager(t *testing.T) {
-	t.Parallel()
-
-	var nilManager *migrationmanager.Manager
-	assert.Nil(t, nilManager.Migrator())
-}
-
 func TestManager_Migrator(t *testing.T) {
 	t.Parallel()
 
-	db := internaltests.NewSQLiteIntegrationDB(t)
-	migrator, err := migrationsmodule.NewMigrator(db, &internaltests.MockLogger{})
-	require.NoError(t, err)
+	tests := []struct {
+		name         string
+		withMigrator bool
+		nilReceiver  bool
+		wantNil      bool
+	}{
+		{
+			name:         "returns the migrator the manager was built with",
+			withMigrator: true,
+		},
+		{
+			name:    "returns nil when built without a migrator",
+			wantNil: true,
+		},
+		{
+			name:        "returns nil for a nil manager",
+			nilReceiver: true,
+			wantNil:     true,
+		},
+	}
 
-	manager := migrationmanager.NewManager(migrator)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.Same(t, migrator, manager.Migrator())
-	assert.Nil(t, migrationmanager.NewManager(nil).Migrator())
+			var migrator *migrationsmodule.Migrator
+			if tt.withMigrator {
+				db := internaltests.NewSQLiteIntegrationDB(t)
+				var err error
+				migrator, err = migrationsmodule.NewMigrator(db, &internaltests.MockLogger{})
+				require.NoError(t, err)
+			}
+
+			manager := migrationmanager.NewManager(migrator)
+			if tt.nilReceiver {
+				manager = nil
+			}
+
+			got := manager.Migrator()
+
+			if tt.wantNil {
+				assert.Nil(t, got)
+				return
+			}
+			assert.Same(t, migrator, got)
+		})
+	}
 }
 
 func TestManager_PlanPlugins(t *testing.T) {
@@ -302,68 +334,77 @@ func TestExceptPluginIDs(t *testing.T) {
 func TestComposeSelectors(t *testing.T) {
 	t.Parallel()
 
-	t.Run("no selectors returns nil", func(t *testing.T) {
-		t.Parallel()
-
-		assert.Nil(t, migrationmanager.ComposeSelectors())
-	})
-
-	t.Run("all nil selectors return nil", func(t *testing.T) {
-		t.Parallel()
-
-		assert.Nil(t, migrationmanager.ComposeSelectors(nil, nil))
-	})
-
-	t.Run("nil selectors are skipped", func(t *testing.T) {
-		t.Parallel()
-
-		selector := migrationmanager.ComposeSelectors(nil, migrationmanager.OnlyPluginIDs("widgets"))
-		require.NotNil(t, selector)
-		assert.True(t, selector(pluginWithID("widgets")))
-		assert.False(t, selector(pluginWithID("audit")))
-	})
-
-	t.Run("only and except selectors compose", func(t *testing.T) {
-		t.Parallel()
-
-		selector := migrationmanager.ComposeSelectors(
-			migrationmanager.OnlyPluginIDs("widgets", "audit"),
-			migrationmanager.ExceptPluginIDs("audit"),
-		)
-		require.NotNil(t, selector)
-		assert.True(t, selector(pluginWithID("widgets")))
-		assert.False(t, selector(pluginWithID("audit")))
-		assert.False(t, selector(pluginWithID("reports")))
-	})
-
-	t.Run("short-circuits when a selector rejects", func(t *testing.T) {
-		t.Parallel()
-
-		secondCalls := 0
-		selector := migrationmanager.ComposeSelectors(
-			func(models.Plugin) bool { return false },
-			func(models.Plugin) bool {
-				secondCalls++
-				return true
+	tests := []struct {
+		name      string
+		selectors []migrationmanager.PluginSelector
+		pluginIDs []string
+		wantNil   bool
+		want      []bool
+	}{
+		{
+			name:    "no selectors returns nil",
+			wantNil: true,
+		},
+		{
+			name:      "all nil selectors return nil",
+			selectors: []migrationmanager.PluginSelector{nil, nil},
+			wantNil:   true,
+		},
+		{
+			name: "nil selectors are skipped",
+			selectors: []migrationmanager.PluginSelector{
+				nil,
+				migrationmanager.OnlyPluginIDs("widgets"),
 			},
-		)
+			pluginIDs: []string{"widgets", "audit"},
+			want:      []bool{true, false},
+		},
+		{
+			name: "only and except selectors compose",
+			selectors: []migrationmanager.PluginSelector{
+				migrationmanager.OnlyPluginIDs("widgets", "audit"),
+				migrationmanager.ExceptPluginIDs("audit"),
+			},
+			pluginIDs: []string{"widgets", "audit", "reports"},
+			want:      []bool{true, false, false},
+		},
+		{
+			name: "short-circuits when a selector rejects",
+			selectors: []migrationmanager.PluginSelector{
+				func(models.Plugin) bool { return false },
+				func(models.Plugin) bool { panic("selector called after a rejection") },
+			},
+			pluginIDs: []string{"widgets"},
+			want:      []bool{false},
+		},
+		{
+			name: "all selectors must match",
+			selectors: []migrationmanager.PluginSelector{
+				func(models.Plugin) bool { return true },
+				func(models.Plugin) bool { return true },
+			},
+			pluginIDs: []string{"widgets"},
+			want:      []bool{true},
+		},
+	}
 
-		require.NotNil(t, selector)
-		assert.False(t, selector(pluginWithID("widgets")))
-		assert.Zero(t, secondCalls)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("all selectors must match", func(t *testing.T) {
-		t.Parallel()
+			selector := migrationmanager.ComposeSelectors(tt.selectors...)
 
-		selector := migrationmanager.ComposeSelectors(
-			func(models.Plugin) bool { return true },
-			func(models.Plugin) bool { return true },
-		)
+			if tt.wantNil {
+				assert.Nil(t, selector)
+				return
+			}
 
-		require.NotNil(t, selector)
-		assert.True(t, selector(pluginWithID("widgets")))
-	})
+			require.NotNil(t, selector)
+			for i, pluginID := range tt.pluginIDs {
+				assert.Equal(t, tt.want[i], selector(pluginWithID(pluginID)), "plugin %q", pluginID)
+			}
+		})
+	}
 }
 
 func TestManager_RequiresMigrator(t *testing.T) {
@@ -427,14 +468,44 @@ func TestManager_RunCoreAndDropCoreSQLite(t *testing.T) {
 	err = manager.DropCore(ctx, "sqlite")
 	require.NoError(t, err)
 	assertTableMissing(t, ctx, db, "users")
+}
 
-	err = manager.RunCore(ctx, "oracle")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported database provider")
+func TestManager_CoreMigrationsRejectUnsupportedProvider(t *testing.T) {
+	t.Parallel()
 
-	err = manager.DropCore(ctx, "oracle")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported database provider")
+	tests := []struct {
+		name string
+		call func(ctx context.Context, manager *migrationmanager.Manager) error
+	}{
+		{
+			name: "RunCore",
+			call: func(ctx context.Context, manager *migrationmanager.Manager) error {
+				return manager.RunCore(ctx, "oracle")
+			},
+		},
+		{
+			name: "DropCore",
+			call: func(ctx context.Context, manager *migrationmanager.Manager) error {
+				return manager.DropCore(ctx, "oracle")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := internaltests.NewSQLiteIntegrationDB(t)
+			migrator, err := migrationsmodule.NewMigrator(db, &internaltests.MockLogger{})
+			require.NoError(t, err)
+			manager := migrationmanager.NewManager(migrator)
+
+			err = tt.call(context.Background(), manager)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "unsupported database provider")
+		})
+	}
 }
 
 func TestManager_RunPluginsSQLite(t *testing.T) {
