@@ -766,3 +766,569 @@ func TestApiKeyServiceVerify(t *testing.T) {
 		})
 	}
 }
+
+func TestApiKeyServiceDeleteExpired(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		setup   func(*apiKeyServiceFixture)
+		wantErr error
+	}{
+		{
+			name: "success",
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("DeleteExpired", mock.Anything).Return(nil).Once()
+			},
+		},
+		{
+			name: "repository_error",
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("DeleteExpired", mock.Anything).Return(errors.New("boom")).Once()
+			},
+			wantErr: errors.New("boom"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newApiKeyServiceFixture(types.ApiKeyPluginConfig{})
+			tc.setup(fixture)
+
+			err := fixture.mockApiKeyService.DeleteExpired(context.Background())
+
+			if tc.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tc.wantErr.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			fixture.mockApiKeyRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestApiKeyServiceRecordLastRequest(t *testing.T) {
+	t.Parallel()
+
+	timestamp := time.Date(2030, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name        string
+		setup       func(*apiKeyServiceFixture)
+		wantErr     error
+		wantNil     bool
+		wantUpdated bool
+	}{
+		{
+			name: "success",
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1"}, nil).Once()
+				f.mockApiKeyRepo.On("Update", mock.Anything, mock.MatchedBy(func(apiKey *types.ApiKey) bool {
+					return apiKey != nil && apiKey.LastRequestedAt != nil && apiKey.LastRequestedAt.Equal(timestamp)
+				})).Return(&types.ApiKey{ID: "api-key-1", LastRequestedAt: &timestamp}, nil).Once()
+			},
+			wantUpdated: true,
+		},
+		{
+			name: "not_found",
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), nil).Once()
+			},
+			wantErr: coreerrors.ErrNotFound,
+			wantNil: true,
+		},
+		{
+			name: "lookup_error",
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), errors.New("boom")).Once()
+			},
+			wantErr: errors.New("boom"),
+			wantNil: true,
+		},
+		{
+			name: "update_error",
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1"}, nil).Once()
+				f.mockApiKeyRepo.On("Update", mock.Anything, mock.Anything).Return(nil, errors.New("boom")).Once()
+			},
+			wantErr: errors.New("boom"),
+			wantNil: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newApiKeyServiceFixture(types.ApiKeyPluginConfig{})
+			tc.setup(fixture)
+
+			apiKey, err := fixture.mockApiKeyService.RecordLastRequest(context.Background(), "api-key-1", timestamp)
+
+			if tc.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tc.wantErr.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			if tc.wantNil {
+				assert.Nil(t, apiKey)
+			} else {
+				require.NotNil(t, apiKey)
+			}
+			if tc.wantUpdated {
+				require.NotNil(t, apiKey.LastRequestedAt)
+				assert.Equal(t, timestamp, *apiKey.LastRequestedAt)
+			}
+			fixture.mockApiKeyRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestApiKeyServiceValidatePermissionKeys(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		permissions []string
+		setup       func(*apiKeyServiceFixture)
+		wantErr     error
+	}{
+		{
+			name:        "empty_permissions_skip_validation",
+			permissions: nil,
+		},
+		{
+			name:        "valid_permissions",
+			permissions: []string{"read"},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockAccessControlService.On("ValidatePermissionKeys", mock.Anything, []string{"read"}).Return(nil).Once()
+			},
+		},
+		{
+			name:        "not_found_is_mapped",
+			permissions: []string{"missing"},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockAccessControlService.On("ValidatePermissionKeys", mock.Anything, []string{"missing"}).Return(coreerrors.ErrNotFound).Once()
+			},
+			wantErr: coreerrors.ErrNotFound,
+		},
+		{
+			name:        "other_error_propagated",
+			permissions: []string{"read"},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockAccessControlService.On("ValidatePermissionKeys", mock.Anything, []string{"read"}).Return(errors.New("boom")).Once()
+			},
+			wantErr: errors.New("boom"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newApiKeyServiceFixture(types.ApiKeyPluginConfig{})
+			if tc.setup != nil {
+				tc.setup(fixture)
+			}
+
+			err := fixture.mockApiKeyService.ValidatePermissionKeys(context.Background(), tc.permissions)
+
+			if tc.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tc.wantErr.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			fixture.mockAccessControlService.AssertExpectations(t)
+		})
+	}
+}
+
+func TestApiKeyServiceDelete_RateLimitAndRepositoryErrors(t *testing.T) {
+	t.Parallel()
+
+	userID := "user-1"
+
+	tests := []struct {
+		name            string
+		rateLimitEnable bool
+		removeLimiter   bool
+		setup           func(*apiKeyServiceFixture)
+		wantErr         error
+	}{
+		{
+			name:            "rate_limit_delete_rule_error_aborts",
+			rateLimitEnable: true,
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID, KeyHash: "hash", RateLimitEnabled: true}, nil).Once()
+				f.mockRateLimiterService.On("DeleteRule", mock.Anything, "hash").Return(errors.New("boom")).Once()
+			},
+			wantErr: errors.New("boom"),
+		},
+		{
+			name:            "rate_limit_delete_rule_success",
+			rateLimitEnable: true,
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID, KeyHash: "hash", RateLimitEnabled: true}, nil).Once()
+				f.mockRateLimiterService.On("DeleteRule", mock.Anything, "hash").Return(nil).Once()
+				f.mockApiKeyRepo.On("Delete", mock.Anything, "api-key-1").Return(nil).Once()
+			},
+		},
+		{
+			name:            "nil_rate_limiter_skips_rule_cleanup",
+			rateLimitEnable: true,
+			removeLimiter:   true,
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID, KeyHash: "hash", RateLimitEnabled: true}, nil).Once()
+				f.mockApiKeyRepo.On("Delete", mock.Anything, "api-key-1").Return(nil).Once()
+			},
+		},
+		{
+			name: "lookup_repository_error",
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return((*types.ApiKey)(nil), errors.New("boom")).Once()
+			},
+			wantErr: errors.New("boom"),
+		},
+		{
+			name: "repository_delete_error",
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID}, nil).Once()
+				f.mockApiKeyRepo.On("Delete", mock.Anything, "api-key-1").Return(errors.New("boom")).Once()
+			},
+			wantErr: errors.New("boom"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newApiKeyServiceFixture(types.ApiKeyPluginConfig{})
+			if tc.removeLimiter {
+				fixture.mockApiKeyService.rateLimiterService = nil
+			}
+			tc.setup(fixture)
+
+			err := fixture.mockApiKeyService.Delete(context.Background(), userActor(userID), "api-key-1")
+
+			if tc.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tc.wantErr.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			fixture.mockApiKeyRepo.AssertExpectations(t)
+			fixture.mockRateLimiterService.AssertExpectations(t)
+		})
+	}
+}
+
+func TestApiKeyServiceUpdate_RateLimitAndRepositoryErrors(t *testing.T) {
+	t.Parallel()
+
+	userID := "user-1"
+	window := 60
+	maxRequests := 30
+	lastRequestedAt := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
+	expiresAt := time.Date(2031, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name          string
+		req           types.UpdateApiKeyData
+		removeLimiter bool
+		setup         func(*apiKeyServiceFixture)
+		wantErr       error
+	}{
+		{
+			name: "enable_rate_limit_stores_rule",
+			req:  types.UpdateApiKeyData{RateLimitEnabled: new(true), RateLimitTimeWindow: &window, RateLimitMaxRequests: &maxRequests},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID, KeyHash: "hash"}, nil).Once()
+				f.mockRateLimiterService.On("SetRule", mock.Anything, "hash", time.Minute, maxRequests).Return(nil).Once()
+				f.mockApiKeyRepo.On("Update", mock.Anything, mock.MatchedBy(func(apiKey *types.ApiKey) bool {
+					return apiKey != nil && apiKey.RateLimitEnabled
+				})).Return(&types.ApiKey{ID: "api-key-1"}, nil).Once()
+			},
+		},
+		{
+			name: "enabled_without_window_skips_rule",
+			req:  types.UpdateApiKeyData{RateLimitEnabled: new(true)},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID, KeyHash: "hash"}, nil).Once()
+				f.mockApiKeyRepo.On("Update", mock.Anything, mock.Anything).Return(&types.ApiKey{ID: "api-key-1"}, nil).Once()
+			},
+		},
+		{
+			name: "disable_rate_limit_deletes_rule",
+			req:  types.UpdateApiKeyData{RateLimitEnabled: new(false)},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID, KeyHash: "hash", RateLimitEnabled: true}, nil).Once()
+				f.mockRateLimiterService.On("DeleteRule", mock.Anything, "hash").Return(nil).Once()
+				f.mockApiKeyRepo.On("Update", mock.Anything, mock.Anything).Return(&types.ApiKey{ID: "api-key-1"}, nil).Once()
+			},
+		},
+		{
+			name: "set_rule_error_aborts",
+			req:  types.UpdateApiKeyData{RateLimitEnabled: new(true), RateLimitTimeWindow: &window, RateLimitMaxRequests: &maxRequests},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID, KeyHash: "hash"}, nil).Once()
+				f.mockRateLimiterService.On("SetRule", mock.Anything, "hash", time.Minute, maxRequests).Return(errors.New("boom")).Once()
+			},
+			wantErr: errors.New("boom"),
+		},
+		{
+			name: "delete_rule_error_aborts",
+			req:  types.UpdateApiKeyData{RateLimitEnabled: new(false)},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID, KeyHash: "hash", RateLimitEnabled: true}, nil).Once()
+				f.mockRateLimiterService.On("DeleteRule", mock.Anything, "hash").Return(errors.New("boom")).Once()
+			},
+			wantErr: errors.New("boom"),
+		},
+		{
+			name:          "nil_rate_limiter_skips_rule_management",
+			req:           types.UpdateApiKeyData{RateLimitEnabled: new(true), RateLimitTimeWindow: &window, RateLimitMaxRequests: &maxRequests},
+			removeLimiter: true,
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID, KeyHash: "hash"}, nil).Once()
+				f.mockApiKeyRepo.On("Update", mock.Anything, mock.Anything).Return(&types.ApiKey{ID: "api-key-1"}, nil).Once()
+			},
+		},
+		{
+			name: "timestamps_are_applied",
+			req:  types.UpdateApiKeyData{LastRequestedAt: &lastRequestedAt, ExpiresAt: &expiresAt},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID}, nil).Once()
+				f.mockApiKeyRepo.On("Update", mock.Anything, mock.MatchedBy(func(apiKey *types.ApiKey) bool {
+					return apiKey != nil && apiKey.LastRequestedAt != nil && apiKey.LastRequestedAt.Equal(lastRequestedAt) && apiKey.ExpiresAt != nil && apiKey.ExpiresAt.Equal(expiresAt)
+				})).Return(&types.ApiKey{ID: "api-key-1"}, nil).Once()
+			},
+		},
+		{
+			name: "repository_update_error",
+			req:  types.UpdateApiKeyData{},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeUser, OwnerID: userID}, nil).Once()
+				f.mockApiKeyRepo.On("Update", mock.Anything, mock.Anything).Return(nil, errors.New("boom")).Once()
+			},
+			wantErr: errors.New("boom"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newApiKeyServiceFixture(types.ApiKeyPluginConfig{})
+			if tc.removeLimiter {
+				fixture.mockApiKeyService.rateLimiterService = nil
+			}
+			tc.setup(fixture)
+
+			apiKey, err := fixture.mockApiKeyService.Update(context.Background(), userActor(userID), "api-key-1", tc.req)
+
+			if tc.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tc.wantErr.Error())
+				assert.Nil(t, apiKey)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, apiKey)
+			}
+			fixture.mockApiKeyRepo.AssertExpectations(t)
+			fixture.mockRateLimiterService.AssertExpectations(t)
+		})
+	}
+}
+
+func TestApiKeyServiceCreate_RateLimitAndRepositoryPaths(t *testing.T) {
+	t.Parallel()
+
+	userID := "user-1"
+	rawApiKey := "abcdefghij"
+	window := 60
+	maxRequests := 10
+	rateLimitEnabled := true
+
+	tests := []struct {
+		name          string
+		req           types.CreateApiKeyRequest
+		config        types.ApiKeyPluginConfig
+		removeLimiter bool
+		setup         func(*apiKeyServiceFixture)
+		wantErr       error
+		wantRawKey    string
+	}{
+		{
+			name:   "set_rule_error_aborts",
+			config: types.ApiKeyPluginConfig{DefaultPrefix: "ak_"},
+			req:    types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeUser, OwnerID: userID, RateLimitEnabled: &rateLimitEnabled, RateLimitTimeWindow: &window, RateLimitMaxRequests: &maxRequests},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockUserService.On("GetByID", mock.Anything, userID).Return(&models.User{ID: userID}, nil).Once()
+				f.mockTokenService.On("Generate").Return(rawApiKey, nil).Once()
+				f.mockTokenService.On("Hash", "ak_"+rawApiKey).Return("hashed-key").Once()
+				f.mockApiKeyRepo.On("Create", mock.Anything, mock.Anything).Return(&types.ApiKey{ID: "api-key-1", KeyHash: "hashed-key"}, nil).Once()
+				f.mockRateLimiterService.On("SetRule", mock.Anything, "hashed-key", time.Minute, maxRequests).Return(errors.New("boom")).Once()
+			},
+			wantErr: errors.New("boom"),
+		},
+		{
+			name:          "nil_rate_limiter_skips_set_rule",
+			config:        types.ApiKeyPluginConfig{DefaultPrefix: "ak_"},
+			req:           types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeUser, OwnerID: userID, RateLimitEnabled: &rateLimitEnabled, RateLimitTimeWindow: &window, RateLimitMaxRequests: &maxRequests},
+			removeLimiter: true,
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockUserService.On("GetByID", mock.Anything, userID).Return(&models.User{ID: userID}, nil).Once()
+				f.mockTokenService.On("Generate").Return(rawApiKey, nil).Once()
+				f.mockTokenService.On("Hash", "ak_"+rawApiKey).Return("hashed-key").Once()
+				f.mockApiKeyRepo.On("Create", mock.Anything, mock.Anything).Return(&types.ApiKey{ID: "api-key-1", KeyHash: "hashed-key"}, nil).Once()
+			},
+			wantRawKey: "ak_" + rawApiKey,
+		},
+		{
+			name:   "repository_create_error",
+			config: types.ApiKeyPluginConfig{DefaultPrefix: "ak_"},
+			req:    types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeUser, OwnerID: userID},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockUserService.On("GetByID", mock.Anything, userID).Return(&models.User{ID: userID}, nil).Once()
+				f.mockTokenService.On("Generate").Return(rawApiKey, nil).Once()
+				f.mockTokenService.On("Hash", "ak_"+rawApiKey).Return("hashed-key").Once()
+				f.mockApiKeyRepo.On("Create", mock.Anything, mock.Anything).Return(nil, errors.New("boom")).Once()
+			},
+			wantErr: errors.New("boom"),
+		},
+		{
+			name:   "short_raw_key_has_empty_start_and_last",
+			config: types.ApiKeyPluginConfig{},
+			req:    types.CreateApiKeyRequest{Name: "Key", OwnerType: types.OwnerTypeUser, OwnerID: userID},
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockUserService.On("GetByID", mock.Anything, userID).Return(&models.User{ID: userID}, nil).Once()
+				f.mockTokenService.On("Generate").Return("abc", nil).Once()
+				f.mockTokenService.On("Hash", "abc").Return("hashed-key").Once()
+				f.mockApiKeyRepo.On("Create", mock.Anything, mock.MatchedBy(func(apiKey *types.ApiKey) bool {
+					return apiKey != nil && apiKey.Start == "" && apiKey.Last == "" && apiKey.Prefix != nil && *apiKey.Prefix == ""
+				})).Return(&types.ApiKey{ID: "api-key-1", KeyHash: "hashed-key"}, nil).Once()
+			},
+			wantRawKey: "abc",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newApiKeyServiceFixture(tc.config)
+			if tc.removeLimiter {
+				fixture.mockApiKeyService.rateLimiterService = nil
+			}
+			tc.setup(fixture)
+
+			resp, err := fixture.mockApiKeyService.Create(context.Background(), userActor(userID), tc.req)
+
+			if tc.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tc.wantErr.Error())
+				assert.Nil(t, resp)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, resp)
+				assert.Equal(t, tc.wantRawKey, resp.RawApiKey)
+			}
+			fixture.mockUserService.AssertExpectations(t)
+			fixture.mockTokenService.AssertExpectations(t)
+			fixture.mockRateLimiterService.AssertExpectations(t)
+			fixture.mockApiKeyRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestApiKeyService_AuthorizationEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		actor   *models.Actor
+		setup   func(*apiKeyServiceFixture)
+		call    func(*apiKeyService, *models.Actor) error
+		wantErr error
+	}{
+		{
+			name:  "org_key_with_nil_actor_is_unauthorized",
+			actor: nil,
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeOrganization, OwnerID: "org-1"}, nil).Once()
+			},
+			call: func(s *apiKeyService, actor *models.Actor) error {
+				_, err := s.GetByID(context.Background(), actor, "api-key-1")
+				return err
+			},
+			wantErr: coreerrors.ErrUnauthorized,
+		},
+		{
+			name:  "org_key_without_organization_service_is_unprocessable",
+			actor: userActor("user-1"),
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyService.organizationService = nil
+				f.mockApiKeyRepo.On("GetByID", mock.Anything, "api-key-1").Return(&types.ApiKey{ID: "api-key-1", OwnerType: types.OwnerTypeOrganization, OwnerID: "org-1"}, nil).Once()
+			},
+			call: func(s *apiKeyService, actor *models.Actor) error {
+				_, err := s.GetByID(context.Background(), actor, "api-key-1")
+				return err
+			},
+			wantErr: coreerrors.ErrUnprocessableEntity,
+		},
+		{
+			name:  "delete_all_by_owner_unknown_type_still_delegates",
+			actor: userActor("user-1"),
+			setup: func(f *apiKeyServiceFixture) {
+				f.mockApiKeyRepo.On("DeleteAllByOwner", mock.Anything, "service", "svc-1").Return(nil).Once()
+			},
+			call: func(s *apiKeyService, actor *models.Actor) error {
+				return s.DeleteAllByOwner(context.Background(), actor, "service", "svc-1")
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newApiKeyServiceFixture(types.ApiKeyPluginConfig{})
+			tc.setup(fixture)
+
+			err := tc.call(fixture.mockApiKeyService, tc.actor)
+
+			if tc.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tc.wantErr.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			fixture.mockApiKeyRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestHasPermission(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		scopes   []string
+		required string
+		want     bool
+	}{
+		{name: "exact_match", scopes: []string{"read"}, required: "read", want: true},
+		{name: "wildcard_all", scopes: []string{"*"}, required: "anything", want: true},
+		{name: "prefix_wildcard_match", scopes: []string{"org:api-key:*"}, required: "org:api-key:read", want: true},
+		{name: "prefix_wildcard_without_prefix_match", scopes: []string{"users:*"}, required: "org:api-key:read", want: false},
+		{name: "no_match", scopes: []string{"read"}, required: "write", want: false},
+		{name: "empty_scopes", scopes: nil, required: "read", want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.want, hasPermission(tc.scopes, tc.required))
+		})
+	}
+}
