@@ -163,111 +163,132 @@ func newPluginInitContext(t *testing.T, includeUser, includeMailer bool, accessC
 func TestPlugin_Init(t *testing.T) {
 	t.Parallel()
 
-	t.Run("wires every dependency and registers the lookup service", func(t *testing.T) {
-		t.Parallel()
+	wiredAccessControl := orgtests.NewAccessControlServiceStub()
+	failingAccessControl := orgtests.NewAccessControlServiceStub()
+	failingAccessControl.Err = context.DeadlineExceeded
 
-		accessControl := orgtests.NewAccessControlServiceStub()
-		ctx, serviceRegistry, logger := newPluginInitContext(t, true, true, accessControl, nil)
-		plugin := New(types.OrganizationsPluginConfig{Enabled: true})
+	tests := []struct {
+		name          string
+		includeUser   bool
+		includeMailer bool
+		accessControl *orgtests.AccessControlServiceStub
+		config        *models.Config
+		assert        func(t *testing.T, plugin *OrganizationsPlugin, serviceRegistry models.ServiceRegistry, logger *internaltests.LevelRecordingLogger, err error)
+	}{
+		{
+			name:          "wires every dependency and registers the lookup service",
+			includeUser:   true,
+			includeMailer: true,
+			accessControl: wiredAccessControl,
+			assert: func(t *testing.T, plugin *OrganizationsPlugin, serviceRegistry models.ServiceRegistry, logger *internaltests.LevelRecordingLogger, err error) {
+				t.Helper()
+				require.NoError(t, err)
 
-		require.NoError(t, plugin.Init(ctx))
+				require.NotNil(t, plugin.Api)
+				require.NotNil(t, plugin.useCases)
+				require.NotNil(t, plugin.hooksExecutor)
+				require.NotNil(t, plugin.emailTemplateManager)
+				require.NotNil(t, plugin.organizationService)
+				require.NotNil(t, plugin.invitationService)
+				require.NotNil(t, plugin.memberService)
+				require.NotNil(t, plugin.teamService)
+				require.NotNil(t, plugin.teamMemberService)
+				require.Equal(t, wiredAccessControl, plugin.accessControlService)
 
-		require.NotNil(t, plugin.Api)
-		require.NotNil(t, plugin.useCases)
-		require.NotNil(t, plugin.hooksExecutor)
-		require.NotNil(t, plugin.emailTemplateManager)
-		require.NotNil(t, plugin.organizationService)
-		require.NotNil(t, plugin.invitationService)
-		require.NotNil(t, plugin.memberService)
-		require.NotNil(t, plugin.teamService)
-		require.NotNil(t, plugin.teamMemberService)
-		require.Equal(t, accessControl, plugin.accessControlService)
+				lookup, ok := serviceRegistry.Get(models.ServiceOrganization.String()).(OrganizationLookupService)
+				require.True(t, ok)
+				exists, lookupErr := lookup.ExistsByID(context.Background(), "missing-org")
+				require.NoError(t, lookupErr)
+				require.False(t, exists)
 
-		lookup, ok := serviceRegistry.Get(models.ServiceOrganization.String()).(OrganizationLookupService)
-		require.True(t, ok)
-		exists, err := lookup.ExistsByID(context.Background(), "missing-org")
-		require.NoError(t, err)
-		require.False(t, exists)
+				require.Empty(t, logger.Records())
+			},
+		},
+		{
+			name:          "missing mailer only logs a warning",
+			includeUser:   true,
+			accessControl: orgtests.NewAccessControlServiceStub(),
+			assert: func(t *testing.T, plugin *OrganizationsPlugin, serviceRegistry models.ServiceRegistry, logger *internaltests.LevelRecordingLogger, err error) {
+				t.Helper()
+				require.NoError(t, err)
+				require.NotNil(t, plugin.Api)
 
-		require.Empty(t, logger.Records())
-	})
+				records := logger.Records()
+				require.Len(t, records, 1)
+				require.Equal(t, "warn", records[0].Level)
+				require.Contains(t, records[0].Message, "mailer service not available")
 
-	t.Run("missing mailer only logs a warning", func(t *testing.T) {
-		t.Parallel()
-
-		ctx, serviceRegistry, logger := newPluginInitContext(t, true, false, orgtests.NewAccessControlServiceStub(), nil)
-		plugin := New(types.OrganizationsPluginConfig{})
-
-		require.NoError(t, plugin.Init(ctx))
-		require.NotNil(t, plugin.Api)
-
-		records := logger.Records()
-		require.Len(t, records, 1)
-		require.Equal(t, "warn", records[0].Level)
-		require.Contains(t, records[0].Message, "mailer service not available")
-
-		_, registered := serviceRegistry.Get(models.ServiceOrganization.String()).(OrganizationLookupService)
-		require.True(t, registered)
-	})
-
-	t.Run("fails without a user service", func(t *testing.T) {
-		t.Parallel()
-
-		ctx, _, _ := newPluginInitContext(t, false, false, orgtests.NewAccessControlServiceStub(), nil)
-		plugin := New(types.OrganizationsPluginConfig{})
-
-		err := plugin.Init(ctx)
-		require.EqualError(t, err, "user service not available in service registry")
-	})
-
-	t.Run("fails without an access control service", func(t *testing.T) {
-		t.Parallel()
-
-		ctx, _, _ := newPluginInitContext(t, true, false, nil, nil)
-		plugin := New(types.OrganizationsPluginConfig{})
-
-		err := plugin.Init(ctx)
-		require.EqualError(t, err, "access control service not available in service registry")
-	})
-
-	t.Run("fails when permissions cannot be ensured", func(t *testing.T) {
-		t.Parallel()
-
-		accessControl := orgtests.NewAccessControlServiceStub()
-		accessControl.Err = context.DeadlineExceeded
-		ctx, _, _ := newPluginInitContext(t, true, false, accessControl, nil)
-		plugin := New(types.OrganizationsPluginConfig{})
-
-		err := plugin.Init(ctx)
-		require.ErrorIs(t, err, context.DeadlineExceeded)
-		require.ErrorContains(t, err, "failed to ensure organization permissions")
-	})
-
-	t.Run("loads a pre-parsed plugin config", func(t *testing.T) {
-		t.Parallel()
-
-		config := &models.Config{
-			BaseURL:  "https://example.com",
-			BasePath: "/auth",
-			Plugins:  models.PluginsConfig{},
-			PreParsedConfigs: map[string]any{
-				models.PluginOrganizations.String(): types.OrganizationsPluginConfig{
-					Enabled:             true,
-					MembersLimit:        new(11),
-					MaxPageLimit:        new(33),
-					InvitationExpiresIn: time.Hour,
+				_, registered := serviceRegistry.Get(models.ServiceOrganization.String()).(OrganizationLookupService)
+				require.True(t, registered)
+			},
+		},
+		{
+			name:          "fails without a user service",
+			accessControl: orgtests.NewAccessControlServiceStub(),
+			assert: func(t *testing.T, _ *OrganizationsPlugin, _ models.ServiceRegistry, _ *internaltests.LevelRecordingLogger, err error) {
+				t.Helper()
+				require.EqualError(t, err, "user service not available in service registry")
+			},
+		},
+		{
+			name:        "fails without an access control service",
+			includeUser: true,
+			assert: func(t *testing.T, _ *OrganizationsPlugin, _ models.ServiceRegistry, _ *internaltests.LevelRecordingLogger, err error) {
+				t.Helper()
+				require.EqualError(t, err, "access control service not available in service registry")
+			},
+		},
+		{
+			name:          "fails when permissions cannot be ensured",
+			includeUser:   true,
+			accessControl: failingAccessControl,
+			assert: func(t *testing.T, _ *OrganizationsPlugin, _ models.ServiceRegistry, _ *internaltests.LevelRecordingLogger, err error) {
+				t.Helper()
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				require.ErrorContains(t, err, "failed to ensure organization permissions")
+			},
+		},
+		{
+			name:          "loads a pre-parsed plugin config",
+			includeUser:   true,
+			includeMailer: true,
+			accessControl: orgtests.NewAccessControlServiceStub(),
+			config: &models.Config{
+				BaseURL:  "https://example.com",
+				BasePath: "/auth",
+				Plugins:  models.PluginsConfig{},
+				PreParsedConfigs: map[string]any{
+					models.PluginOrganizations.String(): types.OrganizationsPluginConfig{
+						Enabled:             true,
+						MembersLimit:        new(11),
+						MaxPageLimit:        new(33),
+						InvitationExpiresIn: time.Hour,
+					},
 				},
 			},
-		}
-		ctx, _, _ := newPluginInitContext(t, true, true, orgtests.NewAccessControlServiceStub(), config)
-		plugin := New(types.OrganizationsPluginConfig{})
+			assert: func(t *testing.T, plugin *OrganizationsPlugin, _ models.ServiceRegistry, _ *internaltests.LevelRecordingLogger, err error) {
+				t.Helper()
+				require.NoError(t, err)
+				require.True(t, plugin.pluginConfig.Enabled)
+				require.Equal(t, 11, *plugin.pluginConfig.MembersLimit)
+				require.Equal(t, 33, *plugin.pluginConfig.MaxPageLimit)
+				require.Equal(t, time.Hour, plugin.pluginConfig.InvitationExpiresIn)
+			},
+		},
+	}
 
-		require.NoError(t, plugin.Init(ctx))
-		require.True(t, plugin.pluginConfig.Enabled)
-		require.Equal(t, 11, *plugin.pluginConfig.MembersLimit)
-		require.Equal(t, 33, *plugin.pluginConfig.MaxPageLimit)
-		require.Equal(t, time.Hour, plugin.pluginConfig.InvitationExpiresIn)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, serviceRegistry, logger := newPluginInitContext(t, tt.includeUser, tt.includeMailer, tt.accessControl, tt.config)
+			plugin := New(types.OrganizationsPluginConfig{})
+
+			err := plugin.Init(ctx)
+
+			tt.assert(t, plugin, serviceRegistry, logger, err)
+		})
+	}
 }
 
 func TestBuildAPI_WiresServices(t *testing.T) {

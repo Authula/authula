@@ -429,31 +429,42 @@ func TestAPI_GetInvitation(t *testing.T) {
 	ctx := context.Background()
 	actor := orgtests.Actor("user-1")
 
-	t.Run("invitation from another organization is not found", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name            string
+		invitationOrgID string
+		wantErr         error
+	}{
+		{
+			name:            "invitation from another organization is not found",
+			invitationOrgID: "org-2",
+			wantErr:         coreerrors.ErrNotFound,
+		},
+		{
+			name:            "invitation in the requested organization is returned",
+			invitationOrgID: "org-1",
+		},
+	}
 
-		fixture := newAPIFixture()
-		fixture.invSvc.On("GetOrganizationInvitationByIDWithOrg", mock.Anything, "inv-1").
-			Return(&types.GetOrganizationInvitationResponse{Invitation: &types.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-2"}}, nil).Once()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		got, err := fixture.api.GetInvitation(ctx, actor, "org-1", "inv-1")
-		require.ErrorIs(t, err, coreerrors.ErrNotFound)
-		require.Nil(t, got)
-		fixture.assertExpectations(t)
-	})
+			response := &types.GetOrganizationInvitationResponse{Invitation: &types.OrganizationInvitation{ID: "inv-1", OrganizationID: tt.invitationOrgID}}
+			fixture := newAPIFixture()
+			fixture.invSvc.On("GetOrganizationInvitationByIDWithOrg", mock.Anything, "inv-1").Return(response, nil).Once()
 
-	t.Run("invitation in the requested organization is returned", func(t *testing.T) {
-		t.Parallel()
+			got, err := fixture.api.GetInvitation(ctx, actor, "org-1", "inv-1")
 
-		response := &types.GetOrganizationInvitationResponse{Invitation: &types.OrganizationInvitation{ID: "inv-1", OrganizationID: "org-1"}}
-		fixture := newAPIFixture()
-		fixture.invSvc.On("GetOrganizationInvitationByIDWithOrg", mock.Anything, "inv-1").Return(response, nil).Once()
-
-		got, err := fixture.api.GetInvitation(ctx, actor, "org-1", "inv-1")
-		require.NoError(t, err)
-		require.Equal(t, response, got)
-		fixture.assertExpectations(t)
-	})
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				require.Nil(t, got)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, response, got)
+			}
+			fixture.assertExpectations(t)
+		})
+	}
 }
 
 func TestAPI_GetUserPermissionsInOrganizationRoleLookupError(t *testing.T) {
