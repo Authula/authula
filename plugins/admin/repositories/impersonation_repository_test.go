@@ -5,9 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 
-	"github.com/Authula/authula/internal/tests"
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/repositories"
 	"github.com/Authula/authula/plugins/admin/types"
@@ -15,7 +17,7 @@ import (
 
 func setupImpersonationRepo(t *testing.T) (*repositories.BunImpersonationRepository, *bun.DB, func()) {
 	t.Helper()
-	db, _ := tests.NewIntegrationTestDBFromEnv(t)
+	db, _ := internaltests.NewIntegrationTestDBFromEnv(t)
 
 	ctx := context.Background()
 	if _, err := db.NewCreateTable().Model((*types.Impersonation)(nil)).IfNotExists().Exec(ctx); err != nil {
@@ -381,4 +383,58 @@ func TestBunImpersonationRepository_UserExists(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBunImpersonationRepository_GetLatestActive_NotFound(t *testing.T) {
+	t.Parallel()
+
+	db := internaltests.NewSQLiteIntegrationDB(t)
+	ctx := context.Background()
+	_, err := db.NewCreateTable().Model((*types.Impersonation)(nil)).IfNotExists().Exec(ctx)
+	require.NoError(t, err)
+
+	repo := repositories.NewBunImpersonationRepository(db)
+
+	got, err := repo.GetLatestActiveImpersonationByActor(ctx, "missing")
+	require.NoError(t, err)
+	assert.Nil(t, got)
+}
+
+func TestBunImpersonationRepository_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	db := internaltests.NewSQLiteIntegrationDB(t)
+	repo := repositories.NewBunImpersonationRepository(db)
+	ctx := context.Background()
+
+	assert.Error(t, repo.CreateImpersonation(ctx, &types.Impersonation{
+		ID:           "imp-1",
+		ActorUserID:  "actor",
+		TargetUserID: "target",
+		Reason:       "reason",
+		StartedAt:    time.Now().UTC(),
+		ExpiresAt:    time.Now().UTC().Add(time.Hour),
+	}))
+
+	all, err := repo.GetAllImpersonations(ctx)
+	assert.Error(t, err)
+	assert.Nil(t, all)
+
+	byID, err := repo.GetImpersonationByID(ctx, "imp-1")
+	assert.Error(t, err)
+	assert.Nil(t, byID)
+
+	active, err := repo.GetActiveImpersonationByID(ctx, "imp-1")
+	assert.Error(t, err)
+	assert.Nil(t, active)
+
+	latest, err := repo.GetLatestActiveImpersonationByActor(ctx, "actor")
+	assert.Error(t, err)
+	assert.Nil(t, latest)
+
+	assert.Error(t, repo.EndImpersonation(ctx, "imp-1", new("actor")))
+
+	exists, err := repo.UserExists(ctx, "actor")
+	assert.Error(t, err)
+	assert.False(t, exists)
 }

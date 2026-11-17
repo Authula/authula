@@ -4,12 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
 	_ "modernc.org/sqlite"
 
 	"github.com/Authula/authula/internal/sqlitedsn"
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/plugins/admin/repositories"
 	"github.com/Authula/authula/plugins/admin/types"
 )
@@ -34,6 +38,47 @@ func setupRepo(t *testing.T) (*repositories.BunUserStateRepository, func()) {
 		_ = sqldb.Close()
 	}
 	return repo, cleanup
+}
+
+func TestBunUserStateRepository_CreateAndUpdate(t *testing.T) {
+	t.Parallel()
+
+	db := internaltests.NewSQLiteIntegrationDB(t)
+	ctx := context.Background()
+	_, err := db.NewCreateTable().Model((*types.AdminUserState)(nil)).IfNotExists().Exec(ctx)
+	require.NoError(t, err)
+
+	repo := repositories.NewBunUserStateRepository(db)
+
+	state := &types.AdminUserState{UserID: "u1", Banned: false}
+	require.NoError(t, repo.Create(ctx, state))
+
+	got, err := repo.GetByUserID(ctx, "u1")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.False(t, got.Banned)
+
+	// Creating the same primary key again must surface the conflict as an error.
+	require.Error(t, repo.Create(ctx, &types.AdminUserState{UserID: "u1"}))
+
+	bannedAt := time.Now().UTC()
+	bannedUntil := bannedAt.Add(time.Hour)
+	require.NoError(t, repo.Update(ctx, &types.AdminUserState{
+		UserID:       "u1",
+		Banned:       true,
+		BannedAt:     &bannedAt,
+		BannedUntil:  &bannedUntil,
+		BannedReason: new("reason"),
+	}))
+
+	got, err = repo.GetByUserID(ctx, "u1")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.True(t, got.Banned)
+	require.NotNil(t, got.BannedReason)
+	assert.Equal(t, "reason", *got.BannedReason)
+	require.NotNil(t, got.BannedUntil)
+	assert.WithinDuration(t, bannedUntil, *got.BannedUntil, time.Second)
 }
 
 func TestBunUserStateRepository_GetByUserID(t *testing.T) {
@@ -202,4 +247,25 @@ func TestBunUserStateRepository_GetBanned(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBunUserStateRepository_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	db := internaltests.NewSQLiteIntegrationDB(t)
+	repo := repositories.NewBunUserStateRepository(db)
+	ctx := context.Background()
+
+	got, err := repo.GetByUserID(ctx, "u1")
+	assert.Error(t, err)
+	assert.Nil(t, got)
+
+	assert.Error(t, repo.Upsert(ctx, &types.AdminUserState{UserID: "u1"}))
+	assert.Error(t, repo.Create(ctx, &types.AdminUserState{UserID: "u1"}))
+	assert.Error(t, repo.Update(ctx, &types.AdminUserState{UserID: "u1"}))
+	assert.Error(t, repo.Delete(ctx, "u1"))
+
+	rows, err := repo.GetBanned(ctx)
+	assert.Error(t, err)
+	assert.Nil(t, rows)
 }
