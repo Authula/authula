@@ -61,28 +61,40 @@ func TestSecondaryStoragePluginMetadata(t *testing.T) {
 	assert.Nil(t, plugin.DependsOn())
 }
 
-func TestNewSecondaryStoragePluginAppliesDefaults(t *testing.T) {
+func TestNewSecondaryStoragePluginConfig(t *testing.T) {
 	t.Parallel()
 
-	plugin := New(SecondaryStoragePluginConfig{})
+	tests := []struct {
+		name         string
+		config       SecondaryStoragePluginConfig
+		wantProvider SecondaryStorageProvider
+		wantEnabled  bool
+	}{
+		{
+			name:         "empty config applies memory provider default",
+			config:       SecondaryStoragePluginConfig{},
+			wantProvider: SecondaryStorageProviderMemory,
+		},
+		{
+			name:         "explicit provider and enabled flag are preserved",
+			config:       SecondaryStoragePluginConfig{Provider: SecondaryStorageProviderDatabase, Enabled: true},
+			wantProvider: SecondaryStorageProviderDatabase,
+			wantEnabled:  true,
+		},
+	}
 
-	config, ok := plugin.Config().(SecondaryStoragePluginConfig)
-	require.True(t, ok)
-	assert.Equal(t, SecondaryStorageProviderMemory, config.Provider)
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-func TestNewSecondaryStoragePluginPreservesProvider(t *testing.T) {
-	t.Parallel()
+			plugin := New(tt.config)
 
-	plugin := New(SecondaryStoragePluginConfig{
-		Provider: SecondaryStorageProviderDatabase,
-		Enabled:  true,
-	})
-
-	config, ok := plugin.Config().(SecondaryStoragePluginConfig)
-	require.True(t, ok)
-	assert.Equal(t, SecondaryStorageProviderDatabase, config.Provider)
-	assert.True(t, config.Enabled)
+			config, ok := plugin.Config().(SecondaryStoragePluginConfig)
+			require.True(t, ok)
+			assert.Equal(t, tt.wantProvider, config.Provider)
+			assert.Equal(t, tt.wantEnabled, config.Enabled)
+		})
+	}
 }
 
 func TestNewWithStorage(t *testing.T) {
@@ -225,62 +237,59 @@ func TestSecondaryStoragePluginInitDatabaseProvider(t *testing.T) {
 }
 
 func TestSecondaryStoragePluginInitRedisProvider(t *testing.T) {
-	t.Setenv(env.EnvRedisURL, "")
 	server := miniredis.RunT(t)
 
-	registry := newRecordingServiceRegistry()
-	plugin := New(SecondaryStoragePluginConfig{
-		Provider: SecondaryStorageProviderRedis,
-		Redis: &RedisStorageConfig{
-			URL:        "redis://" + server.Addr(),
-			MaxRetries: -1,
+	tests := []struct {
+		name   string
+		envURL string
+		config *RedisStorageConfig
+	}{
+		{
+			name:   "config url is used when environment url is empty",
+			envURL: "",
+			config: &RedisStorageConfig{URL: "redis://" + server.Addr(), MaxRetries: -1},
 		},
-	})
+		{
+			name:   "environment url is used when config url is empty",
+			envURL: "redis://" + server.Addr(),
+			config: &RedisStorageConfig{},
+		},
+	}
 
-	err := plugin.Init(newTestPluginContext(registry, &internaltests.LevelRecordingLogger{}, nil))
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(env.EnvRedisURL, tt.envURL)
 
-	registered, ok := registry.Get(models.ServiceSecondaryStorage.String()).(*SecondaryStorageServiceImpl)
-	require.True(t, ok)
-	assert.Equal(t, "redis", registered.GetProviderName())
+			registry := newRecordingServiceRegistry()
+			plugin := New(SecondaryStoragePluginConfig{
+				Provider: SecondaryStorageProviderRedis,
+				Redis:    tt.config,
+			})
 
-	storage, ok := registered.GetStorage().(*RedisSecondaryStorage)
-	require.True(t, ok)
+			err := plugin.Init(newTestPluginContext(registry, &internaltests.LevelRecordingLogger{}, nil))
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				assert.NoError(t, plugin.Close())
+			})
 
-	require.NoError(t, storage.Set(context.Background(), "plugin-key", "plugin-value", nil))
-	value, err := storage.Get(context.Background(), "plugin-key")
-	require.NoError(t, err)
-	assert.Equal(t, "plugin-value", value)
+			registered, ok := registry.Get(models.ServiceSecondaryStorage.String()).(*SecondaryStorageServiceImpl)
+			require.True(t, ok)
+			assert.Equal(t, "redis", registered.GetProviderName())
 
-	assert.NoError(t, plugin.Close())
-}
+			storage, ok := registered.GetStorage().(*RedisSecondaryStorage)
+			require.True(t, ok)
 
-func TestSecondaryStoragePluginInitRedisProviderUsesEnvironmentURL(t *testing.T) {
-	server := miniredis.RunT(t)
-	t.Setenv(env.EnvRedisURL, "redis://"+server.Addr())
-
-	registry := newRecordingServiceRegistry()
-	plugin := New(SecondaryStoragePluginConfig{
-		Provider: SecondaryStorageProviderRedis,
-		Redis:    &RedisStorageConfig{},
-	})
-
-	err := plugin.Init(newTestPluginContext(registry, &internaltests.LevelRecordingLogger{}, nil))
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		assert.NoError(t, plugin.Close())
-	})
-
-	registered, ok := registry.Get(models.ServiceSecondaryStorage.String()).(*SecondaryStorageServiceImpl)
-	require.True(t, ok)
-	_, ok = registered.GetStorage().(*RedisSecondaryStorage)
-	assert.True(t, ok)
+			require.NoError(t, storage.Set(context.Background(), "plugin-key", "plugin-value", nil))
+			value, err := storage.Get(context.Background(), "plugin-key")
+			require.NoError(t, err)
+			assert.Equal(t, "plugin-value", value)
+		})
+	}
 }
 
 func TestSecondaryStoragePluginInitRedisFallbackToMemory(t *testing.T) {
 	tests := []struct {
 		name string
-		env  string
 		cfg  *RedisStorageConfig
 	}{
 		{
@@ -506,37 +515,59 @@ func TestSecondaryStoragePluginMigrations(t *testing.T) {
 func TestSecondaryStoragePluginClose(t *testing.T) {
 	t.Parallel()
 
-	t.Run("without storage", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name       string
+		newPlugin  func(t *testing.T, storage *internaltests.MockSecondaryStorage) *SecondaryStoragePlugin
+		closeCalls int
+		wantErr    string
+	}{
+		{
+			name: "without storage",
+			newPlugin: func(t *testing.T, _ *internaltests.MockSecondaryStorage) *SecondaryStoragePlugin {
+				return New(SecondaryStoragePluginConfig{})
+			},
+			closeCalls: 1,
+		},
+		{
+			name: "propagates storage close errors",
+			newPlugin: func(t *testing.T, storage *internaltests.MockSecondaryStorage) *SecondaryStoragePlugin {
+				storage.On("Close").Return(errors.New("close failed")).Once()
+				return NewWithStorage("custom", storage)
+			},
+			closeCalls: 1,
+			wantErr:    "close failed",
+		},
+		{
+			name: "closes initialized storage and is idempotent",
+			newPlugin: func(t *testing.T, _ *internaltests.MockSecondaryStorage) *SecondaryStoragePlugin {
+				plugin := New(SecondaryStoragePluginConfig{Provider: SecondaryStorageProviderMemory})
+				require.NoError(t, plugin.Init(newTestPluginContext(newRecordingServiceRegistry(), &internaltests.LevelRecordingLogger{}, nil)))
+				return plugin
+			},
+			closeCalls: 2,
+		},
+	}
 
-		plugin := New(SecondaryStoragePluginConfig{})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		assert.NoError(t, plugin.Close())
-	})
+			storage := new(internaltests.MockSecondaryStorage)
+			plugin := tt.newPlugin(t, storage)
 
-	t.Run("propagates storage close errors", func(t *testing.T) {
-		t.Parallel()
+			var err error
+			for range tt.closeCalls {
+				if err = plugin.Close(); err != nil {
+					break
+				}
+			}
 
-		storage := new(internaltests.MockSecondaryStorage)
-		storage.On("Close").Return(errors.New("close failed")).Once()
-		plugin := NewWithStorage("custom", storage)
-
-		err := plugin.Close()
-
-		require.Error(t, err)
-		assert.EqualError(t, err, "close failed")
-		storage.AssertExpectations(t)
-	})
-
-	t.Run("closes initialized storage", func(t *testing.T) {
-		t.Parallel()
-
-		registry := newRecordingServiceRegistry()
-		plugin := New(SecondaryStoragePluginConfig{Provider: SecondaryStorageProviderMemory})
-
-		require.NoError(t, plugin.Init(newTestPluginContext(registry, &internaltests.LevelRecordingLogger{}, nil)))
-
-		assert.NoError(t, plugin.Close())
-		assert.NoError(t, plugin.Close(), "plugin Close must be idempotent")
-	})
+			storage.AssertExpectations(t)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }
