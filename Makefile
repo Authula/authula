@@ -10,7 +10,7 @@ GOLANGCI_LINT_VERSION?=v2.15.0
 AIR_VERSION?=latest
 
 .PHONY: help build build-exe run dev test clean install setup tools hooks hooks-uninstall
-.PHONY: test-coverage
+.PHONY: test-coverage test-coverage-filtered
 .PHONY: lint format vet deps-update all check quick-check ci
 .PHONY: migrate-core-up migrate-core-down migrate-plugins-up migrate-plugins-down migrate-status
 .PHONY: openapi-export
@@ -58,6 +58,9 @@ test-coverage: # Run all tests once and write aggregated coverage
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 	@go tool cover -func=coverage.out | awk '/^total:/ {print "Total coverage: " $$3}'
+
+test-coverage-filtered: test-coverage # Run tests once and print production coverage report
+	@./scripts/coverage-filtered.sh coverage.out
 
 # Dependency management
 install: # Install dependencies
