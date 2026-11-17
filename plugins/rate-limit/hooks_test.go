@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	plugintests "github.com/Authula/authula/plugins/rate-limit/tests"
@@ -871,5 +874,107 @@ func assertRateLimitRuleContext(t *testing.T, reqCtx *models.RequestContext, exp
 	}
 	if stored != expected {
 		t.Fatalf("unexpected stored rule context: got %+v, expected %+v", stored, expected)
+	}
+}
+
+func TestSetRuleContextFromRecord_NilRecordIsNoop(t *testing.T) {
+	t.Parallel()
+
+	reqCtx := &models.RequestContext{Values: map[string]any{}}
+
+	SetRuleContextFromRecord(reqCtx, nil)
+
+	_, ok := reqCtx.Values[models.ContextRateLimitRule.String()]
+	assert.False(t, ok)
+}
+
+func TestNormalizeIP(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		ip   string
+		want string
+	}{
+		{name: "ipv4_unchanged", ip: "127.0.0.1", want: "127.0.0.1"},
+		{name: "ipv6_is_bracketed", ip: "::1", want: "[::1]"},
+		{name: "hostname_unchanged", ip: "client.local", want: "client.local"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.want, normalizeIP(tc.ip))
+		})
+	}
+}
+
+func TestRateLimitPluginCheckRateLimitRuleHook_ErrorAndInvalidContext(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name             string
+		contextValue     any
+		provider         *plugintests.FakeRateLimitProvider
+		wantHandled      bool
+		wantLimitHeader  string
+		wantProviderCall bool
+	}{
+		{
+			name:             "provider_error_fails_open",
+			contextValue:     models.RateLimitRuleContext{Key: "rule-1", WindowSeconds: 60, MaxRequests: 5},
+			provider:         plugintests.NewFakeRateLimitProvider().WithCheckError(errors.New("boom")),
+			wantProviderCall: true,
+		},
+		{
+			name:            "zero_window_is_ignored",
+			contextValue:    models.RateLimitRuleContext{Key: "rule-1", WindowSeconds: 0, MaxRequests: 5},
+			provider:        plugintests.NewFakeRateLimitProvider(),
+			wantHandled:     false,
+			wantLimitHeader: "",
+		},
+		{
+			name:            "zero_max_is_ignored",
+			contextValue:    models.RateLimitRuleContext{Key: "rule-1", WindowSeconds: 60, MaxRequests: 0},
+			provider:        plugintests.NewFakeRateLimitProvider(),
+			wantHandled:     false,
+			wantLimitHeader: "",
+		},
+		{
+			name:            "invalid_value_type_is_ignored",
+			contextValue:    "not-a-rule",
+			provider:        plugintests.NewFakeRateLimitProvider(),
+			wantHandled:     false,
+			wantLimitHeader: "",
+		},
+		{
+			name:             "blocked_request_sets_response",
+			contextValue:     models.RateLimitRuleContext{Key: "rule-1", WindowSeconds: 60, MaxRequests: 1},
+			provider:         plugintests.NewFakeRateLimitProvider().WithCheckResult(false, 2, time.Unix(6000, 0), nil),
+			wantHandled:      true,
+			wantLimitHeader:  "1",
+			wantProviderCall: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := &RateLimitPlugin{provider: tc.provider, logger: &internaltests.MockLogger{}}
+			reqCtx := newTestRequestContext(t, map[string]any{models.ContextRateLimitRule.String(): tc.contextValue})
+
+			err := plugin.checkRateLimitRuleHook()(reqCtx)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantHandled, reqCtx.Handled)
+			assert.Equal(t, tc.wantLimitHeader, reqCtx.ResponseWriter.Header().Get("X-RateLimit-Limit"))
+			if tc.wantProviderCall {
+				assert.Equal(t, "rule-1", tc.provider.LastCheckKey)
+			} else {
+				assert.Empty(t, tc.provider.LastCheckKey)
+			}
+		})
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/rate-limit/types"
 )
 
@@ -16,6 +17,9 @@ type FakeRateLimitProvider struct {
 	GetErr error
 	SetErr error
 	Store  map[string]types.RateLimitRuleRecord
+
+	GetValueErr   error
+	DeleteRuleErr error
 
 	LastCheckKey    string
 	LastCheckWindow time.Duration
@@ -34,6 +38,9 @@ func NewFakeRateLimitProvider() *FakeRateLimitProvider {
 func (p *FakeRateLimitProvider) GetName() string { return "fake" }
 
 func (p *FakeRateLimitProvider) GetValue(_ context.Context, key string) (any, error) {
+	if p.GetValueErr != nil {
+		return nil, p.GetValueErr
+	}
 	record, ok := p.Store[key]
 	if !ok {
 		return nil, nil
@@ -107,8 +114,42 @@ func (p *FakeRateLimitProvider) GetRule(_ context.Context, key string) (time.Dur
 }
 
 func (p *FakeRateLimitProvider) DeleteRule(_ context.Context, key string) error {
+	if p.DeleteRuleErr != nil {
+		return p.DeleteRuleErr
+	}
 	delete(p.Store, key)
 	return nil
 }
 
 func (p *FakeRateLimitProvider) Close() error { return nil }
+
+// StubSecondaryStorageService is a minimal SecondaryStorageService for plugin tests.
+type StubSecondaryStorageService struct {
+	Storage models.SecondaryStorage
+	Name    string
+}
+
+func (s *StubSecondaryStorageService) GetStorage() models.SecondaryStorage { return s.Storage }
+
+func (s *StubSecondaryStorageService) GetProviderName() string { return s.Name }
+
+// RecordingServiceRegistry records registrations so tests can assert wiring.
+type RecordingServiceRegistry struct {
+	Services   map[string]any
+	Registered []string
+}
+
+func (r *RecordingServiceRegistry) Register(name string, service any) {
+	if r.Services == nil {
+		r.Services = make(map[string]any)
+	}
+	r.Services[name] = service
+	r.Registered = append(r.Registered, name)
+}
+
+func (r *RecordingServiceRegistry) Get(name string) any {
+	if r == nil || r.Services == nil {
+		return nil
+	}
+	return r.Services[name]
+}
