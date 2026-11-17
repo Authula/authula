@@ -33,66 +33,82 @@ func TestPublishEventAsync(t *testing.T) {
 	t.Parallel()
 
 	event := models.Event{ID: "evt-1", Type: "user.created", Payload: map[string]any{"id": "user-1"}}
+	publishErr := errors.New("broker unavailable")
 
-	t.Run("nil event bus does nothing", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name       string
+		withBus    bool
+		withLogger bool
+		publishErr error
+		wantLog    bool
+	}{
+		{
+			name:       "nil event bus does nothing",
+			withLogger: true,
+		},
+		{
+			name:       "publishes event asynchronously",
+			withBus:    true,
+			withLogger: true,
+		},
+		{
+			name:       "logs publish failure",
+			withBus:    true,
+			withLogger: true,
+			publishErr: publishErr,
+			wantLog:    true,
+		},
+		{
+			name:       "publish failure without logger does not panic",
+			withBus:    true,
+			publishErr: publishErr,
+		},
+	}
 
-		logger := &recordingLogger{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		PublishEventAsync(nil, logger, event)
+			recorder := &recordingLogger{}
+			published := make(chan models.Event, 1)
 
-		assert.Empty(t, logger.Records())
-	})
+			var bus models.EventBus
+			if tt.withBus {
+				bus = &eventsTestBus{published: published, err: tt.publishErr}
+			}
 
-	t.Run("publishes event asynchronously", func(t *testing.T) {
-		t.Parallel()
+			var logger models.Logger
+			if tt.withLogger {
+				logger = recorder
+			}
 
-		bus := &eventsTestBus{published: make(chan models.Event, 1)}
+			PublishEventAsync(bus, logger, event)
 
-		PublishEventAsync(bus, nil, event)
+			if tt.withBus {
+				select {
+				case got := <-published:
+					assert.Equal(t, event, got)
+				case <-time.After(2 * time.Second):
+					t.Fatal("timed out waiting for event to be published")
+				}
+			}
 
-		select {
-		case got := <-bus.published:
-			assert.Equal(t, event, got)
-		case <-time.After(2 * time.Second):
-			t.Fatal("timed out waiting for event to be published")
-		}
-	})
+			if !tt.wantLog {
+				assert.Empty(t, recorder.Records())
+				return
+			}
 
-	t.Run("logs publish failure", func(t *testing.T) {
-		t.Parallel()
+			require.Eventually(t, func() bool {
+				return len(recorder.Records()) == 1
+			}, 2*time.Second, 5*time.Millisecond)
 
-		publishErr := errors.New("broker unavailable")
-		bus := &eventsTestBus{published: make(chan models.Event, 1), err: publishErr}
-		logger := &recordingLogger{}
-
-		PublishEventAsync(bus, logger, event)
-
-		require.Eventually(t, func() bool {
-			return len(logger.Records()) == 1
-		}, 2*time.Second, 5*time.Millisecond)
-
-		record := logger.Records()[0]
-		assert.Equal(t, "error", record.Level)
-		assert.Equal(t, "failed to publish event asynchronously", record.Message)
-		assert.Contains(t, record.Args, "event_type")
-		assert.Contains(t, record.Args, event.Type)
-		assert.Contains(t, record.Args, event.ID)
-		assert.Contains(t, record.Args, publishErr)
-	})
-
-	t.Run("publish failure without logger does not panic", func(t *testing.T) {
-		t.Parallel()
-
-		bus := &eventsTestBus{published: make(chan models.Event, 1), err: errors.New("broker unavailable")}
-
-		PublishEventAsync(bus, nil, event)
-
-		select {
-		case got := <-bus.published:
-			assert.Equal(t, event, got)
-		case <-time.After(2 * time.Second):
-			t.Fatal("timed out waiting for event to be published")
-		}
-	})
+			record := recorder.Records()[0]
+			assert.Equal(t, "error", record.Level)
+			assert.Equal(t, "failed to publish event asynchronously", record.Message)
+			assert.Contains(t, record.Args, "event_type")
+			assert.Contains(t, record.Args, event.Type)
+			assert.Contains(t, record.Args, event.ID)
+			assert.Contains(t, record.Args, publishErr)
+		})
+	}
 }

@@ -16,14 +16,33 @@ import (
 func TestGenerateUUID(t *testing.T) {
 	t.Parallel()
 
-	first := GenerateUUID()
-	second := GenerateUUID()
+	tests := []struct {
+		name  string
+		check func(t *testing.T, first, second string)
+	}{
+		{
+			name: "generates unique values",
+			check: func(t *testing.T, first, second string) {
+				assert.NotEqual(t, first, second)
+			},
+		},
+		{
+			name: "generates version 4 UUIDs",
+			check: func(t *testing.T, first, _ string) {
+				parsed, err := uuid.Parse(first)
+				require.NoError(t, err)
+				assert.Equal(t, uuid.Version(4), parsed.Version())
+			},
+		},
+	}
 
-	assert.NotEqual(t, first, second)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	parsed, err := uuid.Parse(first)
-	require.NoError(t, err)
-	assert.Equal(t, uuid.Version(4), parsed.Version())
+			tt.check(t, GenerateUUID(), GenerateUUID())
+		})
+	}
 }
 
 func TestNormalizeEmail(t *testing.T) {
@@ -96,28 +115,15 @@ func TestCompareStringArrays(t *testing.T) {
 func TestCloneRequestContext(t *testing.T) {
 	t.Parallel()
 
-	t.Run("nil context returns nil", func(t *testing.T) {
-		t.Parallel()
-
-		assert.Nil(t, CloneRequestContext(nil))
-	})
-
-	t.Run("copies scalar fields and detaches maps", func(t *testing.T) {
-		t.Parallel()
-
-		request := httptest.NewRequest(http.MethodGet, "/me", nil)
-		response := httptest.NewRecorder()
-		route := &models.Route{Method: http.MethodGet, Path: "/me"}
-		actor := &models.Actor{ID: "user-1"}
-
-		original := &models.RequestContext{
-			Request:         request,
-			ResponseWriter:  response,
+	newFullRequestContext := func() *models.RequestContext {
+		return &models.RequestContext{
+			Request:         httptest.NewRequest(http.MethodGet, "/me", nil),
+			ResponseWriter:  httptest.NewRecorder(),
 			Path:            "/me",
 			Method:          http.MethodGet,
 			Headers:         http.Header{"X-Test": []string{"value"}},
-			Route:           route,
-			Actor:           actor,
+			Route:           &models.Route{Method: http.MethodGet, Path: "/me"},
+			Actor:           &models.Actor{ID: "user-1"},
 			Handled:         true,
 			ClientIP:        "1.2.3.4",
 			Values:          map[string]any{"key": "value"},
@@ -126,45 +132,94 @@ func TestCloneRequestContext(t *testing.T) {
 			ResponseBody:    []byte("body"),
 			ResponseReady:   true,
 		}
+	}
 
-		cloned := CloneRequestContext(original)
+	tests := []struct {
+		name     string
+		original *models.RequestContext
+		verify   func(t *testing.T, original, cloned *models.RequestContext)
+	}{
+		{
+			name: "nil context returns nil",
+			verify: func(t *testing.T, _, cloned *models.RequestContext) {
+				assert.Nil(t, cloned)
+			},
+		},
+		{
+			name:     "shares request, route and actor references",
+			original: newFullRequestContext(),
+			verify: func(t *testing.T, original, cloned *models.RequestContext) {
+				require.NotNil(t, cloned)
+				assert.Same(t, original.Request, cloned.Request)
+				assert.Same(t, original.Route, cloned.Route)
+				assert.Same(t, original.Actor, cloned.Actor)
+			},
+		},
+		{
+			name:     "copies path, method, headers and handled flag",
+			original: newFullRequestContext(),
+			verify: func(t *testing.T, original, cloned *models.RequestContext) {
+				require.NotNil(t, cloned)
+				assert.Equal(t, original.Path, cloned.Path)
+				assert.Equal(t, original.Method, cloned.Method)
+				assert.Equal(t, original.Headers, cloned.Headers)
+				assert.True(t, cloned.Handled)
+			},
+		},
+		{
+			name:     "drops response state and client IP",
+			original: newFullRequestContext(),
+			verify: func(t *testing.T, _, cloned *models.RequestContext) {
+				require.NotNil(t, cloned)
+				assert.Nil(t, cloned.ResponseWriter)
+				assert.Empty(t, cloned.ClientIP)
+				assert.Zero(t, cloned.ResponseStatus)
+				assert.Nil(t, cloned.ResponseBody)
+				assert.False(t, cloned.ResponseReady)
+			},
+		},
+		{
+			name:     "detaches values map",
+			original: newFullRequestContext(),
+			verify: func(t *testing.T, original, cloned *models.RequestContext) {
+				require.NotNil(t, cloned)
+				cloned.Values["key"] = "changed"
+				cloned.Values["extra"] = true
+				assert.Equal(t, "value", original.Values["key"])
+				assert.NotContains(t, original.Values, "extra")
+			},
+		},
+		{
+			name:     "detaches response headers",
+			original: newFullRequestContext(),
+			verify: func(t *testing.T, original, cloned *models.RequestContext) {
+				require.NotNil(t, cloned)
+				cloned.ResponseHeaders["X-Response"][0] = "changed"
+				cloned.ResponseHeaders["X-New"] = []string{"new"}
+				assert.Equal(t, []string{"a", "b"}, original.ResponseHeaders["X-Response"])
+				assert.NotContains(t, original.ResponseHeaders, "X-New")
+			},
+		},
+		{
+			name:     "nil maps become empty maps",
+			original: &models.RequestContext{},
+			verify: func(t *testing.T, _, cloned *models.RequestContext) {
+				require.NotNil(t, cloned)
+				assert.NotNil(t, cloned.Values)
+				assert.Empty(t, cloned.Values)
+				assert.NotNil(t, cloned.ResponseHeaders)
+				assert.Empty(t, cloned.ResponseHeaders)
+			},
+		},
+	}
 
-		require.NotNil(t, cloned)
-		assert.Same(t, request, cloned.Request)
-		assert.Same(t, route, cloned.Route)
-		assert.Same(t, actor, cloned.Actor)
-		assert.Equal(t, original.Path, cloned.Path)
-		assert.Equal(t, original.Method, cloned.Method)
-		assert.Equal(t, original.Headers, cloned.Headers)
-		assert.True(t, cloned.Handled)
-		assert.Nil(t, cloned.ResponseWriter)
-		assert.Empty(t, cloned.ClientIP)
-		assert.Zero(t, cloned.ResponseStatus)
-		assert.Nil(t, cloned.ResponseBody)
-		assert.False(t, cloned.ResponseReady)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		cloned.Values["key"] = "changed"
-		cloned.Values["extra"] = true
-		assert.Equal(t, "value", original.Values["key"])
-		assert.NotContains(t, original.Values, "extra")
-
-		cloned.ResponseHeaders["X-Response"][0] = "changed"
-		cloned.ResponseHeaders["X-New"] = []string{"new"}
-		assert.Equal(t, []string{"a", "b"}, original.ResponseHeaders["X-Response"])
-		assert.NotContains(t, original.ResponseHeaders, "X-New")
-	})
-
-	t.Run("nil maps become empty maps", func(t *testing.T) {
-		t.Parallel()
-
-		cloned := CloneRequestContext(&models.RequestContext{})
-
-		require.NotNil(t, cloned)
-		assert.NotNil(t, cloned.Values)
-		assert.Empty(t, cloned.Values)
-		assert.NotNil(t, cloned.ResponseHeaders)
-		assert.Empty(t, cloned.ResponseHeaders)
-	})
+			tt.verify(t, tt.original, CloneRequestContext(tt.original))
+		})
+	}
 }
 
 func TestNormalizePath(t *testing.T) {
@@ -178,7 +233,7 @@ func TestNormalizePath(t *testing.T) {
 		{name: "adds leading slash", input: "users", want: "/users"},
 		{name: "removes trailing slash", input: "/users/", want: "/users"},
 		{name: "keeps nested path", input: "/users/me", want: "/users/me"},
-		{name: "collapses nothing but the root", input: "/users//me", want: "/users//me"},
+		{name: "keeps duplicate inner slashes", input: "/users//me", want: "/users//me"},
 		{name: "empty becomes empty", input: "", want: ""},
 		{name: "root becomes empty", input: "/", want: ""},
 	}

@@ -19,137 +19,184 @@ type jsonTestPayload struct {
 func TestParseJSON(t *testing.T) {
 	t.Parallel()
 
-	t.Run("decodes body", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name    string
+		body    string
+		want    jsonTestPayload
+		wantErr bool
+	}{
+		{
+			name: "decodes body",
+			body: `{"name":"user","age":30}`,
+			want: jsonTestPayload{Name: "user", Age: 30},
+		},
+		{
+			name:    "malformed body returns error",
+			body:    `{"name":`,
+			wantErr: true,
+		},
+	}
 
-		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"name":"user","age":30}`))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		var got jsonTestPayload
-		err := ParseJSON(request, &got)
+			request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.body))
 
-		require.NoError(t, err)
-		assert.Equal(t, jsonTestPayload{Name: "user", Age: 30}, got)
-	})
+			var got jsonTestPayload
+			err := ParseJSON(request, &got)
 
-	t.Run("malformed body returns error", func(t *testing.T) {
-		t.Parallel()
-
-		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"name":`))
-
-		var got jsonTestPayload
-		err := ParseJSON(request, &got)
-
-		require.Error(t, err)
-	})
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestJSONResponse(t *testing.T) {
 	t.Parallel()
 
-	t.Run("writes status header and body", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name   string
+		status int
+		data   any
+		check  func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name:   "writes status header and body",
+			status: http.StatusCreated,
+			data:   jsonTestPayload{Name: "user", Age: 30},
+			check: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusCreated, recorder.Code)
+				assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
 
-		recorder := httptest.NewRecorder()
+				var got jsonTestPayload
+				require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &got))
+				assert.Equal(t, jsonTestPayload{Name: "user", Age: 30}, got)
+			},
+		},
+		{
+			name:   "encoding failure writes error details",
+			status: http.StatusOK,
+			data:   make(chan int),
+			check: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				assert.Contains(t, recorder.Body.String(), "unsupported type")
+			},
+		},
+	}
 
-		JSONResponse(recorder, http.StatusCreated, jsonTestPayload{Name: "user", Age: 30})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		assert.Equal(t, http.StatusCreated, recorder.Code)
-		assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
+			recorder := httptest.NewRecorder()
 
-		var got jsonTestPayload
-		require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &got))
-		assert.Equal(t, jsonTestPayload{Name: "user", Age: 30}, got)
-	})
+			JSONResponse(recorder, tt.status, tt.data)
 
-	t.Run("encoding failure writes error details", func(t *testing.T) {
-		t.Parallel()
-
-		recorder := httptest.NewRecorder()
-
-		JSONResponse(recorder, http.StatusOK, make(chan int))
-
-		assert.Contains(t, recorder.Body.String(), "unsupported type")
-	})
+			tt.check(t, recorder)
+		})
+	}
 }
 
 func TestToMap(t *testing.T) {
 	t.Parallel()
 
-	t.Run("nil returns nil", func(t *testing.T) {
-		t.Parallel()
+	input := map[string]any{"key": "value"}
 
-		assert.Nil(t, ToMap(nil))
-	})
+	tests := []struct {
+		name  string
+		input any
+		want  map[string]any
+		check func(t *testing.T, got map[string]any)
+	}{
+		{
+			name:  "nil returns nil",
+			input: nil,
+		},
+		{
+			name:  "map is returned unchanged",
+			input: input,
+			want:  input,
+			check: func(t *testing.T, got map[string]any) {
+				got["key"] = "changed"
+				assert.Equal(t, "changed", input["key"])
+			},
+		},
+		{
+			name:  "struct uses json tags",
+			input: jsonTestPayload{Name: "user", Age: 30},
+			want:  map[string]any{"name": "user", "age": float64(30)},
+		},
+		{
+			name:  "unmarshallable value returns nil",
+			input: make(chan int),
+		},
+		{
+			name:  "non object json returns nil map",
+			input: "just-a-string",
+		},
+	}
 
-	t.Run("map is returned unchanged", func(t *testing.T) {
-		t.Parallel()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		input := map[string]any{"key": "value"}
+			got := ToMap(tt.input)
 
-		got := ToMap(input)
-
-		assert.Equal(t, input, got)
-		got["key"] = "changed"
-		assert.Equal(t, "changed", input["key"])
-	})
-
-	t.Run("struct uses json tags", func(t *testing.T) {
-		t.Parallel()
-
-		got := ToMap(jsonTestPayload{Name: "user", Age: 30})
-
-		assert.Equal(t, map[string]any{"name": "user", "age": float64(30)}, got)
-	})
-
-	t.Run("unmarshallable value returns nil", func(t *testing.T) {
-		t.Parallel()
-
-		assert.Nil(t, ToMap(make(chan int)))
-	})
-
-	t.Run("non object json returns nil map", func(t *testing.T) {
-		t.Parallel()
-
-		assert.Nil(t, ToMap("just-a-string"))
-	})
+			assert.Equal(t, tt.want, got)
+			if tt.check != nil {
+				tt.check(t, got)
+			}
+		})
+	}
 }
 
 func TestFromMap(t *testing.T) {
 	t.Parallel()
 
-	t.Run("nil map returns nil", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name    string
+		input   map[string]any
+		want    jsonTestPayload
+		wantErr bool
+	}{
+		{
+			name:  "nil map returns nil",
+			input: nil,
+		},
+		{
+			name:  "decodes into struct",
+			input: map[string]any{"name": "user", "age": 30},
+			want:  jsonTestPayload{Name: "user", Age: 30},
+		},
+		{
+			name:    "marshal error is returned",
+			input:   map[string]any{"bad": make(chan int)},
+			wantErr: true,
+		},
+		{
+			name:    "unmarshal error is returned",
+			input:   map[string]any{"age": "not-a-number"},
+			wantErr: true,
+		},
+	}
 
-		var got jsonTestPayload
-		require.NoError(t, FromMap(nil, &got))
-		assert.Equal(t, jsonTestPayload{}, got)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("decodes into struct", func(t *testing.T) {
-		t.Parallel()
+			var got jsonTestPayload
+			err := FromMap(tt.input, &got)
 
-		var got jsonTestPayload
-		err := FromMap(map[string]any{"name": "user", "age": 30}, &got)
-
-		require.NoError(t, err)
-		assert.Equal(t, jsonTestPayload{Name: "user", Age: 30}, got)
-	})
-
-	t.Run("marshal error is returned", func(t *testing.T) {
-		t.Parallel()
-
-		var got jsonTestPayload
-		err := FromMap(map[string]any{"bad": make(chan int)}, &got)
-
-		require.Error(t, err)
-	})
-
-	t.Run("unmarshal error is returned", func(t *testing.T) {
-		t.Parallel()
-
-		var got jsonTestPayload
-		err := FromMap(map[string]any{"age": "not-a-number"}, &got)
-
-		require.Error(t, err)
-	})
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
