@@ -133,19 +133,19 @@ func TestRouterRegistrationSkipsDisabledRoutes(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			router := newTestRouterWithConfig(tc.config, nil)
+			router := newTestRouterWithConfig(tt.config, nil)
 			called := false
 
-			tc.register(router, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			tt.register(router, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				called = true
 				w.WriteHeader(http.StatusOK)
 			}))
 
-			rec := performRequest(router, tc.method, tc.path)
+			rec := performRequest(router, tt.method, tt.path)
 
 			assert.Equal(t, http.StatusNotFound, rec.Code)
 			assert.False(t, called, "disabled route handler must not run")
@@ -166,15 +166,15 @@ func TestRouterRegisterRouteSupportsAllMethods(t *testing.T) {
 		{name: "custom method fallback", method: http.MethodTrace},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			router := newTestRouter("", nil)
 			called := false
 
 			router.RegisterRoute(models.Route{
-				Method: tc.method,
+				Method: tt.method,
 				Path:   "/resource",
 				Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					called = true
@@ -182,7 +182,7 @@ func TestRouterRegisterRouteSupportsAllMethods(t *testing.T) {
 				}),
 			})
 
-			rec := performRequest(router, tc.method, "/resource")
+			rec := performRequest(router, tt.method, "/resource")
 
 			assert.Equal(t, http.StatusNoContent, rec.Code)
 			assert.True(t, called)
@@ -193,61 +193,81 @@ func TestRouterRegisterRouteSupportsAllMethods(t *testing.T) {
 func TestRouterSetRouteMetadataFromConfigBranches(t *testing.T) {
 	t.Parallel()
 
-	t.Run("initializes nil metadata maps", func(t *testing.T) {
-		t.Parallel()
-
-		router := newTestRouter("/api/auth", nil)
-		router.routeMetadata = nil
-		router.routeEntries = nil
-
-		router.SetRouteMetadataFromConfig(map[string]map[string]any{
-			"GET:/thing": {"plugins": []string{"plugin.one"}},
-		})
-
-		require.NotNil(t, router.routeMetadata)
-		require.Len(t, router.routeEntries, 1)
-		assert.Equal(t, []string{"plugin.one"}, router.routeMetadata["GET:/api/auth/thing"]["plugins"])
-	})
-
-	t.Run("skips keys without a method separator", func(t *testing.T) {
-		t.Parallel()
-
-		router := newTestRouter("/api/auth", nil)
-
-		router.SetRouteMetadataFromConfig(map[string]map[string]any{
-			"malformed":  {"plugins": []string{"ignored"}},
-			"GET:/valid": {"plugins": []string{"plugin.one"}},
-		})
-
-		require.Len(t, router.routeEntries, 1)
-		require.Len(t, router.routeMetadata, 1)
-		assert.Contains(t, router.routeMetadata, "GET:/api/auth/valid")
-	})
-
-	t.Run("merges repeated keys", func(t *testing.T) {
-		t.Parallel()
-
-		router := newTestRouter("/api/auth", nil)
-
-		router.SetRouteMetadataFromConfig(map[string]map[string]any{
-			"GET:/thing": {
-				"plugins":     []string{"plugin.one"},
-				"permissions": []string{"read"},
+	tests := []struct {
+		name         string
+		resetMaps    bool
+		inputs       []map[string]map[string]any
+		wantEntries  int
+		wantMetadata map[string]map[string]any
+	}{
+		{
+			name:      "initializes nil metadata maps",
+			resetMaps: true,
+			inputs: []map[string]map[string]any{
+				{"GET:/thing": {"plugins": []string{"plugin.one"}}},
 			},
-		})
-		router.SetRouteMetadataFromConfig(map[string]map[string]any{
-			"GET:/api/auth/thing": {
-				"roles": []string{"admin"},
+			wantEntries: 1,
+			wantMetadata: map[string]map[string]any{
+				"GET:/api/auth/thing": {"plugins": []string{"plugin.one"}},
 			},
-		})
+		},
+		{
+			name: "skips keys without a method separator",
+			inputs: []map[string]map[string]any{
+				{
+					"malformed":  {"plugins": []string{"ignored"}},
+					"GET:/valid": {"plugins": []string{"plugin.one"}},
+				},
+			},
+			wantEntries: 1,
+			wantMetadata: map[string]map[string]any{
+				"GET:/api/auth/valid": {"plugins": []string{"plugin.one"}},
+			},
+		},
+		{
+			name: "merges repeated keys",
+			inputs: []map[string]map[string]any{
+				{
+					"GET:/thing": {
+						"plugins":     []string{"plugin.one"},
+						"permissions": []string{"read"},
+					},
+				},
+				{
+					"GET:/api/auth/thing": {
+						"roles": []string{"admin"},
+					},
+				},
+			},
+			wantEntries: 1,
+			wantMetadata: map[string]map[string]any{
+				"GET:/api/auth/thing": {
+					"plugins":     []string{"plugin.one"},
+					"permissions": []string{"read"},
+					"roles":       []string{"admin"},
+				},
+			},
+		},
+	}
 
-		metadata := router.routeMetadata["GET:/api/auth/thing"]
-		require.NotNil(t, metadata)
-		assert.Equal(t, []string{"plugin.one"}, metadata["plugins"])
-		assert.Equal(t, []string{"read"}, metadata["permissions"])
-		assert.Equal(t, []string{"admin"}, metadata["roles"])
-		require.Len(t, router.routeEntries, 1)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := newTestRouter("/api/auth", nil)
+			if tt.resetMaps {
+				router.routeMetadata = nil
+				router.routeEntries = nil
+			}
+
+			for _, input := range tt.inputs {
+				router.SetRouteMetadataFromConfig(input)
+			}
+
+			assert.Equal(t, tt.wantMetadata, router.routeMetadata)
+			assert.Len(t, router.routeEntries, tt.wantEntries)
+		})
+	}
 }
 
 func TestRouterRouteMetadataLookupBranches(t *testing.T) {
@@ -276,12 +296,12 @@ func TestRouterRouteMetadataLookupBranches(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			router := newTestRouter(tc.basePath, nil)
-			router.routeMetadata[tc.storedKey] = map[string]any{
+			router := newTestRouter(tt.basePath, nil)
+			router.routeMetadata[tt.storedKey] = map[string]any{
 				"plugins": []string{"items.plugin"},
 			}
 
@@ -294,11 +314,11 @@ func TestRouterRouteMetadataLookupBranches(t *testing.T) {
 				},
 			})
 
-			rec := performRequest(router, http.MethodGet, tc.requestPath)
+			rec := performRequest(router, http.MethodGet, tt.requestPath)
 
 			assert.Equal(t, http.StatusNotFound, rec.Code)
 			require.NotNil(t, captured)
-			assert.Equal(t, tc.wantPattern, captured.Pattern)
+			assert.Equal(t, tt.wantPattern, captured.Pattern)
 			assert.Equal(t, []string{"items.plugin"}, captured.Metadata["plugins"])
 		})
 	}
@@ -409,22 +429,22 @@ func TestRouterCORSHandling(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			router := newTestRouterWithConfig(tc.config, nil)
+			router := newTestRouterWithConfig(tt.config, nil)
 			registerTestRoute(router, http.MethodGet, "/resource", func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusNoContent)
 			})
 
-			rec := performRequestWithHeaders(router, tc.method, "/resource", map[string]string{"Origin": tc.origin})
+			rec := performRequestWithHeaders(router, tt.method, "/resource", map[string]string{"Origin": tt.origin})
 
-			assert.Equal(t, tc.wantStatus, rec.Code)
-			for key, want := range tc.wantHeaders {
+			assert.Equal(t, tt.wantStatus, rec.Code)
+			for key, want := range tt.wantHeaders {
 				assert.Equal(t, want, rec.Header().Get(key), key)
 			}
-			for _, key := range tc.absentHeaders {
+			for _, key := range tt.absentHeaders {
 				assert.Empty(t, rec.Header().Get(key), key)
 			}
 			assert.Contains(t, rec.Header().Values("Vary"), "Origin")
@@ -450,45 +470,60 @@ func TestRouterRedirectDefaultsToFound(t *testing.T) {
 	assert.Equal(t, redirectURL, rec.Header().Get("Location"))
 }
 
-func TestRouterFinalizeResponseLogsFlushError(t *testing.T) {
+func TestRouterFlushErrorIsLogged(t *testing.T) {
 	t.Parallel()
 
-	logger := &internaltests.LevelRecordingLogger{}
-	router := NewRouter(&models.Config{BasePath: "/api/auth"}, logger, nil)
-
-	registerTestRoute(router, http.MethodGet, "/fail", func(_ http.ResponseWriter, r *http.Request) {
-		ctx, ok := models.GetRequestContext(r.Context())
-		require.True(t, ok)
-		ctx.SetResponse(http.StatusOK, nil, []byte("body"))
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/fail", nil)
-	router.ServeHTTP(&failingResponseWriter{}, req)
-
-	assert.Contains(t, logger.Messages(), "Failed to flush response")
-}
-
-func TestRouterPreflightLogsFlushError(t *testing.T) {
-	t.Parallel()
-
-	logger := &internaltests.LevelRecordingLogger{}
-	router := NewRouter(&models.Config{BasePath: "/api/auth"}, logger, nil)
-
-	router.RegisterHook(models.Hook{
-		Stage: models.HookOnComplete,
-		Handler: func(ctx *models.RequestContext) error {
-			ctx.SetResponse(http.StatusOK, nil, []byte("preflight"))
-			if writer, ok := ctx.ResponseWriter.(*internalrouter.DeferredResponseWriter); ok {
-				writer.OverrideWithContext(ctx)
-			}
-			return nil
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		setup  func(*testing.T, *Router)
+	}{
+		{
+			name:   "finalized route response",
+			method: http.MethodGet,
+			path:   "/api/auth/fail",
+			setup: func(t *testing.T, router *Router) {
+				registerTestRoute(router, http.MethodGet, "/fail", func(_ http.ResponseWriter, r *http.Request) {
+					ctx, ok := models.GetRequestContext(r.Context())
+					require.True(t, ok)
+					ctx.SetResponse(http.StatusOK, nil, []byte("body"))
+				})
+			},
 		},
-	})
+		{
+			name:   "preflight completion response",
+			method: http.MethodOptions,
+			path:   "/api/auth/probe",
+			setup: func(_ *testing.T, router *Router) {
+				router.RegisterHook(models.Hook{
+					Stage: models.HookOnComplete,
+					Handler: func(ctx *models.RequestContext) error {
+						ctx.SetResponse(http.StatusOK, nil, []byte("preflight"))
+						if writer, ok := ctx.ResponseWriter.(*internalrouter.DeferredResponseWriter); ok {
+							writer.OverrideWithContext(ctx)
+						}
+						return nil
+					},
+				})
+			},
+		},
+	}
 
-	req := httptest.NewRequest(http.MethodOptions, "/api/auth/probe", nil)
-	router.ServeHTTP(&failingResponseWriter{}, req)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.Contains(t, logger.Messages(), "Failed to flush response")
+			logger := &internaltests.LevelRecordingLogger{}
+			router := NewRouter(&models.Config{BasePath: "/api/auth"}, logger, nil)
+			tt.setup(t, router)
+
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			router.ServeHTTP(&failingResponseWriter{}, req)
+
+			assert.Contains(t, logger.Messages(), "Failed to flush response")
+		})
+	}
 }
 
 func TestRouterFallsBackWhenClientIPIsInvalid(t *testing.T) {
@@ -577,8 +612,8 @@ func TestRouterHooksSkipWhenRouteIsMissing(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			router := newTestRouter("/api/auth", nil)
@@ -587,7 +622,7 @@ func TestRouterHooksSkipWhenRouteIsMissing(t *testing.T) {
 				Values:  make(map[string]any),
 			}
 
-			assert.False(t, tc.run(router, ctx))
+			assert.False(t, tt.run(router, ctx))
 		})
 	}
 }
@@ -595,103 +630,119 @@ func TestRouterHooksSkipWhenRouteIsMissing(t *testing.T) {
 func TestRouterCompletionHookMatcherAndError(t *testing.T) {
 	t.Parallel()
 
-	t.Run("matcher false skips the hook", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name       string
+		matcher    models.HookMatcher
+		handlerErr error
+		wantRan    bool
+		wantLog    string
+	}{
+		{
+			name:    "matcher false skips the hook",
+			matcher: func(*models.RequestContext) bool { return false },
+			wantRan: false,
+		},
+		{
+			name:       "handler error is logged",
+			handlerErr: errors.New("completion failed"),
+			wantRan:    true,
+			wantLog:    "Hook handler error (sync)",
+		},
+	}
 
-		router := newTestRouter("/api/auth", nil)
-		ran := false
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		router.RegisterHook(models.Hook{
-			Stage:   models.HookOnComplete,
-			Matcher: func(*models.RequestContext) bool { return false },
-			Handler: func(*models.RequestContext) error {
-				ran = true
-				return nil
-			},
+			logger := &internaltests.LevelRecordingLogger{}
+			router := NewRouter(&models.Config{BasePath: "/api/auth"}, logger, nil)
+			ran := false
+
+			router.RegisterHook(models.Hook{
+				Stage:   models.HookOnComplete,
+				Matcher: tt.matcher,
+				Handler: func(*models.RequestContext) error {
+					ran = true
+					return tt.handlerErr
+				},
+			})
+			registerTestRoute(router, http.MethodGet, "/test", func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+
+			rec := performRequest(router, http.MethodGet, "/api/auth/test")
+
+			assert.Equal(t, http.StatusOK, rec.Code)
+			assert.Equal(t, tt.wantRan, ran)
+			if tt.wantLog != "" {
+				assert.Contains(t, logger.Messages(), tt.wantLog)
+			}
 		})
-		registerTestRoute(router, http.MethodGet, "/test", func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		})
-
-		rec := performRequest(router, http.MethodGet, "/api/auth/test")
-
-		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.False(t, ran)
-	})
-
-	t.Run("handler error is logged", func(t *testing.T) {
-		t.Parallel()
-
-		logger := &internaltests.LevelRecordingLogger{}
-		router := NewRouter(&models.Config{BasePath: "/api/auth"}, logger, nil)
-
-		router.RegisterHook(models.Hook{
-			Stage: models.HookOnComplete,
-			Handler: func(*models.RequestContext) error {
-				return errors.New("completion failed")
-			},
-		})
-		registerTestRoute(router, http.MethodGet, "/test", func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		})
-
-		rec := performRequest(router, http.MethodGet, "/api/auth/test")
-
-		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.Contains(t, logger.Messages(), "Hook handler error (sync)")
-	})
+	}
 }
 
 func TestRouterBypassHookFiltering(t *testing.T) {
 	t.Parallel()
 
-	logger := &internaltests.LevelRecordingLogger{}
-	router := NewRouter(&models.Config{BasePath: "/api/auth"}, logger, nil)
-	router.SetRouteMetadataFromConfig(map[string]map[string]any{
-		"OPTIONS:/api/auth/probe": {"plugins": []string{"plugin.allowed"}},
-	})
-
-	otherRuns := 0
-	matcherRuns := 0
-	errorRuns := 0
-
-	router.RegisterHook(models.Hook{
-		Stage:       models.HookOnRequest,
-		RunOnBypass: true,
-		PluginID:    "plugin.other",
-		Handler: func(*models.RequestContext) error {
-			otherRuns++
-			return nil
+	tests := []struct {
+		name       string
+		pluginID   string
+		matcher    models.HookMatcher
+		handlerErr error
+		wantRuns   int
+		wantLog    string
+	}{
+		{
+			name:     "hook for another plugin does not run",
+			pluginID: "plugin.other",
+			wantRuns: 0,
 		},
-	})
-	router.RegisterHook(models.Hook{
-		Stage:       models.HookOnRequest,
-		RunOnBypass: true,
-		PluginID:    "plugin.allowed",
-		Matcher:     func(*models.RequestContext) bool { return false },
-		Handler: func(*models.RequestContext) error {
-			matcherRuns++
-			return nil
+		{
+			name:     "hook rejected by its matcher does not run",
+			pluginID: "plugin.allowed",
+			matcher:  func(*models.RequestContext) bool { return false },
+			wantRuns: 0,
 		},
-	})
-	router.RegisterHook(models.Hook{
-		Stage:       models.HookOnRequest,
-		RunOnBypass: true,
-		PluginID:    "plugin.allowed",
-		Order:       1,
-		Handler: func(*models.RequestContext) error {
-			errorRuns++
-			return errors.New("bypass failed")
+		{
+			name:       "matching bypass hook runs and its error is logged",
+			pluginID:   "plugin.allowed",
+			handlerErr: errors.New("bypass failed"),
+			wantRuns:   1,
+			wantLog:    "Hook handler error (sync)",
 		},
-	})
+	}
 
-	rec := performRequest(router, http.MethodOptions, "/api/auth/probe")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, 0, otherRuns, "hook for another plugin must not run")
-	assert.Equal(t, 0, matcherRuns, "hook rejected by its matcher must not run")
-	assert.Equal(t, 1, errorRuns, "matching bypass hook must run")
-	assert.Contains(t, logger.Messages(), "Hook handler error (sync)")
+			logger := &internaltests.LevelRecordingLogger{}
+			router := NewRouter(&models.Config{BasePath: "/api/auth"}, logger, nil)
+			router.SetRouteMetadataFromConfig(map[string]map[string]any{
+				"OPTIONS:/api/auth/probe": {"plugins": []string{"plugin.allowed"}},
+			})
+
+			runs := 0
+			router.RegisterHook(models.Hook{
+				Stage:       models.HookOnRequest,
+				RunOnBypass: true,
+				PluginID:    tt.pluginID,
+				Matcher:     tt.matcher,
+				Handler: func(*models.RequestContext) error {
+					runs++
+					return tt.handlerErr
+				},
+			})
+
+			rec := performRequest(router, http.MethodOptions, "/api/auth/probe")
+
+			assert.Equal(t, http.StatusOK, rec.Code)
+			assert.Equal(t, tt.wantRuns, runs)
+			if tt.wantLog != "" {
+				assert.Contains(t, logger.Messages(), tt.wantLog)
+			}
+		})
+	}
 }
 
 func TestRouterAsyncHookErrorHandling(t *testing.T) {
@@ -722,12 +773,12 @@ func TestRouterAsyncHookErrorHandling(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				logger := &internaltests.LevelRecordingLogger{}
 				router := NewRouter(&models.Config{BasePath: "/api/auth"}, logger, &RouterOptions{
-					AsyncHookTimeout: tc.timeout,
+					AsyncHookTimeout: tt.timeout,
 					HookErrorMode:    HookErrorModeContinue,
 				})
 
@@ -737,7 +788,7 @@ func TestRouterAsyncHookErrorHandling(t *testing.T) {
 					Async: true,
 					Handler: func(ctx *models.RequestContext) error {
 						close(started)
-						return tc.handler(ctx)
+						return tt.handler(ctx)
 					},
 				})
 				registerTestRoute(router, http.MethodGet, "/async", func(w http.ResponseWriter, _ *http.Request) {
@@ -749,7 +800,7 @@ func TestRouterAsyncHookErrorHandling(t *testing.T) {
 				synctest.Wait()
 
 				assert.Equal(t, http.StatusOK, rec.Code)
-				assert.Contains(t, logger.Messages(), tc.wantMessage)
+				assert.Contains(t, logger.Messages(), tt.wantMessage)
 			})
 		})
 	}
@@ -770,11 +821,11 @@ func TestMatchRoutePathWildcardAndRoot(t *testing.T) {
 		{name: "wildcard matches many trailing segments", request: "/foo/bar/baz", pattern: "/foo/*", want: true},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tc.want, matchRoutePath(tc.request, tc.pattern))
+			assert.Equal(t, tt.want, matchRoutePath(tt.request, tt.pattern))
 		})
 	}
 }
