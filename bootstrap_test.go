@@ -18,21 +18,17 @@ import (
 	serviceinterfaces "github.com/Authula/authula/services"
 )
 
-// newIsolatedConfig builds a config with every environment override cleared so
-// the developer environment cannot change bootstrap behaviour.
-func newIsolatedConfig(t *testing.T) *models.Config {
-	t.Helper()
+// newTestConfig returns the default config with a valid test secret. It does
+// not read environment variables, so tests that use it can run in parallel.
+func newTestConfig() *models.Config {
+	cfg := config.NewDefaultConfig()
+	cfg.SecretKey = internaltests.MustDecodeKey(internaltests.EncryptionKeyDevDefault)
 
-	t.Setenv(env.EnvBaseURL, "")
-	t.Setenv(env.EnvSecret, "")
-	t.Setenv(env.EnvSecrets, "")
-	t.Setenv(env.EnvDatabaseURL, "")
-	t.Setenv(env.EnvCookieDomain, "")
-	t.Setenv(env.EnvGoEnvironment, "")
-
-	return config.NewConfig()
+	return cfg
 }
 
+// Not parallel: t.Setenv changes process-wide environment variables and
+// panics when used by a test that calls t.Parallel.
 func TestInitLogger_DefaultLogger(t *testing.T) {
 	original := slog.Default()
 	t.Cleanup(func() { slog.SetDefault(original) })
@@ -83,34 +79,54 @@ func TestInitLogger_DefaultLogger(t *testing.T) {
 }
 
 func TestInitLogger_CustomLoggerIsWrapped(t *testing.T) {
-	original := slog.Default()
-	t.Cleanup(func() { slog.SetDefault(original) })
+	t.Parallel()
 
-	base := new(internaltests.LevelRecordingLogger)
-	cfg := &models.Config{Logger: models.LoggerConfig{Level: "debug", Logger: base}}
+	tests := []struct {
+		name    string
+		level   string
+		message string
+	}{
+		{
+			name:    "custom logger receives info messages",
+			level:   "debug",
+			message: "hello",
+		},
+	}
 
-	logger := InitLogger(cfg)
-	require.NotNil(t, logger)
-	assert.NotSame(t, base, logger, "the configured logger must be wrapped in a fan-out")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	fanout, ok := logger.(models.LoggerFanout)
-	require.True(t, ok, "InitLogger must return a fan-out logger, got %T", logger)
+			original := slog.Default()
+			base := new(internaltests.LevelRecordingLogger)
+			cfg := &models.Config{Logger: models.LoggerConfig{Level: tt.level, Logger: base}}
 
-	sink := new(internaltests.LevelRecordingLogger)
-	detach := fanout.AddLogger(sink)
-	t.Cleanup(detach)
+			logger := InitLogger(cfg)
+			require.NotNil(t, logger)
+			assert.NotSame(t, base, logger, "the configured logger must be wrapped in a fan-out")
 
-	logger.Info("hello", "key", "value")
+			fanout, ok := logger.(models.LoggerFanout)
+			require.True(t, ok, "InitLogger must return a fan-out logger, got %T", logger)
 
-	assert.Equal(t, []string{"hello"}, base.Messages())
-	assert.Equal(t, []string{"hello"}, sink.Messages())
-	assert.Equal(t, original, slog.Default(), "a custom logger must not replace the slog default")
+			sink := new(internaltests.LevelRecordingLogger)
+			detach := fanout.AddLogger(sink)
+			t.Cleanup(detach)
+
+			logger.Info(tt.message, "key", "value")
+
+			assert.Equal(t, []string{tt.message}, base.Messages())
+			assert.Equal(t, []string{tt.message}, sink.Messages())
+			assert.Equal(t, original, slog.Default(), "a custom logger must not replace the slog default")
+		})
+	}
 }
 
 type closeableDB interface {
 	Close() error
 }
 
+// Not parallel: the cases set AUTHULA_DATABASE_URL with t.Setenv, which
+// changes process-wide environment variables.
 func TestInitDatabase(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -169,6 +185,8 @@ func TestInitDatabase(t *testing.T) {
 }
 
 func TestInitEventBus(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		bus     models.EventBusConfig
@@ -201,6 +219,8 @@ func TestInitEventBus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			cfg := &models.Config{EventBus: tt.bus}
 			bus, err := InitEventBus(cfg)
 
@@ -219,18 +239,20 @@ func TestInitEventBus(t *testing.T) {
 }
 
 func TestInitCoreServices(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
-		config  func(t *testing.T) *models.Config
+		config  func() *models.Config
 		wantErr string
 	}{
 		{
 			name:   "registers every core service",
-			config: newIsolatedConfig,
+			config: newTestConfig,
 		},
 		{
 			name: "invalid encryption key",
-			config: func(t *testing.T) *models.Config {
+			config: func() *models.Config {
 				return &models.Config{SecretKey: []byte("short")}
 			},
 			wantErr: "failed to initialize token repository",
@@ -239,7 +261,9 @@ func TestInitCoreServices(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := tt.config(t)
+			t.Parallel()
+
+			cfg := tt.config()
 			registry := internalplugins.NewServiceRegistry()
 
 			var db *bun.DB
@@ -286,25 +310,45 @@ func TestInitCoreServices(t *testing.T) {
 }
 
 func TestInitCoreSystems(t *testing.T) {
-	cfg := newIsolatedConfig(t)
-	sessionService := new(internaltests.MockSessionService)
-	verificationService := new(internaltests.MockVerificationService)
-	coreServices := &serviceinterfaces.CoreServices{
-		SessionService:      sessionService,
-		VerificationService: verificationService,
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		wantNames []string
+	}{
+		{
+			name:      "returns session and verification cleanup systems in order",
+			wantNames: []string{"SessionCleanupSystem", "VerificationCleanupSystem"},
+		},
 	}
 
-	systems := InitCoreSystems(new(internaltests.LevelRecordingLogger), cfg, coreServices)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	require.Len(t, systems, 2)
-	assert.Equal(t, "SessionCleanupSystem", systems[0].Name())
-	assert.Equal(t, "VerificationCleanupSystem", systems[1].Name())
+			cfg := newTestConfig()
+			sessionService := new(internaltests.MockSessionService)
+			verificationService := new(internaltests.MockVerificationService)
+			coreServices := &serviceinterfaces.CoreServices{
+				SessionService:      sessionService,
+				VerificationService: verificationService,
+			}
 
-	for _, system := range systems {
-		require.NoError(t, system.Init(context.Background()))
-		require.NoError(t, system.Close())
+			systems := InitCoreSystems(new(internaltests.LevelRecordingLogger), cfg, coreServices)
+
+			names := make([]string, 0, len(systems))
+			for _, system := range systems {
+				names = append(names, system.Name())
+			}
+			assert.Equal(t, tt.wantNames, names)
+
+			for _, system := range systems {
+				require.NoError(t, system.Init(context.Background()))
+				require.NoError(t, system.Close())
+			}
+
+			sessionService.AssertExpectations(t)
+			verificationService.AssertExpectations(t)
+		})
 	}
-
-	sessionService.AssertExpectations(t)
-	verificationService.AssertExpectations(t)
 }
