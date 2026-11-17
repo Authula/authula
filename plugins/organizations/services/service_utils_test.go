@@ -680,3 +680,22 @@ func TestServiceUtils_ClampPaginationOnANilReceiver(t *testing.T) {
 		utils.ClampPagination(pagination.Params{Page: 0, Limit: 1_000_000}),
 	)
 }
+
+func TestNewServiceUtils_WiresRepositories(t *testing.T) {
+	t.Parallel()
+
+	orgRepo := &orgtests.MockOrganizationRepository{}
+	memberRepo := &orgtests.MockOrganizationMemberRepository{}
+	teamRepo := &orgtests.MockOrganizationTeamRepository{}
+
+	utils := NewServiceUtils(orgRepo, memberRepo, teamRepo, 42)
+
+	require.NotNil(t, utils)
+	require.Equal(t, orgRepo, utils.orgRepo)
+	require.Equal(t, memberRepo, utils.orgMemberRepo)
+	require.Equal(t, teamRepo, utils.orgTeamRepo)
+	require.Equal(t, 42, utils.maxPageLimit)
+
+	clamped := utils.ClampPagination(pagination.Params{Page: 1, Limit: 100})
+	require.Equal(t, 42, clamped.Limit)
+}
