@@ -96,7 +96,7 @@ func TestStateService_CreateUserState(t *testing.T) {
 			name:   "creates banned state",
 			userID: " u1 ",
 			request: admintypes.CreateUserStateRequest{
-				Banned:       true,
+				Banned:       new(true),
 				BannedUntil:  &now,
 				BannedReason: new("reason"),
 			},
@@ -213,7 +213,7 @@ func TestStateService_UpdateUserState(t *testing.T) {
 		{
 			name:    "updates existing state",
 			userID:  " u1 ",
-			request: admintypes.UpsertUserStateRequest{Banned: true, BannedReason: new("reason")},
+			request: admintypes.UpsertUserStateRequest{Banned: new(true), BannedReason: new("reason")},
 			setup: func(usr *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository) {
 				imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
 				usr.On("GetByUserID", mock.Anything, "u1").Return(&admintypes.AdminUserState{UserID: "u1"}, nil).Once()
@@ -425,7 +425,7 @@ func TestStateService_CreateSessionState(t *testing.T) {
 			name:      "creates revoked state with impersonation details",
 			sessionID: " s1 ",
 			request: admintypes.CreateSessionStateRequest{
-				Revoke:                 true,
+				Revoke:                 new(true),
 				RevokedReason:          new("reason"),
 				ImpersonatorUserID:     new("actor"),
 				ImpersonationReason:    new("impersonation"),
@@ -535,7 +535,7 @@ func TestStateService_UpdateSessionState(t *testing.T) {
 		{
 			name:      "updates existing state",
 			sessionID: " s1 ",
-			request:   admintypes.UpsertSessionStateRequest{Revoke: true, RevokedReason: new("reason")},
+			request:   admintypes.UpsertSessionStateRequest{Revoke: new(true), RevokedReason: new("reason")},
 			setup: func(sess *admintests.MockSessionStateRepository) {
 				sess.On("SessionExists", mock.Anything, "s1").Return(true, nil).Once()
 				sess.On("GetBySessionID", mock.Anything, "s1").Return(&admintypes.AdminSessionState{SessionID: "s1"}, nil).Once()
@@ -649,7 +649,7 @@ func TestStateService_UpsertUserState(t *testing.T) {
 			name:   "ban with details",
 			userID: "u1",
 			request: admintypes.UpsertUserStateRequest{
-				Banned:       true,
+				Banned:       new(true),
 				BannedUntil:  &now,
 				BannedReason: new("reason"),
 			},
@@ -669,7 +669,7 @@ func TestStateService_UpsertUserState(t *testing.T) {
 			name:   "unban",
 			userID: "u1",
 			request: admintypes.UpsertUserStateRequest{
-				Banned: false,
+				Banned: new(false),
 			},
 			setup: func(usr *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository) {
 				imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
@@ -691,7 +691,7 @@ func TestStateService_UpsertUserState(t *testing.T) {
 		{
 			name:    "repo error",
 			userID:  "u1",
-			request: admintypes.UpsertUserStateRequest{Banned: false},
+			request: admintypes.UpsertUserStateRequest{Banned: new(false)},
 			setup: func(usr *admintests.MockUserStateRepository, imp *admintests.MockImpersonationRepository) {
 				imp.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
 				usr.On("Upsert", mock.Anything, mock.Anything).Return(upsertErr).Once()
@@ -887,7 +887,7 @@ func TestStateService_UpsertSessionState(t *testing.T) {
 		{
 			name:      "revoke",
 			sessionID: "s1",
-			request:   admintypes.UpsertSessionStateRequest{Revoke: true, RevokedReason: new("r")},
+			request:   admintypes.UpsertSessionStateRequest{Revoke: new(true), RevokedReason: new("r")},
 			actor:     new("actor"),
 			setup: func(sess *admintests.MockSessionStateRepository) {
 				sess.On("SessionExists", mock.Anything, "s1").Return(true, nil).Once()

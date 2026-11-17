@@ -79,7 +79,7 @@ func TestStateUseCase_UpsertUserState(t *testing.T) {
 		{
 			name:    "forwards trimmed id to service",
 			userID:  " u1 ",
-			request: admintypes.UpsertUserStateRequest{Banned: true},
+			request: admintypes.UpsertUserStateRequest{Banned: new(true)},
 			setup: func(userStateRepo *admintests.MockUserStateRepository, impRepo *admintests.MockImpersonationRepository) {
 				impRepo.On("UserExists", mock.Anything, "u1").Return(true, nil).Once()
 				userStateRepo.On("Upsert", mock.Anything, mock.MatchedBy(func(s *admintypes.AdminUserState) bool {
@@ -263,7 +263,7 @@ func TestStateUseCase_UpsertSessionState(t *testing.T) {
 		{
 			name:      "forwards trimmed id",
 			sessionID: " s1 ",
-			request:   admintypes.UpsertSessionStateRequest{Revoke: true},
+			request:   admintypes.UpsertSessionStateRequest{Revoke: new(true)},
 			setup: func(sessionStateRepo *admintests.MockSessionStateRepository) {
 				sessionStateRepo.On("SessionExists", mock.Anything, "s1").Return(true, nil).Once()
 				sessionStateRepo.On("Upsert", mock.Anything, mock.MatchedBy(func(s *admintypes.AdminSessionState) bool {
@@ -825,7 +825,7 @@ func TestStateUseCase_UpdateUserState(t *testing.T) {
 				userID = " "
 			}
 
-			state, err := uc.UpdateUserState(context.Background(), internaltests.TestActor(), userID, admintypes.UpsertUserStateRequest{Banned: true}, nil)
+			state, err := uc.UpdateUserState(context.Background(), internaltests.TestActor(), userID, admintypes.UpsertUserStateRequest{Banned: new(true)}, nil)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Nil(t, state)
@@ -927,7 +927,7 @@ func TestStateUseCase_UpdateSessionState(t *testing.T) {
 				sessionID = " "
 			}
 
-			state, err := uc.UpdateSessionState(context.Background(), internaltests.TestActor(), sessionID, admintypes.UpsertSessionStateRequest{Revoke: true}, nil)
+			state, err := uc.UpdateSessionState(context.Background(), internaltests.TestActor(), sessionID, admintypes.UpsertSessionStateRequest{Revoke: new(true)}, nil)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Nil(t, state)

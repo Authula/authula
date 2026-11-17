@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 
@@ -56,6 +57,29 @@ func TestCreateUserStateHandler(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:            "rejects banned until in the past",
+			body:            internaltests.MarshalToJSON(t, map[string]any{"banned": true, "banned_until": time.Now().Add(-time.Hour)}),
+			expectedStatus:  http.StatusUnprocessableEntity,
+			expectedMessage: "banned until time must be in the future",
+		},
+		{
+			name:            "rejects missing banned field",
+			body:            []byte("{}"),
+			expectedStatus:  http.StatusUnprocessableEntity,
+			expectedMessage: "Key: 'CreateUserStateRequest.Banned' Error:Field validation for 'Banned' failed on the 'required' tag",
+		},
+		{
+			name: "success with banned false",
+			body: []byte(`{"banned": false}`),
+			setup: func(userStateRepo *admintests.MockUserStateRepository, impRepo *admintests.MockImpersonationRepository) {
+				impRepo.On("UserExists", mock.Anything, "user-1").Return(true, nil).Once()
+				userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return((*types.AdminUserState)(nil), nil).Once()
+				userStateRepo.On("Create", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(nil).Once()
+				userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(&types.AdminUserState{UserID: "user-1", Banned: false}, nil).Once()
+			},
+			expectedStatus: http.StatusCreated,
+		},
 	}
 
 	for _, tc := range tests {
@@ -70,7 +94,7 @@ func TestCreateUserStateHandler(t *testing.T) {
 
 			body := tc.body
 			if body == nil {
-				body = internaltests.MarshalToJSON(t, types.CreateUserStateRequest{Banned: true})
+				body = internaltests.MarshalToJSON(t, types.CreateUserStateRequest{Banned: new(true)})
 			}
 
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/users/user-1/state", body, nil)
@@ -214,6 +238,34 @@ func TestUpdateUserStateHandler(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:            "rejects banned until in the past",
+			body:            internaltests.MarshalToJSON(t, map[string]any{"banned": true, "banned_until": time.Now().Add(-time.Hour)}),
+			expectedStatus:  http.StatusUnprocessableEntity,
+			expectedMessage: "banned until time must be in the future",
+		},
+		{
+			name: "success with future banned until",
+			body: internaltests.MarshalToJSON(t, map[string]any{"banned": true, "banned_until": time.Now().Add(time.Hour)}),
+			setup: func(userStateRepo *admintests.MockUserStateRepository, impRepo *admintests.MockImpersonationRepository) {
+				impRepo.On("UserExists", mock.Anything, "user-1").Return(true, nil).Once()
+				userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(&types.AdminUserState{UserID: "user-1"}, nil).Once()
+				userStateRepo.On("Update", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(nil).Once()
+				userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(&types.AdminUserState{UserID: "user-1", Banned: true}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "success with banned false",
+			body: []byte(`{"banned": false}`),
+			setup: func(userStateRepo *admintests.MockUserStateRepository, impRepo *admintests.MockImpersonationRepository) {
+				impRepo.On("UserExists", mock.Anything, "user-1").Return(true, nil).Once()
+				userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(&types.AdminUserState{UserID: "user-1"}, nil).Once()
+				userStateRepo.On("Update", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(nil).Once()
+				userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(&types.AdminUserState{UserID: "user-1", Banned: false}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+		},
 	}
 
 	for _, tc := range tests {
@@ -228,7 +280,7 @@ func TestUpdateUserStateHandler(t *testing.T) {
 
 			body := tc.body
 			if body == nil {
-				body = internaltests.MarshalToJSON(t, types.UpsertUserStateRequest{Banned: true})
+				body = internaltests.MarshalToJSON(t, types.UpsertUserStateRequest{Banned: new(true)})
 			}
 
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/users/user-1/state", body, nil)
@@ -292,6 +344,22 @@ func TestUpsertUserStateHandler(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:            "rejects banned until in the past",
+			body:            internaltests.MarshalToJSON(t, map[string]any{"banned": true, "banned_until": time.Now().Add(-time.Hour)}),
+			expectedStatus:  http.StatusUnprocessableEntity,
+			expectedMessage: "banned until time must be in the future",
+		},
+		{
+			name: "success with banned false",
+			body: []byte(`{"banned": false}`),
+			setup: func(userStateRepo *admintests.MockUserStateRepository, _ *admintests.MockSessionStateRepository, impRepo *admintests.MockImpersonationRepository) {
+				impRepo.On("UserExists", mock.Anything, "user-1").Return(true, nil).Once()
+				userStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminUserState")).Return(nil).Once()
+				userStateRepo.On("GetByUserID", mock.Anything, "user-1").Return(&types.AdminUserState{UserID: "user-1", Banned: false}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+		},
 	}
 
 	for _, tc := range tests {
@@ -304,7 +372,7 @@ func TestUpsertUserStateHandler(t *testing.T) {
 			}
 			handler := adminhandlers.NewUpsertUserStateHandler(useCase)
 
-			request := types.UpsertUserStateRequest{Banned: true}
+			request := types.UpsertUserStateRequest{Banned: new(true)}
 			body := tc.body
 			if body == nil {
 				body = internaltests.MarshalToJSON(t, request)
@@ -491,6 +559,12 @@ func TestBanUserHandler(t *testing.T) {
 					t.Fatalf("expected state, got %v", payload)
 				}
 			},
+		},
+		{
+			name:            "rejects banned until in the past",
+			body:            internaltests.MarshalToJSON(t, map[string]any{"banned_until": time.Now().Add(-time.Hour)}),
+			expectedStatus:  http.StatusUnprocessableEntity,
+			expectedMessage: "banned until time must be in the future",
 		},
 	}
 

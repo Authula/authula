@@ -288,16 +288,20 @@ func TestUserStateRequests_Validate(t *testing.T) {
 	}{
 		{
 			name:    "create_accepts_banned_without_expiry",
-			request: &CreateUserStateRequest{Banned: true},
+			request: &CreateUserStateRequest{Banned: new(true)},
 		},
 		{
 			name:    "create_accepts_banned_with_future_expiry",
-			request: &CreateUserStateRequest{Banned: true, BannedUntil: new(now.Add(time.Hour))},
+			request: &CreateUserStateRequest{Banned: new(true), BannedUntil: new(now.Add(time.Hour))},
 		},
 		{
 			name:    "create_rejects_banned_with_past_expiry",
-			request: &CreateUserStateRequest{Banned: true, BannedUntil: new(now.Add(-time.Hour))},
+			request: &CreateUserStateRequest{Banned: new(true), BannedUntil: new(now.Add(-time.Hour))},
 			wantIs:  constants.ErrBannedUntilBeforeNow,
+		},
+		{
+			name:    "create_accepts_explicit_unbanned",
+			request: &CreateUserStateRequest{Banned: new(false)},
 		},
 		{
 			name:    "create_rejects_unbanned_zero_value",
@@ -306,15 +310,15 @@ func TestUserStateRequests_Validate(t *testing.T) {
 		},
 		{
 			name:    "upsert_accepts_banned_without_expiry",
-			request: &UpsertUserStateRequest{Banned: true},
+			request: &UpsertUserStateRequest{Banned: new(true)},
 		},
 		{
 			name:    "upsert_accepts_banned_with_future_expiry",
-			request: &UpsertUserStateRequest{Banned: true, BannedUntil: new(now.Add(time.Hour))},
+			request: &UpsertUserStateRequest{Banned: new(true), BannedUntil: new(now.Add(time.Hour))},
 		},
 		{
 			name:    "upsert_rejects_banned_with_past_expiry",
-			request: &UpsertUserStateRequest{Banned: true, BannedUntil: new(now.Add(-time.Hour))},
+			request: &UpsertUserStateRequest{Banned: new(true), BannedUntil: new(now.Add(-time.Hour))},
 			wantIs:  constants.ErrBannedUntilBeforeNow,
 		},
 		{
@@ -394,22 +398,26 @@ func TestSessionStateRequests_Validate(t *testing.T) {
 	}{
 		{
 			name:    "create_accepts_revoked_session",
-			request: &CreateSessionStateRequest{Revoke: true},
+			request: &CreateSessionStateRequest{Revoke: new(true)},
 		},
 		{
 			name: "create_accepts_future_impersonation_expiry",
 			request: &CreateSessionStateRequest{
-				Revoke:                 true,
+				Revoke:                 new(true),
 				ImpersonationExpiresAt: new(now.Add(time.Hour)),
 			},
 		},
 		{
 			name: "create_rejects_past_impersonation_expiry",
 			request: &CreateSessionStateRequest{
-				Revoke:                 true,
+				Revoke:                 new(true),
 				ImpersonationExpiresAt: new(now.Add(-time.Hour)),
 			},
 			wantIs: constants.ErrImpersonationExpiresAtBeforeNow,
+		},
+		{
+			name:    "create_accepts_explicit_not_revoked",
+			request: &CreateSessionStateRequest{Revoke: new(false)},
 		},
 		{
 			name:    "create_rejects_zero_value",
@@ -418,19 +426,19 @@ func TestSessionStateRequests_Validate(t *testing.T) {
 		},
 		{
 			name:    "upsert_accepts_revoked_session",
-			request: &UpsertSessionStateRequest{Revoke: true},
+			request: &UpsertSessionStateRequest{Revoke: new(true)},
 		},
 		{
 			name: "upsert_accepts_future_impersonation_expiry",
 			request: &UpsertSessionStateRequest{
-				Revoke:                 true,
+				Revoke:                 new(true),
 				ImpersonationExpiresAt: new(now.Add(time.Hour)),
 			},
 		},
 		{
 			name: "upsert_rejects_past_impersonation_expiry",
 			request: &UpsertSessionStateRequest{
-				Revoke:                 true,
+				Revoke:                 new(true),
 				ImpersonationExpiresAt: new(now.Add(-time.Hour)),
 			},
 			wantIs: constants.ErrImpersonationExpiresAtBeforeNow,
