@@ -196,54 +196,92 @@ func TestNewCoreAPI_SignOut(t *testing.T) {
 func TestCoreRoutes(t *testing.T) {
 	t.Parallel()
 
-	userService := &internaltests.MockUserService{}
-	sessionService := &internaltests.MockSessionService{}
+	tests := []struct {
+		name       string
+		routeIndex int
+		wantMethod string
+		wantPath   string
+	}{
+		{name: "get me route", routeIndex: 0, wantMethod: http.MethodGet, wantPath: "/me"},
+		{name: "sign out route", routeIndex: 1, wantMethod: http.MethodPost, wantPath: "/sign-out"},
+	}
 
-	routes := core.CoreRoutes(&internaltests.MockLogger{}, userService, sessionService)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	require.Len(t, routes, 2)
+			routes := core.CoreRoutes(&internaltests.MockLogger{}, &internaltests.MockUserService{}, &internaltests.MockSessionService{})
 
-	assert.Equal(t, http.MethodGet, routes[0].Method)
-	assert.Equal(t, "/me", routes[0].Path)
-	assert.Len(t, routes[0].Middleware, 1)
-	require.NotNil(t, routes[0].Handler)
+			require.Len(t, routes, 2)
+			route := routes[tt.routeIndex]
+			assert.Equal(t, tt.wantMethod, route.Method)
+			assert.Equal(t, tt.wantPath, route.Path)
+			assert.Len(t, route.Middleware, 1)
+			require.NotNil(t, route.Handler)
+		})
+	}
+}
 
-	assert.Equal(t, http.MethodPost, routes[1].Method)
-	assert.Equal(t, "/sign-out", routes[1].Path)
-	assert.Len(t, routes[1].Middleware, 1)
-	require.NotNil(t, routes[1].Handler)
+func TestCoreRoutes_DelegatesToServices(t *testing.T) {
+	t.Parallel()
 
-	t.Run("get me route delegates to the user service", func(t *testing.T) {
-		user := &models.User{ID: "user-1", Name: "Test User", Email: "user@example.com"}
-		userService.On("GetByID", mock.Anything, "user-1").Return(user, nil)
+	user := &models.User{ID: "user-1", Name: "Test User", Email: "user@example.com"}
 
-		req, recorder, reqCtx := internaltests.NewHandlerRequest(t, http.MethodGet, "/me", nil, new("user-1"))
+	tests := []struct {
+		name           string
+		routeIndex     int
+		method         string
+		path           string
+		body           []byte
+		configure      func(*internaltests.MockUserService, *internaltests.MockSessionService)
+		assertResponse func(t *testing.T, reqCtx *models.RequestContext)
+	}{
+		{
+			name:       "get me route delegates to the user service",
+			routeIndex: 0,
+			method:     http.MethodGet,
+			path:       "/me",
+			configure: func(userService *internaltests.MockUserService, _ *internaltests.MockSessionService) {
+				userService.On("GetByID", mock.Anything, "user-1").Return(user, nil)
+			},
+			assertResponse: func(t *testing.T, reqCtx *models.RequestContext) {
+				response := internaltests.DecodeResponseJSON[coretypes.GetMeResponse](t, reqCtx)
+				assert.Equal(t, user, response.User)
+			},
+		},
+		{
+			name:       "sign out route delegates to the session service",
+			routeIndex: 1,
+			method:     http.MethodPost,
+			path:       "/sign-out",
+			body:       []byte(`{"sign_out_all":true}`),
+			configure: func(_ *internaltests.MockUserService, sessionService *internaltests.MockSessionService) {
+				sessionService.On("DeleteAllByUserID", mock.Anything, "user-1").Return(nil)
+			},
+			assertResponse: func(t *testing.T, reqCtx *models.RequestContext) {
+				assert.Equal(t, true, reqCtx.Values[models.ContextAuthSignOut.String()])
+				response := internaltests.DecodeResponseJSON[coretypes.SignOutResponse](t, reqCtx)
+				assert.Equal(t, "signed out from all sessions", response.Message)
+			},
+		},
+	}
 
-		routes[0].Handler.ServeHTTP(recorder, req)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		assert.Equal(t, http.StatusOK, reqCtx.ResponseStatus)
-		response := internaltests.DecodeResponseJSON[coretypes.GetMeResponse](t, reqCtx)
-		assert.Equal(t, user, response.User)
-		userService.AssertExpectations(t)
-	})
+			userService := &internaltests.MockUserService{}
+			sessionService := &internaltests.MockSessionService{}
+			tt.configure(userService, sessionService)
+			routes := core.CoreRoutes(&internaltests.MockLogger{}, userService, sessionService)
+			req, recorder, reqCtx := internaltests.NewHandlerRequest(t, tt.method, tt.path, tt.body, new("user-1"))
 
-	t.Run("sign out route delegates to the session service", func(t *testing.T) {
-		sessionService.On("DeleteAllByUserID", mock.Anything, "user-1").Return(nil)
+			routes[tt.routeIndex].Handler.ServeHTTP(recorder, req)
 
-		req, recorder, reqCtx := internaltests.NewHandlerRequest(
-			t,
-			http.MethodPost,
-			"/sign-out",
-			[]byte(`{"sign_out_all":true}`),
-			new("user-1"),
-		)
-
-		routes[1].Handler.ServeHTTP(recorder, req)
-
-		assert.Equal(t, http.StatusOK, reqCtx.ResponseStatus)
-		assert.Equal(t, true, reqCtx.Values[models.ContextAuthSignOut.String()])
-		response := internaltests.DecodeResponseJSON[coretypes.SignOutResponse](t, reqCtx)
-		assert.Equal(t, "signed out from all sessions", response.Message)
-		sessionService.AssertExpectations(t)
-	})
+			assert.Equal(t, http.StatusOK, reqCtx.ResponseStatus)
+			tt.assertResponse(t, reqCtx)
+			userService.AssertExpectations(t)
+			sessionService.AssertExpectations(t)
+		})
+	}
 }
