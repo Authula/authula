@@ -1022,68 +1022,131 @@ func TestAuthActorHelpers(t *testing.T) {
 func TestAuthCoreMigrations(t *testing.T) {
 	t.Parallel()
 
-	t.Run("uninitialized manager returns an error", func(t *testing.T) {
-		t.Parallel()
-
-		auth := &Auth{}
-		assert.EqualError(t, auth.RunCoreMigrations(context.Background()), "migrator not initialized")
-		assert.EqualError(t, auth.DropCoreMigrations(context.Background()), "migrator not initialized")
-	})
-
-	t.Run("sqlite run and drop", func(t *testing.T) {
-		t.Parallel()
+	uninitializedAuth := func(*testing.T) *Auth { return &Auth{} }
+	sqliteAuth := func(t *testing.T) *Auth {
+		t.Helper()
 
 		auth := newComposedAuth(t)
 		t.Cleanup(func() { _ = auth.EventBus().Close() })
+		return auth
+	}
 
-		require.NoError(t, auth.DropCoreMigrations(context.Background()))
-		require.NoError(t, auth.RunCoreMigrations(context.Background()))
-	})
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T) *Auth
+		act     func(*Auth) error
+		wantErr string
+	}{
+		{
+			name:    "run without an initialized migrator returns an error",
+			setup:   uninitializedAuth,
+			act:     func(auth *Auth) error { return auth.RunCoreMigrations(context.Background()) },
+			wantErr: "migrator not initialized",
+		},
+		{
+			name:    "drop without an initialized migrator returns an error",
+			setup:   uninitializedAuth,
+			act:     func(auth *Auth) error { return auth.DropCoreMigrations(context.Background()) },
+			wantErr: "migrator not initialized",
+		},
+		{
+			name:  "run core migrations on sqlite",
+			setup: sqliteAuth,
+			act:   func(auth *Auth) error { return auth.RunCoreMigrations(context.Background()) },
+		},
+		{
+			name:  "drop core migrations on sqlite",
+			setup: sqliteAuth,
+			act:   func(auth *Auth) error { return auth.DropCoreMigrations(context.Background()) },
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			auth := tc.setup(t)
+
+			err := tc.act(auth)
+			if tc.wantErr != "" {
+				assert.EqualError(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }
 
 func TestAuthClosePlugins(t *testing.T) {
 	t.Parallel()
 
-	t.Run("nil registry", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name              string
+		withRegistry      bool
+		wantCloseAllCalls int
+	}{
+		{
+			name: "nil registry",
+		},
+		{
+			name:              "closes every registered plugin",
+			withRegistry:      true,
+			wantCloseAllCalls: 1,
+		},
+	}
 
-		auth := &Auth{}
-		require.NoError(t, auth.ClosePlugins())
-	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("closes every registered plugin", func(t *testing.T) {
-		t.Parallel()
+			registry := &fakeAuthPluginRegistry{}
+			auth := &Auth{}
+			if tc.withRegistry {
+				auth.PluginRegistry = registry
+			}
 
-		registry := &fakeAuthPluginRegistry{}
-		auth := &Auth{PluginRegistry: registry}
-
-		require.NoError(t, auth.ClosePlugins())
-		assert.Equal(t, 1, registry.closeAllCalls)
-	})
+			require.NoError(t, auth.ClosePlugins())
+			assert.Equal(t, tc.wantCloseAllCalls, registry.closeAllCalls)
+		})
+	}
 }
 
 func TestAuthCloseSystems(t *testing.T) {
 	t.Parallel()
 
-	t.Run("no systems", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name          string
+		systems       []*fakeAuthSystem
+		wantErrorLogs []string
+	}{
+		{
+			name: "no systems",
+		},
+		{
+			name: "closes systems and logs failures",
+			systems: []*fakeAuthSystem{
+				{name: "ok"},
+				{name: "failing", closeErr: errors.New("close failed")},
+			},
+			wantErrorLogs: []string{"failed to close core system"},
+		},
+	}
 
-		auth := &Auth{}
-		require.NoError(t, auth.CloseSystems())
-	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("closes systems and logs failures", func(t *testing.T) {
-		t.Parallel()
+			logger := &internaltests.RecordingLogger{}
+			auth := &Auth{logger: logger}
+			for _, system := range tc.systems {
+				auth.systems = append(auth.systems, system)
+			}
 
-		logger := &internaltests.RecordingLogger{}
-		okSystem := &fakeAuthSystem{name: "ok"}
-		failingSystem := &fakeAuthSystem{name: "failing", closeErr: errors.New("close failed")}
-
-		auth := &Auth{logger: logger, systems: []models.CoreSystem{okSystem, failingSystem}}
-
-		require.NoError(t, auth.CloseSystems())
-		assert.Equal(t, 1, okSystem.closeCalls)
-		assert.Equal(t, 1, failingSystem.closeCalls)
-		assert.Equal(t, []string{"failed to close core system"}, logger.ErrorCalls)
-	})
+			require.NoError(t, auth.CloseSystems())
+			for _, system := range tc.systems {
+				assert.Equal(t, 1, system.closeCalls, "system %s", system.name)
+			}
+			assert.Equal(t, tc.wantErrorLogs, logger.ErrorCalls)
+		})
+	}
 }
