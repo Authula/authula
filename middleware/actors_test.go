@@ -10,8 +10,6 @@ import (
 	"github.com/Authula/authula/models"
 )
 
-// newActorRequest builds a request whose context already carries a
-// RequestContext, as the router does before running middleware.
 func newActorRequest(actor *models.Actor) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "/auth/me", nil)
 	reqCtx := &models.RequestContext{
