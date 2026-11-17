@@ -1,6 +1,7 @@
 package apikey
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -264,6 +265,172 @@ func TestApiKeyPluginHook_ValidateApiKey(t *testing.T) {
 			mockOrgService.AssertExpectations(t)
 			if rateLimitService != nil {
 				rateLimitService.AssertExpectations(t)
+			}
+		})
+	}
+}
+
+func TestApiKeyPluginHook_ValidateApiKeyErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		apiKey          *types.ApiKey
+		verifyErr       error
+		userSetup       func(*internaltests.MockUserService)
+		orgSetup        func(*internaltests.MockOrganizationService)
+		omitOrgService  bool
+		recordErr       error
+		rateLimitSetup  func(*internaltests.MockRateLimitService)
+		expectedStatus  int
+		expectedHandled bool
+		expectedActor   bool
+	}{
+		{
+			name:            "verify_error_returns_internal_error",
+			verifyErr:       errors.New("boom"),
+			expectedStatus:  http.StatusInternalServerError,
+			expectedHandled: true,
+		},
+		{
+			name:   "user_lookup_error_returns_internal_error",
+			apiKey: &types.ApiKey{ID: "api-key-1", OwnerID: "user-1", OwnerType: types.OwnerTypeUser},
+			userSetup: func(us *internaltests.MockUserService) {
+				us.On("GetByID", mock.Anything, "user-1").Return(nil, errors.New("boom")).Once()
+			},
+			expectedStatus:  http.StatusInternalServerError,
+			expectedHandled: true,
+		},
+		{
+			name:            "organization_service_nil_returns_internal_error",
+			apiKey:          &types.ApiKey{ID: "api-key-1", OwnerID: "org-1", OwnerType: types.OwnerTypeOrganization},
+			omitOrgService:  true,
+			expectedStatus:  http.StatusInternalServerError,
+			expectedHandled: true,
+		},
+		{
+			name:   "organization_lookup_error_returns_internal_error",
+			apiKey: &types.ApiKey{ID: "api-key-1", OwnerID: "org-1", OwnerType: types.OwnerTypeOrganization},
+			orgSetup: func(os *internaltests.MockOrganizationService) {
+				os.On("ExistsByID", mock.Anything, "org-1").Return(false, errors.New("boom")).Once()
+			},
+			expectedStatus:  http.StatusInternalServerError,
+			expectedHandled: true,
+		},
+		{
+			name:            "unknown_owner_type_returns_internal_error",
+			apiKey:          &types.ApiKey{ID: "api-key-1", OwnerID: "owner-1", OwnerType: "machine"},
+			expectedStatus:  http.StatusInternalServerError,
+			expectedHandled: true,
+		},
+		{
+			name:   "record_last_request_error_returns_internal_error",
+			apiKey: &types.ApiKey{ID: "api-key-1", OwnerID: "user-1", OwnerType: types.OwnerTypeUser},
+			userSetup: func(us *internaltests.MockUserService) {
+				us.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1"}, nil).Once()
+			},
+			recordErr:       errors.New("boom"),
+			expectedStatus:  http.StatusInternalServerError,
+			expectedHandled: true,
+			expectedActor:   true,
+		},
+		{
+			name:   "rate_limit_rule_lookup_error_fails_open",
+			apiKey: &types.ApiKey{ID: "api-key-1", OwnerID: "user-1", OwnerType: types.OwnerTypeUser, RateLimitEnabled: true},
+			userSetup: func(us *internaltests.MockUserService) {
+				us.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1"}, nil).Once()
+			},
+			rateLimitSetup: func(rs *internaltests.MockRateLimitService) {
+				rs.On("GetRule", mock.Anything, mock.Anything).Return(nil, errors.New("boom")).Once()
+			},
+			expectedActor: true,
+		},
+		{
+			name:   "rate_limit_check_error_fails_open",
+			apiKey: &types.ApiKey{ID: "api-key-1", OwnerID: "user-1", OwnerType: types.OwnerTypeUser, RateLimitEnabled: true},
+			userSetup: func(us *internaltests.MockUserService) {
+				us.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1"}, nil).Once()
+			},
+			rateLimitSetup: func(rs *internaltests.MockRateLimitService) {
+				rs.On("GetRule", mock.Anything, mock.Anything).Return(&rootservices.RateLimitKeyRule{Window: time.Minute, MaxRequests: 5}, nil).Once()
+				rs.On("CheckAndIncrement", mock.Anything, mock.Anything, time.Minute, 5).Return(false, 0, time.Time{}, errors.New("boom")).Once()
+			},
+			expectedActor: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			service := &apiKeyTests.MockApiKeyService{}
+			service.On("Verify", mock.Anything, types.VerifyApiKeyRequest{Key: "good-key"}).Return(func() *types.VerifyApiKeyResult {
+				if tc.verifyErr != nil {
+					return nil
+				}
+				return &types.VerifyApiKeyResult{Valid: true, ApiKey: tc.apiKey}
+			}(), tc.verifyErr).Once()
+
+			recordAPIKey := tc.apiKey
+			if recordAPIKey == nil {
+				recordAPIKey = &types.ApiKey{ID: "api-key-1"}
+			}
+			if tc.verifyErr == nil && tc.apiKey != nil {
+				service.On("RecordLastRequest", mock.Anything, recordAPIKey.ID, mock.Anything).Return(recordAPIKey, tc.recordErr).Maybe()
+			}
+
+			mockUserService := &internaltests.MockUserService{}
+			if tc.userSetup != nil {
+				tc.userSetup(mockUserService)
+			}
+
+			mockOrgService := &internaltests.MockOrganizationService{}
+			if tc.orgSetup != nil {
+				tc.orgSetup(mockOrgService)
+			}
+
+			var rateLimiterService rootservices.RateLimiterService
+			var mockRateLimitService *internaltests.MockRateLimitService
+			if tc.rateLimitSetup != nil {
+				mockRateLimitService = &internaltests.MockRateLimitService{}
+				tc.rateLimitSetup(mockRateLimitService)
+				rateLimiterService = mockRateLimitService
+			}
+
+			plugin := &ApiKeyPlugin{
+				config:              types.ApiKeyPluginConfig{Header: "X-Test-API-Key"},
+				logger:              &internaltests.MockLogger{},
+				pluginCtx:           &models.PluginContext{Logger: &internaltests.MockLogger{}},
+				rateLimiterService:  rateLimiterService,
+				userService:         mockUserService,
+				organizationService: mockOrgService,
+				Api:                 NewAPI(service),
+			}
+			if tc.omitOrgService {
+				plugin.organizationService = nil
+			}
+
+			reqCtx := internaltests.NewRequestContext(t, http.MethodGet, "/protected", map[string]string{"X-Test-API-Key": "good-key"})
+
+			err := plugin.validateApiKeyHook()(reqCtx)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedHandled, reqCtx.Handled)
+			if tc.expectedStatus != 0 {
+				assert.Equal(t, tc.expectedStatus, reqCtx.ResponseStatus)
+			}
+			if tc.expectedActor {
+				assert.NotNil(t, reqCtx.Actor)
+			} else {
+				assert.Nil(t, reqCtx.Actor)
+			}
+			assert.Empty(t, reqCtx.ResponseWriter.Header().Get("X-RateLimit-Limit"))
+
+			service.AssertExpectations(t)
+			mockUserService.AssertExpectations(t)
+			mockOrgService.AssertExpectations(t)
+			if mockRateLimitService != nil {
+				mockRateLimitService.AssertExpectations(t)
 			}
 		})
 	}

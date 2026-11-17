@@ -468,3 +468,56 @@ func TestBunApiKeyRepository_WithTx(t *testing.T) {
 		t.Fatal("expected tx key to persist after commit")
 	}
 }
+
+func TestBunApiKeyRepository_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	ownerType := types.OwnerTypeUser
+	ownerID := "user-1"
+
+	tests := []struct {
+		name string
+		call func(interface {
+			GetAll(context.Context, *string, *string, int, int) ([]*types.ApiKey, int, error)
+			Update(context.Context, *types.ApiKey) (*types.ApiKey, error)
+		}) error
+	}{
+		{
+			name: "get_all_closed_database",
+			call: func(repo interface {
+				GetAll(context.Context, *string, *string, int, int) ([]*types.ApiKey, int, error)
+				Update(context.Context, *types.ApiKey) (*types.ApiKey, error)
+			}) error {
+				_, _, err := repo.GetAll(ctx, &ownerType, &ownerID, 1, 10)
+				return err
+			},
+		},
+		{
+			name: "update_closed_database",
+			call: func(repo interface {
+				GetAll(context.Context, *string, *string, int, int) ([]*types.ApiKey, int, error)
+				Update(context.Context, *types.ApiKey) (*types.ApiKey, error)
+			}) error {
+				_, err := repo.Update(ctx, createTestApiKey("api-key-1", types.OwnerTypeUser, ownerID))
+				return err
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := newTestApiKeyDB(t)
+			repo := NewBunApiKeyRepository(db)
+			if err := db.Close(); err != nil {
+				t.Fatalf("failed to close db: %v", err)
+			}
+
+			if err := tc.call(repo); err == nil {
+				t.Fatal("expected an error from a closed database")
+			}
+		})
+	}
+}
