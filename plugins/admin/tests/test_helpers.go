@@ -12,6 +12,7 @@ import (
 	adminservices "github.com/Authula/authula/plugins/admin/services"
 	"github.com/Authula/authula/plugins/admin/types"
 	"github.com/Authula/authula/plugins/admin/usecases"
+	rootservices "github.com/Authula/authula/services"
 )
 
 func PtrTime(t *testing.T, offset int) *time.Time {
@@ -24,6 +25,42 @@ func NewUsersUseCaseFixture() (usecases.UsersUseCase, *internaltests.MockUserRep
 	mockUserRepo := &internaltests.MockUserRepository{}
 	service := adminservices.NewUsersService(mockUserRepo)
 	return usecases.NewUsersUseCase(service, &internaltests.NoopAuthorizer{}), mockUserRepo
+}
+
+type MockAccessControlService struct {
+	mock.Mock
+}
+
+func (m *MockAccessControlService) RoleExists(ctx context.Context, roleName string) (bool, error) {
+	args := m.Called(ctx, roleName)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockAccessControlService) GetRolePermissionsByName(ctx context.Context, roleName string) ([]string, error) {
+	args := m.Called(ctx, roleName)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockAccessControlService) GetRoleWeightByName(ctx context.Context, roleName string) (int, error) {
+	args := m.Called(ctx, roleName)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *MockAccessControlService) ValidatePermissionKeys(ctx context.Context, permissionKeys []string) error {
+	args := m.Called(ctx, permissionKeys)
+	return args.Error(0)
+}
+
+func (m *MockAccessControlService) EnsurePermissions(ctx context.Context, permissions []rootservices.PermissionDefinition) error {
+	args := m.Called(ctx, permissions)
+	return args.Error(0)
+}
+
+func NewAccessControlServiceFixture() *MockAccessControlService {
+	return &MockAccessControlService{}
 }
 
 type MockPasswordService struct {
