@@ -25,13 +25,13 @@ func TestCreateUserRequest_Validate(t *testing.T) {
 	}{
 		{
 			name:    "accepts_required_fields",
-			request: CreateUserRequest{Name: "Ada Lovelace", Email: "ada@example.com"},
+			request: CreateUserRequest{Name: "John Doe", Email: "john.doe@example.com"},
 		},
 		{
 			name: "accepts_all_optional_fields",
 			request: CreateUserRequest{
-				Name:          "Ada Lovelace",
-				Email:         "ada@example.com",
+				Name:          "John Doe",
+				Email:         "john.doe@example.com",
 				EmailVerified: new(true),
 				Image:         new("/avatar.png"),
 				Metadata:      map[string]any{"plan": "pro"},
@@ -39,17 +39,17 @@ func TestCreateUserRequest_Validate(t *testing.T) {
 		},
 		{
 			name:    "rejects_missing_name",
-			request: CreateUserRequest{Email: "ada@example.com"},
+			request: CreateUserRequest{Email: "john.doe@example.com"},
 			wantErr: true,
 		},
 		{
 			name:    "rejects_missing_email",
-			request: CreateUserRequest{Name: "Ada Lovelace"},
+			request: CreateUserRequest{Name: "John Doe"},
 			wantErr: true,
 		},
 		{
 			name:    "rejects_invalid_email",
-			request: CreateUserRequest{Name: "Ada Lovelace", Email: "not-an-email"},
+			request: CreateUserRequest{Name: "John Doe", Email: "not-an-email"},
 			wantErr: true,
 		},
 	}
@@ -84,11 +84,11 @@ func TestUpdateUserRequest_Validate(t *testing.T) {
 		},
 		{
 			name:    "accepts_name_only",
-			request: UpdateUserRequest{Name: new("Ada Lovelace")},
+			request: UpdateUserRequest{Name: new("John Doe")},
 		},
 		{
 			name:    "accepts_valid_email_only",
-			request: UpdateUserRequest{Email: new("ada@example.com")},
+			request: UpdateUserRequest{Email: new("john.doe@example.com")},
 		},
 		{
 			name:    "rejects_invalid_email",
@@ -640,19 +640,19 @@ func TestCreateUserRequest_JSONOmitempty(t *testing.T) {
 	}{
 		{
 			name:    "omits_unset_optionals",
-			request: CreateUserRequest{Name: "Ada", Email: "ada@example.com"},
-			want:    `{"name":"Ada","email":"ada@example.com"}`,
+			request: CreateUserRequest{Name: "John", Email: "john.doe@example.com"},
+			want:    `{"name":"John","email":"john.doe@example.com"}`,
 		},
 		{
 			name: "includes_populated_optionals",
 			request: CreateUserRequest{
-				Name:          "Ada",
-				Email:         "ada@example.com",
+				Name:          "John",
+				Email:         "john.doe@example.com",
 				EmailVerified: new(true),
 				Image:         new("/avatar.png"),
 				Metadata:      map[string]any{"plan": "pro"},
 			},
-			want: `{"name":"Ada","email":"ada@example.com","email_verified":true,"image":"/avatar.png","metadata":{"plan":"pro"}}`,
+			want: `{"name":"John","email":"john.doe@example.com","email_verified":true,"image":"/avatar.png","metadata":{"plan":"pro"}}`,
 		},
 	}
 

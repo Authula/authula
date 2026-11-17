@@ -88,13 +88,13 @@ func TestEnableResponse_JSONRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	want := EnableResponse{
-		TotpURI:     "otpauth://totp/Authula:ada@example.com?secret=ABC123",
+		TotpURI:     "otpauth://totp/Authula:john.doe@example.com?secret=ABC123",
 		BackupCodes: []string{"code-1", "code-2"},
 	}
 
 	data, err := json.Marshal(want)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"totp_uri":"otpauth://totp/Authula:ada@example.com?secret=ABC123","backup_codes":["code-1","code-2"]}`, string(data))
+	require.JSONEq(t, `{"totp_uri":"otpauth://totp/Authula:john.doe@example.com?secret=ABC123","backup_codes":["code-1","code-2"]}`, string(data))
 
 	var got EnableResponse
 	require.NoError(t, json.Unmarshal(data, &got))
@@ -139,8 +139,8 @@ func TestVerifyTOTPResponse_JSONRoundTrip(t *testing.T) {
 	want := VerifyTOTPResponse{
 		User: &models.User{
 			ID:            "user-1",
-			Name:          "Ada Lovelace",
-			Email:         "ada@example.com",
+			Name:          "John Doe",
+			Email:         "john.doe@example.com",
 			EmailVerified: true,
 			CreatedAt:     now,
 			UpdatedAt:     now,

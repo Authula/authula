@@ -21,15 +21,15 @@ func TestSignUpRequest_Validate(t *testing.T) {
 		{
 			name: "trims_and_lowercases_all_string_fields",
 			request: SignUpRequest{
-				Name:        "  Ada Lovelace  ",
-				Email:       "  ADA@Example.COM ",
+				Name:        "  John Doe  ",
+				Email:       "  john.doe@example.com ",
 				Password:    "  s3cret  ",
 				Image:       new("  /avatar.png  "),
 				CallbackURL: new("  /welcome  "),
 			},
 			want: SignUpRequest{
-				Name:        "Ada Lovelace",
-				Email:       "ada@example.com",
+				Name:        "John Doe",
+				Email:       "john.doe@example.com",
 				Password:    "s3cret",
 				Image:       new("/avatar.png"),
 				CallbackURL: new("/welcome"),
@@ -38,27 +38,27 @@ func TestSignUpRequest_Validate(t *testing.T) {
 		{
 			name: "leaves_nil_optionals_untouched",
 			request: SignUpRequest{
-				Name:     "Ada Lovelace",
-				Email:    "ada@example.com",
+				Name:     "John Doe",
+				Email:    "john.doe@example.com",
 				Password: "s3cret",
 			},
 			want: SignUpRequest{
-				Name:     "Ada Lovelace",
-				Email:    "ada@example.com",
+				Name:     "John Doe",
+				Email:    "john.doe@example.com",
 				Password: "s3cret",
 			},
 		},
 		{
 			name: "keeps_metadata_as_provided",
 			request: SignUpRequest{
-				Name:     "Ada",
-				Email:    "ada@example.com",
+				Name:     "John",
+				Email:    "john.doe@example.com",
 				Password: "s3cret",
 				Metadata: map[string]any{"plan": "pro"},
 			},
 			want: SignUpRequest{
-				Name:     "Ada",
-				Email:    "ada@example.com",
+				Name:     "John",
+				Email:    "john.doe@example.com",
 				Password: "s3cret",
 				Metadata: map[string]any{"plan": "pro"},
 			},
@@ -87,12 +87,12 @@ func TestSignInRequest_Validate(t *testing.T) {
 		{
 			name: "trims_and_lowercases_fields",
 			request: SignInRequest{
-				Email:       "  ADA@Example.COM ",
+				Email:       "  john.doe@example.com ",
 				Password:    "  s3cret  ",
 				CallbackURL: new("  /dashboard  "),
 			},
 			want: SignInRequest{
-				Email:       "ada@example.com",
+				Email:       "john.doe@example.com",
 				Password:    "s3cret",
 				CallbackURL: new("/dashboard"),
 			},
@@ -100,11 +100,11 @@ func TestSignInRequest_Validate(t *testing.T) {
 		{
 			name: "leaves_nil_callback_url_untouched",
 			request: SignInRequest{
-				Email:    "ada@example.com",
+				Email:    "john.doe@example.com",
 				Password: "s3cret",
 			},
 			want: SignInRequest{
-				Email:    "ada@example.com",
+				Email:    "john.doe@example.com",
 				Password: "s3cret",
 			},
 		},
@@ -200,18 +200,18 @@ func TestRequestPasswordResetRequest_Validate(t *testing.T) {
 		{
 			name: "trims_and_lowercases_email",
 			request: RequestPasswordResetRequest{
-				Email:       "  ADA@Example.COM ",
+				Email:       "  john.doe@example.com ",
 				CallbackURL: new("  /reset  "),
 			},
 			want: RequestPasswordResetRequest{
-				Email:       "ada@example.com",
+				Email:       "john.doe@example.com",
 				CallbackURL: new("/reset"),
 			},
 		},
 		{
 			name:    "leaves_nil_callback_url_untouched",
-			request: RequestPasswordResetRequest{Email: "ada@example.com"},
-			want:    RequestPasswordResetRequest{Email: "ada@example.com"},
+			request: RequestPasswordResetRequest{Email: "john.doe@example.com"},
+			want:    RequestPasswordResetRequest{Email: "john.doe@example.com"},
 		},
 	}
 
@@ -305,23 +305,23 @@ func TestSignUpRequest_JSONOmitempty(t *testing.T) {
 		{
 			name: "omits_unset_optionals",
 			request: SignUpRequest{
-				Name:     "Ada",
-				Email:    "ada@example.com",
+				Name:     "John",
+				Email:    "john.doe@example.com",
 				Password: "s3cret",
 			},
-			want: `{"name":"Ada","email":"ada@example.com","password":"s3cret"}`,
+			want: `{"name":"John","email":"john.doe@example.com","password":"s3cret"}`,
 		},
 		{
 			name: "includes_populated_optionals",
 			request: SignUpRequest{
-				Name:        "Ada",
-				Email:       "ada@example.com",
+				Name:        "John",
+				Email:       "john.doe@example.com",
 				Password:    "s3cret",
 				Image:       new("/avatar.png"),
 				Metadata:    map[string]any{"plan": "pro"},
 				CallbackURL: new("/welcome"),
 			},
-			want: `{"name":"Ada","email":"ada@example.com","password":"s3cret","image":"/avatar.png","metadata":{"plan":"pro"},"callback_url":"/welcome"}`,
+			want: `{"name":"John","email":"john.doe@example.com","password":"s3cret","image":"/avatar.png","metadata":{"plan":"pro"},"callback_url":"/welcome"}`,
 		},
 	}
 
@@ -339,13 +339,13 @@ func TestSignUpRequest_JSONOmitempty(t *testing.T) {
 func TestSignUpRequest_JSONRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	payload := `{"name":"Ada","email":"ada@example.com","password":"s3cret","image":"/avatar.png","metadata":{"plan":"pro"},"callback_url":"/welcome"}`
+	payload := `{"name":"John","email":"john.doe@example.com","password":"s3cret","image":"/avatar.png","metadata":{"plan":"pro"},"callback_url":"/welcome"}`
 
 	var request SignUpRequest
 	require.NoError(t, json.Unmarshal([]byte(payload), &request))
 	require.Equal(t, SignUpRequest{
-		Name:        "Ada",
-		Email:       "ada@example.com",
+		Name:        "John",
+		Email:       "john.doe@example.com",
 		Password:    "s3cret",
 		Image:       new("/avatar.png"),
 		Metadata:    map[string]any{"plan": "pro"},
@@ -360,8 +360,8 @@ func TestSignInResponse_JSONRoundTrip(t *testing.T) {
 	want := SignInResponse{
 		User: &models.User{
 			ID:            "user-1",
-			Name:          "Ada Lovelace",
-			Email:         "ada@example.com",
+			Name:          "John Doe",
+			Email:         "john.doe@example.com",
 			EmailVerified: true,
 			Image:         new("/avatar.png"),
 			Metadata:      map[string]any{"plan": "pro"},
@@ -380,7 +380,7 @@ func TestSignInResponse_JSONRoundTrip(t *testing.T) {
 
 	data, err := json.Marshal(want)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"user":{"id":"user-1","name":"Ada Lovelace","email":"ada@example.com","email_verified":true,"image":"/avatar.png","metadata":{"plan":"pro"},"created_at":"2026-11-17T12:30:00Z","updated_at":"2026-11-17T12:30:00Z"},"session":{"id":"session-1","user_id":"user-1","token":"token-123","expires_at":"2026-11-17T13:30:00Z","ip_address":null,"user_agent":null,"created_at":"2026-11-17T12:30:00Z","updated_at":"2026-11-17T12:30:00Z"}}`, string(data))
+	require.JSONEq(t, `{"user":{"id":"user-1","name":"John Doe","email":"john.doe@example.com","email_verified":true,"image":"/avatar.png","metadata":{"plan":"pro"},"created_at":"2026-11-17T12:30:00Z","updated_at":"2026-11-17T12:30:00Z"},"session":{"id":"session-1","user_id":"user-1","token":"token-123","expires_at":"2026-11-17T13:30:00Z","ip_address":null,"user_agent":null,"created_at":"2026-11-17T12:30:00Z","updated_at":"2026-11-17T12:30:00Z"}}`, string(data))
 
 	var got SignInResponse
 	require.NoError(t, json.Unmarshal(data, &got))

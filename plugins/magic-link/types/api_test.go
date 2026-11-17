@@ -23,20 +23,20 @@ func TestMagicLinkSignInRequest_Validate(t *testing.T) {
 		{
 			name: "trims_and_lowercases_email",
 			request: MagicLinkSignInRequest{
-				Email:       "  ADA@Example.COM ",
-				Name:        new(" Ada Lovelace "),
+				Email:       "  john.doe@example.com ",
+				Name:        new(" John Doe "),
 				CallbackURL: new(" /welcome "),
 			},
 			want: MagicLinkSignInRequest{
-				Email:       "ada@example.com",
-				Name:        new(" Ada Lovelace "),
+				Email:       "john.doe@example.com",
+				Name:        new(" John Doe "),
 				CallbackURL: new(" /welcome "),
 			},
 		},
 		{
 			name:    "accepts_minimal_request",
-			request: MagicLinkSignInRequest{Email: "ada@example.com"},
-			want:    MagicLinkSignInRequest{Email: "ada@example.com"},
+			request: MagicLinkSignInRequest{Email: "john.doe@example.com"},
+			want:    MagicLinkSignInRequest{Email: "john.doe@example.com"},
 		},
 		{
 			name:   "rejects_empty_email",
@@ -147,17 +147,17 @@ func TestMagicLinkSignInRequest_JSONOmitempty(t *testing.T) {
 	}{
 		{
 			name:    "omits_unset_optionals",
-			request: MagicLinkSignInRequest{Email: "ada@example.com"},
-			want:    `{"email":"ada@example.com"}`,
+			request: MagicLinkSignInRequest{Email: "john.doe@example.com"},
+			want:    `{"email":"john.doe@example.com"}`,
 		},
 		{
 			name: "includes_populated_optionals",
 			request: MagicLinkSignInRequest{
-				Email:       "ada@example.com",
-				Name:        new("Ada Lovelace"),
+				Email:       "john.doe@example.com",
+				Name:        new("John Doe"),
 				CallbackURL: new("/welcome"),
 			},
-			want: `{"email":"ada@example.com","name":"Ada Lovelace","callback_url":"/welcome"}`,
+			want: `{"email":"john.doe@example.com","name":"John Doe","callback_url":"/welcome"}`,
 		},
 	}
 
@@ -210,8 +210,8 @@ func TestMagicLinkExchangeResponse_JSONRoundTrip(t *testing.T) {
 	want := MagicLinkExchangeResponse{
 		User: &models.User{
 			ID:            "user-1",
-			Name:          "Ada Lovelace",
-			Email:         "ada@example.com",
+			Name:          "John Doe",
+			Email:         "john.doe@example.com",
 			EmailVerified: true,
 			CreatedAt:     now,
 			UpdatedAt:     now,
