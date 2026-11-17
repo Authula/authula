@@ -272,3 +272,172 @@ func TestBunPermissionsRepositoryDeletePermission(t *testing.T) {
 		})
 	}
 }
+
+func TestBunPermissionsRepositoryGetPermissionByKey(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		permissionKey  string
+		seedPermission *types.Permission
+		wantNil        bool
+		wantErrMsg     string
+	}{
+		{
+			name:          "not found",
+			permissionKey: "missing",
+			wantNil:       true,
+		},
+		{
+			name:           "success",
+			permissionKey:  "users.read",
+			seedPermission: &types.Permission{ID: "p1", Key: "users.read", Description: new("Read users")},
+		},
+		{
+			name:          "query error",
+			permissionKey: "users.read",
+			wantErrMsg:    "failed to get permission by key",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := plugintests.SetupRepoDB(t)
+			repo := NewBunPermissionsRepository(db)
+			ctx := context.Background()
+
+			if tc.seedPermission != nil {
+				if err := repo.CreatePermission(ctx, tc.seedPermission); err != nil {
+					t.Fatalf("failed to seed permission: %v", err)
+				}
+			}
+			if tc.wantErrMsg != "" {
+				if err := db.Close(); err != nil {
+					t.Fatalf("failed to close db: %v", err)
+				}
+			}
+
+			permission, err := repo.GetPermissionByKey(ctx, tc.permissionKey)
+			if tc.wantErrMsg != "" {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if permission != nil {
+					t.Fatalf("expected nil permission, got %#v", permission)
+				}
+				if !strings.Contains(err.Error(), tc.wantErrMsg) {
+					t.Fatalf("expected error containing %q, got %v", tc.wantErrMsg, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantNil {
+				if permission != nil {
+					t.Fatalf("expected nil permission, got %#v", permission)
+				}
+				return
+			}
+			if permission == nil || permission.Key != tc.permissionKey {
+				t.Fatalf("unexpected permission %#v", permission)
+			}
+		})
+	}
+}
+
+func TestBunPermissionsRepositoryQueryErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		run        func(context.Context, *BunPermissionsRepository) (any, bool, error)
+		wantErrMsg string
+	}{
+		{
+			name: "get all permissions",
+			run: func(ctx context.Context, repo *BunPermissionsRepository) (any, bool, error) {
+				permissions, err := repo.GetAllPermissions(ctx)
+				return permissions, false, err
+			},
+			wantErrMsg: "failed to get permissions",
+		},
+		{
+			name: "get permission by id",
+			run: func(ctx context.Context, repo *BunPermissionsRepository) (any, bool, error) {
+				permission, err := repo.GetPermissionByID(ctx, "p1")
+				return permission, false, err
+			},
+			wantErrMsg: "failed to get permission by id",
+		},
+		{
+			name: "update permission",
+			run: func(ctx context.Context, repo *BunPermissionsRepository) (any, bool, error) {
+				updated, err := repo.UpdatePermission(ctx, "p1", new("updated"))
+				return nil, updated, err
+			},
+			wantErrMsg: "sql: database is closed",
+		},
+		{
+			name: "delete permission",
+			run: func(ctx context.Context, repo *BunPermissionsRepository) (any, bool, error) {
+				deleted, err := repo.DeletePermission(ctx, "p1")
+				return nil, deleted, err
+			},
+			wantErrMsg: "sql: database is closed",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := plugintests.SetupRepoDB(t)
+			repo := NewBunPermissionsRepository(db)
+			if err := db.Close(); err != nil {
+				t.Fatalf("failed to close db: %v", err)
+			}
+
+			_, flag, err := tc.run(context.Background(), repo)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tc.wantErrMsg) {
+				t.Fatalf("expected error containing %q, got %v", tc.wantErrMsg, err)
+			}
+			if flag {
+				t.Fatal("expected false flag on error")
+			}
+		})
+	}
+}
+
+func TestBunPermissionsRepositoryUpdatePermissionWithoutDescription(t *testing.T) {
+	t.Parallel()
+
+	db := plugintests.SetupRepoDB(t)
+	repo := NewBunPermissionsRepository(db)
+	ctx := context.Background()
+
+	if err := repo.CreatePermission(ctx, &types.Permission{ID: "p1", Key: "users.read", Description: new("Read users")}); err != nil {
+		t.Fatalf("failed to seed permission: %v", err)
+	}
+
+	updated, err := repo.UpdatePermission(ctx, "p1", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !updated {
+		t.Fatal("expected permission to be updated")
+	}
+
+	permission, err := repo.GetPermissionByID(ctx, "p1")
+	if err != nil {
+		t.Fatalf("failed to fetch permission: %v", err)
+	}
+	if permission == nil || permission.Description == nil || *permission.Description != "Read users" {
+		t.Fatalf("expected description to be preserved, got %#v", permission)
+	}
+}

@@ -303,3 +303,212 @@ func TestBunRolePermissionsRepositoryRemoveRolePermission(t *testing.T) {
 		})
 	}
 }
+
+func TestBunRolePermissionsRepositoryCountRolesByPermission(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		seed         func(*BunRolesRepository, *BunPermissionsRepository, *BunRolePermissionsRepository, context.Context)
+		permissionID string
+		wantCount    int
+		wantErrMsg   string
+	}{
+		{
+			name:         "no grants",
+			permissionID: "perm-1",
+			wantCount:    0,
+		},
+		{
+			name:         "counts grants across roles",
+			permissionID: "perm-1",
+			seed: func(rolesRepo *BunRolesRepository, permissionsRepo *BunPermissionsRepository, rolePermissionsRepo *BunRolePermissionsRepository, ctx context.Context) {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
+					panic(err)
+				}
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-2", Name: "viewer", Weight: 10}); err != nil {
+					panic(err)
+				}
+				if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read"}); err != nil {
+					panic(err)
+				}
+				if err := rolePermissionsRepo.AddRolePermission(ctx, "role-1", "perm-1", nil); err != nil {
+					panic(err)
+				}
+				if err := rolePermissionsRepo.AddRolePermission(ctx, "role-2", "perm-1", nil); err != nil {
+					panic(err)
+				}
+			},
+			wantCount: 2,
+		},
+		{
+			name:         "query error",
+			permissionID: "perm-1",
+			wantErrMsg:   "failed to count roles by permission",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := plugintests.SetupRepoDB(t)
+			rolesRepo := NewBunRolesRepository(db)
+			permissionsRepo := NewBunPermissionsRepository(db)
+			rolePermissionsRepo := NewBunRolePermissionsRepository(db)
+			ctx := context.Background()
+
+			if tc.seed != nil {
+				tc.seed(rolesRepo, permissionsRepo, rolePermissionsRepo, ctx)
+			}
+			if tc.wantErrMsg != "" {
+				if err := db.Close(); err != nil {
+					t.Fatalf("failed to close db: %v", err)
+				}
+			}
+
+			count, err := rolePermissionsRepo.CountRolesByPermission(ctx, tc.permissionID)
+			if tc.wantErrMsg != "" {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if count != 0 {
+					t.Fatalf("expected 0 count on error, got %d", count)
+				}
+				if !strings.Contains(err.Error(), tc.wantErrMsg) {
+					t.Fatalf("expected error containing %q, got %v", tc.wantErrMsg, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if count != tc.wantCount {
+				t.Fatalf("expected count %d, got %d", tc.wantCount, count)
+			}
+		})
+	}
+}
+
+func TestBunRolePermissionsRepositoryErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		run  func(context.Context, *BunRolePermissionsRepository) error
+	}{
+		{
+			name: "get role permissions",
+			run: func(ctx context.Context, repo *BunRolePermissionsRepository) error {
+				_, err := repo.GetRolePermissions(ctx, "role-1")
+				return err
+			},
+		},
+		{
+			name: "add role permission",
+			run: func(ctx context.Context, repo *BunRolePermissionsRepository) error {
+				return repo.AddRolePermission(ctx, "role-1", "perm-1", nil)
+			},
+		},
+		{
+			name: "remove role permission",
+			run: func(ctx context.Context, repo *BunRolePermissionsRepository) error {
+				return repo.RemoveRolePermission(ctx, "role-1", "perm-1")
+			},
+		},
+		{
+			name: "replace role permissions",
+			run: func(ctx context.Context, repo *BunRolePermissionsRepository) error {
+				return repo.ReplaceRolePermissions(ctx, "role-1", []string{"perm-1"}, nil)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := plugintests.SetupRepoDB(t)
+			repo := NewBunRolePermissionsRepository(db)
+			if err := db.Close(); err != nil {
+				t.Fatalf("failed to close db: %v", err)
+			}
+
+			if err := tc.run(context.Background(), repo); err == nil {
+				t.Fatal("expected error, got nil")
+			}
+		})
+	}
+}
+
+func TestBunRolePermissionsRepositoryReplaceRolePermissionsDuplicate(t *testing.T) {
+	t.Parallel()
+
+	db := plugintests.SetupRepoDB(t)
+	rolesRepo := NewBunRolesRepository(db)
+	permissionsRepo := NewBunPermissionsRepository(db)
+	rolePermissionsRepo := NewBunRolePermissionsRepository(db)
+	ctx := context.Background()
+
+	if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
+		t.Fatalf("failed to seed role: %v", err)
+	}
+	if err := permissionsRepo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read"}); err != nil {
+		t.Fatalf("failed to seed permission: %v", err)
+	}
+
+	err := rolePermissionsRepo.ReplaceRolePermissions(ctx, "role-1", []string{"perm-1", "perm-1"}, nil)
+	if err == nil {
+		t.Fatal("expected duplicate insert error, got nil")
+	}
+
+	permissions, err := rolePermissionsRepo.GetRolePermissions(ctx, "role-1")
+	if err != nil {
+		t.Fatalf("failed to fetch role permissions: %v", err)
+	}
+	if len(permissions) != 0 {
+		t.Fatalf("expected transaction rollback to clear permissions, got %#v", permissions)
+	}
+}
+
+func TestNewBunRolePermissionRepository(t *testing.T) {
+	t.Parallel()
+
+	db := plugintests.SetupRepoDB(t)
+	repo := NewBunRolePermissionRepository(db)
+	ctx := context.Background()
+
+	if err := repo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
+		t.Fatalf("failed to create role through composite repository: %v", err)
+	}
+	if err := repo.CreatePermission(ctx, &types.Permission{ID: "perm-1", Key: "users.read"}); err != nil {
+		t.Fatalf("failed to create permission through composite repository: %v", err)
+	}
+	if err := repo.AddRolePermission(ctx, "role-1", "perm-1", nil); err != nil {
+		t.Fatalf("failed to add role permission through composite repository: %v", err)
+	}
+	if err := repo.AssignUserRole(ctx, "u1", "role-1", nil, nil); err != nil {
+		t.Fatalf("failed to assign user role through composite repository: %v", err)
+	}
+
+	role, err := repo.GetRoleByName(ctx, "editor")
+	if err != nil || role == nil {
+		t.Fatalf("failed to read role through composite repository: %v", err)
+	}
+	permission, err := repo.GetPermissionByKey(ctx, "users.read")
+	if err != nil || permission == nil {
+		t.Fatalf("failed to read permission through composite repository: %v", err)
+	}
+	rolePermissions, err := repo.GetRolePermissions(ctx, "role-1")
+	if err != nil || len(rolePermissions) != 1 {
+		t.Fatalf("unexpected role permissions %#v: %v", rolePermissions, err)
+	}
+	userRoles, err := repo.GetUserRoles(ctx, "u1")
+	if err != nil || len(userRoles) != 1 {
+		t.Fatalf("unexpected user roles %#v: %v", userRoles, err)
+	}
+	count, err := repo.CountUsersByRole(ctx, "role-1")
+	if err != nil || count != 1 {
+		t.Fatalf("unexpected user count %d: %v", count, err)
+	}
+}

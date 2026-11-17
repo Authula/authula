@@ -2,14 +2,17 @@ package services
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	accesscontroltests "github.com/Authula/authula/plugins/access-control/tests"
 	"github.com/Authula/authula/plugins/access-control/types"
+	rootservices "github.com/Authula/authula/services"
 )
 
 func TestAccessControlServiceRoleExists(t *testing.T) {
@@ -289,6 +292,212 @@ func TestAccessControlServiceGetRoleWeightByName(t *testing.T) {
 			}
 
 			rolesRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestAccessControlServiceAssignRoleToUserIfMissing(t *testing.T) {
+	t.Parallel()
+
+	lookupErr := errors.New("role lookup failed")
+	userRolesErr := errors.New("user roles failed")
+	assignErr := errors.New("assign failed")
+
+	tests := []struct {
+		name    string
+		setup   func(*accesscontroltests.MockRolesRepository, *accesscontroltests.MockUserRolesRepository)
+		wantErr error
+	}{
+		{
+			name: "role lookup error",
+			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				rolesRepo.On("GetRoleByName", mock.Anything, "editor").Return((*types.Role)(nil), lookupErr).Once()
+			},
+			wantErr: lookupErr,
+		},
+		{
+			name: "user roles lookup error",
+			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				rolesRepo.On("GetRoleByName", mock.Anything, "editor").Return(&types.Role{ID: "role-1", Name: "editor"}, nil).Once()
+				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return(([]types.UserRoleInfo)(nil), userRolesErr).Once()
+			},
+			wantErr: userRolesErr,
+		},
+		{
+			name: "role already assigned",
+			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				rolesRepo.On("GetRoleByName", mock.Anything, "editor").Return(&types.Role{ID: "role-1", Name: "editor"}, nil).Once()
+				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{{RoleID: "role-1", RoleName: "editor"}}, nil).Once()
+			},
+		},
+		{
+			name: "assignment error",
+			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				rolesRepo.On("GetRoleByName", mock.Anything, "editor").Return(&types.Role{ID: "role-1", Name: "editor"}, nil).Once()
+				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "editor"}, nil).Once()
+				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), (*time.Time)(nil)).Return(assignErr).Once()
+			},
+			wantErr: assignErr,
+		},
+		{
+			name: "assigns missing role",
+			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, userRolesRepo *accesscontroltests.MockUserRolesRepository) {
+				rolesRepo.On("GetRoleByName", mock.Anything, "editor").Return(&types.Role{ID: "role-1", Name: "editor"}, nil).Once()
+				userRolesRepo.On("GetUserRoles", mock.Anything, "user-1").Return([]types.UserRoleInfo{{RoleID: "role-2", RoleName: "viewer"}}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return(&types.Role{ID: "role-1", Name: "editor", Weight: 10}, nil).Once()
+				userRolesRepo.On("AssignUserRole", mock.Anything, "user-1", "role-1", (*string)(nil), (*time.Time)(nil)).Return(nil).Once()
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			rolesRepo := &accesscontroltests.MockRolesRepository{}
+			userRolesRepo := &accesscontroltests.MockUserRolesRepository{}
+			tc.setup(rolesRepo, userRolesRepo)
+
+			service := NewAccessControlService(
+				NewRolesService(rolesRepo, nil, nil),
+				NewUserRolesService(userRolesRepo, rolesRepo),
+				nil,
+			)
+			err := service.AssignRoleToUserIfMissing(context.Background(), "user-1", "editor", nil)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
+			}
+
+			rolesRepo.AssertExpectations(t)
+			userRolesRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestAccessControlServiceEnsurePermissions(t *testing.T) {
+	t.Parallel()
+
+	lookupErr := errors.New("lookup failed")
+	createErr := errors.New("create failed")
+
+	tests := []struct {
+		name        string
+		definitions []rootservices.PermissionDefinition
+		setup       func(*accesscontroltests.MockPermissionsRepository)
+		wantErr     error
+	}{
+		{
+			name:        "empty definitions",
+			definitions: nil,
+		},
+		{
+			name:        "lookup error",
+			definitions: []rootservices.PermissionDefinition{{Key: "users.read", Description: "Read users"}},
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
+				permissionsRepo.On("GetPermissionByKey", mock.Anything, "users.read").Return((*types.Permission)(nil), lookupErr).Once()
+			},
+			wantErr: lookupErr,
+		},
+		{
+			name:        "create error",
+			definitions: []rootservices.PermissionDefinition{{Key: "users.read", Description: "Read users"}},
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
+				permissionsRepo.On("GetPermissionByKey", mock.Anything, "users.read").Return((*types.Permission)(nil), nil).Once()
+				permissionsRepo.On("CreatePermission", mock.Anything, mock.MatchedBy(func(permission *types.Permission) bool {
+					return permission != nil && permission.ID != "" && permission.Key == "users.read" && permission.IsSystem && permission.Description != nil && *permission.Description == "Read users"
+				})).Return(createErr).Once()
+			},
+			wantErr: createErr,
+		},
+		{
+			name: "skips existing and creates missing",
+			definitions: []rootservices.PermissionDefinition{
+				{Key: "users.read", Description: "Read users"},
+				{Key: "users.write", Description: "Write users"},
+			},
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
+				permissionsRepo.On("GetPermissionByKey", mock.Anything, "users.read").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
+				permissionsRepo.On("GetPermissionByKey", mock.Anything, "users.write").Return((*types.Permission)(nil), nil).Once()
+				permissionsRepo.On("CreatePermission", mock.Anything, mock.MatchedBy(func(permission *types.Permission) bool {
+					return permission != nil && permission.Key == "users.write" && permission.IsSystem
+				})).Return(nil).Once()
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
+			if tc.setup != nil {
+				tc.setup(permissionsRepo)
+			}
+
+			service := NewAccessControlService(nil, nil, permissionsRepo)
+			err := service.EnsurePermissions(context.Background(), tc.definitions)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
+			}
+
+			permissionsRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestAccessControlServiceGetRoleDetailsErrors(t *testing.T) {
+	t.Parallel()
+
+	roleErr := errors.New("role lookup failed")
+
+	tests := []struct {
+		name    string
+		setup   func(*accesscontroltests.MockRolesRepository, *accesscontroltests.MockRolePermissionsRepository)
+		run     func(context.Context, *AccessControlService) error
+		wantErr error
+	}{
+		{
+			name: "role permissions detail lookup error",
+			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, rolePermRepo *accesscontroltests.MockRolePermissionsRepository) {
+				rolesRepo.On("GetRoleByName", mock.Anything, "editor").Return(&types.Role{ID: "role-1", Name: "editor"}, nil).Once()
+				rolesRepo.On("GetRoleByID", mock.Anything, "role-1").Return((*types.Role)(nil), roleErr).Once()
+			},
+			run: func(ctx context.Context, service *AccessControlService) error {
+				_, err := service.GetRolePermissionsByName(ctx, "editor")
+				return err
+			},
+			wantErr: roleErr,
+		},
+		{
+			name: "role weight with blank id is not found",
+			setup: func(rolesRepo *accesscontroltests.MockRolesRepository, rolePermRepo *accesscontroltests.MockRolePermissionsRepository) {
+				rolesRepo.On("GetRoleByName", mock.Anything, "editor").Return(&types.Role{ID: "", Name: "editor"}, nil).Once()
+			},
+			run: func(ctx context.Context, service *AccessControlService) error {
+				_, err := service.GetRoleWeightByName(ctx, "editor")
+				return err
+			},
+			wantErr: coreerrors.ErrNotFound,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			rolesRepo := &accesscontroltests.MockRolesRepository{}
+			rolePermRepo := &accesscontroltests.MockRolePermissionsRepository{}
+			tc.setup(rolesRepo, rolePermRepo)
+
+			service := NewAccessControlService(NewRolesService(rolesRepo, rolePermRepo, nil), NewUserRolesService(nil, nil), nil)
+			err := tc.run(context.Background(), service)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
+			}
+
+			rolesRepo.AssertExpectations(t)
+			rolePermRepo.AssertExpectations(t)
 		})
 	}
 }
