@@ -401,3 +401,223 @@ func TestPermissionsServiceDeletePermission(t *testing.T) {
 		})
 	}
 }
+
+func TestPermissionsServiceGetPermissionByKey(t *testing.T) {
+	t.Parallel()
+
+	repoErr := errors.New("lookup failed")
+
+	tests := []struct {
+		name    string
+		key     string
+		setup   func(*accesscontroltests.MockPermissionsRepository)
+		wantID  string
+		wantErr error
+	}{
+		{
+			name:    "blank key",
+			key:     "",
+			wantErr: coreerrors.ErrBadRequest,
+		},
+		{
+			name: "repository error",
+			key:  "users.read",
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
+				permissionsRepo.On("GetPermissionByKey", mock.Anything, "users.read").Return((*types.Permission)(nil), repoErr).Once()
+			},
+			wantErr: repoErr,
+		},
+		{
+			name: "not found",
+			key:  "users.read",
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
+				permissionsRepo.On("GetPermissionByKey", mock.Anything, "users.read").Return((*types.Permission)(nil), nil).Once()
+			},
+			wantErr: coreerrors.ErrNotFound,
+		},
+		{
+			name: "success",
+			key:  "users.read",
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
+				permissionsRepo.On("GetPermissionByKey", mock.Anything, "users.read").Return(&types.Permission{ID: "perm-1", Key: "users.read"}, nil).Once()
+			},
+			wantID: "perm-1",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
+			if tc.setup != nil {
+				tc.setup(permissionsRepo)
+			}
+
+			service := NewPermissionsService(permissionsRepo, nil)
+			permission, err := service.GetPermissionByKey(context.Background(), tc.key)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
+			}
+			if tc.wantErr != nil {
+				if permission != nil {
+					t.Fatalf("expected nil permission, got %#v", permission)
+				}
+				permissionsRepo.AssertExpectations(t)
+				return
+			}
+			if permission == nil || permission.ID != tc.wantID {
+				t.Fatalf("unexpected permission %#v", permission)
+			}
+
+			permissionsRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestPermissionsServiceGetPermissionByIDRepositoryError(t *testing.T) {
+	t.Parallel()
+
+	repoErr := errors.New("lookup failed")
+
+	permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
+	permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return((*types.Permission)(nil), repoErr).Once()
+
+	service := NewPermissionsService(permissionsRepo, nil)
+	permission, err := service.GetPermissionByID(context.Background(), "perm-1")
+	if !errors.Is(err, repoErr) {
+		t.Fatalf("expected err %v, got %v", repoErr, err)
+	}
+	if permission != nil {
+		t.Fatalf("expected nil permission, got %#v", permission)
+	}
+
+	permissionsRepo.AssertExpectations(t)
+}
+
+func TestPermissionsServiceUpdatePermissionRepositoryErrors(t *testing.T) {
+	t.Parallel()
+
+	repoErr := errors.New("lookup failed")
+	updateErr := errors.New("update failed")
+	refetchErr := errors.New("refetch failed")
+	description := "Updated description"
+
+	tests := []struct {
+		name    string
+		setup   func(*accesscontroltests.MockPermissionsRepository)
+		wantErr error
+	}{
+		{
+			name: "lookup error",
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
+				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return((*types.Permission)(nil), repoErr).Once()
+			},
+			wantErr: repoErr,
+		},
+		{
+			name: "update error",
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
+				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1"}, nil).Once()
+				permissionsRepo.On("UpdatePermission", mock.Anything, "perm-1", &description).Return(false, updateErr).Once()
+			},
+			wantErr: updateErr,
+		},
+		{
+			name: "refetch error",
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
+				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1"}, nil).Once()
+				permissionsRepo.On("UpdatePermission", mock.Anything, "perm-1", &description).Return(true, nil).Once()
+				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return((*types.Permission)(nil), refetchErr).Once()
+			},
+			wantErr: refetchErr,
+		},
+		{
+			name: "refetch returns nil",
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository) {
+				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1"}, nil).Once()
+				permissionsRepo.On("UpdatePermission", mock.Anything, "perm-1", &description).Return(true, nil).Once()
+				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return((*types.Permission)(nil), nil).Once()
+			},
+			wantErr: coreerrors.ErrNotFound,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
+			tc.setup(permissionsRepo)
+
+			service := NewPermissionsService(permissionsRepo, nil)
+			permission, err := service.UpdatePermission(context.Background(), "perm-1", types.UpdatePermissionRequest{Description: &description})
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
+			}
+			if permission != nil {
+				t.Fatalf("expected nil permission, got %#v", permission)
+			}
+
+			permissionsRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestPermissionsServiceDeletePermissionRepositoryErrors(t *testing.T) {
+	t.Parallel()
+
+	repoErr := errors.New("lookup failed")
+	countErr := errors.New("count failed")
+	deleteErr := errors.New("delete failed")
+
+	tests := []struct {
+		name    string
+		setup   func(*accesscontroltests.MockPermissionsRepository, *accesscontroltests.MockRolePermissionsRepository)
+		wantErr error
+	}{
+		{
+			name: "lookup error",
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
+				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return((*types.Permission)(nil), repoErr).Once()
+			},
+			wantErr: repoErr,
+		},
+		{
+			name: "count error",
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
+				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1"}, nil).Once()
+				rolePermissionsRepo.On("CountRolesByPermission", mock.Anything, "perm-1").Return(0, countErr).Once()
+			},
+			wantErr: countErr,
+		},
+		{
+			name: "delete error",
+			setup: func(permissionsRepo *accesscontroltests.MockPermissionsRepository, rolePermissionsRepo *accesscontroltests.MockRolePermissionsRepository) {
+				permissionsRepo.On("GetPermissionByID", mock.Anything, "perm-1").Return(&types.Permission{ID: "perm-1"}, nil).Once()
+				rolePermissionsRepo.On("CountRolesByPermission", mock.Anything, "perm-1").Return(0, nil).Once()
+				permissionsRepo.On("DeletePermission", mock.Anything, "perm-1").Return(false, deleteErr).Once()
+			},
+			wantErr: deleteErr,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			permissionsRepo := &accesscontroltests.MockPermissionsRepository{}
+			rolePermissionsRepo := &accesscontroltests.MockRolePermissionsRepository{}
+			tc.setup(permissionsRepo, rolePermissionsRepo)
+
+			service := NewPermissionsService(permissionsRepo, rolePermissionsRepo)
+			err := service.DeletePermission(context.Background(), "perm-1")
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
+			}
+
+			permissionsRepo.AssertExpectations(t)
+			rolePermissionsRepo.AssertExpectations(t)
+		})
+	}
+}

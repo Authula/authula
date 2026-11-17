@@ -207,3 +207,43 @@ func sameStringPtr(got, want *string) bool {
 	}
 	return *got == *want
 }
+
+func TestBunUserPermissionsRepositoryQueryErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		run  func(context.Context, *BunUserPermissionsRepository) error
+	}{
+		{
+			name: "get user permissions",
+			run: func(ctx context.Context, repo *BunUserPermissionsRepository) error {
+				_, err := repo.GetUserPermissions(ctx, "u1")
+				return err
+			},
+		},
+		{
+			name: "has permissions",
+			run: func(ctx context.Context, repo *BunUserPermissionsRepository) error {
+				_, err := repo.HasPermissions(ctx, "u1", []string{"users.read"})
+				return err
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := plugintests.SetupRepoDB(t)
+			repo := NewBunUserPermissionsRepository(db)
+			if err := db.Close(); err != nil {
+				t.Fatalf("failed to close db: %v", err)
+			}
+
+			if err := tc.run(context.Background(), repo); err == nil {
+				t.Fatal("expected error, got nil")
+			}
+		})
+	}
+}

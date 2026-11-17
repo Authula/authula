@@ -324,3 +324,159 @@ func TestBunUserRolesRepositoryRemoveUserRole(t *testing.T) {
 		})
 	}
 }
+
+func TestBunUserRolesRepositoryCountUsersByRole(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		seed       func(*BunRolesRepository, *BunUserRolesRepository, context.Context)
+		roleID     string
+		wantCount  int
+		wantErrMsg string
+	}{
+		{
+			name:      "no assignments",
+			roleID:    "role-1",
+			wantCount: 0,
+		},
+		{
+			name:   "counts users",
+			roleID: "role-1",
+			seed: func(rolesRepo *BunRolesRepository, userRolesRepo *BunUserRolesRepository, ctx context.Context) {
+				if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
+					panic(err)
+				}
+				if err := userRolesRepo.AssignUserRole(ctx, "u1", "role-1", nil, nil); err != nil {
+					panic(err)
+				}
+				if err := userRolesRepo.AssignUserRole(ctx, "u2", "role-1", nil, nil); err != nil {
+					panic(err)
+				}
+			},
+			wantCount: 2,
+		},
+		{
+			name:       "query error",
+			roleID:     "role-1",
+			wantErrMsg: "failed to count users by role",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := plugintests.SetupRepoDB(t)
+			rolesRepo := NewBunRolesRepository(db)
+			userRolesRepo := NewBunUserRolesRepository(db)
+			ctx := context.Background()
+
+			if tc.seed != nil {
+				tc.seed(rolesRepo, userRolesRepo, ctx)
+			}
+			if tc.wantErrMsg != "" {
+				if err := db.Close(); err != nil {
+					t.Fatalf("failed to close db: %v", err)
+				}
+			}
+
+			count, err := userRolesRepo.CountUsersByRole(ctx, tc.roleID)
+			if tc.wantErrMsg != "" {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if count != 0 {
+					t.Fatalf("expected 0 count on error, got %d", count)
+				}
+				if !strings.Contains(err.Error(), tc.wantErrMsg) {
+					t.Fatalf("expected error containing %q, got %v", tc.wantErrMsg, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if count != tc.wantCount {
+				t.Fatalf("expected count %d, got %d", tc.wantCount, count)
+			}
+		})
+	}
+}
+
+func TestBunUserRolesRepositoryQueryErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		run  func(context.Context, *BunUserRolesRepository) error
+	}{
+		{
+			name: "get user roles",
+			run: func(ctx context.Context, repo *BunUserRolesRepository) error {
+				_, err := repo.GetUserRoles(ctx, "u1")
+				return err
+			},
+		},
+		{
+			name: "replace user roles",
+			run: func(ctx context.Context, repo *BunUserRolesRepository) error {
+				return repo.ReplaceUserRoles(ctx, "u1", []string{"role-1"}, nil)
+			},
+		},
+		{
+			name: "remove user role",
+			run: func(ctx context.Context, repo *BunUserRolesRepository) error {
+				return repo.RemoveUserRole(ctx, "u1", "role-1")
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := plugintests.SetupRepoDB(t)
+			repo := NewBunUserRolesRepository(db)
+			if err := db.Close(); err != nil {
+				t.Fatalf("failed to close db: %v", err)
+			}
+
+			if err := tc.run(context.Background(), repo); err == nil {
+				t.Fatal("expected error, got nil")
+			}
+		})
+	}
+}
+
+func TestBunUserRolesRepositoryReplaceUserRolesDuplicate(t *testing.T) {
+	t.Parallel()
+
+	db := plugintests.SetupRepoDB(t)
+	rolesRepo := NewBunRolesRepository(db)
+	userRolesRepo := NewBunUserRolesRepository(db)
+	ctx := context.Background()
+
+	if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-1", Name: "editor", Weight: 10}); err != nil {
+		t.Fatalf("failed to seed role: %v", err)
+	}
+	if err := rolesRepo.CreateRole(ctx, &types.Role{ID: "role-2", Name: "viewer", Weight: 10}); err != nil {
+		t.Fatalf("failed to seed role: %v", err)
+	}
+	if err := userRolesRepo.AssignUserRole(ctx, "u1", "role-2", nil, nil); err != nil {
+		t.Fatalf("failed to seed user role: %v", err)
+	}
+
+	err := userRolesRepo.ReplaceUserRoles(ctx, "u1", []string{"role-1", "role-1"}, nil)
+	if err == nil {
+		t.Fatal("expected duplicate insert error, got nil")
+	}
+
+	roles, err := userRolesRepo.GetUserRoles(ctx, "u1")
+	if err != nil {
+		t.Fatalf("failed to fetch user roles: %v", err)
+	}
+	if len(roles) != 1 || roles[0].RoleID != "role-2" {
+		t.Fatalf("expected rollback to preserve existing role, got %#v", roles)
+	}
+}

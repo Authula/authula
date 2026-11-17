@@ -212,3 +212,214 @@ func TestAccessControlPluginAssignRoleFromContextHook(t *testing.T) {
 		})
 	}
 }
+
+func newAccessControlPermissionsHookTestPlugin(userPermissionsRepo *accesscontroltests.MockUserPermissionsRepository) *AccessControlPlugin {
+	userPermissionsService := services.NewUserPermissionsService(userPermissionsRepo)
+
+	return &AccessControlPlugin{
+		Api:    NewAPI(nil, nil, nil, nil, userPermissionsService),
+		logger: &internaltests.MockLogger{},
+	}
+}
+
+func TestAccessControlPluginRequireAccessControl(t *testing.T) {
+	t.Parallel()
+
+	repoErr := errors.New("permissions lookup failed")
+
+	tests := []struct {
+		name           string
+		actor          *authmodels.Actor
+		requiredScopes []string
+		setup          func(*accesscontroltests.MockUserPermissionsRepository)
+		wantErr        error
+		wantHandled    bool
+		wantStatus     int
+		wantScopes     []string
+	}{
+		{
+			name:  "nil actor is a no-op",
+			actor: nil,
+		},
+		{
+			name:  "actor without id is a no-op",
+			actor: &authmodels.Actor{ID: ""},
+		},
+		{
+			name:  "machine actor without required permissions is a no-op",
+			actor: &authmodels.Actor{ID: "machine-1", Type: authmodels.ActorMachine},
+		},
+		{
+			name:           "machine actor missing required permission is forbidden",
+			actor:          &authmodels.Actor{ID: "machine-1", Type: authmodels.ActorMachine, Scopes: []string{"other:read"}},
+			requiredScopes: []string{"users:read"},
+			wantHandled:    true,
+			wantStatus:     http.StatusForbidden,
+		},
+		{
+			name:  "hydrates user scopes when empty",
+			actor: &authmodels.Actor{ID: "user-1", Type: authmodels.ActorUser},
+			setup: func(repo *accesscontroltests.MockUserPermissionsRepository) {
+				repo.On("GetUserPermissions", mock.Anything, "user-1").Return([]types.UserPermissionInfo{{PermissionKey: "users:read"}}, nil).Once()
+			},
+			wantScopes: []string{"users:read"},
+		},
+		{
+			name:           "grants access when required permission is present",
+			actor:          &authmodels.Actor{ID: "user-1", Type: authmodels.ActorUser},
+			requiredScopes: []string{"users:read"},
+			setup: func(repo *accesscontroltests.MockUserPermissionsRepository) {
+				repo.On("GetUserPermissions", mock.Anything, "user-1").Return([]types.UserPermissionInfo{{PermissionKey: "users:read"}}, nil).Once()
+			},
+			wantScopes: []string{"users:read"},
+		},
+		{
+			name:           "denies access when required permission is missing",
+			actor:          &authmodels.Actor{ID: "user-1", Type: authmodels.ActorUser},
+			requiredScopes: []string{"users:write"},
+			setup: func(repo *accesscontroltests.MockUserPermissionsRepository) {
+				repo.On("GetUserPermissions", mock.Anything, "user-1").Return([]types.UserPermissionInfo{{PermissionKey: "users:read"}}, nil).Once()
+			},
+			wantHandled: true,
+			wantStatus:  http.StatusForbidden,
+			wantScopes:  []string{"users:read"},
+		},
+		{
+			name:  "api key scopes remain when still active",
+			actor: &authmodels.Actor{ID: "user-1", Type: authmodels.ActorUser, Scopes: []string{"users:read"}},
+			setup: func(repo *accesscontroltests.MockUserPermissionsRepository) {
+				repo.On("GetUserPermissions", mock.Anything, "user-1").Return([]types.UserPermissionInfo{{PermissionKey: "users:read"}, {PermissionKey: "users:write"}}, nil).Once()
+			},
+			wantScopes: []string{"users:read"},
+		},
+		{
+			name:  "api key with stale scope is rejected",
+			actor: &authmodels.Actor{ID: "user-1", Type: authmodels.ActorUser, Scopes: []string{"users:delete"}},
+			setup: func(repo *accesscontroltests.MockUserPermissionsRepository) {
+				repo.On("GetUserPermissions", mock.Anything, "user-1").Return([]types.UserPermissionInfo{{PermissionKey: "users:read"}}, nil).Once()
+			},
+			wantHandled: true,
+			wantStatus:  http.StatusInternalServerError,
+		},
+		{
+			name:  "permission lookup failure returns internal error",
+			actor: &authmodels.Actor{ID: "user-1", Type: authmodels.ActorUser},
+			setup: func(repo *accesscontroltests.MockUserPermissionsRepository) {
+				repo.On("GetUserPermissions", mock.Anything, "user-1").Return(([]types.UserPermissionInfo)(nil), repoErr).Once()
+			},
+			wantHandled: true,
+			wantStatus:  http.StatusInternalServerError,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			userPermissionsRepo := &accesscontroltests.MockUserPermissionsRepository{}
+			if tc.setup != nil {
+				tc.setup(userPermissionsRepo)
+			}
+
+			plugin := newAccessControlPermissionsHookTestPlugin(userPermissionsRepo)
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			reqCtx := &authmodels.RequestContext{
+				Request: req,
+				Actor:   tc.actor,
+				Route:   &authmodels.Route{Metadata: map[string]any{}},
+			}
+			if tc.requiredScopes != nil {
+				reqCtx.Route.Metadata["permissions"] = tc.requiredScopes
+			}
+
+			err := plugin.requireAccessControl(reqCtx)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("expected err %v, got %v", tc.wantErr, err)
+			}
+			if reqCtx.Handled != tc.wantHandled {
+				t.Fatalf("expected handled=%v, got %v", tc.wantHandled, reqCtx.Handled)
+			}
+			if tc.wantStatus != 0 && reqCtx.ResponseStatus != tc.wantStatus {
+				t.Fatalf("expected status %d, got %d", tc.wantStatus, reqCtx.ResponseStatus)
+			}
+			if tc.wantScopes != nil && tc.actor != nil {
+				if len(tc.actor.Scopes) != len(tc.wantScopes) {
+					t.Fatalf("expected scopes %v, got %v", tc.wantScopes, tc.actor.Scopes)
+				}
+				for i := range tc.wantScopes {
+					if tc.actor.Scopes[i] != tc.wantScopes[i] {
+						t.Fatalf("expected scopes %v, got %v", tc.wantScopes, tc.actor.Scopes)
+					}
+				}
+			}
+
+			userPermissionsRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestAccessControlAssignRoleContext(t *testing.T) {
+	t.Parallel()
+
+	value := authmodels.AccessControlAssignRoleContext{UserID: "user-1", RoleName: "editor"}
+
+	tests := []struct {
+		name   string
+		input  any
+		want   authmodels.AccessControlAssignRoleContext
+		wantOK bool
+	}{
+		{
+			name:   "struct value",
+			input:  value,
+			want:   value,
+			wantOK: true,
+		},
+		{
+			name:   "pointer value",
+			input:  &value,
+			want:   value,
+			wantOK: true,
+		},
+		{
+			name:   "nil pointer",
+			input:  (*authmodels.AccessControlAssignRoleContext)(nil),
+			wantOK: false,
+		},
+		{
+			name:   "unsupported type",
+			input:  "invalid",
+			wantOK: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, ok := accessControlAssignRoleContext(tc.input)
+			if ok != tc.wantOK || got != tc.want {
+				t.Fatalf("expected (%#v, %v), got (%#v, %v)", tc.want, tc.wantOK, got, ok)
+			}
+		})
+	}
+}
+
+func TestExtractPermissionKeys(t *testing.T) {
+	t.Parallel()
+
+	permissions := []types.UserPermissionInfo{
+		{PermissionKey: "users:read"},
+		{PermissionKey: "users:write"},
+	}
+
+	keys := extractPermissionKeys(permissions)
+	if len(keys) != 2 || keys[0] != "users:read" || keys[1] != "users:write" {
+		t.Fatalf("unexpected keys %v", keys)
+	}
+
+	if keys := extractPermissionKeys(nil); len(keys) != 0 {
+		t.Fatalf("expected empty keys, got %v", keys)
+	}
+}
