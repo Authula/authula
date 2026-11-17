@@ -5,10 +5,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/rate-limit/services"
+	plugintests "github.com/Authula/authula/plugins/rate-limit/tests"
 	"github.com/Authula/authula/plugins/rate-limit/types"
+	rootservices "github.com/Authula/authula/services"
 )
 
 func TestInMemoryProvider(t *testing.T) {
@@ -129,4 +134,218 @@ func newTestRateLimitPlugin(t *testing.T) (*RateLimitPlugin, types.RateLimitProv
 	})
 
 	return &RateLimitPlugin{provider: provider, logger: &internaltests.MockLogger{}}, provider
+}
+
+func TestRateLimitPlugin_MetadataAndHooks(t *testing.T) {
+	t.Parallel()
+
+	plugin := New(types.RateLimitPluginConfig{})
+
+	metadata := plugin.Metadata()
+	require.Equal(t, models.PluginRateLimit.String(), metadata.ID)
+	require.NotEmpty(t, metadata.Version)
+	require.NotEmpty(t, metadata.Description)
+	require.NotNil(t, plugin.Config())
+	require.Nil(t, plugin.DependsOn())
+
+	hooks := plugin.Hooks()
+	require.Len(t, hooks, 3)
+	assert.Equal(t, models.HookOnRequest, hooks[0].Stage)
+	assert.Equal(t, 0, hooks[0].Order)
+	assert.Equal(t, models.HookBefore, hooks[1].Stage)
+	assert.Equal(t, 15, hooks[1].Order)
+	assert.Equal(t, models.HookAfter, hooks[2].Stage)
+	assert.Equal(t, 0, hooks[2].Order)
+	for _, hook := range hooks {
+		assert.NotNil(t, hook.Handler)
+	}
+}
+
+func TestRateLimitPlugin_Migrations(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		provider  types.RateLimitProviderType
+		wantEmpty bool
+	}{
+		{name: "database_provider_has_migrations", provider: types.RateLimitProviderDatabase},
+		{name: "memory_provider_has_no_migrations", provider: types.RateLimitProviderInMemory, wantEmpty: true},
+		{name: "redis_provider_has_no_migrations", provider: types.RateLimitProviderRedis, wantEmpty: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := New(types.RateLimitPluginConfig{Provider: tc.provider})
+
+			migrations := plugin.Migrations("sqlite")
+
+			if tc.wantEmpty {
+				assert.Empty(t, migrations)
+			} else {
+				assert.NotEmpty(t, migrations)
+			}
+		})
+	}
+}
+
+func TestRateLimitPlugin_Init(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		config         types.RateLimitPluginConfig
+		withDB         bool
+		services       map[string]any
+		configFn       func() *models.Config
+		wantError      string
+		wantProvider   string
+		wantRegistered bool
+	}{
+		{
+			name:   "memory_provider_defaults",
+			config: types.RateLimitPluginConfig{},
+			services: map[string]any{
+				models.ServiceSecondaryStorage.String(): &plugintests.StubSecondaryStorageService{Storage: nil, Name: "none"},
+			},
+			wantProvider:   "memory",
+			wantRegistered: true,
+		},
+		{
+			name:           "memory_provider_with_config",
+			config:         types.RateLimitPluginConfig{Provider: types.RateLimitProviderInMemory, Memory: &types.MemoryStorageConfig{CleanupInterval: time.Hour}},
+			services:       map[string]any{},
+			wantProvider:   "memory",
+			wantRegistered: true,
+		},
+		{
+			name:           "redis_without_secondary_storage_falls_back_to_memory",
+			config:         types.RateLimitPluginConfig{Provider: types.RateLimitProviderRedis},
+			services:       map[string]any{},
+			wantProvider:   "memory",
+			wantRegistered: true,
+		},
+		{
+			name:           "redis_with_secondary_storage_uses_it",
+			config:         types.RateLimitPluginConfig{Provider: types.RateLimitProviderRedis},
+			services:       map[string]any{models.ServiceSecondaryStorage.String(): &plugintests.StubSecondaryStorageService{Storage: &internaltests.MockSecondaryStorage{}, Name: "redis"}},
+			wantProvider:   "redis",
+			wantRegistered: true,
+		},
+		{
+			name:           "database_without_db_falls_back_to_memory",
+			config:         types.RateLimitPluginConfig{Provider: types.RateLimitProviderDatabase},
+			services:       map[string]any{},
+			wantProvider:   "memory",
+			wantRegistered: true,
+		},
+		{
+			name:           "database_with_db_uses_database_provider",
+			config:         types.RateLimitPluginConfig{Provider: types.RateLimitProviderDatabase, Database: &types.DatabaseStorageConfig{CleanupInterval: time.Hour}},
+			withDB:         true,
+			services:       map[string]any{},
+			wantProvider:   "database",
+			wantRegistered: true,
+		},
+		{
+			name:      "invalid_plugin_config_errors",
+			config:    types.RateLimitPluginConfig{},
+			services:  map[string]any{},
+			wantError: "expected a map",
+			configFn: func() *models.Config {
+				return &models.Config{Plugins: map[string]any{models.PluginRateLimit.String(): "invalid"}}
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := New(tc.config)
+			registry := &plugintests.RecordingServiceRegistry{Services: tc.services}
+			configFn := tc.configFn
+			if configFn == nil {
+				configFn = func() *models.Config { return &models.Config{} }
+			}
+			pluginCtx := &models.PluginContext{
+				Logger:          &internaltests.MockLogger{},
+				ServiceRegistry: registry,
+				GetConfig:       configFn,
+			}
+			if tc.withDB {
+				pluginCtx.DB = internaltests.NewSQLiteIntegrationDB(t)
+			}
+
+			err := plugin.Init(pluginCtx)
+
+			if tc.wantError != "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tc.wantError)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, plugin.provider)
+			assert.Equal(t, tc.wantProvider, plugin.provider.GetName())
+
+			if tc.wantRegistered {
+				assert.Contains(t, registry.Registered, models.ServiceRateLimit.String())
+				service, ok := registry.Services[models.ServiceRateLimit.String()].(rootservices.RateLimiterService)
+				require.True(t, ok)
+				require.NotNil(t, service)
+			}
+			require.NoError(t, plugin.Close())
+		})
+	}
+}
+
+func TestRateLimitPlugin_TrySecondaryStorage(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		registry models.ServiceRegistry
+		wantNil  bool
+		wantName string
+	}{
+		{
+			name:     "missing_service",
+			registry: &internaltests.TestServiceRegistry{Services: map[string]any{}},
+			wantNil:  true,
+		},
+		{
+			name: "nil_storage",
+			registry: &internaltests.TestServiceRegistry{Services: map[string]any{
+				models.ServiceSecondaryStorage.String(): &plugintests.StubSecondaryStorageService{Storage: nil, Name: "redis"},
+			}},
+			wantNil: true,
+		},
+		{
+			name: "configured_storage",
+			registry: &internaltests.TestServiceRegistry{Services: map[string]any{
+				models.ServiceSecondaryStorage.String(): &plugintests.StubSecondaryStorageService{Storage: &internaltests.MockSecondaryStorage{}, Name: "custom"},
+			}},
+			wantName: "custom",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := &RateLimitPlugin{pluginCtx: &models.PluginContext{ServiceRegistry: tc.registry}}
+
+			provider := plugin.trySecondaryStorage()
+
+			if tc.wantNil {
+				assert.Nil(t, provider)
+				return
+			}
+			require.NotNil(t, provider)
+			assert.Equal(t, tc.wantName, provider.GetName())
+			require.NoError(t, provider.Close())
+		})
+	}
 }

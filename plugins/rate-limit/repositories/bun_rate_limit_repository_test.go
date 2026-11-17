@@ -337,3 +337,51 @@ func TestBunRateLimitRepository_DeleteRule(t *testing.T) {
 		})
 	}
 }
+
+func TestBunRateLimitRepository_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		wantErrMsg string
+		call       func(*rateLimitRepository) error
+	}{
+		{
+			name:       "cleanup_expired_closed_database",
+			wantErrMsg: "failed to cleanup expired records",
+			call: func(repo *rateLimitRepository) error {
+				return repo.CleanupExpired(context.Background(), time.Now().UTC())
+			},
+		},
+		{
+			name:       "set_rule_closed_database",
+			wantErrMsg: "failed to set rate limit rule",
+			call: func(repo *rateLimitRepository) error {
+				return repo.SetRule(context.Background(), "key-1", 60, 10)
+			},
+		},
+		{
+			name:       "get_rule_closed_database",
+			wantErrMsg: "failed to get rate limit rule",
+			call: func(repo *rateLimitRepository) error {
+				_, err := repo.GetRule(context.Background(), "key-1")
+				return err
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := tests.NewSQLiteIntegrationDB(t)
+			repo := NewRateLimitRepository(db).(*rateLimitRepository)
+			require.NoError(t, db.Close())
+
+			err := tc.call(repo)
+
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.wantErrMsg)
+		})
+	}
+}
