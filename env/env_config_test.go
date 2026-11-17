@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// unsetEnv removes key for the duration of the test and restores the previous
-// value, if any, afterwards.
 func unsetEnv(t *testing.T, key string) {
 	t.Helper()
 
