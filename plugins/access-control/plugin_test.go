@@ -49,75 +49,92 @@ func TestAccessControlPluginMetadata(t *testing.T) {
 func TestAccessControlPluginInit(t *testing.T) {
 	t.Parallel()
 
-	t.Run("creates services, permissions and api", func(t *testing.T) {
-		t.Parallel()
-
-		db := accesscontroltests.SetupRepoDB(t)
-		ctx := newTestPluginContext(nil)
-		ctx.DB = db
-
-		plugin := New(types.AccessControlPluginConfig{Enabled: true})
-		require.NoError(t, plugin.Init(ctx))
-
-		require.NotNil(t, plugin.Api)
-		require.NotNil(t, plugin.useCases)
-		require.NotNil(t, plugin.accessControlService)
-		require.NotNil(t, ctx.ServiceRegistry.Get(models.ServiceAccessControl.String()))
-
-		permissions, err := plugin.Api.GetAllPermissions(context.Background())
-		require.NoError(t, err)
-		require.Len(t, permissions, 19)
-	})
-
-	t.Run("is idempotent when permissions already exist", func(t *testing.T) {
-		t.Parallel()
-
-		db := accesscontroltests.SetupRepoDB(t)
-		ctx := newTestPluginContext(nil)
-		ctx.DB = db
-
-		plugin := New(types.AccessControlPluginConfig{})
-		require.NoError(t, plugin.Init(ctx))
-		require.NoError(t, plugin.Init(ctx))
-
-		permissions, err := plugin.Api.GetAllPermissions(context.Background())
-		require.NoError(t, err)
-		require.Len(t, permissions, 19)
-	})
-
-	t.Run("loads pre-parsed config", func(t *testing.T) {
-		t.Parallel()
-
-		db := accesscontroltests.SetupRepoDB(t)
-		config := &models.Config{
-			Plugins: map[string]any{},
-			PreParsedConfigs: map[string]any{
-				models.PluginAccessControl.String(): types.AccessControlPluginConfig{Enabled: true},
+	tests := []struct {
+		name            string
+		pluginConfig    types.AccessControlPluginConfig
+		config          *models.Config
+		closeDB         bool
+		initCalls       int
+		wantErrContains string
+		verify          func(t *testing.T, plugin *AccessControlPlugin, ctx *models.PluginContext)
+	}{
+		{
+			name:         "creates services, permissions and api",
+			pluginConfig: types.AccessControlPluginConfig{Enabled: true},
+			initCalls:    1,
+			verify: func(t *testing.T, plugin *AccessControlPlugin, ctx *models.PluginContext) {
+				require.NotNil(t, plugin.useCases)
+				require.NotNil(t, plugin.accessControlService)
+				require.NotNil(t, ctx.ServiceRegistry.Get(models.ServiceAccessControl.String()))
 			},
-		}
-		ctx := newTestPluginContext(config)
-		ctx.DB = db
+		},
+		{
+			name:         "is idempotent when permissions already exist",
+			pluginConfig: types.AccessControlPluginConfig{},
+			initCalls:    2,
+		},
+		{
+			name:         "loads pre-parsed config",
+			pluginConfig: types.AccessControlPluginConfig{},
+			config: &models.Config{
+				Plugins: map[string]any{},
+				PreParsedConfigs: map[string]any{
+					models.PluginAccessControl.String(): types.AccessControlPluginConfig{Enabled: true},
+				},
+			},
+			initCalls: 1,
+			verify: func(t *testing.T, plugin *AccessControlPlugin, ctx *models.PluginContext) {
+				require.True(t, plugin.Config().(types.AccessControlPluginConfig).Enabled)
+			},
+		},
+		{
+			name:            "fails when permissions cannot be ensured",
+			pluginConfig:    types.AccessControlPluginConfig{},
+			closeDB:         true,
+			initCalls:       1,
+			wantErrContains: "failed to ensure access control permissions",
+		},
+	}
 
-		plugin := New(types.AccessControlPluginConfig{})
-		require.NoError(t, plugin.Init(ctx))
-		require.True(t, plugin.Config().(types.AccessControlPluginConfig).Enabled)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("fails when permissions cannot be ensured", func(t *testing.T) {
-		t.Parallel()
+			db := accesscontroltests.SetupRepoDB(t)
+			if tt.closeDB {
+				require.NoError(t, db.Close())
+			}
 
-		db := accesscontroltests.SetupRepoDB(t)
-		require.NoError(t, db.Close())
+			ctx := newTestPluginContext(tt.config)
+			ctx.DB = db
 
-		ctx := newTestPluginContext(nil)
-		ctx.DB = db
+			plugin := New(tt.pluginConfig)
 
-		plugin := New(types.AccessControlPluginConfig{})
-		err := plugin.Init(ctx)
-		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to ensure access control permissions")
-		require.Nil(t, plugin.Api)
-	})
+			var err error
+			for range tt.initCalls {
+				if err = plugin.Init(ctx); err != nil {
+					break
+				}
+			}
+
+			if tt.wantErrContains != "" {
+				require.ErrorContains(t, err, tt.wantErrContains)
+				require.Nil(t, plugin.Api)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, plugin.Api)
+
+			permissions, err := plugin.Api.GetAllPermissions(context.Background())
+			require.NoError(t, err)
+			require.Len(t, permissions, 19)
+
+			if tt.verify != nil {
+				tt.verify(t, plugin, ctx)
+			}
+		})
+	}
 }
 
 func TestAccessControlPluginMigrations(t *testing.T) {
