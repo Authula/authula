@@ -9,6 +9,7 @@ import (
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/repositories"
 	"github.com/Authula/authula/plugins/admin/types"
+	"github.com/Authula/authula/util"
 )
 
 type StateService struct {
@@ -263,7 +264,7 @@ func (s *StateService) GetUserAdminSessions(ctx context.Context, actor *models.A
 
 func (s *StateService) RevokeSession(ctx context.Context, actor *models.Actor, sessionID string, reason *string, actorUserID *string) (*types.AdminSessionState, error) {
 	return s.UpsertSessionState(ctx, actor, sessionID, types.UpsertSessionStateRequest{
-		Revoke:        true,
+		Revoke:        new(true),
 		RevokedReason: reason,
 	}, actorUserID)
 }
@@ -274,22 +275,23 @@ func (s *StateService) GetRevokedSessionStates(ctx context.Context, actor *model
 
 func (s *StateService) BanUser(ctx context.Context, actor *models.Actor, userID string, request types.BanUserRequest, actorUserID *string) (*types.AdminUserState, error) {
 	return s.UpsertUserState(ctx, actor, userID, types.UpsertUserStateRequest{
-		Banned:       true,
+		Banned:       new(true),
 		BannedUntil:  request.BannedUntil,
 		BannedReason: request.Reason,
 	}, actorUserID)
 }
 
 func (s *StateService) UnbanUser(ctx context.Context, actor *models.Actor, userID string) (*types.AdminUserState, error) {
-	return s.UpsertUserState(ctx, actor, userID, types.UpsertUserStateRequest{Banned: false}, nil)
+	return s.UpsertUserState(ctx, actor, userID, types.UpsertUserStateRequest{Banned: new(false)}, nil)
 }
 
 func buildUserState(userID string, request types.UpsertUserStateRequest, actorUserID *string) *types.AdminUserState {
+	banned := util.DerefPointer(request.Banned)
 	state := &types.AdminUserState{
 		UserID: userID,
-		Banned: request.Banned,
+		Banned: banned,
 	}
-	if request.Banned {
+	if banned {
 		now := time.Now().UTC()
 		state.BannedAt = &now
 		state.BannedUntil = request.BannedUntil
@@ -302,7 +304,7 @@ func buildUserState(userID string, request types.UpsertUserStateRequest, actorUs
 
 func buildSessionState(sessionID string, request types.UpsertSessionStateRequest, actorUserID *string) *types.AdminSessionState {
 	state := &types.AdminSessionState{SessionID: sessionID}
-	if request.Revoke {
+	if util.DerefPointer(request.Revoke) {
 		now := time.Now().UTC()
 		state.RevokedAt = &now
 		state.RevokedReason = request.RevokedReason
@@ -316,11 +318,12 @@ func buildSessionState(sessionID string, request types.UpsertSessionStateRequest
 }
 
 func buildUserStateFromCreate(userID string, request types.CreateUserStateRequest, actorUserID *string) *types.AdminUserState {
+	banned := util.DerefPointer(request.Banned)
 	state := &types.AdminUserState{
 		UserID: userID,
-		Banned: request.Banned,
+		Banned: banned,
 	}
-	if request.Banned {
+	if banned {
 		now := time.Now().UTC()
 		state.BannedAt = &now
 		state.BannedUntil = request.BannedUntil
@@ -333,7 +336,7 @@ func buildUserStateFromCreate(userID string, request types.CreateUserStateReques
 
 func buildSessionStateFromCreate(sessionID string, request types.CreateSessionStateRequest, actorUserID *string) *types.AdminSessionState {
 	state := &types.AdminSessionState{SessionID: sessionID}
-	if request.Revoke {
+	if util.DerefPointer(request.Revoke) {
 		now := time.Now().UTC()
 		state.RevokedAt = &now
 		state.RevokedReason = request.RevokedReason

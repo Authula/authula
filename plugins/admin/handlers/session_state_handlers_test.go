@@ -58,6 +58,29 @@ func TestCreateSessionStateHandler(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:            "rejects impersonation expiry in the past",
+			body:            internaltests.MarshalToJSON(t, map[string]any{"revoke": true, "impersonation_expires_at": time.Now().Add(-time.Hour)}),
+			expectedStatus:  http.StatusUnprocessableEntity,
+			expectedMessage: "impersonation expiration time must be in the future",
+		},
+		{
+			name:            "rejects missing revoke field",
+			body:            []byte("{}"),
+			expectedStatus:  http.StatusUnprocessableEntity,
+			expectedMessage: "Key: 'CreateSessionStateRequest.Revoke' Error:Field validation for 'Revoke' failed on the 'required' tag",
+		},
+		{
+			name: "success with revoke false",
+			body: []byte(`{"revoke": false}`),
+			setup: func(sessionStateRepo *admintests.MockSessionStateRepository) {
+				sessionStateRepo.On("SessionExists", mock.Anything, "session-1").Return(true, nil).Once()
+				sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return((*types.AdminSessionState)(nil), nil).Once()
+				sessionStateRepo.On("Create", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(nil).Once()
+				sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return(&types.AdminSessionState{SessionID: "session-1"}, nil).Once()
+			},
+			expectedStatus: http.StatusCreated,
+		},
 	}
 
 	for _, tc := range tests {
@@ -72,7 +95,7 @@ func TestCreateSessionStateHandler(t *testing.T) {
 
 			body := tc.body
 			if body == nil {
-				body = internaltests.MarshalToJSON(t, types.CreateSessionStateRequest{Revoke: true})
+				body = internaltests.MarshalToJSON(t, types.CreateSessionStateRequest{Revoke: new(true)})
 			}
 
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/admin/sessions/session-1/state", body, nil)
@@ -205,6 +228,23 @@ func TestUpdateSessionStateHandler(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:            "rejects impersonation expiry in the past",
+			body:            internaltests.MarshalToJSON(t, map[string]any{"revoke": true, "impersonation_expires_at": time.Now().Add(-time.Hour)}),
+			expectedStatus:  http.StatusUnprocessableEntity,
+			expectedMessage: "impersonation expiration time must be in the future",
+		},
+		{
+			name: "success with revoke false",
+			body: []byte(`{"revoke": false}`),
+			setup: func(sessionStateRepo *admintests.MockSessionStateRepository) {
+				sessionStateRepo.On("SessionExists", mock.Anything, "session-1").Return(true, nil).Once()
+				sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return(&types.AdminSessionState{SessionID: "session-1"}, nil).Once()
+				sessionStateRepo.On("Update", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(nil).Once()
+				sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return(&types.AdminSessionState{SessionID: "session-1"}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+		},
 	}
 
 	for _, tc := range tests {
@@ -219,7 +259,7 @@ func TestUpdateSessionStateHandler(t *testing.T) {
 
 			body := tc.body
 			if body == nil {
-				body = internaltests.MarshalToJSON(t, types.UpsertSessionStateRequest{Revoke: true})
+				body = internaltests.MarshalToJSON(t, types.UpsertSessionStateRequest{Revoke: new(true)})
 			}
 
 			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPatch, "/admin/sessions/session-1/state", body, nil)
@@ -282,6 +322,22 @@ func TestUpsertSessionStateHandler(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:            "rejects impersonation expiry in the past",
+			body:            internaltests.MarshalToJSON(t, map[string]any{"revoke": true, "impersonation_expires_at": time.Now().Add(-time.Hour)}),
+			expectedStatus:  http.StatusUnprocessableEntity,
+			expectedMessage: "impersonation expiration time must be in the future",
+		},
+		{
+			name: "success with revoke false",
+			body: []byte(`{"revoke": false}`),
+			setup: func(_ *admintests.MockUserStateRepository, sessionStateRepo *admintests.MockSessionStateRepository, _ *admintests.MockImpersonationRepository) {
+				sessionStateRepo.On("SessionExists", mock.Anything, "session-1").Return(true, nil).Once()
+				sessionStateRepo.On("Upsert", mock.Anything, mock.AnythingOfType("*types.AdminSessionState")).Return(nil).Once()
+				sessionStateRepo.On("GetBySessionID", mock.Anything, "session-1").Return(&types.AdminSessionState{SessionID: "session-1"}, nil).Once()
+			},
+			expectedStatus: http.StatusOK,
+		},
 	}
 
 	for _, tc := range tests {
@@ -294,7 +350,7 @@ func TestUpsertSessionStateHandler(t *testing.T) {
 			}
 			handler := adminhandlers.NewUpsertSessionStateHandler(useCase)
 
-			request := types.UpsertSessionStateRequest{Revoke: true}
+			request := types.UpsertSessionStateRequest{Revoke: new(true)}
 			body := tc.body
 			if body == nil {
 				body = internaltests.MarshalToJSON(t, request)

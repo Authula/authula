@@ -167,7 +167,7 @@ type UpsertUserStateResponse struct {
 }
 
 type CreateUserStateRequest struct {
-	Banned       bool       `json:"banned" required:"true" nullable:"false" validate:"required"`
+	Banned       *bool      `json:"banned" required:"true" nullable:"false" validate:"required"`
 	BannedUntil  *time.Time `json:"banned_until,omitempty" nullable:"true"`
 	BannedReason *string    `json:"banned_reason,omitempty" nullable:"true"`
 }
@@ -177,7 +177,7 @@ func (req *CreateUserStateRequest) Validate() error {
 		return err
 	}
 
-	if req.Banned && req.BannedUntil != nil && req.BannedUntil.Before(time.Now()) {
+	if util.DerefPointer(req.Banned) && req.BannedUntil != nil && req.BannedUntil.Before(time.Now()) {
 		return constants.ErrBannedUntilBeforeNow
 	}
 
@@ -185,7 +185,7 @@ func (req *CreateUserStateRequest) Validate() error {
 }
 
 type UpsertUserStateRequest struct {
-	Banned       bool       `json:"banned" required:"true" nullable:"false" validate:"required"`
+	Banned       *bool      `json:"banned" required:"true" nullable:"false" validate:"required"`
 	BannedUntil  *time.Time `json:"banned_until,omitempty" nullable:"true"`
 	BannedReason *string    `json:"banned_reason,omitempty" nullable:"true"`
 }
@@ -195,7 +195,7 @@ func (req *UpsertUserStateRequest) Validate() error {
 		return err
 	}
 
-	if req.Banned && req.BannedUntil != nil && req.BannedUntil.Before(time.Now()) {
+	if util.DerefPointer(req.Banned) && req.BannedUntil != nil && req.BannedUntil.Before(time.Now()) {
 		return constants.ErrBannedUntilBeforeNow
 	}
 
@@ -212,10 +212,6 @@ type BanUserRequest struct {
 }
 
 func (req *BanUserRequest) Validate() error {
-	if err := util.ValidateStruct(req); err != nil {
-		return err
-	}
-
 	if req.BannedUntil != nil && req.BannedUntil.Before(time.Now()) {
 		return constants.ErrBannedUntilBeforeNow
 	}
@@ -236,7 +232,7 @@ type GetSessionStateResponse struct {
 }
 
 type CreateSessionStateRequest struct {
-	Revoke                 bool       `json:"revoke" required:"true" nullable:"false" validate:"required"`
+	Revoke                 *bool      `json:"revoke" required:"true" nullable:"false" validate:"required"`
 	RevokedReason          *string    `json:"revoked_reason,omitempty" nullable:"true"`
 	ImpersonatorUserID     *string    `json:"impersonator_user_id,omitempty" nullable:"true"`
 	ImpersonationReason    *string    `json:"impersonation_reason,omitempty" nullable:"true"`
@@ -256,7 +252,7 @@ func (req *CreateSessionStateRequest) Validate() error {
 }
 
 type UpsertSessionStateRequest struct {
-	Revoke                 bool       `json:"revoke" required:"true" nullable:"false" validate:"required"`
+	Revoke                 *bool      `json:"revoke" required:"true" nullable:"false" validate:"required"`
 	RevokedReason          *string    `json:"revoked_reason,omitempty" nullable:"true"`
 	ImpersonatorUserID     *string    `json:"impersonator_user_id,omitempty" nullable:"true"`
 	ImpersonationReason    *string    `json:"impersonation_reason,omitempty" nullable:"true"`
