@@ -1,12 +1,17 @@
 package usecases
 
 import (
+	"context"
+	"errors"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	emailtmpl "github.com/Authula/authula/core/email/template"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/types"
 )
@@ -83,4 +88,225 @@ func TestSendEmailVerificationUseCase(t *testing.T) {
 			f.tokenSvc.AssertExpectations(t)
 		})
 	}
+}
+
+var errSendVerificationBackend = errors.New("database unavailable")
+
+// notifyingLogger records error messages and signals the first one, so tests
+// can wait for logging that happens in a background goroutine.
+type notifyingLogger struct {
+	mu     sync.Mutex
+	errors []string
+	done   chan struct{}
+	once   sync.Once
+}
+
+func newNotifyingLogger() *notifyingLogger {
+	return &notifyingLogger{done: make(chan struct{})}
+}
+
+func (l *notifyingLogger) Debug(string, ...any) {}
+func (l *notifyingLogger) Info(string, ...any)  {}
+func (l *notifyingLogger) Warn(string, ...any)  {}
+
+func (l *notifyingLogger) Error(msg string, _ ...any) {
+	l.mu.Lock()
+	l.errors = append(l.errors, msg)
+	l.mu.Unlock()
+	l.once.Do(func() { close(l.done) })
+}
+
+func (l *notifyingLogger) messages() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]string(nil), l.errors...)
+}
+
+func waitForSignal(t *testing.T, signal <-chan struct{}, description string) {
+	t.Helper()
+	select {
+	case <-signal:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for %s", description)
+	}
+}
+
+func TestSendEmailVerificationUseCase_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		setup   func(*emailPasswordTestFixture)
+		wantErr string
+		wantLog string
+	}{
+		{
+			name: "user lookup error is logged and swallowed",
+			setup: func(f *emailPasswordTestFixture) {
+				f.userSvc.On("GetByID", mock.Anything, "user-1").Return(nil, errSendVerificationBackend).Once()
+			},
+			wantLog: "failed to fetch user",
+		},
+		{
+			name: "token generation error is wrapped and returned",
+			setup: func(f *emailPasswordTestFixture) {
+				f.userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+				f.tokenSvc.On("Generate").Return("", errSendVerificationBackend).Once()
+			},
+			wantErr: "failed to generate verification token",
+			wantLog: "database unavailable",
+		},
+		{
+			name: "delete failure is logged and execution continues",
+			setup: func(f *emailPasswordTestFixture) {
+				f.userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+				f.tokenSvc.On("Generate").Return("verify-token", nil).Once()
+				f.tokenSvc.On("Hash", "verify-token").Return("hashed-token").Once()
+				f.verificationSvc.On("DeleteByUserIDAndType", mock.Anything, "user-1", models.TypeEmailVerification).Return(errSendVerificationBackend).Once()
+				f.verificationSvc.On("Create", mock.Anything, "user-1", "hashed-token", models.TypeEmailVerification, "test@example.com", 24*time.Hour).Return(&models.Verification{ID: "verif-1"}, nil).Once()
+			},
+			wantLog: "database unavailable",
+		},
+		{
+			name: "create failure is wrapped and returned",
+			setup: func(f *emailPasswordTestFixture) {
+				f.userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+				f.tokenSvc.On("Generate").Return("verify-token", nil).Once()
+				f.tokenSvc.On("Hash", "verify-token").Return("hashed-token").Once()
+				f.verificationSvc.On("DeleteByUserIDAndType", mock.Anything, "user-1", models.TypeEmailVerification).Return(nil).Once()
+				f.verificationSvc.On("Create", mock.Anything, "user-1", "hashed-token", models.TypeEmailVerification, "test@example.com", 24*time.Hour).Return(nil, errSendVerificationBackend).Once()
+			},
+			wantErr: "failed to create verification token",
+			wantLog: "database unavailable",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f := newEmailPasswordTestFixture()
+			tc.setup(f)
+
+			// An untyped nil mailer keeps these cases free of the background
+			// goroutine. Passing the typed nil mock would still satisfy the
+			// interface and panic inside the goroutine.
+			logger := newNotifyingLogger()
+			uc := NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, logger, f.userSvc, f.verificationSvc, f.tokenSvc, nil, f.tmplMgr)
+
+			err := uc.Send(testRequestContext(), "user-1", nil)
+
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tc.wantErr)
+			}
+			if tc.wantLog != "" {
+				require.Contains(t, strings.Join(logger.messages(), "\n"), tc.wantLog)
+			}
+			f.userSvc.AssertExpectations(t)
+			f.verificationSvc.AssertExpectations(t)
+			f.tokenSvc.AssertExpectations(t)
+		})
+	}
+}
+
+func TestSendEmailVerificationUseCase_MailerFallback(t *testing.T) {
+	t.Parallel()
+
+	expectVerificationCreated := func(f *emailPasswordTestFixture) {
+		f.userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+		f.tokenSvc.On("Generate").Return("verify-token", nil).Once()
+		f.tokenSvc.On("Hash", "verify-token").Return("hashed-token").Once()
+		f.verificationSvc.On("DeleteByUserIDAndType", mock.Anything, "user-1", models.TypeEmailVerification).Return(nil).Once()
+		f.verificationSvc.On("Create", mock.Anything, "user-1", "hashed-token", models.TypeEmailVerification, "test@example.com", 24*time.Hour).Return(&models.Verification{ID: "verif-1"}, nil).Once()
+	}
+
+	t.Run("plugin callback failure falls back to the mailer", func(t *testing.T) {
+		t.Parallel()
+		f := newEmailPasswordTestFixture()
+		expectVerificationCreated(f)
+		logger := newNotifyingLogger()
+		sent := make(chan struct{})
+
+		f.pluginConfig.SendEmailVerification = func(types.SendEmailVerificationParams, *models.RequestContext) error {
+			return errSendVerificationBackend
+		}
+		f.mailerSvc.On("SendEmail", mock.Anything, "test@example.com", "Verify your email", mock.Anything, mock.Anything).
+			Run(func(mock.Arguments) { close(sent) }).
+			Return(nil).Once()
+
+		uc := NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, logger, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr)
+		require.NoError(t, uc.Send(testRequestContext(), "user-1", nil))
+
+		waitForSignal(t, sent, "mailer send")
+		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send email verification via plugin callback")
+		f.mailerSvc.AssertExpectations(t)
+	})
+
+	t.Run("plugin callback success skips the mailer", func(t *testing.T) {
+		t.Parallel()
+		f := newEmailPasswordTestFixture()
+		expectVerificationCreated(f)
+
+		f.pluginConfig.SendEmailVerification = func(types.SendEmailVerificationParams, *models.RequestContext) error {
+			return nil
+		}
+
+		uc := NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, newNotifyingLogger(), f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr)
+		require.NoError(t, uc.Send(testRequestContext(), "user-1", nil))
+
+		f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
+	})
+
+	t.Run("render failure in the background is logged", func(t *testing.T) {
+		t.Parallel()
+		f := newEmailPasswordTestFixture()
+		expectVerificationCreated(f)
+		// A manager without registered templates forces the render path to fail.
+		f.tmplMgr = emailtmpl.NewManager()
+		logger := newNotifyingLogger()
+
+		uc := NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, logger, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr)
+		require.NoError(t, uc.Send(testRequestContext(), "user-1", nil))
+
+		waitForSignal(t, logger.done, "background render error")
+		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send email verification via built-in email service")
+		f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
+	})
+}
+
+func TestSendEmailVerificationUseCase_SendEmailVerification(t *testing.T) {
+	t.Parallel()
+
+	t.Run("renders the template and sends it", func(t *testing.T) {
+		t.Parallel()
+		f := newEmailPasswordTestFixture()
+		link := "http://localhost/auth/verify?token=abc"
+		f.mailerSvc.On(
+			"SendEmail",
+			mock.Anything,
+			"test@example.com",
+			"Verify your email",
+			mock.MatchedBy(func(body string) bool { return strings.Contains(body, link) }),
+			mock.MatchedBy(func(body string) bool { return strings.Contains(body, link) }),
+		).Return(nil).Once()
+
+		uc := NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, newNotifyingLogger(), f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr).(*sendEmailVerificationUseCase)
+		err := uc.sendEmailVerification(context.Background(), &models.User{ID: "user-1", Email: "test@example.com"}, link)
+
+		require.NoError(t, err)
+		f.mailerSvc.AssertExpectations(t)
+	})
+
+	t.Run("render failure is logged and returned", func(t *testing.T) {
+		t.Parallel()
+		f := newEmailPasswordTestFixture()
+		logger := newNotifyingLogger()
+
+		uc := NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, logger, f.userSvc, f.verificationSvc, f.tokenSvc, nil, emailtmpl.NewManager()).(*sendEmailVerificationUseCase)
+		err := uc.sendEmailVerification(context.Background(), &models.User{ID: "user-1", Email: "test@example.com"}, "http://localhost/auth/verify?token=abc")
+
+		require.ErrorContains(t, err, "not found")
+		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to render email verification template")
+	})
 }
