@@ -928,3 +928,517 @@ func TestSessionPlugin_IssueSessionCookieHook(t *testing.T) {
 		})
 	}
 }
+
+func sessionInitConfig(session models.SessionConfig) *models.Config {
+	return &models.Config{Session: session}
+}
+
+func defaultInitSessionConfig() models.SessionConfig {
+	return models.SessionConfig{
+		CookieName:   testCookieName,
+		ExpiresIn:    testExpiresIn,
+		UpdateAge:    testUpdateAge,
+		CookieMaxAge: testExpiresIn,
+	}
+}
+
+func TestSessionPlugin_New(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cfg  SessionPluginConfig
+	}{
+		{name: "keeps the enabled flag", cfg: SessionPluginConfig{Enabled: true}},
+		{name: "keeps the disabled flag", cfg: SessionPluginConfig{Enabled: false}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := New(tt.cfg)
+
+			require.NotNil(t, plugin)
+			assert.Equal(t, tt.cfg, plugin.pluginConfig)
+			assert.Equal(t, tt.cfg, plugin.Config())
+		})
+	}
+}
+
+func TestSessionPlugin_Metadata(t *testing.T) {
+	t.Parallel()
+
+	metadata := New(SessionPluginConfig{Enabled: true}).Metadata()
+
+	assert.Equal(t, models.PluginSession.String(), metadata.ID)
+	assert.Equal(t, "1.0.0", metadata.Version)
+	assert.Equal(t, "Provides cookie-based session authentication", metadata.Description)
+}
+
+func TestSessionPlugin_Config(t *testing.T) {
+	t.Parallel()
+
+	cfg := SessionPluginConfig{Enabled: true}
+	plugin := New(cfg)
+
+	assert.Equal(t, cfg, plugin.Config())
+}
+
+func TestSessionPlugin_Close(t *testing.T) {
+	t.Parallel()
+
+	require.NoError(t, New(SessionPluginConfig{Enabled: true}).Close())
+}
+
+func TestSessionPlugin_ApplyDefaults(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   SessionPluginConfig
+		want SessionPluginConfig
+	}{
+		{
+			name: "zero value stays zero",
+			in:   SessionPluginConfig{},
+			want: SessionPluginConfig{},
+		},
+		{
+			name: "custom enabled value is preserved",
+			in:   SessionPluginConfig{Enabled: true},
+			want: SessionPluginConfig{Enabled: true},
+		},
+		{
+			name: "explicitly disabled value is preserved",
+			in:   SessionPluginConfig{Enabled: false},
+			want: SessionPluginConfig{Enabled: false},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := tt.in
+			cfg.ApplyDefaults()
+
+			assert.Equal(t, tt.want, cfg)
+		})
+	}
+}
+
+func TestSessionPlugin_SessionHookIDString(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		id   SessionHookID
+		want string
+	}{
+		{name: "auth hook id", id: HookIDSessionAuth, want: "session.auth"},
+		{name: "optional auth hook id", id: HookIDSessionAuthOptional, want: "session.auth.optional"},
+		{name: "custom hook id", id: SessionHookID("session.custom"), want: "session.custom"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, tt.id.String())
+		})
+	}
+}
+
+func TestSessionPlugin_Init(t *testing.T) {
+	t.Parallel()
+
+	mockUserSvc := new(internaltests.MockUserService)
+	mockSessionSvc := new(internaltests.MockSessionService)
+	mockTokenSvc := new(internaltests.MockTokenService)
+
+	tests := []struct {
+		name        string
+		config      *models.Config
+		services    map[string]any
+		wantErr     string
+		wantEnabled bool
+	}{
+		{
+			name:     "config decode failure is returned",
+			config:   &models.Config{Session: defaultInitSessionConfig(), Plugins: models.PluginsConfig{"session": 12345}},
+			services: map[string]any{},
+			wantErr:  "expected a map",
+		},
+		{
+			name:     "missing user service is rejected",
+			config:   sessionInitConfig(defaultInitSessionConfig()),
+			services: map[string]any{},
+			wantErr:  "user service not available",
+		},
+		{
+			name:   "user service of the wrong type is rejected",
+			config: sessionInitConfig(defaultInitSessionConfig()),
+			services: map[string]any{
+				models.ServiceUser.String(): "not-a-user-service",
+			},
+			wantErr: "user service not available",
+		},
+		{
+			name:   "missing session service is rejected",
+			config: sessionInitConfig(defaultInitSessionConfig()),
+			services: map[string]any{
+				models.ServiceUser.String(): mockUserSvc,
+			},
+			wantErr: "session service not available",
+		},
+		{
+			name:   "session service of the wrong type is rejected",
+			config: sessionInitConfig(defaultInitSessionConfig()),
+			services: map[string]any{
+				models.ServiceUser.String():    mockUserSvc,
+				models.ServiceSession.String(): mockUserSvc,
+			},
+			wantErr: "session service not available",
+		},
+		{
+			name:   "missing token service is rejected",
+			config: sessionInitConfig(defaultInitSessionConfig()),
+			services: map[string]any{
+				models.ServiceUser.String():    mockUserSvc,
+				models.ServiceSession.String(): mockSessionSvc,
+			},
+			wantErr: "token service not available",
+		},
+		{
+			name:   "token service of the wrong type is rejected",
+			config: sessionInitConfig(defaultInitSessionConfig()),
+			services: map[string]any{
+				models.ServiceUser.String():    mockUserSvc,
+				models.ServiceSession.String(): mockSessionSvc,
+				models.ServiceToken.String():   mockSessionSvc,
+			},
+			wantErr: "token service not available",
+		},
+		{
+			name: "pre-parsed config is loaded and services are wired",
+			config: &models.Config{
+				Session:          defaultInitSessionConfig(),
+				Plugins:          models.PluginsConfig{},
+				PreParsedConfigs: map[string]any{models.PluginSession.String(): SessionPluginConfig{Enabled: true}},
+			},
+			services: map[string]any{
+				models.ServiceUser.String():    mockUserSvc,
+				models.ServiceSession.String(): mockSessionSvc,
+				models.ServiceToken.String():   mockTokenSvc,
+			},
+			wantEnabled: true,
+		},
+		{
+			name:   "raw plugin config map is decoded",
+			config: &models.Config{Session: defaultInitSessionConfig(), Plugins: models.PluginsConfig{"session": map[string]any{"enabled": true}}},
+			services: map[string]any{
+				models.ServiceUser.String():    mockUserSvc,
+				models.ServiceSession.String(): mockSessionSvc,
+				models.ServiceToken.String():   mockTokenSvc,
+			},
+			wantEnabled: true,
+		},
+		{
+			name:   "config without plugin entries keeps constructor values",
+			config: sessionInitConfig(defaultInitSessionConfig()),
+			services: map[string]any{
+				models.ServiceUser.String():    mockUserSvc,
+				models.ServiceSession.String(): mockSessionSvc,
+				models.ServiceToken.String():   mockTokenSvc,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			logger := new(internaltests.MockLogger)
+			registry := &internaltests.TestServiceRegistry{Services: tt.services}
+			ctx := &models.PluginContext{
+				Logger:          logger,
+				ServiceRegistry: registry,
+				GetConfig:       func() *models.Config { return tt.config },
+			}
+			plugin := New(SessionPluginConfig{Enabled: false})
+
+			err := plugin.Init(ctx)
+
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				assert.False(t, plugin.pluginConfig.Enabled)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Same(t, ctx, plugin.ctx)
+			assert.Same(t, logger, plugin.logger)
+			assert.Same(t, tt.config, plugin.globalConfig)
+			assert.Same(t, mockUserSvc, plugin.userService)
+			assert.Same(t, mockSessionSvc, plugin.sessionService)
+			assert.Same(t, mockTokenSvc, plugin.tokenService)
+			assert.Equal(t, tt.wantEnabled, plugin.pluginConfig.Enabled)
+		})
+	}
+}
+
+func TestSessionPlugin_InitWarning(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		updateAge time.Duration
+		expiresIn time.Duration
+		wantWarn  bool
+	}{
+		{
+			name:      "warns when update age equals expires in",
+			updateAge: time.Hour,
+			expiresIn: time.Hour,
+			wantWarn:  true,
+		},
+		{
+			name:      "warns when update age is longer than expires in",
+			updateAge: 2 * time.Hour,
+			expiresIn: time.Hour,
+			wantWarn:  true,
+		},
+		{
+			name:      "stays quiet when update age is shorter than expires in",
+			updateAge: time.Minute,
+			expiresIn: time.Hour,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			logger := new(internaltests.LevelRecordingLogger)
+			registry := &internaltests.TestServiceRegistry{Services: map[string]any{
+				models.ServiceUser.String():    new(internaltests.MockUserService),
+				models.ServiceSession.String(): new(internaltests.MockSessionService),
+				models.ServiceToken.String():   new(internaltests.MockTokenService),
+			}}
+			cfg := sessionInitConfig(models.SessionConfig{
+				CookieName: testCookieName,
+				ExpiresIn:  tt.expiresIn,
+				UpdateAge:  tt.updateAge,
+			})
+			ctx := &models.PluginContext{
+				Logger:          logger,
+				ServiceRegistry: registry,
+				GetConfig:       func() *models.Config { return cfg },
+			}
+
+			require.NoError(t, New(SessionPluginConfig{Enabled: true}).Init(ctx))
+
+			warnings := 0
+			for _, record := range logger.Records() {
+				if record.Level == "warn" {
+					warnings++
+				}
+			}
+			if tt.wantWarn {
+				assert.Equal(t, 1, warnings, "expected the short update window warning")
+			} else {
+				assert.Zero(t, warnings, "unexpected warning")
+			}
+		})
+	}
+}
+
+func TestSessionPlugin_BuildHooks(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		index          int
+		wantStage      models.HookStage
+		wantPluginID   string
+		wantOrder      int
+		wantMatcher    bool
+		wantHandlerSet bool
+	}{
+		{
+			name:           "required auth validation runs before the route",
+			index:          0,
+			wantStage:      models.HookBefore,
+			wantPluginID:   HookIDSessionAuth.String(),
+			wantOrder:      10,
+			wantHandlerSet: true,
+		},
+		{
+			name:           "optional auth validation runs before the route",
+			index:          1,
+			wantStage:      models.HookBefore,
+			wantPluginID:   HookIDSessionAuthOptional.String(),
+			wantOrder:      10,
+			wantHandlerSet: true,
+		},
+		{
+			name:           "cookie issuance runs after a successful auth",
+			index:          2,
+			wantStage:      models.HookAfter,
+			wantOrder:      10,
+			wantMatcher:    true,
+			wantHandlerSet: true,
+		},
+		{
+			name:           "cookie clearing runs after sign out",
+			index:          3,
+			wantStage:      models.HookAfter,
+			wantOrder:      10,
+			wantMatcher:    true,
+			wantHandlerSet: true,
+		},
+	}
+
+	hooks := New(SessionPluginConfig{Enabled: true}).Hooks()
+	require.Len(t, hooks, len(tests))
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			hook := hooks[tt.index]
+			assert.Equal(t, tt.wantStage, hook.Stage)
+			assert.Equal(t, tt.wantPluginID, hook.PluginID)
+			assert.Equal(t, tt.wantOrder, hook.Order)
+			assert.False(t, hook.Async, "auth hooks must never run asynchronously")
+			if tt.wantMatcher {
+				assert.NotNil(t, hook.Matcher)
+			} else {
+				assert.Nil(t, hook.Matcher)
+			}
+			if tt.wantHandlerSet {
+				assert.NotNil(t, hook.Handler)
+			}
+		})
+	}
+
+	t.Run("buildHooks and Hooks return the same wiring", func(t *testing.T) {
+		t.Parallel()
+
+		plugin := New(SessionPluginConfig{Enabled: true})
+		built := plugin.buildHooks()
+		exposed := plugin.Hooks()
+
+		require.Len(t, exposed, len(built))
+		for i := range built {
+			assert.Equal(t, built[i].Stage, exposed[i].Stage)
+			assert.Equal(t, built[i].PluginID, exposed[i].PluginID)
+			assert.Equal(t, built[i].Order, exposed[i].Order)
+			assert.Equal(t, built[i].Matcher == nil, exposed[i].Matcher == nil)
+		}
+	})
+
+	t.Run("sign out hook clears the session cookie", func(t *testing.T) {
+		t.Parallel()
+
+		plugin := New(SessionPluginConfig{Enabled: true})
+		plugin.globalConfig = sessionInitConfig(defaultInitSessionConfig())
+		w := httptest.NewRecorder()
+		reqCtx := &models.RequestContext{
+			Request:         httptest.NewRequest(http.MethodPost, "/sign-out", nil),
+			ResponseWriter:  w,
+			Values:          make(map[string]any),
+			ResponseHeaders: make(http.Header),
+		}
+
+		require.NoError(t, plugin.buildHooks()[3].Handler(reqCtx))
+
+		cookies := w.Result().Cookies()
+		require.Len(t, cookies, 1)
+		assert.Equal(t, testCookieName, cookies[0].Name)
+		assert.Empty(t, cookies[0].Value)
+		assert.Less(t, cookies[0].MaxAge, 0, "cookie must be expired")
+		assert.False(t, reqCtx.Handled)
+	})
+}
+
+func TestSessionPlugin_AuthSuccessMatcher(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		values map[string]any
+		want   bool
+	}{
+		{name: "true auth success value matches", values: map[string]any{models.ContextAuthSuccess.String(): true}, want: true},
+		{name: "false auth success value does not match", values: map[string]any{models.ContextAuthSuccess.String(): false}},
+		{name: "missing auth success value does not match", values: map[string]any{}},
+		{name: "nil values do not match"},
+		{name: "non-boolean auth success value does not match", values: map[string]any{models.ContextAuthSuccess.String(): "true"}},
+		{name: "sign out value is ignored", values: map[string]any{models.ContextAuthSignOut.String(): true}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := New(SessionPluginConfig{Enabled: true})
+			reqCtx := &models.RequestContext{Values: tt.values}
+
+			assert.Equal(t, tt.want, plugin.authSuccessMatcher(reqCtx))
+		})
+	}
+}
+
+func TestSessionPlugin_SignedOutMatcher(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		values map[string]any
+		want   bool
+	}{
+		{name: "true sign out value matches", values: map[string]any{models.ContextAuthSignOut.String(): true}, want: true},
+		{name: "false sign out value does not match", values: map[string]any{models.ContextAuthSignOut.String(): false}},
+		{name: "missing sign out value does not match", values: map[string]any{}},
+		{name: "nil values do not match"},
+		{name: "non-boolean sign out value does not match", values: map[string]any{models.ContextAuthSignOut.String(): 1}},
+		{name: "auth success value is ignored", values: map[string]any{models.ContextAuthSuccess.String(): true}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := New(SessionPluginConfig{Enabled: true})
+			reqCtx := &models.RequestContext{Values: tt.values}
+
+			assert.Equal(t, tt.want, plugin.signedOutMatcher(reqCtx))
+		})
+	}
+}
+
+func TestSessionPlugin_ClearSessionCookieHook(t *testing.T) {
+	t.Parallel()
+
+	plugin := New(SessionPluginConfig{Enabled: true})
+	plugin.globalConfig = sessionInitConfig(defaultInitSessionConfig())
+	w := httptest.NewRecorder()
+	reqCtx := &models.RequestContext{
+		Request:         httptest.NewRequest(http.MethodPost, "/sign-out", nil),
+		ResponseWriter:  w,
+		Values:          make(map[string]any),
+		ResponseHeaders: make(http.Header),
+	}
+
+	err := plugin.clearSessionCookieHook(reqCtx)
+
+	require.NoError(t, err)
+	assert.False(t, reqCtx.Handled)
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1)
+	assert.Equal(t, testCookieName, cookies[0].Name)
+	assert.Empty(t, cookies[0].Value, "cleared cookie must carry no value")
+	assert.Less(t, cookies[0].MaxAge, 0, "cleared cookie must expire immediately")
+}
