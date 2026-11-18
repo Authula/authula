@@ -62,6 +62,28 @@ func TestParseEmailProviderType(t *testing.T) {
 	}
 }
 
+func TestSMTPTLSMode_String(t *testing.T) {
+	tests := []struct {
+		name string
+		mode SMTPTLSMode
+		want string
+	}{
+		{name: "off", mode: SMTPTLSModeOff, want: "off"},
+		{name: "starttls", mode: SMTPTLSModeStartTLS, want: "starttls"},
+		{name: "tls", mode: SMTPTLSModeTLS, want: "tls"},
+		{name: "custom mode", mode: SMTPTLSMode("custom-mode"), want: "custom-mode"},
+		{name: "empty", mode: SMTPTLSMode(""), want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.mode.String(); got != tt.want {
+				t.Errorf("SMTPTLSMode(%q).String() = %q, want %q", string(tt.mode), got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSupportedEmailProviders(t *testing.T) {
 	providers := SupportedEmailProviders()
 
