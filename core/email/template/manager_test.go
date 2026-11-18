@@ -43,6 +43,26 @@ func TestManager_Register(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "invalid text template",
+			def: Definition{
+				Name:    "bad_text",
+				Subject: "OK",
+				Text:    "{{.Name",
+				HTML:    "<p>OK</p>",
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid html template",
+			def: Definition{
+				Name:    "bad_html",
+				Subject: "OK",
+				Text:    "OK",
+				HTML:    "<p>{{.Name</p>",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -128,6 +148,34 @@ func TestManager_Render(t *testing.T) {
 			},
 			templateName: "missing_key",
 			data:         map[string]any{"WrongKey": "value"},
+			wantErr:      true,
+		},
+		{
+			name: "subject execution error returns error",
+			setup: func(mgr *Manager) {
+				_ = mgr.Register(Definition{
+					Name:    "subject_exec_error",
+					Subject: "{{.Name.First}}",
+					Text:    "{{.Name}}",
+					HTML:    "<p>{{.Name}}</p>",
+				})
+			},
+			templateName: "subject_exec_error",
+			data:         map[string]any{"Name": "Alice"},
+			wantErr:      true,
+		},
+		{
+			name: "text execution error returns error",
+			setup: func(mgr *Manager) {
+				_ = mgr.Register(Definition{
+					Name:    "text_exec_error",
+					Subject: "{{.Name}}",
+					Text:    "{{.Name.First}}",
+					HTML:    "<p>{{.Name}}</p>",
+				})
+			},
+			templateName: "text_exec_error",
+			data:         map[string]any{"Name": "Alice"},
 			wantErr:      true,
 		},
 	}
