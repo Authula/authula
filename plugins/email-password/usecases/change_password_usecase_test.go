@@ -2,15 +2,18 @@ package usecases
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	emailtmpl "github.com/Authula/authula/core/email/template"
 	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/email-password/constants"
+	"github.com/Authula/authula/plugins/email-password/types"
 )
 
 func TestChangePasswordUseCase(t *testing.T) {
@@ -50,7 +53,7 @@ func TestChangePasswordUseCase(t *testing.T) {
 				f.accountSvc.On("Update", mock.Anything, mock.MatchedBy(func(a *models.Account) bool { return a.Password != nil && *a.Password == "hashed-password" })).Return(&models.Account{ID: "account-1"}, nil).Once()
 				f.verificationSvc.On("Delete", mock.Anything, "verif-1").Return(nil).Once()
 				f.mailerSvc.On("SendEmail", mock.Anything, "test@example.com", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-				f.eventBus.On("Publish", mock.Anything, mock.Anything).Return(nil).Maybe()
+				f.eventBus.On("Publish", mock.Anything).Return(nil).Maybe()
 			},
 			assert: func(t *testing.T, err error) { require.NoError(t, err) },
 		},
@@ -72,4 +75,251 @@ func TestChangePasswordUseCase(t *testing.T) {
 			f.passwordSvc.AssertExpectations(t)
 		})
 	}
+}
+
+func passwordFlowVerification() *models.Verification {
+	return &models.Verification{
+		ID:        "verif-1",
+		Type:      models.TypePasswordResetRequest,
+		UserID:    new("user-1"),
+		ExpiresAt: time.Now().Add(time.Hour),
+	}
+}
+
+func expectPasswordFlowToken(f *emailPasswordTestFixture, verification *models.Verification, err error) {
+	f.tokenSvc.On("Hash", "token-123").Return("hashed-token").Once()
+	f.verificationSvc.On("GetByToken", mock.Anything, "hashed-token").Return(verification, err).Once()
+}
+
+// expectPasswordFlowOwnerAndAccount prepares the user and account lookups that
+// precede the password update.
+func expectPasswordFlowOwnerAndAccount(f *emailPasswordTestFixture) {
+	f.userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+	f.accountSvc.On("GetByUserIDAndProvider", mock.Anything, "user-1", models.AuthProviderEmail.String()).Return(&models.Account{ID: "account-1", UserID: "user-1", AccountID: "test@example.com"}, nil).Once()
+}
+
+func TestChangePasswordUseCase_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	expiredVerification := func() *models.Verification {
+		verification := passwordFlowVerification()
+		verification.ExpiresAt = time.Now().Add(-time.Hour)
+		return verification
+	}
+	wrongTypeVerification := func() *models.Verification {
+		verification := passwordFlowVerification()
+		verification.Type = models.TypeEmailResetRequest
+		return verification
+	}
+
+	tests := []struct {
+		name      string
+		setup     func(*emailPasswordTestFixture)
+		expectErr error
+	}{
+		{
+			name: "unexpected token lookup error is returned",
+			setup: func(f *emailPasswordTestFixture) {
+				expectPasswordFlowToken(f, nil, errPasswordFlowBackend)
+			},
+			expectErr: errPasswordFlowBackend,
+		},
+		{
+			name: "missing verification is rejected",
+			setup: func(f *emailPasswordTestFixture) {
+				expectPasswordFlowToken(f, nil, nil)
+			},
+			expectErr: constants.ErrInvalidOrExpiredToken,
+		},
+		{
+			name: "expired verification is rejected",
+			setup: func(f *emailPasswordTestFixture) {
+				expectPasswordFlowToken(f, expiredVerification(), nil)
+			},
+			expectErr: constants.ErrInvalidOrExpiredToken,
+		},
+		{
+			name: "wrong verification type is rejected",
+			setup: func(f *emailPasswordTestFixture) {
+				expectPasswordFlowToken(f, wrongTypeVerification(), nil)
+			},
+			expectErr: constants.ErrInvalidOrExpiredToken,
+		},
+		{
+			name: "user lookup error is returned",
+			setup: func(f *emailPasswordTestFixture) {
+				expectPasswordFlowToken(f, passwordFlowVerification(), nil)
+				f.userSvc.On("GetByID", mock.Anything, "user-1").Return(nil, errPasswordFlowBackend).Once()
+			},
+			expectErr: errPasswordFlowBackend,
+		},
+		{
+			name: "missing user is rejected",
+			setup: func(f *emailPasswordTestFixture) {
+				expectPasswordFlowToken(f, passwordFlowVerification(), nil)
+				f.userSvc.On("GetByID", mock.Anything, "user-1").Return(nil, nil).Once()
+			},
+			expectErr: constants.ErrUserNotFound,
+		},
+		{
+			name: "account lookup error is returned",
+			setup: func(f *emailPasswordTestFixture) {
+				expectPasswordFlowToken(f, passwordFlowVerification(), nil)
+				f.userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+				f.accountSvc.On("GetByUserIDAndProvider", mock.Anything, "user-1", models.AuthProviderEmail.String()).Return(nil, errPasswordFlowBackend).Once()
+			},
+			expectErr: errPasswordFlowBackend,
+		},
+		{
+			name: "missing account is rejected",
+			setup: func(f *emailPasswordTestFixture) {
+				expectPasswordFlowToken(f, passwordFlowVerification(), nil)
+				f.userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+				f.accountSvc.On("GetByUserIDAndProvider", mock.Anything, "user-1", models.AuthProviderEmail.String()).Return(nil, nil).Once()
+			},
+			expectErr: constants.ErrAccountNotFound,
+		},
+		{
+			name: "password hash error is returned",
+			setup: func(f *emailPasswordTestFixture) {
+				expectPasswordFlowToken(f, passwordFlowVerification(), nil)
+				expectPasswordFlowOwnerAndAccount(f)
+				f.passwordSvc.On("Hash", "NewPassword1!").Return("", errPasswordFlowBackend).Once()
+			},
+			expectErr: errPasswordFlowBackend,
+		},
+		{
+			name: "account update error is returned",
+			setup: func(f *emailPasswordTestFixture) {
+				expectPasswordFlowToken(f, passwordFlowVerification(), nil)
+				expectPasswordFlowOwnerAndAccount(f)
+				f.passwordSvc.On("Hash", "NewPassword1!").Return("hashed-password", nil).Once()
+				f.accountSvc.On("Update", mock.Anything, mock.Anything).Return(nil, errPasswordFlowBackend).Once()
+			},
+			expectErr: errPasswordFlowBackend,
+		},
+		{
+			name: "verification delete error is returned",
+			setup: func(f *emailPasswordTestFixture) {
+				expectPasswordFlowToken(f, passwordFlowVerification(), nil)
+				expectPasswordFlowOwnerAndAccount(f)
+				f.passwordSvc.On("Hash", "NewPassword1!").Return("hashed-password", nil).Once()
+				f.accountSvc.On("Update", mock.Anything, mock.Anything).Return(&models.Account{ID: "account-1"}, nil).Once()
+				f.verificationSvc.On("Delete", mock.Anything, "verif-1").Return(errPasswordFlowBackend).Once()
+			},
+			expectErr: errPasswordFlowBackend,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newEmailPasswordTestFixture()
+			tt.setup(f)
+
+			err := f.changePasswordUseCase().ChangePassword(context.Background(), "token-123", "NewPassword1!")
+
+			require.ErrorIs(t, err, tt.expectErr)
+			f.userSvc.AssertExpectations(t)
+			f.accountSvc.AssertExpectations(t)
+			f.verificationSvc.AssertExpectations(t)
+			f.tokenSvc.AssertExpectations(t)
+			f.passwordSvc.AssertExpectations(t)
+		})
+	}
+}
+
+func TestChangePasswordUseCase_CallbackPaths(t *testing.T) {
+	t.Parallel()
+
+	expectCommit := func(f *emailPasswordTestFixture) {
+		expectPasswordFlowToken(f, passwordFlowVerification(), nil)
+		expectPasswordFlowOwnerAndAccount(f)
+		f.passwordSvc.On("Hash", "NewPassword1!").Return("hashed-password", nil).Once()
+		f.accountSvc.On("Update", mock.Anything, mock.Anything).Return(&models.Account{ID: "account-1"}, nil).Once()
+		f.verificationSvc.On("Delete", mock.Anything, "verif-1").Return(nil).Once()
+	}
+
+	t.Run("successful callback skips the mailer", func(t *testing.T) {
+		t.Parallel()
+		f := newEmailPasswordTestFixture()
+		expectCommit(f)
+		f.eventBus.On("Publish", mock.Anything).Return(nil).Maybe()
+		f.pluginConfig.SendChangedPasswordEmail = func(types.SendChangedPasswordEmailParams, *models.RequestContext) error {
+			return nil
+		}
+
+		err := f.changePasswordUseCase().ChangePassword(context.Background(), "token-123", "NewPassword1!")
+
+		require.NoError(t, err)
+		f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
+	})
+
+	t.Run("callback failure is logged and falls back to the mailer", func(t *testing.T) {
+		t.Parallel()
+		f := newEmailPasswordTestFixture()
+		expectCommit(f)
+		f.eventBus.On("Publish", mock.Anything).Return(nil).Maybe()
+		logger := newPasswordFlowLogger()
+		sent := make(chan struct{})
+		f.pluginConfig.SendChangedPasswordEmail = func(types.SendChangedPasswordEmailParams, *models.RequestContext) error {
+			return errPasswordFlowBackend
+		}
+		f.mailerSvc.On("SendEmail", mock.Anything, "test@example.com", "Your password has been changed", mock.Anything, mock.Anything).
+			Run(func(mock.Arguments) { close(sent) }).
+			Return(nil).Once()
+
+		uc := NewChangePasswordUseCase(f.globalConfig, logger, f.pluginConfig, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.passwordSvc, f.mailerSvc, f.eventBus, f.tmplMgr, f.hooksExecutor)
+		err := uc.ChangePassword(context.Background(), "token-123", "NewPassword1!")
+
+		require.NoError(t, err)
+		waitForPasswordFlowSignal(t, sent, "changed password email")
+		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send changed password email via plugin callback")
+		f.mailerSvc.AssertExpectations(t)
+	})
+
+	t.Run("background send failure is logged", func(t *testing.T) {
+		t.Parallel()
+		f := newEmailPasswordTestFixture()
+		expectCommit(f)
+		f.eventBus.On("Publish", mock.Anything).Return(nil).Maybe()
+		logger := newPasswordFlowLogger()
+		f.mailerSvc.On("SendEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errPasswordFlowBackend).Once()
+
+		uc := NewChangePasswordUseCase(f.globalConfig, logger, f.pluginConfig, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.passwordSvc, f.mailerSvc, f.eventBus, f.tmplMgr, f.hooksExecutor)
+		err := uc.ChangePassword(context.Background(), "token-123", "NewPassword1!")
+
+		require.NoError(t, err)
+		waitForPasswordFlowSignal(t, logger.done, "background send error")
+		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send changed password email via built-in email service")
+		f.mailerSvc.AssertExpectations(t)
+	})
+}
+
+func TestChangePasswordUseCase_SendChangedPasswordEmail(t *testing.T) {
+	t.Parallel()
+
+	t.Run("renders the template and sends it", func(t *testing.T) {
+		t.Parallel()
+		f := newEmailPasswordTestFixture()
+		f.mailerSvc.On("SendEmail", mock.Anything, "test@example.com", "Your password has been changed", mock.Anything, mock.Anything).Return(nil).Once()
+
+		uc := f.changePasswordUseCase().(*changePasswordUseCase)
+		err := uc.sendChangedPasswordEmail(context.Background(), &models.User{ID: "user-1", Email: "test@example.com"})
+
+		require.NoError(t, err)
+		f.mailerSvc.AssertExpectations(t)
+	})
+
+	t.Run("render failure is logged and returned", func(t *testing.T) {
+		t.Parallel()
+		f := newEmailPasswordTestFixture()
+		logger := newPasswordFlowLogger()
+
+		uc := NewChangePasswordUseCase(f.globalConfig, logger, f.pluginConfig, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.passwordSvc, nil, f.eventBus, emailtmpl.NewManager(), f.hooksExecutor).(*changePasswordUseCase)
+		err := uc.sendChangedPasswordEmail(context.Background(), &models.User{ID: "user-1", Email: "test@example.com"})
+
+		require.ErrorContains(t, err, "not found")
+		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to render password changed template")
+	})
 }
