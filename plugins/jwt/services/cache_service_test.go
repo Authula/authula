@@ -5,11 +5,15 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 
@@ -93,14 +97,91 @@ func seedJWKSKeys(t *testing.T, ctx context.Context, repo repositories.JWKSRepos
 	return keys
 }
 
+// stubSecondaryStorage is a local fake so cache error branches can be
+// exercised without touching the shared JWT test mocks.
+type stubSecondaryStorage struct {
+	value       any
+	getErr      error
+	setErr      error
+	deleteErr   error
+	setCalls    int
+	deleteCalls int
+}
+
+var _ models.SecondaryStorage = (*stubSecondaryStorage)(nil)
+
+func (s *stubSecondaryStorage) Get(context.Context, string) (any, error) {
+	if s.getErr != nil {
+		return nil, s.getErr
+	}
+	return s.value, nil
+}
+
+func (s *stubSecondaryStorage) Set(context.Context, string, any, *time.Duration) error {
+	s.setCalls++
+	return s.setErr
+}
+
+func (s *stubSecondaryStorage) Delete(context.Context, string) error {
+	s.deleteCalls++
+	return s.deleteErr
+}
+
+func (s *stubSecondaryStorage) Incr(context.Context, string, *time.Duration) (int, error) {
+	return 0, nil
+}
+
+func (s *stubSecondaryStorage) TTL(context.Context, string) (*time.Duration, error) {
+	return nil, nil
+}
+
+func (s *stubSecondaryStorage) Scan(context.Context, string) ([]string, error) {
+	return nil, nil
+}
+
+func (s *stubSecondaryStorage) Close() error { return nil }
+
+func testJWKSetJSON(t *testing.T) string {
+	t.Helper()
+
+	pubKey, err := jwk.ParseKey([]byte(generateTestJWKS(t).PublicKey), jwk.WithPEM(true))
+	require.NoError(t, err)
+
+	set := jwk.NewSet()
+	require.NoError(t, set.AddKey(pubKey))
+
+	data, err := json.Marshal(set)
+	require.NoError(t, err)
+
+	return string(data)
+}
+
+func TestNewCacheService(t *testing.T) {
+	t.Parallel()
+
+	f := newCacheTestFixture(t)
+	ttl := 12 * time.Hour
+
+	svc := NewCacheService(f.repo, f.storage, f.logger, ttl)
+
+	concrete, ok := svc.(*cacheService)
+	require.True(t, ok)
+	require.Equal(t, f.repo, concrete.repo)
+	require.Equal(t, f.storage, concrete.secondaryStorage)
+	require.Equal(t, f.logger, concrete.logger)
+	require.Equal(t, ttl, concrete.cacheTTL)
+}
+
 func TestCacheService_GetCachedJWKS(t *testing.T) {
 	t.Parallel()
 
+	cachedJWKS := testJWKSetJSON(t)
+
 	tests := []struct {
-		name      string
-		setupSvc  func(*cacheTestFixture) CacheService
-		setupMock func(*cacheTestFixture)
-		wantErr   string
+		name     string
+		setupSvc func(*cacheTestFixture) CacheService
+		wantErr  string
+		wantKeys int
 	}{
 		{
 			name: "no secondary storage",
@@ -126,6 +207,54 @@ func TestCacheService_GetCachedJWKS(t *testing.T) {
 			},
 			wantErr: "cached JWKS is empty or invalid type",
 		},
+		{
+			name: "storage read error",
+			setupSvc: func(f *cacheTestFixture) CacheService {
+				return &cacheService{
+					repo:             f.repo,
+					secondaryStorage: &stubSecondaryStorage{getErr: assert.AnError},
+					logger:           f.logger,
+					cacheTTL:         f.ttl,
+				}
+			},
+			wantErr: "cache miss",
+		},
+		{
+			name: "cached value has unexpected type",
+			setupSvc: func(f *cacheTestFixture) CacheService {
+				return &cacheService{
+					repo:             f.repo,
+					secondaryStorage: &stubSecondaryStorage{value: 42},
+					logger:           f.logger,
+					cacheTTL:         f.ttl,
+				}
+			},
+			wantErr: "cached JWKS is empty or invalid type",
+		},
+		{
+			name: "cached value is not a valid JWKS",
+			setupSvc: func(f *cacheTestFixture) CacheService {
+				return &cacheService{
+					repo:             f.repo,
+					secondaryStorage: &stubSecondaryStorage{value: "{not-json"},
+					logger:           f.logger,
+					cacheTTL:         f.ttl,
+				}
+			},
+			wantErr: "failed to parse cached JWKS",
+		},
+		{
+			name: "cache hit",
+			setupSvc: func(f *cacheTestFixture) CacheService {
+				return &cacheService{
+					repo:             f.repo,
+					secondaryStorage: &stubSecondaryStorage{value: cachedJWKS},
+					logger:           f.logger,
+					cacheTTL:         f.ttl,
+				}
+			},
+			wantKeys: 1,
+		},
 	}
 
 	for _, tt := range tests {
@@ -135,10 +264,18 @@ func TestCacheService_GetCachedJWKS(t *testing.T) {
 			f := newCacheTestFixture(t)
 			svc := tt.setupSvc(f)
 
-			_, err := svc.GetCachedJWKS(context.Background())
+			set, err := svc.GetCachedJWKS(context.Background())
 
-			require.Error(t, err)
-			require.Contains(t, err.Error(), tt.wantErr)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+				require.Nil(t, set)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, set)
+			require.Equal(t, tt.wantKeys, set.Len())
 		})
 	}
 }
@@ -185,6 +322,80 @@ func TestCacheService_FetchJWKSFromDatabase(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, set)
 				require.Equal(t, tt.wantKeys, set.Len())
+			}
+		})
+	}
+}
+
+func TestCacheService_FetchJWKSFromDatabase_InvalidKeys(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		repoErr      error
+		withValidKey bool
+		wantKeys     int
+		wantErr      string
+	}{
+		{
+			name:    "repository error",
+			repoErr: assert.AnError,
+			wantErr: "failed to fetch web keys",
+		},
+		{
+			name:    "only invalid public keys",
+			wantErr: "no valid keys found",
+		},
+		{
+			name:         "invalid public key is skipped",
+			withValidKey: true,
+			wantKeys:     1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newCacheTestFixture(t)
+			ctx := context.Background()
+
+			repo := f.repo
+			var mockRepo *jwttests.MockJWKSRepository
+			if tt.repoErr != nil {
+				mockRepo = &jwttests.MockJWKSRepository{}
+				mockRepo.On("GetJWKSKeys", mock.Anything).Return(nil, tt.repoErr)
+				repo = mockRepo
+			} else {
+				invalid := generateTestJWKS(t)
+				invalid.PublicKey = "not a pem"
+				require.NoError(t, f.repo.StoreJWKSKey(ctx, invalid))
+				if tt.withValidKey {
+					seedJWKSKeys(t, ctx, f.repo, 1)
+				}
+			}
+
+			svc := &cacheService{
+				repo:             repo,
+				secondaryStorage: f.storage,
+				logger:           f.logger,
+				cacheTTL:         f.ttl,
+			}
+
+			set, err := svc.FetchJWKSFromDatabase(ctx)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+				require.Nil(t, set)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, set)
+				require.Equal(t, tt.wantKeys, set.Len())
+			}
+
+			if mockRepo != nil {
+				mockRepo.AssertExpectations(t)
 			}
 		})
 	}
@@ -242,6 +453,139 @@ func TestCacheService_GetJWKSWithFallback(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, set)
 				require.Equal(t, tt.wantKeyLen, set.Len())
+			}
+		})
+	}
+}
+
+func TestCacheService_GetJWKSWithFallback_DatabaseFailure(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		storage     *stubSecondaryStorage
+		repoErr     error
+		seedDB      bool
+		wantKeys    int
+		wantErr     string
+		wantSetCall int
+	}{
+		{
+			name:    "database fetch error",
+			storage: &stubSecondaryStorage{},
+			repoErr: assert.AnError,
+			wantErr: "failed to fetch JWKS from database",
+		},
+		{
+			name:        "cache write error still returns the set",
+			storage:     &stubSecondaryStorage{setErr: assert.AnError},
+			seedDB:      true,
+			wantKeys:    1,
+			wantSetCall: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newCacheTestFixture(t)
+			ctx := context.Background()
+
+			repo := f.repo
+			var mockRepo *jwttests.MockJWKSRepository
+			if tt.repoErr != nil {
+				mockRepo = &jwttests.MockJWKSRepository{}
+				mockRepo.On("GetJWKSKeys", mock.Anything).Return(nil, tt.repoErr)
+				repo = mockRepo
+			}
+			if tt.seedDB {
+				seedJWKSKeys(t, ctx, f.repo, 1)
+			}
+
+			svc := &cacheService{
+				repo:             repo,
+				secondaryStorage: tt.storage,
+				logger:           f.logger,
+				cacheTTL:         f.ttl,
+			}
+
+			set, err := svc.GetJWKSWithFallback(ctx)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+				require.Nil(t, set)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, set)
+				require.Equal(t, tt.wantKeys, set.Len())
+			}
+			require.Equal(t, tt.wantSetCall, tt.storage.setCalls)
+
+			if mockRepo != nil {
+				mockRepo.AssertExpectations(t)
+			}
+		})
+	}
+}
+
+func TestCacheService_InvalidateCache_Errors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		storage *stubSecondaryStorage
+		repoErr error
+		wantErr string
+	}{
+		{
+			name:    "delete error",
+			storage: &stubSecondaryStorage{deleteErr: assert.AnError},
+			wantErr: "failed to delete cache",
+		},
+		{
+			name:    "database fetch error is ignored",
+			storage: &stubSecondaryStorage{},
+			repoErr: assert.AnError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newCacheTestFixture(t)
+			ctx := context.Background()
+
+			repo := f.repo
+			var mockRepo *jwttests.MockJWKSRepository
+			if tt.repoErr != nil {
+				mockRepo = &jwttests.MockJWKSRepository{}
+				mockRepo.On("GetJWKSKeys", mock.Anything).Return(nil, tt.repoErr)
+				repo = mockRepo
+			}
+
+			svc := &cacheService{
+				repo:             repo,
+				secondaryStorage: tt.storage,
+				logger:           f.logger,
+				cacheTTL:         f.ttl,
+			}
+
+			err := svc.InvalidateCache(ctx)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, 1, tt.storage.deleteCalls)
+			require.Zero(t, tt.storage.setCalls)
+
+			if mockRepo != nil {
+				mockRepo.AssertExpectations(t)
 			}
 		})
 	}
@@ -315,9 +659,10 @@ func TestCacheService_CacheJWKS(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		noStorage bool
-		wantErr   string
+		name       string
+		noStorage  bool
+		storageErr error
+		wantErr    string
 	}{
 		{
 			name:      "no secondary storage",
@@ -325,6 +670,11 @@ func TestCacheService_CacheJWKS(t *testing.T) {
 		},
 		{
 			name: "success",
+		},
+		{
+			name:       "storage write error",
+			storageErr: assert.AnError,
+			wantErr:    "failed to cache JWKS",
 		},
 	}
 
@@ -334,16 +684,19 @@ func TestCacheService_CacheJWKS(t *testing.T) {
 
 			f := newCacheTestFixture(t)
 
-			var svc CacheService
-			if tt.noStorage {
-				svc = &cacheService{
-					repo:             f.repo,
-					secondaryStorage: nil,
-					logger:           f.logger,
-					cacheTTL:         f.ttl,
-				}
-			} else {
-				svc = f.newCacheService()
+			var storage models.SecondaryStorage = f.storage
+			switch {
+			case tt.noStorage:
+				storage = nil
+			case tt.storageErr != nil:
+				storage = &stubSecondaryStorage{setErr: tt.storageErr}
+			}
+
+			svc := &cacheService{
+				repo:             f.repo,
+				secondaryStorage: storage,
+				logger:           f.logger,
+				cacheTTL:         f.ttl,
 			}
 
 			ctx := context.Background()

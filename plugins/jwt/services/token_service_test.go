@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -15,7 +16,37 @@ import (
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/types"
+	"github.com/Authula/authula/services"
 )
+
+var _ services.JWTService = (*tokenService)(nil)
+
+func TestNewJWTService(t *testing.T) {
+	t.Parallel()
+
+	f := newServiceTestFixture(t)
+	config := TokenServiceConfig{
+		ExpiresIn:        30 * time.Minute,
+		RefreshExpiresIn: 48 * time.Hour,
+		Issuer:           "https://issuer.example.com/api/auth",
+		Audience:         "test-audience",
+	}
+
+	svc := NewJWTService(f.logger, f.sessionSvc, f.coreTokenSvc, f.keySvc, f.cacheSvc, f.blacklistSvc, config)
+
+	concrete, ok := svc.(*tokenService)
+	require.True(t, ok, "NewJWTService must return the concrete token service")
+	require.Equal(t, f.logger, concrete.logger)
+	require.Equal(t, f.sessionSvc, concrete.sessionService)
+	require.Equal(t, f.coreTokenSvc, concrete.coreTokenService)
+	require.Equal(t, f.keySvc, concrete.keyService)
+	require.Equal(t, f.cacheSvc, concrete.cacheService)
+	require.Equal(t, f.blacklistSvc, concrete.blacklistService)
+	require.Equal(t, config.ExpiresIn, concrete.expiresIn)
+	require.Equal(t, config.RefreshExpiresIn, concrete.refreshExpiresIn)
+	require.Equal(t, config.Issuer, concrete.issuer)
+	require.Equal(t, config.Audience, concrete.audience)
+}
 
 func parseTestToken(t *testing.T, tokenStr string, f *serviceTestFixture) map[string]any {
 	t.Helper()
@@ -217,6 +248,19 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			wantErr: "invalid token_type",
 		},
 		{
+			name: "missing_token_type",
+			claims: map[string]any{
+				jwt.SubjectKey:    "user-1",
+				"user_id":         "user-1",
+				"session_id":      "sess-1",
+				"actor_type":      "user",
+				jwt.JwtIDKey:      "jti-missing-type",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			wantErr: "missing token_type claim",
+		},
+		{
 			name: "valid_machine_token",
 			claims: map[string]any{
 				jwt.SubjectKey:    "client-1",
@@ -351,6 +395,81 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			},
 			wantErr: "session expired or invalid",
 		},
+		{
+			name: "missing_session_id",
+			claims: map[string]any{
+				jwt.SubjectKey:    "user-1",
+				"user_id":         "user-1",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
+				jwt.JwtIDKey:      "jti-missing-session",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			setupMocks: func(t *testing.T, f *serviceTestFixture) {
+				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-missing-session").Return(false, nil)
+			},
+			wantErr: "missing session_id claim",
+		},
+		{
+			name: "blacklisted_session",
+			claims: map[string]any{
+				jwt.SubjectKey:    "user-1",
+				"user_id":         "user-1",
+				"session_id":      "sess-revoked",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
+				jwt.JwtIDKey:      "jti-revoked-session",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			setupMocks: func(t *testing.T, f *serviceTestFixture) {
+				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-revoked-session").Return(false, nil)
+				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "session:sess-revoked").Return(true, nil)
+			},
+			wantErr: "session has been revoked",
+		},
+		{
+			name: "machine_token_missing_subject",
+			claims: map[string]any{
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "machine",
+				jwt.JwtIDKey:      "jti-machine-no-sub",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			setupMocks: func(t *testing.T, f *serviceTestFixture) {
+				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-machine-no-sub").Return(false, nil)
+			},
+			wantErr: "missing subject claim",
+		},
+		{
+			name: "user_extra_claims_are_passed_through",
+			claims: map[string]any{
+				jwt.SubjectKey:    "user-1",
+				"user_id":         "user-1",
+				"session_id":      "sess-1",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "user",
+				"department":      "engineering",
+				"role_key":        "admin",
+				jwt.JwtIDKey:      "jti-extra-claims",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			setupMocks: func(t *testing.T, f *serviceTestFixture) {
+				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-extra-claims").Return(false, nil)
+				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "session:sess-1").Return(false, nil)
+				f.sessionSvc.On("GetByID", mock.Anything, "sess-1").Return(&models.Session{
+					ID: "sess-1", ExpiresAt: time.Now().Add(time.Hour),
+				}, nil)
+			},
+			wantActor: func(t *testing.T, actor *models.Actor) {
+				require.Equal(t, "engineering", actor.Claims["department"])
+				require.Equal(t, "admin", actor.Claims["role_key"])
+				require.Equal(t, "sess-1", actor.Claims["session_id"])
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -459,6 +578,27 @@ func TestTokenService_GenerateUserToken(t *testing.T) {
 				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return("", assert.AnError)
 			},
 			wantErr: "failed to decrypt private key",
+		},
+		{
+			name:      "invalid private key pem",
+			userID:    "user-1",
+			sessionID: "sess-1",
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
+				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return("not a pem block", nil)
+			},
+			wantErr: "failed to parse private key",
+		},
+		{
+			name:        "signing failure from unsupported extra claim",
+			userID:      "user-1",
+			sessionID:   "sess-1",
+			extraClaims: map[string]any{"unsupported": math.NaN()},
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
+				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
+			},
+			wantErr: "failed to sign access token",
 		},
 	}
 
@@ -575,6 +715,17 @@ func TestTokenService_GenerateMachineToken(t *testing.T) {
 				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return("", assert.AnError)
 			},
 			wantErr: "failed to decrypt private key",
+		},
+		{
+			name:           "invalid private key pem",
+			clientID:       "client-1",
+			organizationID: "",
+			scopes:         nil,
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
+				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return("not a pem block", nil)
+			},
+			wantErr: "failed to parse private key",
 		},
 	}
 
@@ -756,6 +907,46 @@ func TestTokenService_ValidateRefreshToken(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tt.wantSession, claims["session_id"])
 			require.Equal(t, tt.wantUser, claims["user_id"])
+		})
+	}
+}
+
+func TestTokenService_JWKSFailure(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		validate func(*tokenService, context.Context, string) error
+	}{
+		{
+			name: "validate token",
+			validate: func(svc *tokenService, ctx context.Context, token string) error {
+				_, err := svc.ValidateToken(ctx, token)
+				return err
+			},
+		},
+		{
+			name: "validate refresh token",
+			validate: func(svc *tokenService, ctx context.Context, token string) error {
+				_, err := svc.ValidateRefreshToken(ctx, token)
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newServiceTestFixture(t)
+			f.cacheSvc.On("GetJWKSWithFallback", mock.Anything).Return(nil, assert.AnError)
+			svc := f.newJWTService()
+
+			err := tt.validate(svc, context.Background(), "irrelevant-token")
+
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "failed to get JWKS")
+			f.cacheSvc.AssertExpectations(t)
 		})
 	}
 }
