@@ -274,13 +274,14 @@ func TestSessionPlugin_ValidateSessionHook(t *testing.T) {
 	now := time.Now().UTC()
 
 	tests := []struct {
-		name        string
-		cookie      *http.Cookie
-		setup       func(*internaltests.MockTokenService, *internaltests.MockSessionService)
-		wantHandled bool
-		wantStatus  int
-		wantActorID string
-		wantCookie  bool
+		name          string
+		cookie        *http.Cookie
+		existingActor *models.Actor
+		setup         func(*internaltests.MockTokenService, *internaltests.MockSessionService)
+		wantHandled   bool
+		wantStatus    int
+		wantActorID   string
+		wantCookie    bool
 	}{
 		{
 			name:        "missing cookie returns unauthorized",
@@ -343,6 +344,11 @@ func TestSessionPlugin_ValidateSessionHook(t *testing.T) {
 			wantActorID: "u1",
 			wantCookie:  true,
 		},
+		{
+			name:          "actor already set by another auth plugin is left untouched",
+			existingActor: &models.Actor{ID: "external", Type: models.ActorUser},
+			setup:         func(*internaltests.MockTokenService, *internaltests.MockSessionService) {},
+		},
 	}
 
 	for _, tt := range tests {
@@ -360,6 +366,7 @@ func TestSessionPlugin_ValidateSessionHook(t *testing.T) {
 			reqCtx := &models.RequestContext{
 				Request:         r,
 				ResponseWriter:  w,
+				Actor:           tt.existingActor,
 				Values:          make(map[string]any),
 				ResponseHeaders: make(http.Header),
 			}
@@ -368,10 +375,13 @@ func TestSessionPlugin_ValidateSessionHook(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantHandled, reqCtx.Handled)
-			if tt.wantHandled {
+			switch {
+			case tt.wantHandled:
 				assert.Equal(t, tt.wantStatus, reqCtx.ResponseStatus)
 				assert.Nil(t, reqCtx.Actor)
-			} else {
+			case tt.existingActor != nil:
+				assert.Same(t, tt.existingActor, reqCtx.Actor)
+			default:
 				require.NotNil(t, reqCtx.Actor)
 				assert.Equal(t, tt.wantActorID, reqCtx.Actor.ID)
 				assert.Equal(t, "s1", reqCtx.Values[models.ContextSessionID.String()])
@@ -389,29 +399,6 @@ func TestSessionPlugin_ValidateSessionHook(t *testing.T) {
 			mockSessionSvc.AssertExpectations(t)
 		})
 	}
-
-	t.Run("skips when an actor is already set by another auth plugin", func(t *testing.T) {
-		t.Parallel()
-
-		mockTokenSvc := new(internaltests.MockTokenService)
-		mockSessionSvc := new(internaltests.MockSessionService)
-		plugin := newTestPlugin(mockSessionSvc, mockTokenSvc)
-
-		existing := &models.Actor{ID: "external", Type: models.ActorUser}
-		reqCtx := &models.RequestContext{
-			Request:         httptest.NewRequest(http.MethodGet, "/me", nil),
-			ResponseWriter:  httptest.NewRecorder(),
-			Actor:           existing,
-			Values:          make(map[string]any),
-			ResponseHeaders: make(http.Header),
-		}
-
-		require.NoError(t, plugin.validateSessionHook(reqCtx))
-		assert.False(t, reqCtx.Handled)
-		assert.Same(t, existing, reqCtx.Actor)
-		mockTokenSvc.AssertExpectations(t)
-		mockSessionSvc.AssertExpectations(t)
-	})
 }
 
 func TestSessionPlugin_ValidateSessionCookie(t *testing.T) {
@@ -471,6 +458,17 @@ func TestSessionPlugin_ValidateSessionCookie(t *testing.T) {
 			},
 			wantToken: "plaintext",
 		},
+		{
+			name:   "delete failure still rejects the expired session",
+			cookie: &http.Cookie{Name: testCookieName, Value: "plaintext"},
+			setup: func(tokenSvc *internaltests.MockTokenService, sessionSvc *internaltests.MockSessionService) {
+				tokenSvc.On("Hash", "plaintext").Return("hashed").Once()
+				sessionSvc.On("GetByToken", mock.Anything, "hashed").
+					Return(&models.Session{ID: "s1", UserID: "u1", ExpiresAt: now.Add(-time.Minute)}, nil).Once()
+				sessionSvc.On("Delete", mock.Anything, "s1").Return(errors.New("db down")).Once()
+			},
+			wantMsg: "session expired",
+		},
 	}
 
 	for _, tt := range tests {
@@ -511,29 +509,6 @@ func TestSessionPlugin_ValidateSessionCookie(t *testing.T) {
 			mockSessionSvc.AssertExpectations(t)
 		})
 	}
-
-	t.Run("delete failure still rejects the expired session", func(t *testing.T) {
-		t.Parallel()
-
-		mockTokenSvc := new(internaltests.MockTokenService)
-		mockSessionSvc := new(internaltests.MockSessionService)
-		mockTokenSvc.On("Hash", "plaintext").Return("hashed").Once()
-		mockSessionSvc.On("GetByToken", mock.Anything, "hashed").
-			Return(&models.Session{ID: "s1", UserID: "u1", ExpiresAt: now.Add(-time.Minute)}, nil).Once()
-		mockSessionSvc.On("Delete", mock.Anything, "s1").Return(errors.New("db down")).Once()
-		plugin := newTestPlugin(mockSessionSvc, mockTokenSvc)
-
-		r := httptest.NewRequest(http.MethodGet, "/me", nil)
-		r.AddCookie(&http.Cookie{Name: testCookieName, Value: "plaintext"})
-
-		session, rawToken, err := plugin.validateSessionCookie(r)
-
-		require.EqualError(t, err, "session expired")
-		assert.Nil(t, session)
-		assert.Empty(t, rawToken)
-		mockTokenSvc.AssertExpectations(t)
-		mockSessionSvc.AssertExpectations(t)
-	})
 }
 
 func TestSessionPlugin_ValidateSessionHookOptional(t *testing.T) {
@@ -542,11 +517,12 @@ func TestSessionPlugin_ValidateSessionHookOptional(t *testing.T) {
 	now := time.Now().UTC()
 
 	tests := []struct {
-		name        string
-		cookie      *http.Cookie
-		setup       func(*internaltests.MockTokenService, *internaltests.MockSessionService)
-		wantActorID string
-		wantCookie  bool
+		name          string
+		cookie        *http.Cookie
+		existingActor *models.Actor
+		setup         func(*internaltests.MockTokenService, *internaltests.MockSessionService)
+		wantActorID   string
+		wantCookie    bool
 	}{
 		{
 			name:  "missing cookie is skipped silently",
@@ -593,6 +569,11 @@ func TestSessionPlugin_ValidateSessionHookOptional(t *testing.T) {
 			wantActorID: "u1",
 			wantCookie:  true,
 		},
+		{
+			name:          "actor already set by another auth plugin is left untouched",
+			existingActor: &models.Actor{ID: "external", Type: models.ActorUser},
+			setup:         func(*internaltests.MockTokenService, *internaltests.MockSessionService) {},
+		},
 	}
 
 	for _, tt := range tests {
@@ -612,6 +593,7 @@ func TestSessionPlugin_ValidateSessionHookOptional(t *testing.T) {
 			reqCtx := &models.RequestContext{
 				Request:         r,
 				ResponseWriter:  w,
+				Actor:           tt.existingActor,
 				Values:          make(map[string]any),
 				ResponseHeaders: make(http.Header),
 			}
@@ -620,9 +602,12 @@ func TestSessionPlugin_ValidateSessionHookOptional(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.False(t, reqCtx.Handled)
-			if tt.wantActorID == "" {
+			switch {
+			case tt.existingActor != nil:
+				assert.Same(t, tt.existingActor, reqCtx.Actor)
+			case tt.wantActorID == "":
 				assert.Nil(t, reqCtx.Actor)
-			} else {
+			default:
 				require.NotNil(t, reqCtx.Actor)
 				assert.Equal(t, tt.wantActorID, reqCtx.Actor.ID)
 				assert.Equal(t, "s1", reqCtx.Values[models.ContextSessionID.String()])
@@ -640,29 +625,6 @@ func TestSessionPlugin_ValidateSessionHookOptional(t *testing.T) {
 			mockSessionSvc.AssertExpectations(t)
 		})
 	}
-
-	t.Run("skips when an actor is already set by another auth plugin", func(t *testing.T) {
-		t.Parallel()
-
-		mockTokenSvc := new(internaltests.MockTokenService)
-		mockSessionSvc := new(internaltests.MockSessionService)
-		plugin := newTestPlugin(mockSessionSvc, mockTokenSvc)
-
-		existing := &models.Actor{ID: "external", Type: models.ActorUser}
-		reqCtx := &models.RequestContext{
-			Request:         httptest.NewRequest(http.MethodGet, "/me", nil),
-			ResponseWriter:  httptest.NewRecorder(),
-			Actor:           existing,
-			Values:          make(map[string]any),
-			ResponseHeaders: make(http.Header),
-		}
-
-		require.NoError(t, plugin.validateSessionHookOptional(reqCtx))
-		assert.False(t, reqCtx.Handled)
-		assert.Same(t, existing, reqCtx.Actor)
-		mockTokenSvc.AssertExpectations(t)
-		mockSessionSvc.AssertExpectations(t)
-	})
 }
 
 func TestSessionPlugin_AuthMiddleware(t *testing.T) {
