@@ -117,42 +117,59 @@ func TestInitDatabaseSQLiteMemory(t *testing.T) {
 }
 
 func TestInitDatabaseSQLiteFile(t *testing.T) {
-	t.Run("absolute path creates parent directory and database", func(t *testing.T) {
-		dbPath := filepath.Join(t.TempDir(), "nested", "authula.db")
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T) (dbURL, wantPath string)
+		wantErr string
+	}{
+		{
+			name: "absolute path creates parent directory and database",
+			setup: func(t *testing.T) (string, string) {
+				dbPath := filepath.Join(t.TempDir(), "nested", "authula.db")
+				return dbPath, dbPath
+			},
+		},
+		{
+			name: "relative path resolves against working directory",
+			setup: func(t *testing.T) (string, string) {
+				workingDir := t.TempDir()
+				t.Chdir(workingDir)
+				return filepath.Join("data", "authula.db"), filepath.Join(workingDir, "data", "authula.db")
+			},
+		},
+		{
+			name: "directory creation failure is returned",
+			setup: func(t *testing.T) (string, string) {
+				blocker := filepath.Join(t.TempDir(), "blocker")
+				require.NoError(t, os.WriteFile(blocker, []byte("not a directory"), 0o600))
+				return filepath.Join(blocker, "nested", "authula.db"), ""
+			},
+			wantErr: "failed to create database directory",
+		},
+	}
 
-		db := openDatabase(t, "", DatabaseOptions{Provider: "sqlite", URL: dbPath}, "info")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dbURL, wantPath := tc.setup(t)
 
-		requireUsableSQLite(t, db)
-		_, err := os.Stat(dbPath)
-		require.NoError(t, err)
-	})
+			if tc.wantErr != "" {
+				t.Setenv(env.EnvDatabaseURL, "")
 
-	t.Run("relative path resolves against working directory", func(t *testing.T) {
-		workingDir := t.TempDir()
-		t.Chdir(workingDir)
+				db, err := InitDatabase(DatabaseOptions{Provider: "sqlite", URL: dbURL}, nil, "info")
 
-		db := openDatabase(t, "", DatabaseOptions{Provider: "sqlite", URL: filepath.Join("data", "authula.db")}, "info")
+				require.Error(t, err)
+				assert.Nil(t, db)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				return
+			}
 
-		requireUsableSQLite(t, db)
-		_, err := os.Stat(filepath.Join(workingDir, "data", "authula.db"))
-		require.NoError(t, err)
-	})
+			db := openDatabase(t, "", DatabaseOptions{Provider: "sqlite", URL: dbURL}, "info")
 
-	t.Run("directory creation failure is returned", func(t *testing.T) {
-		blocker := filepath.Join(t.TempDir(), "blocker")
-		require.NoError(t, os.WriteFile(blocker, []byte("not a directory"), 0o600))
-
-		t.Setenv(env.EnvDatabaseURL, "")
-
-		db, err := InitDatabase(DatabaseOptions{
-			Provider: "sqlite",
-			URL:      filepath.Join(blocker, "nested", "authula.db"),
-		}, nil, "info")
-
-		require.Error(t, err)
-		assert.Nil(t, db)
-		assert.Contains(t, err.Error(), "failed to create database directory")
-	})
+			requireUsableSQLite(t, db)
+			_, err := os.Stat(wantPath)
+			require.NoError(t, err)
+		})
+	}
 }
 
 func TestInitDatabaseUsesEnvironmentURLOverOptions(t *testing.T) {
@@ -199,24 +216,20 @@ func TestInitDatabaseNetworkProvidersOpenLazily(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv(env.EnvDatabaseURL, "")
-
-			db, err := InitDatabase(DatabaseOptions{Provider: tc.provider, URL: tc.url}, nil, "info")
-
 			if tc.wantOpenError {
+				t.Setenv(env.EnvDatabaseURL, "")
+
+				db, err := InitDatabase(DatabaseOptions{Provider: tc.provider, URL: tc.url}, nil, "info")
+
 				require.Error(t, err)
 				assert.Nil(t, db)
 				return
 			}
 
-			require.NoError(t, err)
-			require.NotNil(t, db)
-			t.Cleanup(func() {
-				closeDatabase(t, db)
-			})
-
 			// Only open-time behaviour is asserted; no query is executed, so
 			// nothing dials the unreachable address above.
+			db := openDatabase(t, "", DatabaseOptions{Provider: tc.provider, URL: tc.url}, "info")
+
 			bunDB := requireBunDatabase(t, db)
 			assert.Equal(t, tc.wantDialect, bunDB.Dialect().Name())
 		})
@@ -225,9 +238,10 @@ func TestInitDatabaseNetworkProvidersOpenLazily(t *testing.T) {
 
 func TestConfigurePool(t *testing.T) {
 	tests := []struct {
-		name        string
-		opts        DatabaseOptions
-		wantMaxOpen int
+		name           string
+		opts           DatabaseOptions
+		wantMaxOpen    int
+		checkIdleLimit bool
 	}{
 		{
 			name:        "defaults derive from cpu count",
@@ -254,10 +268,49 @@ func TestConfigurePool(t *testing.T) {
 			opts:        DatabaseOptions{ConnMaxLifetime: time.Second},
 			wantMaxOpen: runtime.NumCPU() * 4,
 		},
+		{
+			name:           "max idle connections is honoured",
+			opts:           DatabaseOptions{Provider: "sqlite", MaxOpenConns: 3, MaxIdleConns: 1},
+			checkIdleLimit: true,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.checkIdleLimit {
+				// database/sql does not expose the idle limit, so assert it by behaviour:
+				// three borrowed connections must collapse to a single idle one when the
+				// configured idle limit is one.
+				opts := tc.opts
+				opts.URL = filepath.Join(t.TempDir(), "authula.db")
+
+				db := openDatabase(t, "", opts, "info")
+				bunDB := requireBunDatabase(t, db)
+
+				ctx := context.Background()
+				conns := make([]*sql.Conn, 0, 3)
+				for range 3 {
+					conn, err := bunDB.DB.Conn(ctx)
+					require.NoError(t, err)
+					conns = append(conns, conn)
+				}
+
+				require.Eventually(t,
+					func() bool { return bunDB.Stats().OpenConnections == 3 },
+					5*time.Second, 10*time.Millisecond,
+					"expected three open connections before releasing them")
+
+				for _, conn := range conns {
+					require.NoError(t, conn.Close())
+				}
+
+				require.Eventually(t,
+					func() bool { return bunDB.Stats().Idle == 1 },
+					5*time.Second, 10*time.Millisecond,
+					"expected idle connections to be capped at one")
+				return
+			}
+
 			sqlDB, err := sql.Open("sqlite", sqlitedsn.Build(":memory:"))
 			require.NoError(t, err)
 			t.Cleanup(func() {
@@ -269,41 +322,6 @@ func TestConfigurePool(t *testing.T) {
 			assert.Equal(t, tc.wantMaxOpen, sqlDB.Stats().MaxOpenConnections)
 		})
 	}
-
-	// database/sql does not expose the idle limit, so assert it by behaviour:
-	// three borrowed connections must collapse to a single idle one when the
-	// configured idle limit is one.
-	t.Run("max idle connections is honoured", func(t *testing.T) {
-		db := openDatabase(t, "", DatabaseOptions{
-			Provider:     "sqlite",
-			URL:          filepath.Join(t.TempDir(), "authula.db"),
-			MaxOpenConns: 3,
-			MaxIdleConns: 1,
-		}, "info")
-		bunDB := requireBunDatabase(t, db)
-
-		ctx := context.Background()
-		conns := make([]*sql.Conn, 0, 3)
-		for range 3 {
-			conn, err := bunDB.DB.Conn(ctx)
-			require.NoError(t, err)
-			conns = append(conns, conn)
-		}
-
-		require.Eventually(t,
-			func() bool { return bunDB.Stats().OpenConnections == 3 },
-			5*time.Second, 10*time.Millisecond,
-			"expected three open connections before releasing them")
-
-		for _, conn := range conns {
-			require.NoError(t, conn.Close())
-		}
-
-		require.Eventually(t,
-			func() bool { return bunDB.Stats().Idle == 1 },
-			5*time.Second, 10*time.Millisecond,
-			"expected idle connections to be capped at one")
-	})
 }
 
 // TestEnableDebuggingQueryHook captures stderr because bundebug writes there.
