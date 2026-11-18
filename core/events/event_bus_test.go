@@ -894,6 +894,7 @@ func TestEventBus_ConsumerLoop(t *testing.T) {
 					require.NoError(t, err)
 
 					require.Equal(t, "user.created", pubsub.nextTopic(t))
+					synctest.Wait()
 					assert.True(t, logger.hasError("failed to subscribe to topic"))
 
 					// The retry only happens after the backoff timer fires.
