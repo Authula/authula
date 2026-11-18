@@ -11,6 +11,7 @@ import (
 
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
+	handlertests "github.com/Authula/authula/plugins/email-password/handlers/tests"
 	plugintests "github.com/Authula/authula/plugins/email-password/tests"
 	"github.com/Authula/authula/plugins/email-password/types"
 )
@@ -54,6 +55,60 @@ func TestSignUpHandler(t *testing.T) {
 			require.Equal(t, tt.expectedStatus, reqCtx.ResponseStatus)
 			su.AssertExpectations(t)
 			send.AssertExpectations(t)
+		})
+	}
+}
+
+func TestSignUpHandler_EmailVerificationResend(t *testing.T) {
+	t.Parallel()
+
+	user := &models.User{ID: "user-1", Email: "jane@example.com"}
+	tests := []struct {
+		name         string
+		sendErr      error
+		expectLogErr bool
+	}{
+		{name: "resend_succeeds"},
+		{name: "resend_failure_is_logged", sendErr: errors.New("smtp unavailable"), expectLogErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			su := &plugintests.MockSignUpUseCase{}
+			su.On("SignUp", mock.Anything, "Jane", "jane@example.com", "password123", (*string)(nil), mock.Anything, (*string)(nil), mock.Anything, mock.Anything).Return(&types.SignUpResult{User: user}, nil).Once()
+
+			sent := make(chan struct{})
+			send := &plugintests.MockSendEmailVerificationUseCase{}
+			send.On("Send", mock.Anything, "user-1", (*string)(nil)).Return(tt.sendErr).Run(func(mock.Arguments) { close(sent) }).Once()
+
+			logged := make(chan struct{})
+			logger := &handlertests.MockLogger{}
+			if tt.expectLogErr {
+				logger.On("Error", "failed to send email", mock.Anything).Run(func(mock.Arguments) { close(logged) }).Once()
+			}
+
+			handler := &SignUpHandler{
+				Logger:                       logger,
+				Config:                       &models.Config{Session: models.SessionConfig{ExpiresIn: time.Hour}},
+				PluginConfig:                 types.EmailPasswordPluginConfig{RequireEmailVerification: true, SendEmailOnSignUp: true},
+				SignUpUseCase:                su,
+				SendEmailVerificationUseCase: send,
+			}
+			body := internaltests.MarshalToJSON(t, types.SignUpRequest{Name: "Jane", Email: "jane@example.com", Password: "password123"})
+			req, w, reqCtx := internaltests.NewHandlerRequest(t, http.MethodPost, "/email-password/sign-up", body, nil)
+
+			handler.Handler().ServeHTTP(w, req)
+
+			handlertests.WaitForSignal(t, sent)
+			if tt.expectLogErr {
+				handlertests.WaitForSignal(t, logged)
+			}
+			require.Equal(t, http.StatusCreated, reqCtx.ResponseStatus)
+			su.AssertExpectations(t)
+			send.AssertExpectations(t)
+			logger.AssertExpectations(t)
 		})
 	}
 }
