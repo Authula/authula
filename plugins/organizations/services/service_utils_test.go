@@ -15,6 +15,7 @@ import (
 	orgconstants "github.com/Authula/authula/plugins/organizations/constants"
 	orgtests "github.com/Authula/authula/plugins/organizations/tests"
 	"github.com/Authula/authula/plugins/organizations/types"
+	rootservices "github.com/Authula/authula/services"
 )
 
 func TestServiceUtils_authorizeOwner(t *testing.T) {
@@ -24,7 +25,7 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		actorUserID  string
+		actor        *models.Actor
 		organization string
 		setup        func(*orgtests.MockOrganizationRepository)
 		expectErr    error
@@ -32,7 +33,7 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 	}{
 		{
 			name:         "success",
-			actorUserID:  "user-1",
+			actor:        orgtests.Actor("user-1"),
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -40,14 +41,26 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 			expectOwner: "user-1",
 		},
 		{
-			name:         "unauthorized when inputs are missing",
-			actorUserID:  "",
+			name:         "unauthorized when actor is nil",
+			actor:        nil,
 			organization: "org-1",
 			expectErr:    coreerrors.ErrUnauthorized,
 		},
 		{
+			name:         "unauthorized when actor ID is empty",
+			actor:        orgtests.Actor(""),
+			organization: "org-1",
+			expectErr:    coreerrors.ErrUnauthorized,
+		},
+		{
+			name:         "unauthorized when organization ID is empty",
+			actor:        orgtests.Actor("user-1"),
+			organization: "",
+			expectErr:    coreerrors.ErrUnauthorized,
+		},
+		{
 			name:         "not found when organization is missing",
-			actorUserID:  "user-1",
+			actor:        orgtests.Actor("user-1"),
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return((*types.Organization)(nil), nil).Once()
@@ -55,8 +68,17 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 			expectErr: coreerrors.ErrNotFound,
 		},
 		{
+			name:         "forbidden when organization claim names another organization",
+			actor:        &models.Actor{ID: "user-1", Type: models.ActorUser, Claims: map[string]any{"organization_id": "org-2"}},
+			organization: "org-1",
+			setup: func(orgRepo *orgtests.MockOrganizationRepository) {
+				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+			},
+			expectErr: coreerrors.ErrForbidden,
+		},
+		{
 			name:         "forbidden when actor is not owner",
-			actorUserID:  "user-2",
+			actor:        orgtests.Actor("user-2"),
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -65,7 +87,7 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 		},
 		{
 			name:         "propagates repository error",
-			actorUserID:  "user-1",
+			actor:        orgtests.Actor("user-1"),
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return((*types.Organization)(nil), repoErr).Once()
@@ -83,7 +105,7 @@ func TestServiceUtils_authorizeOwner(t *testing.T) {
 				tt.setup(orgRepo)
 			}
 
-			org, err := (&ServiceUtils{orgRepo: orgRepo}).authorizeOwner(context.Background(), orgtests.Actor(tt.actorUserID), tt.organization)
+			org, err := (&ServiceUtils{orgRepo: orgRepo}).authorizeOwner(context.Background(), tt.actor, tt.organization)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				require.Nil(t, org)
@@ -108,16 +130,14 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 	tests := []struct {
 		name         string
 		actor        *models.Actor
-		actorUserID  string
 		organization string
 		setup        func(*orgtests.MockOrganizationRepository, *orgtests.MockOrganizationMemberRepository)
 		expectErr    error
-		expectOwner  string
 		expectMember string
 	}{
 		{
 			name:         "owner access",
-			actorUserID:  "user-1",
+			actor:        orgtests.Actor("user-1"),
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -127,7 +147,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 		},
 		{
 			name:         "member access",
-			actorUserID:  "user-2",
+			actor:        orgtests.Actor("user-2"),
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -136,13 +156,12 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 			expectMember: "user-2",
 		},
 		{
-			name:         "machine with matching claim is allowed",
+			name:         "machine with matching claim is allowed without member lookup",
 			actor:        &models.Actor{ID: "key-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}},
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
 			},
-			expectOwner: "user-1",
 		},
 		{
 			name:         "machine without claim is forbidden",
@@ -163,7 +182,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 			expectErr: coreerrors.ErrForbidden,
 		},
 		{
-			name:         "user with mismatched claim is forbidden",
+			name:         "user with mismatched claim is forbidden without member lookup",
 			actor:        &models.Actor{ID: "user-1", Type: models.ActorUser, Claims: map[string]any{"organization_id": "org-2"}},
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -172,14 +191,26 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 			expectErr: coreerrors.ErrForbidden,
 		},
 		{
-			name:         "unauthorized when inputs are missing",
-			actorUserID:  "",
+			name:         "unauthorized when actor is nil",
+			actor:        nil,
 			organization: "org-1",
 			expectErr:    coreerrors.ErrUnauthorized,
 		},
 		{
+			name:         "unauthorized when actor ID is empty",
+			actor:        orgtests.Actor(""),
+			organization: "org-1",
+			expectErr:    coreerrors.ErrUnauthorized,
+		},
+		{
+			name:         "unauthorized when organization ID is empty",
+			actor:        orgtests.Actor("user-1"),
+			organization: "",
+			expectErr:    coreerrors.ErrUnauthorized,
+		},
+		{
 			name:         "not found when organization is missing",
-			actorUserID:  "user-1",
+			actor:        orgtests.Actor("user-1"),
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return((*types.Organization)(nil), nil).Once()
@@ -188,7 +219,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 		},
 		{
 			name:         "forbidden when member is missing",
-			actorUserID:  "user-2",
+			actor:        orgtests.Actor("user-2"),
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -198,7 +229,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 		},
 		{
 			name:         "propagates organization repository error",
-			actorUserID:  "user-1",
+			actor:        orgtests.Actor("user-1"),
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return((*types.Organization)(nil), orgErr).Once()
@@ -207,7 +238,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 		},
 		{
 			name:         "propagates member repository error",
-			actorUserID:  "user-2",
+			actor:        orgtests.Actor("user-2"),
 			organization: "org-1",
 			setup: func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				orgRepo.On("GetByID", mock.Anything, "org-1").Return(&types.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
@@ -227,11 +258,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 				tt.setup(orgRepo, memberRepo)
 			}
 
-			actor := tt.actor
-			if actor == nil {
-				actor = orgtests.Actor(tt.actorUserID)
-			}
-			org, member, err := (&ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}).AuthorizeOrganizationAccess(context.Background(), actor, tt.organization)
+			org, member, err := (&ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo}).AuthorizeOrganizationAccess(context.Background(), tt.actor, tt.organization)
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				require.Nil(t, org)
@@ -243,6 +270,7 @@ func TestServiceUtils_authorizeOrganizationAccess(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, org)
+			require.Equal(t, tt.organization, org.ID)
 			if tt.expectMember != "" {
 				require.NotNil(t, member)
 				require.Equal(t, tt.expectMember, member.UserID)
@@ -521,6 +549,9 @@ func TestServiceUtils_slugify(t *testing.T) {
 func TestServiceUtils_authorizeTeamAccess(t *testing.T) {
 	t.Parallel()
 
+	teamErr := errors.New("team repo failed")
+	memberErr := errors.New("member repo failed")
+
 	tests := []struct {
 		name      string
 		actor     *models.Actor
@@ -553,6 +584,23 @@ func TestServiceUtils_authorizeTeamAccess(t *testing.T) {
 			expectErr: coreerrors.ErrForbidden,
 		},
 		{
+			name:  "member lookup error is propagated",
+			actor: &models.Actor{ID: "user-3", Type: models.ActorUser},
+			setup: func(teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
+				memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "user-3").Return((*types.OrganizationMember)(nil), memberErr).Once()
+			},
+			expectErr: memberErr,
+		},
+		{
+			name:  "team repository error is propagated",
+			actor: &models.Actor{ID: "user-1", Type: models.ActorUser},
+			setup: func(teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				teamRepo.On("GetByID", mock.Anything, "team-1").Return((*types.OrganizationTeam)(nil), teamErr).Once()
+			},
+			expectErr: teamErr,
+		},
+		{
 			name:  "team from another organization is not found",
 			actor: &models.Actor{ID: "user-1", Type: models.ActorUser},
 			setup: func(teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
@@ -569,7 +617,15 @@ func TestServiceUtils_authorizeTeamAccess(t *testing.T) {
 			expectErr: coreerrors.ErrNotFound,
 		},
 		{
-			name:  "machine bound to org is allowed",
+			name:  "user with mismatched organization claim is forbidden without member lookup",
+			actor: &models.Actor{ID: "user-1", Type: models.ActorUser, Claims: map[string]any{"organization_id": "org-2"}},
+			setup: func(teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
+				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
+			},
+			expectErr: coreerrors.ErrForbidden,
+		},
+		{
+			name:  "machine bound to org is allowed without member lookup",
 			actor: &models.Actor{ID: "key-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}},
 			setup: func(teamRepo *orgtests.MockOrganizationTeamRepository, memberRepo *orgtests.MockOrganizationMemberRepository) {
 				teamRepo.On("GetByID", mock.Anything, "team-1").Return(&types.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
@@ -595,14 +651,165 @@ func TestServiceUtils_authorizeTeamAccess(t *testing.T) {
 				tt.setup(teamRepo, memberRepo)
 			}
 
-			err := (&ServiceUtils{orgRepo: nil, orgMemberRepo: memberRepo, orgTeamRepo: teamRepo}).authorizeTeamAccess(context.Background(), tt.actor, "org-1", "team-1")
+			err := (&ServiceUtils{orgMemberRepo: memberRepo, orgTeamRepo: teamRepo}).authorizeTeamAccess(context.Background(), tt.actor, "org-1", "team-1")
+			if tt.expectErr != nil {
+				require.ErrorIs(t, err, tt.expectErr)
+			} else {
+				require.NoError(t, err)
+			}
+			teamRepo.AssertExpectations(t)
+			memberRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestServiceUtils_verifyOrgClaim(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		actor     *models.Actor
+		expectErr error
+	}{
+		{
+			name:  "user claim matching the organization is allowed",
+			actor: &models.Actor{ID: "user-1", Type: models.ActorUser, Claims: map[string]any{"organization_id": "org-1"}},
+		},
+		{
+			name:      "user claim naming another organization is forbidden",
+			actor:     &models.Actor{ID: "user-1", Type: models.ActorUser, Claims: map[string]any{"organization_id": "org-2"}},
+			expectErr: coreerrors.ErrForbidden,
+		},
+		{
+			name:      "machine without organization claim is forbidden",
+			actor:     &models.Actor{ID: "key-1", Type: models.ActorMachine},
+			expectErr: coreerrors.ErrForbidden,
+		},
+		{
+			name:      "machine with empty organization claim is forbidden",
+			actor:     &models.Actor{ID: "key-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": ""}},
+			expectErr: coreerrors.ErrForbidden,
+		},
+		{
+			name:  "user without organization claim is allowed",
+			actor: &models.Actor{ID: "user-1", Type: models.ActorUser},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := verifyOrgClaim(tt.actor, "org-1")
 			if tt.expectErr != nil {
 				require.ErrorIs(t, err, tt.expectErr)
 				return
 			}
 			require.NoError(t, err)
-			teamRepo.AssertExpectations(t)
-			memberRepo.AssertExpectations(t)
+		})
+	}
+}
+
+// roleWeightFailureStub fails weight lookups for one role and delegates every other role to the shared stub.
+type roleWeightFailureStub struct {
+	*orgtests.AccessControlServiceStub
+	failingRole string
+	failure     error
+}
+
+func newRoleWeightFailureStub(failingRole string, failure error) *roleWeightFailureStub {
+	return &roleWeightFailureStub{
+		AccessControlServiceStub: orgtests.NewAccessControlServiceStub(),
+		failingRole:              failingRole,
+		failure:                  failure,
+	}
+}
+
+func (s *roleWeightFailureStub) GetRoleWeightByName(ctx context.Context, roleName string) (int, error) {
+	if roleName == s.failingRole {
+		return 0, s.failure
+	}
+	return s.AccessControlServiceStub.GetRoleWeightByName(ctx, roleName)
+}
+
+func TestServiceUtils_authorizeRoleWeight(t *testing.T) {
+	t.Parallel()
+
+	lookupErr := errors.New("role lookup failed")
+
+	tests := []struct {
+		name          string
+		actorMember   *types.OrganizationMember
+		targetRole    string
+		accessControl rootservices.AccessControlService
+		expectErr     error
+	}{
+		{
+			name:          "allowed when target weight is below actor weight",
+			actorMember:   &types.OrganizationMember{Role: "manager"},
+			targetRole:    "member",
+			accessControl: orgtests.NewAccessControlServiceStub(),
+		},
+		{
+			name:          "allowed when target weight equals actor weight",
+			actorMember:   &types.OrganizationMember{Role: "admin"},
+			targetRole:    "admin",
+			accessControl: orgtests.NewAccessControlServiceStub(),
+		},
+		{
+			name:          "forbidden when target weight is above actor weight",
+			actorMember:   &types.OrganizationMember{Role: "member"},
+			targetRole:    "admin",
+			accessControl: orgtests.NewAccessControlServiceStub(),
+			expectErr:     coreerrors.ErrForbidden,
+		},
+		{
+			name:          "forbidden when actor member is nil",
+			actorMember:   nil,
+			targetRole:    "member",
+			accessControl: orgtests.NewAccessControlServiceStub(),
+			expectErr:     coreerrors.ErrForbidden,
+		},
+		{
+			name:          "forbidden when actor role is unknown",
+			actorMember:   &types.OrganizationMember{Role: "ghost"},
+			targetRole:    "member",
+			accessControl: orgtests.NewAccessControlServiceStub(),
+			expectErr:     coreerrors.ErrForbidden,
+		},
+		{
+			name:          "propagates actor role weight lookup error",
+			actorMember:   &types.OrganizationMember{Role: "manager"},
+			targetRole:    "member",
+			accessControl: newRoleWeightFailureStub("manager", lookupErr),
+			expectErr:     lookupErr,
+		},
+		{
+			name:          "bad request when target role is unknown",
+			actorMember:   &types.OrganizationMember{Role: "manager"},
+			targetRole:    "ghost",
+			accessControl: orgtests.NewAccessControlServiceStub(),
+			expectErr:     coreerrors.ErrBadRequest,
+		},
+		{
+			name:          "propagates target role weight lookup error",
+			actorMember:   &types.OrganizationMember{Role: "manager"},
+			targetRole:    "admin",
+			accessControl: newRoleWeightFailureStub("admin", lookupErr),
+			expectErr:     lookupErr,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := authorizeRoleWeight(context.Background(), tt.accessControl, tt.actorMember, tt.targetRole)
+			if tt.expectErr != nil {
+				require.ErrorIs(t, err, tt.expectErr)
+				return
+			}
+			require.NoError(t, err)
 		})
 	}
 }
