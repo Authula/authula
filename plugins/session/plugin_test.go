@@ -41,6 +41,30 @@ func newTestPlugin(sessionSvc *internaltests.MockSessionService, tokenSvc *inter
 	}
 }
 
+func newSignOutFixture() (*SessionPlugin, *models.RequestContext, *httptest.ResponseRecorder) {
+	plugin := New(SessionPluginConfig{Enabled: true})
+	plugin.globalConfig = sessionInitConfig(defaultInitSessionConfig())
+	w := httptest.NewRecorder()
+	reqCtx := &models.RequestContext{
+		Request:         httptest.NewRequest(http.MethodPost, "/sign-out", nil),
+		ResponseWriter:  w,
+		Values:          make(map[string]any),
+		ResponseHeaders: make(http.Header),
+	}
+
+	return plugin, reqCtx, w
+}
+
+func assertSessionCookieCleared(t *testing.T, w *httptest.ResponseRecorder) {
+	t.Helper()
+
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1)
+	assert.Equal(t, testCookieName, cookies[0].Name)
+	assert.Empty(t, cookies[0].Value, "cleared cookie must carry no value")
+	assert.Less(t, cookies[0].MaxAge, 0, "cleared cookie must expire immediately")
+}
+
 func TestSessionPlugin_RenewSession(t *testing.T) {
 	t.Parallel()
 
@@ -1285,44 +1309,33 @@ func TestSessionPlugin_BuildHooks(t *testing.T) {
 		})
 	}
 
-	t.Run("buildHooks and Hooks return the same wiring", func(t *testing.T) {
-		t.Parallel()
+}
 
-		plugin := New(SessionPluginConfig{Enabled: true})
-		built := plugin.buildHooks()
-		exposed := plugin.Hooks()
+func TestSessionPlugin_HooksMatchBuildHooks(t *testing.T) {
+	t.Parallel()
 
-		require.Len(t, exposed, len(built))
-		for i := range built {
-			assert.Equal(t, built[i].Stage, exposed[i].Stage)
-			assert.Equal(t, built[i].PluginID, exposed[i].PluginID)
-			assert.Equal(t, built[i].Order, exposed[i].Order)
-			assert.Equal(t, built[i].Matcher == nil, exposed[i].Matcher == nil)
-		}
-	})
+	plugin := New(SessionPluginConfig{Enabled: true})
+	built := plugin.buildHooks()
+	exposed := plugin.Hooks()
 
-	t.Run("sign out hook clears the session cookie", func(t *testing.T) {
-		t.Parallel()
+	require.Len(t, exposed, len(built))
+	for i := range built {
+		assert.Equal(t, built[i].Stage, exposed[i].Stage)
+		assert.Equal(t, built[i].PluginID, exposed[i].PluginID)
+		assert.Equal(t, built[i].Order, exposed[i].Order)
+		assert.Equal(t, built[i].Matcher == nil, exposed[i].Matcher == nil)
+	}
+}
 
-		plugin := New(SessionPluginConfig{Enabled: true})
-		plugin.globalConfig = sessionInitConfig(defaultInitSessionConfig())
-		w := httptest.NewRecorder()
-		reqCtx := &models.RequestContext{
-			Request:         httptest.NewRequest(http.MethodPost, "/sign-out", nil),
-			ResponseWriter:  w,
-			Values:          make(map[string]any),
-			ResponseHeaders: make(http.Header),
-		}
+func TestSessionPlugin_SignOutHookClearsSessionCookie(t *testing.T) {
+	t.Parallel()
 
-		require.NoError(t, plugin.buildHooks()[3].Handler(reqCtx))
+	plugin, reqCtx, w := newSignOutFixture()
 
-		cookies := w.Result().Cookies()
-		require.Len(t, cookies, 1)
-		assert.Equal(t, testCookieName, cookies[0].Name)
-		assert.Empty(t, cookies[0].Value)
-		assert.Less(t, cookies[0].MaxAge, 0, "cookie must be expired")
-		assert.False(t, reqCtx.Handled)
-	})
+	require.NoError(t, plugin.buildHooks()[3].Handler(reqCtx))
+
+	assertSessionCookieCleared(t, w)
+	assert.False(t, reqCtx.Handled)
 }
 
 func TestSessionPlugin_AuthSuccessMatcher(t *testing.T) {
@@ -1384,23 +1397,11 @@ func TestSessionPlugin_SignedOutMatcher(t *testing.T) {
 func TestSessionPlugin_ClearSessionCookieHook(t *testing.T) {
 	t.Parallel()
 
-	plugin := New(SessionPluginConfig{Enabled: true})
-	plugin.globalConfig = sessionInitConfig(defaultInitSessionConfig())
-	w := httptest.NewRecorder()
-	reqCtx := &models.RequestContext{
-		Request:         httptest.NewRequest(http.MethodPost, "/sign-out", nil),
-		ResponseWriter:  w,
-		Values:          make(map[string]any),
-		ResponseHeaders: make(http.Header),
-	}
+	plugin, reqCtx, w := newSignOutFixture()
 
 	err := plugin.clearSessionCookieHook(reqCtx)
 
 	require.NoError(t, err)
 	assert.False(t, reqCtx.Handled)
-	cookies := w.Result().Cookies()
-	require.Len(t, cookies, 1)
-	assert.Equal(t, testCookieName, cookies[0].Name)
-	assert.Empty(t, cookies[0].Value, "cleared cookie must carry no value")
-	assert.Less(t, cookies[0].MaxAge, 0, "cleared cookie must expire immediately")
+	assertSessionCookieCleared(t, w)
 }
