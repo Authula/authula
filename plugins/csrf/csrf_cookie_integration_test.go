@@ -7,6 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/Authula/authula/internal/router"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
@@ -154,5 +157,75 @@ func TestCSRFCookiePreservedWithSetJSONResponse(t *testing.T) {
 	csrfHeader := result.Header.Get("X-CSRF-Token")
 	if csrfHeader != token {
 		t.Errorf("Expected CSRF header '%s', got '%s'", token, csrfHeader)
+	}
+}
+
+// The deny handler installed by initializeHeaderProtection must produce the same JSON
+// error shape as the rest of the API when CrossOriginProtection rejects a request.
+func TestCSRFPlugin_HeaderProtectionDenyResponse(t *testing.T) {
+	plugin := New(CSRFPluginConfig{EnableHeaderProtection: true})
+	registry := newMockServiceRegistry()
+	registry.Register(models.ServiceToken.String(), &mockTokenService{})
+
+	require.NoError(t, plugin.Init(&models.PluginContext{
+		Logger:          &internaltests.MockLogger{},
+		ServiceRegistry: registry,
+		GetConfig: func() *models.Config {
+			return &models.Config{
+				Security: models.SecurityConfig{TrustedOrigins: []string{"https://app.example.com"}},
+			}
+		},
+	}))
+	require.NotNil(t, plugin.cop)
+
+	tests := []struct {
+		name       string
+		headers    map[string]string
+		wantStatus int
+		wantNext   bool
+	}{
+		{
+			name:       "cross-site request from an untrusted origin is rejected",
+			headers:    map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example.com"},
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "cross-site request from a trusted origin is allowed",
+			headers:    map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://app.example.com"},
+			wantStatus: http.StatusOK,
+			wantNext:   true,
+		},
+		{
+			name:       "same-origin request is allowed",
+			headers:    map[string]string{"Origin": "https://api.example.com"},
+			wantStatus: http.StatusOK,
+			wantNext:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nextCalled := false
+			handler := plugin.cop.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				nextCalled = true
+				w.WriteHeader(http.StatusOK)
+			}))
+
+			req := httptest.NewRequest(http.MethodPost, "https://api.example.com/auth/sign-in", nil)
+			for key, value := range tt.headers {
+				req.Header.Set(key, value)
+			}
+			w := httptest.NewRecorder()
+
+			handler.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.wantNext, nextCalled)
+			assert.Equal(t, tt.wantStatus, w.Code)
+
+			if tt.wantStatus == http.StatusForbidden {
+				assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+				assert.JSONEq(t, `{"error": "csrf validation failed"}`, w.Body.String())
+			}
+		})
 	}
 }

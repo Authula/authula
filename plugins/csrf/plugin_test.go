@@ -1,11 +1,16 @@
 package csrf
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 )
 
@@ -27,21 +32,53 @@ func (m *MockLogger) Error(msg string, args ...any) {
 	m.errorMessages = append(m.errorMessages, msg)
 }
 
-func initPlugin(t *testing.T, p *CSRFPlugin) {
+// failingTokenService always fails token generation so error branches can be exercised.
+type failingTokenService struct {
+	err error
+}
+
+func (f *failingTokenService) Generate() (string, error) { return "", f.err }
+func (f *failingTokenService) Hash(token string) string  { return "hashed-" + token }
+func (f *failingTokenService) Encrypt(token string) (string, error) {
+	return "encrypted-" + token, nil
+}
+func (f *failingTokenService) Decrypt(encrypted string) (string, error) {
+	return encrypted, nil
+}
+
+// initPluginWithServices initializes the plugin with the given global config and an
+// optional token service, leaving it ready for hook and middleware assertions.
+func initPluginWithServices(t *testing.T, p *CSRFPlugin, config *models.Config, tokenService any) error {
 	t.Helper()
-	if p.logger == nil {
-		p.logger = &MockLogger{}
-	}
+	p.logger = &MockLogger{}
 	registry := newMockServiceRegistry()
-	registry.Register(models.ServiceToken.String(), &mockTokenService{})
-	ctx := &models.PluginContext{
+	if tokenService != nil {
+		registry.Register(models.ServiceToken.String(), tokenService)
+	}
+	return p.Init(&models.PluginContext{
 		Logger:          p.logger,
 		ServiceRegistry: registry,
-		GetConfig:       func() *models.Config { return &models.Config{} },
-	}
-	if err := p.Init(ctx); err != nil {
+		GetConfig:       func() *models.Config { return config },
+	})
+}
+
+func initPlugin(t *testing.T, p *CSRFPlugin) {
+	t.Helper()
+	if err := initPluginWithServices(t, p, &models.Config{}, &mockTokenService{}); err != nil {
 		t.Fatalf("failed to init plugin: %v", err)
 	}
+}
+
+// newHeaderProtectedPlugin returns a plugin with header protection enabled and
+// https://app.example.com as a trusted origin.
+func newHeaderProtectedPlugin(t *testing.T) *CSRFPlugin {
+	t.Helper()
+	p := New(CSRFPluginConfig{EnableHeaderProtection: true})
+	require.NoError(t, initPluginWithServices(t, p, &models.Config{
+		Security: models.SecurityConfig{TrustedOrigins: []string{"https://app.example.com"}},
+	}, &mockTokenService{}))
+	require.NotNil(t, p.cop)
+	return p
 }
 
 func TestCSRFPlugin_Metadata(t *testing.T) {
@@ -737,87 +774,521 @@ func TestCSRFPlugin_Middleware(t *testing.T) {
 }
 
 func TestCSRFPlugin_HeaderProtection(t *testing.T) {
-	t.Run("disabled by default", func(t *testing.T) {
-		p := New(CSRFPluginConfig{})
+	tests := []struct {
+		name       string
+		enable     bool
+		method     string
+		target     string
+		headers    map[string]string
+		wantReject bool
+	}{
+		{
+			name:    "disabled plugin ignores cross-site requests",
+			method:  http.MethodPost,
+			target:  "https://api.example.com/auth/sign-in",
+			headers: map[string]string{"Origin": "https://evil.example.com", "Sec-Fetch-Site": "cross-site"},
+		},
+		{
+			name:    "GET with cross-site metadata is allowed",
+			enable:  true,
+			method:  http.MethodGet,
+			target:  "https://api.example.com/auth/me",
+			headers: map[string]string{"Origin": "https://evil.example.com", "Sec-Fetch-Site": "cross-site"},
+		},
+		{
+			name:    "HEAD with cross-site metadata is allowed",
+			enable:  true,
+			method:  http.MethodHead,
+			target:  "https://api.example.com/auth/me",
+			headers: map[string]string{"Origin": "https://evil.example.com", "Sec-Fetch-Site": "cross-site"},
+		},
+		{
+			name:    "OPTIONS with cross-site metadata is allowed",
+			enable:  true,
+			method:  http.MethodOptions,
+			target:  "https://api.example.com/auth/me",
+			headers: map[string]string{"Origin": "https://evil.example.com", "Sec-Fetch-Site": "cross-site"},
+		},
+		{
+			name:    "same-origin metadata is allowed",
+			enable:  true,
+			method:  http.MethodPost,
+			target:  "https://api.example.com/auth/sign-in",
+			headers: map[string]string{"Sec-Fetch-Site": "same-origin"},
+		},
+		{
+			name:    "none metadata is allowed",
+			enable:  true,
+			method:  http.MethodPost,
+			target:  "https://api.example.com/auth/sign-in",
+			headers: map[string]string{"Sec-Fetch-Site": "none"},
+		},
+		{
+			name:       "same-site metadata from an untrusted origin is rejected",
+			enable:     true,
+			method:     http.MethodPost,
+			target:     "https://api.example.com/auth/sign-in",
+			headers:    map[string]string{"Sec-Fetch-Site": "same-site", "Origin": "https://evil.example.com"},
+			wantReject: true,
+		},
+		{
+			name:    "same-site metadata from a trusted origin is allowed",
+			enable:  true,
+			method:  http.MethodPost,
+			target:  "https://api.example.com/auth/sign-in",
+			headers: map[string]string{"Sec-Fetch-Site": "same-site", "Origin": "https://app.example.com"},
+		},
+		{
+			name:       "cross-site metadata is rejected",
+			enable:     true,
+			method:     http.MethodPost,
+			target:     "https://api.example.com/auth/sign-in",
+			headers:    map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example.com"},
+			wantReject: true,
+		},
+		{
+			name:    "cross-site metadata from a trusted origin is allowed",
+			enable:  true,
+			method:  http.MethodPost,
+			target:  "https://api.example.com/auth/sign-in",
+			headers: map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://app.example.com"},
+		},
+		{
+			name:    "origin matching the host is allowed without fetch metadata",
+			enable:  true,
+			method:  http.MethodPost,
+			target:  "https://api.example.com/auth/sign-in",
+			headers: map[string]string{"Origin": "https://api.example.com"},
+		},
+		{
+			name:       "origin not matching the host is rejected without fetch metadata",
+			enable:     true,
+			method:     http.MethodPost,
+			target:     "https://api.example.com/auth/sign-in",
+			headers:    map[string]string{"Origin": "https://evil.example.com"},
+			wantReject: true,
+		},
+		{
+			name:   "missing fetch metadata headers are allowed",
+			enable: true,
+			method: http.MethodPost,
+			target: "https://api.example.com/auth/sign-in",
+		},
+	}
 
-		if p.cop != nil {
-			t.Error("expected CrossOriginProtection to be nil when disabled")
-		}
-
-		req := httptest.NewRequest("POST", "http://localhost/api/test", nil)
-		req.Header.Set("Origin", "http://evil.com")
-
-		if err := p.validateHeaderProtection(req); err != nil {
-			t.Errorf("expected no error when disabled, got: %v", err)
-		}
-	})
-
-	t.Run("enabled blocks cross-origin unsafe methods", func(t *testing.T) {
-		if testing.Short() {
-			t.Skip("skipping in short mode")
-		}
-
-		p := New(CSRFPluginConfig{})
-		p.logger = &MockLogger{}
-		p.cop = http.NewCrossOriginProtection()
-
-		if err := p.cop.AddTrustedOrigin("https://app.example.com"); err != nil {
-			t.Fatalf("failed to add trusted origin: %v", err)
-		}
-		p.cop.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusForbidden)
-		}))
-
-		req := httptest.NewRequest("POST", "http://localhost/api/test", nil)
-		req.Header.Set("Origin", "http://evil.com")
-		req.Header.Set("Host", "localhost")
-
-		_ = p.validateHeaderProtection(req)
-	})
-
-	t.Run("safe methods bypass header protection", func(t *testing.T) {
-		p := New(CSRFPluginConfig{})
-		p.logger = &MockLogger{}
-		p.cop = http.NewCrossOriginProtection()
-
-		if err := p.cop.AddTrustedOrigin("https://app.example.com"); err != nil {
-			t.Fatalf("failed to add trusted origin: %v", err)
-		}
-
-		safeMethods := []string{http.MethodGet, http.MethodHead, http.MethodOptions}
-		for _, method := range safeMethods {
-			req := httptest.NewRequest(method, "http://localhost/api/test", nil)
-			req.Header.Set("Origin", "http://evil.com")
-
-			if err := p.validateHeaderProtection(req); err != nil {
-				t.Errorf("expected %s to pass, got: %v", method, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := New(CSRFPluginConfig{})
+			if tt.enable {
+				p = newHeaderProtectedPlugin(t)
 			}
-		}
-	})
 
-	t.Run("token validation still required with header protection", func(t *testing.T) {
-		p := New(CSRFPluginConfig{
-			EnableHeaderProtection: true,
-			CookieName:             "authula_csrf_token",
-			HeaderName:             "X-AUTHULA-CSRF-TOKEN",
+			req := httptest.NewRequest(tt.method, tt.target, nil)
+			for key, value := range tt.headers {
+				req.Header.Set(key, value)
+			}
+
+			err := p.validateHeaderProtection(req)
+			if !tt.wantReject {
+				require.NoError(t, err)
+				return
+			}
+
+			require.Error(t, err)
+			logger, ok := p.logger.(*MockLogger)
+			require.True(t, ok)
+			assert.Contains(t, logger.debugMessages, "header-based csrf check failed")
 		})
+	}
+}
 
-		req := httptest.NewRequest("POST", "http://localhost/api/test", nil)
-		w := httptest.NewRecorder()
-		ctx := &models.RequestContext{
-			Request:        req,
-			ResponseWriter: w,
-			Method:         "POST",
-			Path:           "/api/test",
-			Actor:          &models.Actor{ID: "user123"},
-		}
+func TestCSRFPlugin_ConfigReturnsCurrentConfig(t *testing.T) {
+	p := New(CSRFPluginConfig{Enabled: true, CookieName: "custom_csrf"})
 
-		err := p.validateCSRFToken(ctx)
-		if err != nil {
-			t.Errorf("expected no error return, got: %v", err)
-		}
-		if !ctx.Handled {
-			t.Error("expected ctx.Handled to be true for missing token")
-		}
-	})
+	got, ok := p.Config().(CSRFPluginConfig)
+	require.True(t, ok, "Config() should return a CSRFPluginConfig value")
+
+	assert.True(t, got.Enabled)
+	assert.Equal(t, "custom_csrf", got.CookieName)
+	assert.Equal(t, "X-AUTHULA-CSRF-TOKEN", got.HeaderName)
+	assert.Equal(t, 24*time.Hour, got.MaxAge)
+	assert.Equal(t, "lax", got.SameSite)
+}
+
+func TestCSRFPlugin_Close(t *testing.T) {
+	p := New(CSRFPluginConfig{})
+	initPlugin(t, p)
+
+	assert.NoError(t, p.Close())
+}
+
+func TestCSRFPlugin_Init(t *testing.T) {
+	tests := []struct {
+		name         string
+		config       *models.Config
+		tokenService any
+		wantErr      string
+		check        func(t *testing.T, p *CSRFPlugin)
+	}{
+		{
+			name:         "applies defaults when plugin config is absent",
+			config:       &models.Config{},
+			tokenService: &mockTokenService{},
+			check: func(t *testing.T, p *CSRFPlugin) {
+				assert.Equal(t, "authula_csrf_token", p.pluginConfig.CookieName)
+				assert.Equal(t, "X-AUTHULA-CSRF-TOKEN", p.pluginConfig.HeaderName)
+				assert.Equal(t, 24*time.Hour, p.pluginConfig.MaxAge)
+				assert.Equal(t, "lax", p.pluginConfig.SameSite)
+				assert.NotNil(t, p.tokenService)
+			},
+		},
+		{
+			name: "loads values from the plugins map",
+			config: &models.Config{Plugins: models.PluginsConfig{
+				models.PluginCSRF.String(): map[string]any{
+					"enabled":     true,
+					"cookie_name": "custom_csrf",
+					"header_name": "X-Custom-CSRF",
+					"same_site":   "strict",
+					"max_age":     "90m",
+				},
+			}},
+			tokenService: &mockTokenService{},
+			check: func(t *testing.T, p *CSRFPlugin) {
+				assert.True(t, p.pluginConfig.Enabled)
+				assert.Equal(t, "custom_csrf", p.pluginConfig.CookieName)
+				assert.Equal(t, "X-Custom-CSRF", p.pluginConfig.HeaderName)
+				assert.Equal(t, "strict", p.pluginConfig.SameSite)
+				assert.Equal(t, 90*time.Minute, p.pluginConfig.MaxAge)
+			},
+		},
+		{
+			name: "pre-parsed config takes precedence over the plugins map",
+			config: &models.Config{
+				Plugins: models.PluginsConfig{
+					models.PluginCSRF.String(): map[string]any{"cookie_name": "from_map"},
+				},
+				PreParsedConfigs: map[string]any{
+					models.PluginCSRF.String(): CSRFPluginConfig{CookieName: "from_preparsed"},
+				},
+			},
+			tokenService: &mockTokenService{},
+			check: func(t *testing.T, p *CSRFPlugin) {
+				assert.Equal(t, "from_preparsed", p.pluginConfig.CookieName)
+			},
+		},
+		{
+			name: "returns an error for invalid plugin config",
+			config: &models.Config{Plugins: models.PluginsConfig{
+				models.PluginCSRF.String(): map[string]any{"max_age": "not-a-duration"},
+			}},
+			tokenService: &mockTokenService{},
+			wantErr:      "max_age",
+		},
+		{
+			name: "enables header protection with trusted origins",
+			config: &models.Config{
+				Plugins: models.PluginsConfig{
+					models.PluginCSRF.String(): map[string]any{"enable_header_protection": true},
+				},
+				Security: models.SecurityConfig{TrustedOrigins: []string{"https://app.example.com"}},
+			},
+			tokenService: &mockTokenService{},
+			check: func(t *testing.T, p *CSRFPlugin) {
+				assert.True(t, p.pluginConfig.EnableHeaderProtection)
+				assert.NotNil(t, p.cop)
+			},
+		},
+		{
+			name: "rejects trusted origins without a scheme",
+			config: &models.Config{
+				Plugins: models.PluginsConfig{
+					models.PluginCSRF.String(): map[string]any{"enable_header_protection": true},
+				},
+				Security: models.SecurityConfig{TrustedOrigins: []string{"app.example.com"}},
+			},
+			tokenService: &mockTokenService{},
+			wantErr:      "must include scheme",
+		},
+		{
+			name: "rejects trusted origins with a path",
+			config: &models.Config{
+				Plugins: models.PluginsConfig{
+					models.PluginCSRF.String(): map[string]any{"enable_header_protection": true},
+				},
+				Security: models.SecurityConfig{TrustedOrigins: []string{"https://app.example.com/callback"}},
+			},
+			tokenService: &mockTokenService{},
+			wantErr:      "path",
+		},
+		{
+			name:    "returns an error when the token service is missing",
+			config:  &models.Config{},
+			wantErr: "token service not available",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := New(CSRFPluginConfig{})
+
+			err := initPluginWithServices(t, p, tt.config, tt.tokenService)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			tt.check(t, p)
+		})
+	}
+}
+
+func TestCSRFPlugin_SignedOutMatcher(t *testing.T) {
+	p := New(CSRFPluginConfig{})
+	matcher := p.Hooks()[2].Matcher
+	require.NotNil(t, matcher)
+
+	tests := []struct {
+		name   string
+		values map[string]any
+		want   bool
+	}{
+		{name: "nil values", values: nil, want: false},
+		{name: "signed out flag set to true", values: map[string]any{models.ContextAuthSignOut.String(): true}, want: true},
+		{name: "signed out flag set to false", values: map[string]any{models.ContextAuthSignOut.String(): false}, want: false},
+		{name: "signed in request without the flag", values: map[string]any{models.ContextAuthSuccess.String(): true}, want: false},
+		{name: "non-boolean flag value", values: map[string]any{models.ContextAuthSignOut.String(): "true"}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := &models.RequestContext{Values: tt.values}
+			assert.Equal(t, tt.want, matcher(ctx))
+		})
+	}
+}
+
+func TestCSRFPlugin_GenerateCSRFTokenHook(t *testing.T) {
+	tests := []struct {
+		name         string
+		method       string
+		tokenService any
+		wantStatus   int
+		wantHandled  bool
+		wantCookie   bool
+		wantMessage  string
+	}{
+		{
+			name:         "unsafe method is ignored",
+			method:       http.MethodPost,
+			tokenService: &mockTokenService{},
+		},
+		{
+			name:         "token generation failure returns 500",
+			method:       http.MethodGet,
+			tokenService: &failingTokenService{err: errors.New("generate failed")},
+			wantStatus:   http.StatusInternalServerError,
+			wantHandled:  true,
+			wantMessage:  "failed to generate csrf token",
+		},
+		{
+			name:         "HEAD generates a token",
+			method:       http.MethodHead,
+			tokenService: &mockTokenService{},
+			wantCookie:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := New(CSRFPluginConfig{})
+			require.NoError(t, initPluginWithServices(t, p, &models.Config{}, tt.tokenService))
+
+			genHook := p.Hooks()[0]
+			reqCtx := internaltests.NewRequestContext(t, tt.method, "/auth/me", nil)
+
+			require.NoError(t, genHook.Handler(reqCtx))
+
+			assert.Equal(t, tt.wantHandled, reqCtx.Handled)
+			assert.Equal(t, tt.wantCookie, len(reqCtx.ResponseWriter.(*httptest.ResponseRecorder).Result().Cookies()) > 0)
+
+			if tt.wantMessage != "" {
+				internaltests.AssertErrorMessage(t, reqCtx, tt.wantStatus, tt.wantMessage)
+			}
+		})
+	}
+}
+
+func TestCSRFPlugin_ValidateCSRFTokenHook(t *testing.T) {
+	tests := []struct {
+		name        string
+		method      string
+		headers     map[string]string
+		cookieValue string
+		headerValue string
+		wantMessage string
+	}{
+		{
+			name:   "safe method bypasses token validation",
+			method: http.MethodGet,
+		},
+		{
+			name:        "header protection rejects cross-site request",
+			method:      http.MethodPost,
+			headers:     map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example.com"},
+			wantMessage: "csrf validation failed",
+		},
+		{
+			name:        "missing cookie is rejected",
+			method:      http.MethodPost,
+			wantMessage: "missing csrf cookie",
+		},
+		{
+			name:        "missing header is rejected",
+			method:      http.MethodPost,
+			cookieValue: "cookie_token",
+			wantMessage: "missing csrf token in header",
+		},
+		{
+			name:        "mismatched tokens are rejected",
+			method:      http.MethodPost,
+			cookieValue: "cookie_token",
+			headerValue: "header_token",
+			wantMessage: "invalid csrf token",
+		},
+		{
+			name:        "matching tokens are allowed",
+			method:      http.MethodPost,
+			cookieValue: "shared_token",
+			headerValue: "shared_token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newHeaderProtectedPlugin(t)
+			hook := p.Hooks()[1]
+
+			reqCtx := internaltests.NewRequestContext(t, tt.method, "/auth/sign-in", tt.headers)
+			if tt.cookieValue != "" {
+				reqCtx.Request.AddCookie(&http.Cookie{Name: "authula_csrf_token", Value: tt.cookieValue})
+			}
+			if tt.headerValue != "" {
+				reqCtx.Request.Header.Set("X-AUTHULA-CSRF-TOKEN", tt.headerValue)
+			}
+
+			require.NoError(t, hook.Handler(reqCtx))
+
+			if tt.wantMessage != "" {
+				internaltests.AssertErrorMessage(t, reqCtx, http.StatusForbidden, tt.wantMessage)
+				return
+			}
+
+			assert.False(t, reqCtx.Handled)
+			assert.Equal(t, 0, reqCtx.ResponseStatus)
+		})
+	}
+}
+
+func TestCSRFPlugin_ValidateCSRFTokenMissingHeader(t *testing.T) {
+	p := New(CSRFPluginConfig{})
+	initPlugin(t, p)
+
+	reqCtx := internaltests.NewRequestContext(t, http.MethodPost, "/api/protected", nil)
+	reqCtx.Request.AddCookie(&http.Cookie{Name: "authula_csrf_token", Value: "cookie_token"})
+
+	require.NoError(t, p.validateCSRFToken(reqCtx))
+	internaltests.AssertErrorMessage(t, reqCtx, http.StatusForbidden, "missing csrf token in header")
+}
+
+func TestCSRFPlugin_MiddlewareEdgeCases(t *testing.T) {
+	tests := []struct {
+		name         string
+		method       string
+		tokenService any
+		actorID      string
+		cookieValue  string
+		wantStatus   int
+		wantHandler  bool
+		wantMessage  string
+	}{
+		{
+			name:         "authenticated POST with cookie but no header",
+			method:       http.MethodPost,
+			tokenService: &mockTokenService{},
+			actorID:      "user-1",
+			cookieValue:  "cookie_token",
+			wantStatus:   http.StatusForbidden,
+			wantMessage:  "missing csrf token in header",
+		},
+		{
+			name:         "request context without an actor passes through",
+			method:       http.MethodPost,
+			tokenService: &mockTokenService{},
+			wantStatus:   http.StatusOK,
+			wantHandler:  true,
+		},
+		{
+			name:         "token generation failure returns 500",
+			method:       http.MethodGet,
+			tokenService: &failingTokenService{err: errors.New("generate failed")},
+			actorID:      "user-1",
+			wantStatus:   http.StatusInternalServerError,
+			wantMessage:  "failed to generate csrf token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := New(CSRFPluginConfig{})
+			require.NoError(t, initPluginWithServices(t, p, &models.Config{}, tt.tokenService))
+
+			req := httptest.NewRequest(tt.method, "/api/custom", nil)
+			if tt.cookieValue != "" {
+				req.AddCookie(&http.Cookie{Name: "authula_csrf_token", Value: tt.cookieValue})
+			}
+			w := httptest.NewRecorder()
+
+			reqCtx := &models.RequestContext{
+				Request:         req,
+				ResponseWriter:  w,
+				Headers:         req.Header,
+				Values:          make(map[string]any),
+				ResponseHeaders: make(http.Header),
+			}
+			if tt.actorID != "" {
+				reqCtx.Actor = &models.Actor{ID: tt.actorID, Type: models.ActorUser}
+			}
+			req = req.WithContext(models.NewContextWithRequestContext(req.Context(), reqCtx))
+
+			handlerCalled := false
+			next := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				handlerCalled = true
+				rw.WriteHeader(http.StatusOK)
+			})
+
+			p.Middleware()(next).ServeHTTP(w, req)
+
+			if reqCtx.ResponseReady {
+				if reqCtx.ResponseStatus != 0 {
+					w.WriteHeader(reqCtx.ResponseStatus)
+				}
+				if len(reqCtx.ResponseBody) > 0 {
+					_, _ = w.Write(reqCtx.ResponseBody)
+				}
+			}
+
+			assert.Equal(t, tt.wantHandler, handlerCalled)
+			assert.Equal(t, tt.wantStatus, w.Code)
+
+			if tt.wantMessage != "" {
+				payload := internaltests.DecodeResponseJSON[struct {
+					Message string `json:"message"`
+				}](t, reqCtx)
+				assert.Equal(t, tt.wantMessage, payload.Message)
+			}
+		})
+	}
 }
