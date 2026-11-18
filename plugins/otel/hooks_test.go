@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
@@ -528,4 +530,214 @@ func collectMetric(t *testing.T, reader sdkmetric.Reader) (metricdata.Metrics, b
 	}
 
 	return metricdata.Metrics{}, false
+}
+
+// statusResponseWriter exposes the status code through models.ResponseStatusProvider.
+type statusResponseWriter struct {
+	header http.Header
+	status int
+}
+
+func (w *statusResponseWriter) Header() http.Header {
+	if w.header == nil {
+		w.header = http.Header{}
+	}
+	return w.header
+}
+
+func (w *statusResponseWriter) Write(body []byte) (int, error) { return len(body), nil }
+func (w *statusResponseWriter) WriteHeader(status int)         { w.status = status }
+func (w *statusResponseWriter) StatusCode() int                { return w.status }
+
+func TestResolveStatus(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name           string
+		responseStatus int
+		writer         http.ResponseWriter
+		want           int
+	}{
+		{
+			name:           "explicit response status wins",
+			responseStatus: http.StatusTeapot,
+			writer:         &statusResponseWriter{status: http.StatusOK},
+			want:           http.StatusTeapot,
+		},
+		{
+			name:   "response writer status is used",
+			writer: &statusResponseWriter{status: http.StatusTooManyRequests},
+			want:   http.StatusTooManyRequests,
+		},
+		{
+			name:   "zero writer status falls back to 200",
+			writer: &statusResponseWriter{},
+			want:   http.StatusOK,
+		},
+		{
+			name:   "writer without status provider falls back to 200",
+			writer: httptest.NewRecorder(),
+			want:   http.StatusOK,
+		},
+		{
+			name: "nil writer falls back to 200",
+			want: http.StatusOK,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			reqCtx := &models.RequestContext{
+				ResponseStatus: tc.responseStatus,
+				ResponseWriter: tc.writer,
+			}
+
+			assert.Equal(t, tc.want, resolveStatus(reqCtx))
+		})
+	}
+}
+
+func TestRequestContext(t *testing.T) {
+	t.Parallel()
+
+	type contextKey string
+
+	t.Run("uses the request context when present", func(t *testing.T) {
+		t.Parallel()
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req = req.WithContext(context.WithValue(req.Context(), contextKey("marker"), "present"))
+		reqCtx := &models.RequestContext{Request: req}
+
+		assert.Equal(t, "present", requestContext(reqCtx).Value(contextKey("marker")))
+	})
+
+	t.Run("falls back to background when request is nil", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := requestContext(&models.RequestContext{})
+
+		require.NotNil(t, ctx)
+		assert.Nil(t, ctx.Value(contextKey("marker")))
+		assert.Nil(t, ctx.Done())
+	})
+}
+
+func TestRequestMethodAttr(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		method string
+		want   string
+	}{
+		{method: http.MethodConnect, want: "CONNECT"},
+		{method: http.MethodHead, want: "HEAD"},
+		{method: http.MethodOptions, want: "OPTIONS"},
+		{method: http.MethodGet, want: "GET"},
+		{method: http.MethodPost, want: "POST"},
+		{method: http.MethodPut, want: "PUT"},
+		{method: http.MethodPatch, want: "PATCH"},
+		{method: http.MethodDelete, want: "DELETE"},
+		{method: http.MethodTrace, want: "TRACE"},
+		{method: "BREW", want: "_OTHER"},
+		{method: "", want: "_OTHER"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.method, func(t *testing.T) {
+			t.Parallel()
+
+			attr := requestMethodAttr(tc.method)
+
+			assert.Equal(t, attribute.Key("http.request.method"), attr.Key)
+			assert.Equal(t, tc.want, attr.Value.AsString())
+		})
+	}
+}
+
+func TestRoutePattern(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		route *models.Route
+		want  string
+	}{
+		{name: "nil route", route: nil, want: ""},
+		{name: "empty pattern", route: &models.Route{Pattern: ""}, want: ""},
+		{name: "method prefix stripped", route: &models.Route{Pattern: "GET:/api/auth/me"}, want: "/api/auth/me"},
+		{name: "plain pattern kept", route: &models.Route{Pattern: "/api/auth/me"}, want: "/api/auth/me"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			reqCtx := &models.RequestContext{Route: tc.route}
+
+			assert.Equal(t, tc.want, routePattern(reqCtx))
+		})
+	}
+}
+
+func TestFinalizeDropsInvalidSpanState(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		value any
+	}{
+		{name: "wrong value type", value: "not-a-span-state"},
+		{name: "typed nil state", value: (*spanState)(nil)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := &OTelPlugin{}
+			reqCtx := &models.RequestContext{
+				Values: map[string]any{spanStateKey: tc.value},
+			}
+
+			plugin.finalize(reqCtx)
+
+			_, exists := reqCtx.Values[spanStateKey]
+			assert.False(t, exists)
+		})
+	}
+}
+
+func TestOnRequestWithoutRequest(t *testing.T) {
+	t.Parallel()
+
+	plugin := &OTelPlugin{}
+	reqCtx := &models.RequestContext{Method: http.MethodGet}
+
+	require.NoError(t, plugin.onRequest()(reqCtx))
+
+	state, ok := reqCtx.Values[spanStateKey].(*spanState)
+	require.True(t, ok)
+	require.NotNil(t, state)
+	assert.Nil(t, state.span)
+	assert.False(t, state.start.IsZero())
+}
+
+func TestHelpersWithoutRequest(t *testing.T) {
+	t.Parallel()
+
+	reqCtx := &models.RequestContext{ClientIP: "203.0.113.9"}
+
+	scheme, client := resolveSchemeAndClient(reqCtx, true)
+	assert.Equal(t, "http", scheme)
+	assert.Equal(t, "203.0.113.9", client)
+
+	host, port := resolveServer(reqCtx, "https", true)
+	assert.Empty(t, host)
+	assert.Zero(t, port)
+
+	assert.Empty(t, protocolVersion(reqCtx))
+	assert.NotNil(t, requestContext(reqCtx))
 }
