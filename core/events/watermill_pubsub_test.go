@@ -16,6 +16,8 @@ import (
 )
 
 func TestWatermillPubSub_Subscribe_ReturnsSubscriberErrorUnchanged(t *testing.T) {
+	t.Parallel()
+
 	errBrokerDown := errors.New("broker down")
 
 	testCases := []struct {
@@ -34,6 +36,8 @@ func TestWatermillPubSub_Subscribe_ReturnsSubscriberErrorUnchanged(t *testing.T)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			subscriber := new(eventstests.MockWatermillSubscriber)
 			subscriber.On("Subscribe", mock.Anything, "orders").Return(nil, tc.subscriberErr).Once()
 			pubsub := NewWatermillPubSub(new(eventstests.MockWatermillPublisher), subscriber)
@@ -48,6 +52,8 @@ func TestWatermillPubSub_Subscribe_ReturnsSubscriberErrorUnchanged(t *testing.T)
 }
 
 func TestWatermillPubSub_Subscribe_ForwardsAndAcksMessage(t *testing.T) {
+	t.Parallel()
+
 	synctest.Test(t, func(t *testing.T) {
 		watermillMsg := message.NewMessage("msg-1", []byte("payload"))
 		watermillMsg.Metadata.Set("key", "value")
@@ -81,6 +87,8 @@ func TestWatermillPubSub_Subscribe_ForwardsAndAcksMessage(t *testing.T) {
 }
 
 func TestWatermillPubSub_Subscribe_NacksPendingMessageWhenContextCancelled(t *testing.T) {
+	t.Parallel()
+
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		watermillMsg := message.NewMessage("msg-2", []byte("pending"))
@@ -118,6 +126,8 @@ func TestWatermillPubSub_Subscribe_NacksPendingMessageWhenContextCancelled(t *te
 }
 
 func TestWatermillPubSub_Close(t *testing.T) {
+	t.Parallel()
+
 	errPublisherClose := errors.New("publisher close failed")
 	errSubscriberClose := errors.New("subscriber close failed")
 
@@ -169,6 +179,8 @@ func TestWatermillPubSub_Close(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			var publisher message.Publisher
 			publisherMock := new(eventstests.MockWatermillPublisher)
 			if !tc.publisherNil {

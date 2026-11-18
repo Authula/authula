@@ -11,6 +11,9 @@ import (
 	"github.com/Authula/authula/models"
 )
 
+// These tests use t.Setenv, which cannot be combined with t.Parallel because
+// environment variables are process-global.
+//
 // unreachableBrokerAddr has no listener, so dials are refused immediately and no broker is needed.
 const unreachableBrokerAddr = "127.0.0.1:1"
 
