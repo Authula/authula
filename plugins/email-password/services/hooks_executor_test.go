@@ -353,3 +353,224 @@ func TestServiceHookExecutor_BothRegistriesAccessibleInHook(t *testing.T) {
 		t.Fatalf("expected 'mock-user-service', got %v", receivedService)
 	}
 }
+
+func TestServiceHookExecutor_AfterHookErrorsAreLoggedAndNotReturned(t *testing.T) {
+	t.Parallel()
+
+	hookErr := errors.New("hook error")
+	user := &models.User{ID: "user-1", Email: "test@example.com"}
+
+	tests := []struct {
+		name    string
+		hooks   *types.EmailPasswordServiceHooksConfig
+		call    func(executor *ServiceHookExecutor) error
+		wantLog string
+	}{
+		{
+			name: "after sign in hook error",
+			hooks: &types.EmailPasswordServiceHooksConfig{
+				SignIn: &types.SignInServiceHooksConfig{
+					AfterSignIn: func(ctx context.Context, result *types.SignInResult) error {
+						return hookErr
+					},
+				},
+			},
+			call: func(executor *ServiceHookExecutor) error {
+				return executor.AfterSignIn(context.Background(), &types.SignInResult{User: user})
+			},
+			wantLog: "after sign in hook failed",
+		},
+		{
+			name: "after verify email hook error",
+			hooks: &types.EmailPasswordServiceHooksConfig{
+				EmailVerification: &types.EmailVerificationServiceHooksConfig{
+					AfterVerifyEmail: func(ctx context.Context, user *models.User, verificationType models.VerificationType) error {
+						return hookErr
+					},
+				},
+			},
+			call: func(executor *ServiceHookExecutor) error {
+				return executor.AfterVerifyEmail(context.Background(), user, models.TypeEmailVerification)
+			},
+			wantLog: "after verify email hook failed",
+		},
+		{
+			name: "after change password hook error",
+			hooks: &types.EmailPasswordServiceHooksConfig{
+				PasswordChange: &types.PasswordChangeServiceHooksConfig{
+					AfterChangePassword: func(ctx context.Context, user *models.User) error {
+						return hookErr
+					},
+				},
+			},
+			call: func(executor *ServiceHookExecutor) error {
+				return executor.AfterChangePassword(context.Background(), user)
+			},
+			wantLog: "after change password hook failed",
+		},
+		{
+			name: "after email changed hook error",
+			hooks: &types.EmailPasswordServiceHooksConfig{
+				EmailChange: &types.EmailChangeServiceHooksConfig{
+					AfterEmailChanged: func(ctx context.Context, user *models.User, oldEmail, newEmail string) error {
+						return hookErr
+					},
+				},
+			},
+			call: func(executor *ServiceHookExecutor) error {
+				return executor.AfterEmailChanged(context.Background(), user, "old@test.com", "new@test.com")
+			},
+			wantLog: "after email changed hook failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			logger := &internaltests.RecordingLogger{}
+			executor := NewServiceHookExecutor(tt.hooks, logger, nil, nil)
+
+			// Act
+			err := tt.call(executor)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("expected nil error, got %v", err)
+			}
+			if len(logger.ErrorCalls) != 1 || logger.ErrorCalls[0] != tt.wantLog {
+				t.Fatalf("expected error log %q, got %v", tt.wantLog, logger.ErrorCalls)
+			}
+		})
+	}
+}
+
+func TestServiceHookExecutor_AfterChangePasswordHook(t *testing.T) {
+	t.Parallel()
+
+	var called bool
+	logger := &internaltests.RecordingLogger{}
+	executor := NewServiceHookExecutor(&types.EmailPasswordServiceHooksConfig{
+		PasswordChange: &types.PasswordChangeServiceHooksConfig{
+			AfterChangePassword: func(ctx context.Context, user *models.User) error {
+				called = true
+				return nil
+			},
+		},
+	}, logger, nil, nil)
+
+	err := executor.AfterChangePassword(context.Background(), &models.User{ID: "user-1"})
+
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !called {
+		t.Fatal("expected AfterChangePassword hook to be called")
+	}
+	if len(logger.ErrorCalls) != 0 {
+		t.Fatalf("expected no error logs, got %v", logger.ErrorCalls)
+	}
+}
+
+func TestServiceHookExecutor_BeforeRequestPasswordResetHook(t *testing.T) {
+	t.Parallel()
+
+	someErr := errors.New("some error")
+
+	tests := []struct {
+		name    string
+		hookErr error
+		wantErr error
+	}{
+		{
+			name:    "returns nil when hook succeeds",
+			hookErr: nil,
+			wantErr: nil,
+		},
+		{
+			name:    "returns hook error",
+			hookErr: someErr,
+			wantErr: someErr,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			var called bool
+			executor := NewServiceHookExecutor(&types.EmailPasswordServiceHooksConfig{
+				PasswordReset: &types.PasswordResetServiceHooksConfig{
+					BeforeRequestPasswordReset: func(ctx context.Context, user *models.User) error {
+						called = true
+						return tt.hookErr
+					},
+				},
+			}, nil, nil, nil)
+
+			// Act
+			err := executor.BeforeRequestPasswordReset(context.Background(), &models.User{ID: "user-1"})
+
+			// Assert
+			if !called {
+				t.Fatal("expected BeforeRequestPasswordReset hook to be called")
+			}
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("expected error %v, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestServiceHookExecutor_BeforeRequestEmailChangeHook(t *testing.T) {
+	t.Parallel()
+
+	someErr := errors.New("some error")
+
+	tests := []struct {
+		name    string
+		hookErr error
+		wantErr error
+	}{
+		{
+			name:    "returns nil when hook succeeds",
+			hookErr: nil,
+			wantErr: nil,
+		},
+		{
+			name:    "returns hook error",
+			hookErr: someErr,
+			wantErr: someErr,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			var called bool
+			executor := NewServiceHookExecutor(&types.EmailPasswordServiceHooksConfig{
+				EmailChange: &types.EmailChangeServiceHooksConfig{
+					BeforeRequestEmailChange: func(ctx context.Context, user *models.User) error {
+						called = true
+						return tt.hookErr
+					},
+				},
+			}, nil, nil, nil)
+
+			// Act
+			err := executor.BeforeRequestEmailChange(context.Background(), &models.User{ID: "user-1"})
+
+			// Assert
+			if !called {
+				t.Fatal("expected BeforeRequestEmailChange hook to be called")
+			}
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("expected error %v, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
