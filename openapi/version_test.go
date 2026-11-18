@@ -81,3 +81,34 @@ func TestOpenAPIVersion(t *testing.T) {
 		assert.Contains(t, schemas, "HealthResponse", "short names should work with 3.1")
 	})
 }
+
+func TestNewOpenAPIService_RejectsUnsupportedVersion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		version string
+	}{
+		{
+			name:    "rejects 3.2.0",
+			version: "3.2.0",
+		},
+		{
+			name:    "rejects Swagger 2.0",
+			version: "2.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Act
+			svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "", openapi.WithOpenAPIVersion(tt.version))
+
+			// Assert
+			assert.Nil(t, svc)
+			assert.EqualError(t, err, "unsupported OpenAPI version: "+tt.version)
+		})
+	}
+}

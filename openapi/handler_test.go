@@ -2,6 +2,7 @@ package openapi_test
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Authula/authula/openapi"
+	openapitests "github.com/Authula/authula/openapi/tests"
 )
 
 func TestNewOpenAPISpecHandler(t *testing.T) {
@@ -75,4 +77,52 @@ func TestNewOpenAPISpecYAMLHandler(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "text/vnd.yaml", rec.Header().Get("Content-Type"))
 	assert.Contains(t, rec.Body.String(), "openapi: ")
+}
+
+func TestSpecHandlers_ReturnInternalServerErrorWhenMarshalFails(t *testing.T) {
+	t.Parallel()
+
+	errMarshal := errors.New("marshal failed")
+
+	tests := []struct {
+		name       string
+		newHandler func(openapi.OpenAPIService) http.HandlerFunc
+		setup      func(*openapitests.MockOpenAPIService)
+	}{
+		{
+			name:       "JSON handler returns 500 when SpecJSON fails",
+			newHandler: openapi.NewOpenAPISpecHandler,
+			setup: func(m *openapitests.MockOpenAPIService) {
+				m.On("SpecJSON").Return([]byte(nil), errMarshal).Once()
+			},
+		},
+		{
+			name:       "YAML handler returns 500 when SpecYAML fails",
+			newHandler: openapi.NewOpenAPISpecYAMLHandler,
+			setup: func(m *openapitests.MockOpenAPIService) {
+				m.On("SpecYAML").Return([]byte(nil), errMarshal).Once()
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			svc := new(openapitests.MockOpenAPIService)
+			tt.setup(svc)
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/openapi", nil)
+			rec := httptest.NewRecorder()
+
+			// Act
+			tt.newHandler(svc)(rec, req)
+
+			// Assert
+			assert.Equal(t, http.StatusInternalServerError, rec.Code)
+			assert.Contains(t, rec.Body.String(), "Failed to marshal OpenAPI spec: marshal failed")
+			assert.Contains(t, rec.Header().Get("Content-Type"), "text/plain")
+			svc.AssertExpectations(t)
+		})
+	}
 }

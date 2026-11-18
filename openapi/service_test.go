@@ -246,6 +246,65 @@ func TestOpenAPIService_AddOperation(t *testing.T) {
 	}
 }
 
+func TestOpenAPIService_AddOperation_ReturnsError(t *testing.T) {
+	type getTodoRequest struct {
+		ID string `path:"id"`
+	}
+
+	tests := []struct {
+		name    string
+		method  string
+		path    string
+		opts    []openapi.OperationOption
+		setup   func(t *testing.T, svc openapi.OpenAPIService)
+		wantErr string
+	}{
+		{
+			name:    "rejects unsupported HTTP method",
+			method:  "FOO",
+			path:    "/api/health",
+			wantErr: "create operation context",
+		},
+		{
+			name:   "rejects duplicate operation for the same method and path",
+			method: http.MethodGet,
+			path:   "/api/health",
+			setup: func(t *testing.T, svc openapi.OpenAPIService) {
+				require.NoError(t, svc.AddOperation(http.MethodGet, "/api/health"))
+			},
+			wantErr: "create operation context",
+		},
+		{
+			name:    "rejects path placeholder without a matching parameter",
+			method:  http.MethodGet,
+			path:    "/api/todos/{id}",
+			opts:    []openapi.OperationOption{openapi.WithRequest(&struct{}{})},
+			wantErr: "add operation",
+		},
+		{
+			name:    "rejects path parameter without a matching placeholder",
+			method:  http.MethodGet,
+			path:    "/api/todos",
+			opts:    []openapi.OperationOption{openapi.WithRequest(&getTodoRequest{})},
+			wantErr: "add operation",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, err := openapi.NewOpenAPIService("Test API", "1.0.0", "")
+			require.NoError(t, err)
+			if tt.setup != nil {
+				tt.setup(t, svc)
+			}
+
+			err = svc.AddOperation(tt.method, tt.path, tt.opts...)
+
+			assert.ErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
 func TestOpenAPIService_SpecYAML(t *testing.T) {
 	tests := []struct {
 		name   string
