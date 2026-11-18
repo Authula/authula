@@ -234,3 +234,54 @@ func TestOTelPluginConfigActive(t *testing.T) {
 		})
 	}
 }
+
+func TestOTelPluginConfigRuntimeOn(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		value  *bool
+		expect bool
+	}{
+		{name: "unset defaults to on", value: nil, expect: true},
+		{name: "explicit true is on", value: new(true), expect: true},
+		{name: "explicit false is off", value: new(false), expect: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			config := types.OTelPluginConfig{RuntimeMetrics: tc.value}
+			if got := config.RuntimeOn(); got != tc.expect {
+				t.Fatalf("RuntimeOn() = %v, want %v", got, tc.expect)
+			}
+		})
+	}
+}
+
+func TestOTelPluginConfigLogsActive(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		config types.OTelPluginConfig
+		expect bool
+	}{
+		{name: "logs enabled with otlp is active", config: types.OTelPluginConfig{LogsEnabled: true, Exporter: types.ExporterOTLP}, expect: true},
+		{name: "logs enabled with stdout is active", config: types.OTelPluginConfig{LogsEnabled: true, Exporter: types.ExporterStdout}, expect: true},
+		{name: "logs enabled with exporter none is inactive", config: types.OTelPluginConfig{LogsEnabled: true, Exporter: types.ExporterNone}, expect: false},
+		{name: "logs disabled with otlp is inactive", config: types.OTelPluginConfig{LogsEnabled: false, Exporter: types.ExporterOTLP}, expect: false},
+		{name: "logs disabled with exporter none is inactive", config: types.OTelPluginConfig{LogsEnabled: false, Exporter: types.ExporterNone}, expect: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := tc.config.LogsActive(); got != tc.expect {
+				t.Fatalf("LogsActive() = %v, want %v", got, tc.expect)
+			}
+		})
+	}
+}
