@@ -267,6 +267,28 @@ func TestExchangeUseCase(t *testing.T) {
 			},
 		},
 		{
+			name:  "session token generation failure is returned",
+			token: "raw-token",
+			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {
+				h.tokenSvc.On("Hash", "raw-token").Return("hashed-raw-token").Once()
+				h.verificationSvc.On("GetByToken", mock.Anything, "hashed-raw-token").Return(h.verification, nil).Once()
+				h.verificationSvc.On("IsExpired", h.verification).Return(false).Once()
+				h.userSvc.On("GetByID", mock.Anything, h.user.ID).Return(h.user, nil).Once()
+				h.verificationSvc.On("Delete", mock.Anything, h.verification.ID).Return(nil).Once()
+				h.tokenSvc.On("Generate").Return("", errors.New("generation failed")).Once()
+
+				t.Cleanup(func() {
+					h.userSvc.AssertExpectations(t)
+					h.verificationSvc.AssertExpectations(t)
+					h.tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, result *types.MagicLinkExchangeResult, err error) {
+				assert.EqualError(t, err, "generation failed")
+				assert.Nil(t, result)
+			},
+		},
+		{
 			name:  "session creation failure is returned",
 			token: "raw-token",
 			setup: func(t *testing.T, h *exchangeUseCaseTestHarness) {

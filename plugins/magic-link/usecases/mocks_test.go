@@ -1,8 +1,14 @@
 package usecases
 
 import (
+	"sync"
+	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
+	emailconstants "github.com/Authula/authula/core/email/constants"
+	emailtmpl "github.com/Authula/authula/core/email/template"
 	inttests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/magic-link/types"
@@ -84,4 +90,50 @@ func newVerifyTestUseCase() (*VerifyUseCaseImpl, *mockUserService, *mockVerifica
 	}
 
 	return uc, userSvc, verificationSvc, tokenSvc
+}
+
+// newSignInTemplateManager builds a template manager that can render the
+// magic-link sign-in email without loading the plugin's embedded templates.
+func newSignInTemplateManager(t *testing.T) *emailtmpl.Manager {
+	t.Helper()
+
+	mgr := emailtmpl.NewManager()
+	require.NoError(t, mgr.Register(emailtmpl.Definition{
+		Name:    emailconstants.MagicLinkSignInEmailTemplateName,
+		Subject: "Sign in to {{.AppName}}",
+		Text:    "Open this link to sign in: {{.MagicLink}}",
+		HTML:    `<p>Open <a href="{{.MagicLink}}">this link</a> to sign in.</p>`,
+	}))
+
+	return mgr
+}
+
+// errorSignalingLogger reports error messages and signals when the first one
+// arrives, so tests can wait for work performed inside a goroutine.
+type errorSignalingLogger struct {
+	mockLogger
+
+	mu       sync.Mutex
+	messages []string
+	first    sync.Once
+	done     chan struct{}
+}
+
+func newErrorSignalingLogger() *errorSignalingLogger {
+	return &errorSignalingLogger{done: make(chan struct{})}
+}
+
+func (l *errorSignalingLogger) Error(msg string, _ ...any) {
+	l.mu.Lock()
+	l.messages = append(l.messages, msg)
+	l.mu.Unlock()
+
+	l.first.Do(func() { close(l.done) })
+}
+
+func (l *errorSignalingLogger) messagesSnapshot() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return append([]string(nil), l.messages...)
 }
