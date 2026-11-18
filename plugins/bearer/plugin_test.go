@@ -39,110 +39,94 @@ func TestBearerPlugin_Config(t *testing.T) {
 func TestBearerPlugin_Init(t *testing.T) {
 	t.Parallel()
 
-	t.Run("missing_jwt_service", func(t *testing.T) {
-		t.Parallel()
-		reg := &internaltests.MockServiceRegistry{}
-		reg.On("Get", models.ServiceJWT.String()).Return(nil).Once()
-
-		plugin := New(BearerPluginConfig{})
-		err := plugin.Init(&models.PluginContext{
-			Logger:          &internaltests.MockLogger{},
-			ServiceRegistry: reg,
-			GetConfig:       func() *models.Config { return &models.Config{} },
-		})
-		require.Error(t, err)
-		reg.AssertExpectations(t)
-	})
-
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
-		mockSvc := &bearertests.MockJWTService{}
-		reg := &internaltests.MockServiceRegistry{}
-		reg.On("Get", models.ServiceJWT.String()).Return(mockSvc).Once()
-
-		plugin := New(BearerPluginConfig{})
-		err := plugin.Init(&models.PluginContext{
-			Logger:          &internaltests.MockLogger{},
-			ServiceRegistry: reg,
-			GetConfig:       func() *models.Config { return &models.Config{} },
-		})
-		require.NoError(t, err)
-		require.Equal(t, mockSvc, plugin.jwtService)
-		reg.AssertExpectations(t)
-	})
-
-	t.Run("invalid_plugin_config", func(t *testing.T) {
-		t.Parallel()
-		reg := &internaltests.MockServiceRegistry{}
-
-		plugin := New(BearerPluginConfig{})
-		err := plugin.Init(&models.PluginContext{
-			Logger:          &internaltests.MockLogger{},
-			ServiceRegistry: reg,
-			GetConfig: func() *models.Config {
-				return &models.Config{
-					Plugins: models.PluginsConfig{
-						models.PluginBearer.String(): map[string]any{"enabled": "not-a-bool"},
-					},
-				}
+	tests := []struct {
+		name           string
+		config         *models.Config
+		jwtService     any
+		wantJWTLookup  bool
+		wantErr        bool
+		wantEnabled    bool
+		wantHeaderName string
+	}{
+		{
+			name:          "missing_jwt_service",
+			config:        &models.Config{},
+			wantJWTLookup: true,
+			wantErr:       true,
+		},
+		{
+			name:           "success",
+			config:         &models.Config{},
+			jwtService:     &bearertests.MockJWTService{},
+			wantJWTLookup:  true,
+			wantHeaderName: "Authorization",
+		},
+		{
+			name: "invalid_plugin_config",
+			config: &models.Config{
+				Plugins: models.PluginsConfig{
+					models.PluginBearer.String(): map[string]any{"enabled": "not-a-bool"},
+				},
 			},
-		})
-		require.Error(t, err)
-		reg.AssertNotCalled(t, "Get", mock.Anything)
-		reg.AssertExpectations(t)
-	})
-
-	t.Run("preparsed_config_is_applied", func(t *testing.T) {
-		t.Parallel()
-		mockSvc := &bearertests.MockJWTService{}
-		reg := &internaltests.MockServiceRegistry{}
-		reg.On("Get", models.ServiceJWT.String()).Return(mockSvc).Once()
-
-		plugin := New(BearerPluginConfig{})
-		err := plugin.Init(&models.PluginContext{
-			Logger:          &internaltests.MockLogger{},
-			ServiceRegistry: reg,
-			GetConfig: func() *models.Config {
-				return &models.Config{
-					Plugins: models.PluginsConfig{models.PluginBearer.String(): map[string]any{}},
-					PreParsedConfigs: map[string]any{
-						models.PluginBearer.String(): BearerPluginConfig{Enabled: true, HeaderName: "X-Token"},
-					},
-				}
+			wantErr: true,
+		},
+		{
+			name: "preparsed_config_is_applied",
+			config: &models.Config{
+				Plugins: models.PluginsConfig{models.PluginBearer.String(): map[string]any{}},
+				PreParsedConfigs: map[string]any{
+					models.PluginBearer.String(): BearerPluginConfig{Enabled: true, HeaderName: "X-Token"},
+				},
 			},
-		})
-		require.NoError(t, err)
-		require.True(t, plugin.config.Enabled)
-		require.Equal(t, "X-Token", plugin.config.HeaderName)
-		reg.AssertExpectations(t)
-	})
-
-	t.Run("plugin_map_config_is_parsed", func(t *testing.T) {
-		t.Parallel()
-		mockSvc := &bearertests.MockJWTService{}
-		reg := &internaltests.MockServiceRegistry{}
-		reg.On("Get", models.ServiceJWT.String()).Return(mockSvc).Once()
-
-		plugin := New(BearerPluginConfig{})
-		err := plugin.Init(&models.PluginContext{
-			Logger:          &internaltests.MockLogger{},
-			ServiceRegistry: reg,
-			GetConfig: func() *models.Config {
-				return &models.Config{
-					Plugins: models.PluginsConfig{
-						models.PluginBearer.String(): map[string]any{
-							"enabled":     true,
-							"header_name": "X-Auth-Token",
-						},
+			jwtService:     &bearertests.MockJWTService{},
+			wantJWTLookup:  true,
+			wantEnabled:    true,
+			wantHeaderName: "X-Token",
+		},
+		{
+			name: "plugin_map_config_is_parsed",
+			config: &models.Config{
+				Plugins: models.PluginsConfig{
+					models.PluginBearer.String(): map[string]any{
+						"enabled":     true,
+						"header_name": "X-Auth-Token",
 					},
-				}
+				},
 			},
+			jwtService:     &bearertests.MockJWTService{},
+			wantJWTLookup:  true,
+			wantEnabled:    true,
+			wantHeaderName: "X-Auth-Token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			reg := &internaltests.MockServiceRegistry{}
+			if tt.wantJWTLookup {
+				reg.On("Get", models.ServiceJWT.String()).Return(tt.jwtService).Once()
+			}
+
+			plugin := New(BearerPluginConfig{})
+			err := plugin.Init(&models.PluginContext{
+				Logger:          &internaltests.MockLogger{},
+				ServiceRegistry: reg,
+				GetConfig:       func() *models.Config { return tt.config },
+			})
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.jwtService, plugin.jwtService)
+				require.Equal(t, tt.wantEnabled, plugin.config.Enabled)
+				require.Equal(t, tt.wantHeaderName, plugin.config.HeaderName)
+			}
+			reg.AssertExpectations(t)
 		})
-		require.NoError(t, err)
-		require.True(t, plugin.config.Enabled)
-		require.Equal(t, "X-Auth-Token", plugin.config.HeaderName)
-		reg.AssertExpectations(t)
-	})
+	}
 }
 
 func TestBearerPlugin_Close(t *testing.T) {
@@ -155,20 +139,41 @@ func TestBearerPlugin_Close(t *testing.T) {
 func TestBearerPlugin_Hooks(t *testing.T) {
 	t.Parallel()
 
+	tests := []struct {
+		name         string
+		wantStage    models.HookStage
+		wantPluginID string
+		wantOrder    int
+	}{
+		{
+			name:         "required_auth_hook",
+			wantStage:    models.HookBefore,
+			wantPluginID: HookIDBearerAuth.String(),
+			wantOrder:    10,
+		},
+		{
+			name:         "optional_auth_hook",
+			wantStage:    models.HookBefore,
+			wantPluginID: HookIDBearerAuthOptional.String(),
+			wantOrder:    10,
+		},
+	}
+
 	plugin := newTestBearerPlugin(&bearertests.MockJWTService{})
 	hooks := plugin.Hooks()
+	require.Len(t, hooks, len(tests))
 
-	require.Len(t, hooks, 2)
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	require.Equal(t, models.HookBefore, hooks[0].Stage)
-	require.Equal(t, HookIDBearerAuth.String(), hooks[0].PluginID)
-	require.Equal(t, 10, hooks[0].Order)
-	require.NotNil(t, hooks[0].Handler)
-
-	require.Equal(t, models.HookBefore, hooks[1].Stage)
-	require.Equal(t, HookIDBearerAuthOptional.String(), hooks[1].PluginID)
-	require.Equal(t, 10, hooks[1].Order)
-	require.NotNil(t, hooks[1].Handler)
+			hook := hooks[i]
+			require.Equal(t, tt.wantStage, hook.Stage)
+			require.Equal(t, tt.wantPluginID, hook.PluginID)
+			require.Equal(t, tt.wantOrder, hook.Order)
+			require.NotNil(t, hook.Handler)
+		})
+	}
 }
 
 func TestBearerHookID_String(t *testing.T) {
