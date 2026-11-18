@@ -30,6 +30,144 @@ func setupRefreshTokenRepo(t *testing.T) (*bun.DB, *refreshTokenRepositoryImpl) 
 	return db, &refreshTokenRepositoryImpl{db: db}
 }
 
+func newRefreshTokenRecord() *types.RefreshToken {
+	return &types.RefreshToken{
+		ID:        uuid.New().String(),
+		SessionID: uuid.New().String(),
+		TokenHash: uuid.New().String(),
+		ExpiresAt: time.Now().Add(time.Hour),
+	}
+}
+
+func TestNewRefreshTokenRepository(t *testing.T) {
+	t.Parallel()
+
+	db, _ := setupRefreshTokenRepo(t)
+	repo := NewRefreshTokenRepository(db)
+	require.NotNil(t, repo)
+
+	ctx := context.Background()
+	record := newRefreshTokenRecord()
+
+	require.NoError(t, repo.StoreRefreshToken(ctx, record))
+
+	got, err := repo.GetRefreshToken(ctx, record.TokenHash)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Equal(t, record.ID, got.ID)
+}
+
+func TestRefreshTokenRepository_StoreDuplicate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		mutate  func(first, second *types.RefreshToken)
+		wantMsg string
+	}{
+		{
+			name: "rejects a duplicate token hash",
+			mutate: func(first, second *types.RefreshToken) {
+				second.TokenHash = first.TokenHash
+			},
+			wantMsg: "failed to store refresh token",
+		},
+		{
+			name: "rejects a duplicate primary key",
+			mutate: func(first, second *types.RefreshToken) {
+				second.ID = first.ID
+			},
+			wantMsg: "failed to store refresh token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, repo := setupRefreshTokenRepo(t)
+			ctx := context.Background()
+
+			first := newRefreshTokenRecord()
+			require.NoError(t, repo.StoreRefreshToken(ctx, first))
+
+			second := newRefreshTokenRecord()
+			tt.mutate(first, second)
+
+			err := repo.StoreRefreshToken(ctx, second)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantMsg)
+		})
+	}
+}
+
+func TestRefreshTokenRepository_DatabaseErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		call       func(ctx context.Context, repo *refreshTokenRepositoryImpl) error
+		wantErrMsg string
+	}{
+		{
+			name: "StoreRefreshToken wraps the insert failure",
+			call: func(ctx context.Context, repo *refreshTokenRepositoryImpl) error {
+				return repo.StoreRefreshToken(ctx, newRefreshTokenRecord())
+			},
+			wantErrMsg: "failed to store refresh token",
+		},
+		{
+			name: "GetRefreshToken wraps the select failure",
+			call: func(ctx context.Context, repo *refreshTokenRepositoryImpl) error {
+				_, err := repo.GetRefreshToken(ctx, "any-hash")
+				return err
+			},
+			wantErrMsg: "failed to get refresh token",
+		},
+		{
+			name: "RevokeRefreshToken wraps the update failure",
+			call: func(ctx context.Context, repo *refreshTokenRepositoryImpl) error {
+				return repo.RevokeRefreshToken(ctx, "any-hash")
+			},
+			wantErrMsg: "failed to revoke refresh token",
+		},
+		{
+			name: "RevokeAllSessionTokens wraps the update failure",
+			call: func(ctx context.Context, repo *refreshTokenRepositoryImpl) error {
+				return repo.RevokeAllSessionTokens(ctx, "any-session")
+			},
+			wantErrMsg: "failed to revoke session tokens",
+		},
+		{
+			name: "SetLastReuseAttempt wraps the update failure",
+			call: func(ctx context.Context, repo *refreshTokenRepositoryImpl) error {
+				return repo.SetLastReuseAttempt(ctx, "any-hash")
+			},
+			wantErrMsg: "failed to update last reuse attempt",
+		},
+		{
+			name: "CleanupExpiredTokens wraps the delete failure",
+			call: func(ctx context.Context, repo *refreshTokenRepositoryImpl) error {
+				return repo.CleanupExpiredTokens(ctx)
+			},
+			wantErrMsg: "failed to cleanup expired tokens",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			db, repo := setupRefreshTokenRepo(t)
+			require.NoError(t, db.Close())
+
+			err := tt.call(context.Background(), repo)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErrMsg)
+		})
+	}
+}
+
 func TestRefreshTokenRepository_Store(t *testing.T) {
 	t.Parallel()
 
@@ -366,6 +504,110 @@ func TestRefreshTokenRepository_SetLastReuseAttempt(t *testing.T) {
 			require.NotNil(t, got.LastReuseAttempt)
 		})
 	}
+}
+
+func TestRefreshTokenRepository_RotateRefreshTokenErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		replace     *types.RefreshToken
+		blockUpdate bool
+		wantErrMsg  string
+	}{
+		{
+			name:       "rejects a nil replacement record",
+			replace:    nil,
+			wantErrMsg: "new refresh token record is required",
+		},
+		{
+			name:        "rolls back when revoking the old token fails",
+			replace:     newRefreshTokenRecord(),
+			blockUpdate: true,
+			wantErrMsg:  "failed to revoke old refresh token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			db, repo := setupRefreshTokenRepo(t)
+			ctx := context.Background()
+
+			oldToken := newRefreshTokenRecord()
+			require.NoError(t, repo.StoreRefreshToken(ctx, oldToken))
+
+			if tt.blockUpdate {
+				_, err := db.NewRaw(
+					`CREATE TRIGGER block_refresh_token_update BEFORE UPDATE ON refresh_tokens
+					BEGIN SELECT RAISE(ABORT, 'update blocked'); END;`,
+				).Exec(ctx)
+				require.NoError(t, err)
+			}
+
+			rotated, err := repo.RotateRefreshToken(ctx, oldToken.TokenHash, tt.replace)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErrMsg)
+			require.False(t, rotated)
+
+			gotOld, err := repo.GetRefreshToken(ctx, oldToken.TokenHash)
+			require.NoError(t, err)
+			require.NotNil(t, gotOld)
+			require.False(t, gotOld.IsRevoked)
+			require.Nil(t, gotOld.RevokedAt)
+		})
+	}
+}
+
+func TestRefreshTokenRepository_RotateRefreshTokenOnlyOnce(t *testing.T) {
+	t.Parallel()
+
+	_, repo := setupRefreshTokenRepo(t)
+	ctx := context.Background()
+
+	oldToken := newRefreshTokenRecord()
+	require.NoError(t, repo.StoreRefreshToken(ctx, oldToken))
+
+	first := newRefreshTokenRecord()
+	rotated, err := repo.RotateRefreshToken(ctx, oldToken.TokenHash, first)
+	require.NoError(t, err)
+	require.True(t, rotated)
+
+	second := newRefreshTokenRecord()
+	rotated, err = repo.RotateRefreshToken(ctx, oldToken.TokenHash, second)
+	require.NoError(t, err)
+	require.False(t, rotated)
+
+	notStored, err := repo.GetRefreshToken(ctx, second.TokenHash)
+	require.NoError(t, err)
+	require.Nil(t, notStored)
+}
+
+func TestRefreshTokenRepository_SetLastReuseAttemptKeepsFirstValue(t *testing.T) {
+	t.Parallel()
+
+	db, repo := setupRefreshTokenRepo(t)
+	ctx := context.Background()
+
+	record := newRefreshTokenRecord()
+	require.NoError(t, repo.StoreRefreshToken(ctx, record))
+
+	firstAttempt := time.Now().Add(-time.Hour).Truncate(time.Millisecond)
+	_, err := db.NewUpdate().
+		Model((*types.RefreshToken)(nil)).
+		Set("last_reuse_attempt = ?", firstAttempt).
+		Where("token_hash = ?", record.TokenHash).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, repo.SetLastReuseAttempt(ctx, record.TokenHash))
+
+	got, err := repo.GetRefreshToken(ctx, record.TokenHash)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.NotNil(t, got.LastReuseAttempt)
+	require.WithinDuration(t, firstAttempt, *got.LastReuseAttempt, time.Second)
 }
 
 func TestRefreshTokenRepository_CleanupExpiredTokens(t *testing.T) {
