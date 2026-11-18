@@ -393,28 +393,39 @@ func TestTOTPPlugin_InitWiresServices(t *testing.T) {
 func TestTOTPPlugin_Close(t *testing.T) {
 	t.Parallel()
 
-	t.Run("disabled auto cleanup is repeatable", func(t *testing.T) {
-		t.Parallel()
+	cases := []struct {
+		name   string
+		cfg    types.TOTPPluginConfig
+		closes int
+	}{
+		{
+			name:   "disabled auto cleanup is repeatable",
+			cfg:    types.TOTPPluginConfig{},
+			closes: 2,
+		},
+		{
+			// Close blocks until the cleanup goroutine has returned.
+			name: "enabled auto cleanup stops the loop",
+			cfg: types.TOTPPluginConfig{
+				TrustedDevicesAutoCleanup:     true,
+				TrustedDevicesCleanupInterval: time.Hour,
+			},
+			closes: 1,
+		},
+	}
 
-		plugin := New(types.TOTPPluginConfig{})
-		require.NoError(t, plugin.Init(newPluginContext(newStubServices().registry(""), &tests.MockLogger{}, &models.Config{})))
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		require.NoError(t, plugin.Close())
-		require.NoError(t, plugin.Close())
-	})
+			plugin := New(tt.cfg)
+			require.NoError(t, plugin.Init(newPluginContext(newStubServices().registry(""), &tests.MockLogger{}, &models.Config{})))
 
-	t.Run("enabled auto cleanup stops the loop", func(t *testing.T) {
-		t.Parallel()
-
-		plugin := New(types.TOTPPluginConfig{
-			TrustedDevicesAutoCleanup:     true,
-			TrustedDevicesCleanupInterval: time.Hour,
+			for range tt.closes {
+				require.NoError(t, plugin.Close())
+			}
 		})
-		require.NoError(t, plugin.Init(newPluginContext(newStubServices().registry(""), &tests.MockLogger{}, &models.Config{})))
-
-		// Close blocks until the cleanup goroutine has returned.
-		require.NoError(t, plugin.Close())
-	})
+	}
 }
 
 func TestTOTPPlugin_Routes(t *testing.T) {
