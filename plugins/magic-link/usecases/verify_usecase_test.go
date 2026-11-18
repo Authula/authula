@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -179,6 +180,187 @@ func TestVerifyUseCase_Verify(t *testing.T) {
 			assertResult: func(t *testing.T, code string, err error) {
 				assert.NoError(t, err)
 				assert.Equal(t, "new-token-456", code)
+			},
+		},
+		{
+			name:  "verification lookup error returns the error",
+			token: "test-token",
+			setup: func(t *testing.T, uc *VerifyUseCaseImpl, userSvc *mockUserService, verificationSvc *mockVerificationService, tokenSvc *mockTokenService, verification *models.Verification) {
+				tokenSvc.On("Hash", "test-token").Return("hashed-test-token").Once()
+				verificationSvc.On("GetByToken", mock.Anything, "hashed-test-token").Return(nil, errors.New("lookup failed")).Once()
+
+				t.Cleanup(func() {
+					verificationSvc.AssertExpectations(t)
+					tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, code string, err error) {
+				assert.EqualError(t, err, "lookup failed")
+				assert.Empty(t, code)
+			},
+		},
+		{
+			name:  "user lookup error returns the error",
+			token: "test-token",
+			verification: func() *models.Verification {
+				userID := "user-1"
+				return &models.Verification{ID: "verif-1", UserID: &userID, Type: models.TypeMagicLinkSignInRequest}
+			}(),
+			setup: func(t *testing.T, uc *VerifyUseCaseImpl, userSvc *mockUserService, verificationSvc *mockVerificationService, tokenSvc *mockTokenService, verification *models.Verification) {
+				tokenSvc.On("Hash", "test-token").Return("hashed-test-token").Once()
+				verificationSvc.On("GetByToken", mock.Anything, "hashed-test-token").Return(verification, nil).Once()
+				verificationSvc.On("IsExpired", verification).Return(false).Once()
+				userSvc.On("GetByID", mock.Anything, "user-1").Return(nil, errors.New("user lookup failed")).Once()
+
+				t.Cleanup(func() {
+					userSvc.AssertExpectations(t)
+					verificationSvc.AssertExpectations(t)
+					tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, code string, err error) {
+				assert.EqualError(t, err, "user lookup failed")
+				assert.Empty(t, code)
+			},
+		},
+		{
+			name:  "already verified user skips the email verification update",
+			token: "test-token",
+			verification: func() *models.Verification {
+				userID := "user-1"
+				return &models.Verification{ID: "verif-1", UserID: &userID, Type: models.TypeMagicLinkSignInRequest}
+			}(),
+			setup: func(t *testing.T, uc *VerifyUseCaseImpl, userSvc *mockUserService, verificationSvc *mockVerificationService, tokenSvc *mockTokenService, verification *models.Verification) {
+				tokenSvc.On("Hash", "test-token").Return("hashed-test-token").Once()
+				verificationSvc.On("GetByToken", mock.Anything, "hashed-test-token").Return(verification, nil).Once()
+				verificationSvc.On("IsExpired", verification).Return(false).Once()
+				userSvc.On("GetByID", mock.Anything, "user-1").
+					Return(&models.User{ID: "user-1", Email: "test@example.com", EmailVerified: true}, nil).Once()
+				verificationSvc.On("Delete", mock.Anything, "verif-1").Return(nil).Once()
+				tokenSvc.On("Generate").Return("new-exchange-code", nil).Once()
+				tokenSvc.On("Hash", "new-exchange-code").Return("hashed-new-exchange-code").Once()
+				verificationSvc.On("Create", mock.Anything, "user-1", "hashed-new-exchange-code", models.TypeMagicLinkExchangeCode, "test@example.com", uc.PluginConfig.ExpiresIn).
+					Return(&models.Verification{ID: "verif-2"}, nil).Once()
+
+				t.Cleanup(func() {
+					userSvc.AssertExpectations(t)
+					userSvc.AssertNotCalled(t, "UpdateFields", mock.Anything, mock.Anything, mock.Anything)
+					verificationSvc.AssertExpectations(t)
+					tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, code string, err error) {
+				assert.NoError(t, err)
+				assert.Equal(t, "new-exchange-code", code)
+			},
+		},
+		{
+			name:  "email verification update failure returns the error",
+			token: "test-token",
+			verification: func() *models.Verification {
+				userID := "user-1"
+				return &models.Verification{ID: "verif-1", UserID: &userID, Type: models.TypeMagicLinkSignInRequest}
+			}(),
+			setup: func(t *testing.T, uc *VerifyUseCaseImpl, userSvc *mockUserService, verificationSvc *mockVerificationService, tokenSvc *mockTokenService, verification *models.Verification) {
+				tokenSvc.On("Hash", "test-token").Return("hashed-test-token").Once()
+				verificationSvc.On("GetByToken", mock.Anything, "hashed-test-token").Return(verification, nil).Once()
+				verificationSvc.On("IsExpired", verification).Return(false).Once()
+				userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+				userSvc.On("UpdateFields", mock.Anything, "user-1", map[string]any{"email_verified": true}).
+					Return(errors.New("update failed")).Once()
+
+				t.Cleanup(func() {
+					userSvc.AssertExpectations(t)
+					verificationSvc.AssertExpectations(t)
+					tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, code string, err error) {
+				assert.EqualError(t, err, "update failed")
+				assert.Empty(t, code)
+			},
+		},
+		{
+			name:  "verification deletion failure returns the error",
+			token: "test-token",
+			verification: func() *models.Verification {
+				userID := "user-1"
+				return &models.Verification{ID: "verif-1", UserID: &userID, Type: models.TypeMagicLinkSignInRequest}
+			}(),
+			setup: func(t *testing.T, uc *VerifyUseCaseImpl, userSvc *mockUserService, verificationSvc *mockVerificationService, tokenSvc *mockTokenService, verification *models.Verification) {
+				tokenSvc.On("Hash", "test-token").Return("hashed-test-token").Once()
+				verificationSvc.On("GetByToken", mock.Anything, "hashed-test-token").Return(verification, nil).Once()
+				verificationSvc.On("IsExpired", verification).Return(false).Once()
+				userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+				userSvc.On("UpdateFields", mock.Anything, "user-1", map[string]any{"email_verified": true}).Return(nil).Once()
+				verificationSvc.On("Delete", mock.Anything, "verif-1").Return(errors.New("delete failed")).Once()
+
+				t.Cleanup(func() {
+					userSvc.AssertExpectations(t)
+					verificationSvc.AssertExpectations(t)
+					tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, code string, err error) {
+				assert.EqualError(t, err, "delete failed")
+				assert.Empty(t, code)
+			},
+		},
+		{
+			name:  "exchange code generation failure returns the error",
+			token: "test-token",
+			verification: func() *models.Verification {
+				userID := "user-1"
+				return &models.Verification{ID: "verif-1", UserID: &userID, Type: models.TypeMagicLinkSignInRequest}
+			}(),
+			setup: func(t *testing.T, uc *VerifyUseCaseImpl, userSvc *mockUserService, verificationSvc *mockVerificationService, tokenSvc *mockTokenService, verification *models.Verification) {
+				tokenSvc.On("Hash", "test-token").Return("hashed-test-token").Once()
+				verificationSvc.On("GetByToken", mock.Anything, "hashed-test-token").Return(verification, nil).Once()
+				verificationSvc.On("IsExpired", verification).Return(false).Once()
+				userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+				userSvc.On("UpdateFields", mock.Anything, "user-1", map[string]any{"email_verified": true}).Return(nil).Once()
+				verificationSvc.On("Delete", mock.Anything, "verif-1").Return(nil).Once()
+				tokenSvc.On("Generate").Return("", errors.New("generation failed")).Once()
+
+				t.Cleanup(func() {
+					userSvc.AssertExpectations(t)
+					verificationSvc.AssertExpectations(t)
+					tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, code string, err error) {
+				assert.EqualError(t, err, "generation failed")
+				assert.Empty(t, code)
+			},
+		},
+		{
+			name:  "exchange code creation failure returns the error",
+			token: "test-token",
+			verification: func() *models.Verification {
+				userID := "user-1"
+				return &models.Verification{ID: "verif-1", UserID: &userID, Type: models.TypeMagicLinkSignInRequest}
+			}(),
+			setup: func(t *testing.T, uc *VerifyUseCaseImpl, userSvc *mockUserService, verificationSvc *mockVerificationService, tokenSvc *mockTokenService, verification *models.Verification) {
+				tokenSvc.On("Hash", "test-token").Return("hashed-test-token").Once()
+				verificationSvc.On("GetByToken", mock.Anything, "hashed-test-token").Return(verification, nil).Once()
+				verificationSvc.On("IsExpired", verification).Return(false).Once()
+				userSvc.On("GetByID", mock.Anything, "user-1").Return(&models.User{ID: "user-1", Email: "test@example.com"}, nil).Once()
+				userSvc.On("UpdateFields", mock.Anything, "user-1", map[string]any{"email_verified": true}).Return(nil).Once()
+				verificationSvc.On("Delete", mock.Anything, "verif-1").Return(nil).Once()
+				tokenSvc.On("Generate").Return("new-exchange-code", nil).Once()
+				tokenSvc.On("Hash", "new-exchange-code").Return("hashed-new-exchange-code").Once()
+				verificationSvc.On("Create", mock.Anything, "user-1", "hashed-new-exchange-code", models.TypeMagicLinkExchangeCode, "test@example.com", uc.PluginConfig.ExpiresIn).
+					Return(nil, errors.New("creation failed")).Once()
+
+				t.Cleanup(func() {
+					userSvc.AssertExpectations(t)
+					verificationSvc.AssertExpectations(t)
+					tokenSvc.AssertExpectations(t)
+				})
+			},
+			assertResult: func(t *testing.T, code string, err error) {
+				assert.EqualError(t, err, "creation failed")
+				assert.Empty(t, code)
 			},
 		},
 	}
