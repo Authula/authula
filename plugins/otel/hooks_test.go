@@ -144,7 +144,7 @@ func TestFinalizeSpanAttributes(t *testing.T) {
 
 			f := newFixture(t, types.OTelPluginConfig{Enabled: true, TracesEnabled: new(true), MetricsEnabled: new(true)})
 			reqCtx := newRequestContext(http.MethodGet, "/api/auth/me", "GET:/api/auth/me")
-			reqCtx.ClientIP = "203.0.113.7"
+			reqCtx.ClientIP = "127.0.0.1"
 			reqCtx.ResponseStatus = tc.status
 			reqCtx.Actor = tc.actor
 			reqCtx.Request.Header.Set("User-Agent", "authula-test/1.0")
@@ -174,8 +174,8 @@ func TestFinalizeSpanAttributes(t *testing.T) {
 			if v, ok := findAttribute(span, attribute.Key("url.scheme")); !ok || v.AsString() != "http" {
 				t.Errorf("url.scheme = %q (ok=%v), want http", v.AsString(), ok)
 			}
-			if v, ok := findAttribute(span, attribute.Key("client.address")); !ok || v.AsString() != "203.0.113.7" {
-				t.Errorf("client.address = %q (ok=%v), want 203.0.113.7", v.AsString(), ok)
+			if v, ok := findAttribute(span, attribute.Key("client.address")); !ok || v.AsString() != "127.0.0.1" {
+				t.Errorf("client.address = %q (ok=%v), want 127.0.0.1", v.AsString(), ok)
 			}
 			if v, ok := findAttribute(span, attribute.Key("http.response.status_code")); !ok || v.AsInt64() != int64(tc.wantStatusAttr) {
 				t.Errorf("http.response.status_code = %d (ok=%v), want %d", v.AsInt64(), ok, tc.wantStatusAttr)
@@ -281,14 +281,14 @@ func TestResolveSchemeAndClient(t *testing.T) {
 		wantScheme     string
 		wantClient     string
 	}{
-		{name: "plain http", wantScheme: "http", wantClient: "198.51.100.9"},
-		{name: "tls is https", tls: true, wantScheme: "https", wantClient: "198.51.100.9"},
+		{name: "plain http", wantScheme: "http", wantClient: "127.0.0.1"},
+		{name: "tls is https", tls: true, wantScheme: "https", wantClient: "127.0.0.1"},
 		{
 			name:           "spoofed headers ignored without trust",
 			forwardedProto: "https",
 			forwardedFor:   "1.2.3.4",
 			wantScheme:     "http",
-			wantClient:     "198.51.100.9",
+			wantClient:     "127.0.0.1",
 		},
 		{
 			name:           "headers honored with trust",
@@ -305,7 +305,7 @@ func TestResolveSchemeAndClient(t *testing.T) {
 			t.Parallel()
 
 			reqCtx := newRequestContext(http.MethodGet, "/", "")
-			reqCtx.ClientIP = "198.51.100.9"
+			reqCtx.ClientIP = "127.0.0.1"
 			if tc.tls {
 				reqCtx.Request.TLS = &tls.ConnectionState{}
 			}
@@ -373,19 +373,20 @@ func TestProtocolVersion(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
+		name  string
 		proto string
 		want  string
 	}{
-		{proto: "HTTP/1.1", want: "1.1"},
-		{proto: "HTTP/1.0", want: "1.0"},
-		{proto: "HTTP/2.0", want: "2"},
-		{proto: "HTTP/3.0", want: "3"},
-		{proto: "", want: ""},
-		{proto: "garbage", want: ""},
+		{name: "http 1.1", proto: "HTTP/1.1", want: "1.1"},
+		{name: "http 1.0", proto: "HTTP/1.0", want: "1.0"},
+		{name: "http 2.0", proto: "HTTP/2.0", want: "2"},
+		{name: "http 3.0", proto: "HTTP/3.0", want: "3"},
+		{name: "empty proto", proto: "", want: ""},
+		{name: "garbage proto", proto: "garbage", want: ""},
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.proto, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
 			reqCtx := newRequestContext(http.MethodGet, "/", "")
@@ -604,49 +605,64 @@ func TestRequestContext(t *testing.T) {
 
 	type contextKey string
 
-	t.Run("uses the request context when present", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name   string
+		reqCtx *models.RequestContext
+		check  func(t *testing.T, ctx context.Context)
+	}{
+		{
+			name: "uses the request context when present",
+			reqCtx: &models.RequestContext{
+				Request: httptest.NewRequest(http.MethodGet, "/", nil).
+					WithContext(context.WithValue(context.Background(), contextKey("marker"), "present")),
+			},
+			check: func(t *testing.T, ctx context.Context) {
+				assert.Equal(t, "present", ctx.Value(contextKey("marker")))
+			},
+		},
+		{
+			name:   "falls back to background when request is nil",
+			reqCtx: &models.RequestContext{},
+			check: func(t *testing.T, ctx context.Context) {
+				require.NotNil(t, ctx)
+				assert.Nil(t, ctx.Value(contextKey("marker")))
+				assert.Nil(t, ctx.Done())
+			},
+		},
+	}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req = req.WithContext(context.WithValue(req.Context(), contextKey("marker"), "present"))
-		reqCtx := &models.RequestContext{Request: req}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		assert.Equal(t, "present", requestContext(reqCtx).Value(contextKey("marker")))
-	})
-
-	t.Run("falls back to background when request is nil", func(t *testing.T) {
-		t.Parallel()
-
-		ctx := requestContext(&models.RequestContext{})
-
-		require.NotNil(t, ctx)
-		assert.Nil(t, ctx.Value(contextKey("marker")))
-		assert.Nil(t, ctx.Done())
-	})
+			tc.check(t, requestContext(tc.reqCtx))
+		})
+	}
 }
 
 func TestRequestMethodAttr(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
+		name   string
 		method string
 		want   string
 	}{
-		{method: http.MethodConnect, want: "CONNECT"},
-		{method: http.MethodHead, want: "HEAD"},
-		{method: http.MethodOptions, want: "OPTIONS"},
-		{method: http.MethodGet, want: "GET"},
-		{method: http.MethodPost, want: "POST"},
-		{method: http.MethodPut, want: "PUT"},
-		{method: http.MethodPatch, want: "PATCH"},
-		{method: http.MethodDelete, want: "DELETE"},
-		{method: http.MethodTrace, want: "TRACE"},
-		{method: "BREW", want: "_OTHER"},
-		{method: "", want: "_OTHER"},
+		{name: "connect", method: http.MethodConnect, want: "CONNECT"},
+		{name: "head", method: http.MethodHead, want: "HEAD"},
+		{name: "options", method: http.MethodOptions, want: "OPTIONS"},
+		{name: "get", method: http.MethodGet, want: "GET"},
+		{name: "post", method: http.MethodPost, want: "POST"},
+		{name: "put", method: http.MethodPut, want: "PUT"},
+		{name: "patch", method: http.MethodPatch, want: "PATCH"},
+		{name: "delete", method: http.MethodDelete, want: "DELETE"},
+		{name: "trace", method: http.MethodTrace, want: "TRACE"},
+		{name: "unknown method", method: "BREW", want: "_OTHER"},
+		{name: "empty method", method: "", want: "_OTHER"},
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.method, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
 			attr := requestMethodAttr(tc.method)
@@ -728,11 +744,11 @@ func TestOnRequestWithoutRequest(t *testing.T) {
 func TestHelpersWithoutRequest(t *testing.T) {
 	t.Parallel()
 
-	reqCtx := &models.RequestContext{ClientIP: "203.0.113.9"}
+	reqCtx := &models.RequestContext{ClientIP: "127.0.0.1"}
 
 	scheme, client := resolveSchemeAndClient(reqCtx, true)
 	assert.Equal(t, "http", scheme)
-	assert.Equal(t, "203.0.113.9", client)
+	assert.Equal(t, "127.0.0.1", client)
 
 	host, port := resolveServer(reqCtx, "https", true)
 	assert.Empty(t, host)
