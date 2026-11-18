@@ -30,14 +30,11 @@ func TestWithJSONContentType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Arrange
 			unit := new(swaggestopenapi.ContentUnit)
 			unit.ContentType = tt.contentType
 
-			// Act
 			openapi.WithJSONContentType()(unit)
 
-			// Assert
 			assert.Equal(t, "application/json", unit.ContentType)
 		})
 	}

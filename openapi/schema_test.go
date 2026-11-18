@@ -77,16 +77,13 @@ func TestRegisterSchema_NullableProperties(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Arrange
 			svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "",
 				openapi.WithOpenAPIVersion("3.1.0"),
 				openapi.WithShortSchemaNames())
 			require.NoError(t, err)
 
-			// Act
 			err = svc.RegisterSchema("NullableOuter", &nullableOuter{})
 
-			// Assert
 			require.NoError(t, err)
 			schemas := decodeSpecSchemas(t, svc)
 			properties := schemas["NullableOuter"].(map[string]any)["properties"].(map[string]any)
@@ -116,14 +113,11 @@ func TestRegisterSchema_ReturnsErrorForUnsupportedType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Arrange
 			svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "")
 			require.NoError(t, err)
 
-			// Act
 			err = svc.RegisterSchema("Unsupported", tt.typ)
 
-			// Assert
 			assert.ErrorContains(t, err, "reflect schema:")
 			assert.ErrorContains(t, err, "type is not supported")
 		})
@@ -151,16 +145,13 @@ func TestRegisterSchema_CollectsNestedDefinitions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Arrange
 			svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "",
 				openapi.WithOpenAPIVersion(tt.version),
 				openapi.WithShortSchemaNames())
 			require.NoError(t, err)
 
-			// Act
 			err = svc.RegisterSchema("NestedParent", &nestedParent{})
 
-			// Assert
 			require.NoError(t, err)
 			schemas := decodeSpecSchemas(t, svc)
 			assert.Contains(t, schemas, "NestedParent")
@@ -174,14 +165,11 @@ func TestRegisterSchema_CollectsNestedDefinitions(t *testing.T) {
 func TestRegisterSchema_OmitsSchemaWhoseDefaultCannotBeEncodedIn31(t *testing.T) {
 	t.Parallel()
 
-	// Arrange
 	svc, err := openapi.NewOpenAPIService("Test", "1.0.0", "", openapi.WithOpenAPIVersion("3.1.0"))
 	require.NoError(t, err)
 
-	// Act
 	err = svc.RegisterSchema("RatioSchema", &floatWithNaNDefault{})
 
-	// Assert
 	require.NoError(t, err)
 	assert.NotContains(t, decodeSpecSchemas(t, svc), "RatioSchema")
 }
