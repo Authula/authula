@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -16,6 +18,16 @@ import (
 
 type mockRefreshTokenUseCase struct {
 	mock.Mock
+}
+
+// panickingRefreshTokenUseCase simulates an unexpected failure inside the use case so the
+// handler's deferred response handling can be observed while the panic unwinds.
+type panickingRefreshTokenUseCase struct {
+	message string
+}
+
+func (u *panickingRefreshTokenUseCase) RefreshTokens(context.Context, string) (*usecases.RefreshTokenResult, error) {
+	panic(u.message)
 }
 
 func (m *mockRefreshTokenUseCase) RefreshTokens(ctx context.Context, refreshToken string) (*usecases.RefreshTokenResult, error) {
@@ -97,4 +109,46 @@ func TestRefreshTokenHandler(t *testing.T) {
 			mockUC.AssertExpectations(t)
 		})
 	}
+}
+
+func TestRefreshTokenHandler_RequiresRequestContext(t *testing.T) {
+	t.Parallel()
+
+	mockUC := &mockRefreshTokenUseCase{}
+	handler := &RefreshTokenHandler{
+		Logger:              &internaltests.MockLogger{},
+		RefreshTokenUseCase: mockUC,
+	}
+
+	// No RequestContext is attached to the request, so the deferred cleanup must not dereference it.
+	req := httptest.NewRequest(http.MethodPost, "/token/refresh", strings.NewReader("{"))
+	w := httptest.NewRecorder()
+
+	require.Panics(t, func() {
+		handler.Handle().ServeHTTP(w, req)
+	})
+	mockUC.AssertNotCalled(t, "RefreshTokens", mock.Anything, mock.Anything)
+	mockUC.AssertExpectations(t)
+}
+
+func TestRefreshTokenHandler_InitializesResponseHeadersOnPanic(t *testing.T) {
+	t.Parallel()
+
+	handler := &RefreshTokenHandler{
+		Logger:              &internaltests.MockLogger{},
+		RefreshTokenUseCase: &panickingRefreshTokenUseCase{message: "refresh use case exploded"},
+	}
+
+	body := internaltests.MarshalToJSON(t, types.RefreshTokenRequest{RefreshToken: "valid-token"})
+	req, w, reqCtx := internaltests.NewHandlerRequestWithActor(t, http.MethodPost, "/token/refresh", body, nil)
+	require.Nil(t, reqCtx.ResponseHeaders)
+
+	require.PanicsWithValue(t, "refresh use case exploded", func() {
+		handler.Handle().ServeHTTP(w, req)
+	})
+
+	// The deferred cleanup allocates missing headers so the no-store hints are never lost.
+	require.Equal(t, "no-store", reqCtx.ResponseHeaders.Get("Cache-Control"))
+	require.Equal(t, "no-cache", reqCtx.ResponseHeaders.Get("Pragma"))
+	require.False(t, reqCtx.Handled)
 }
