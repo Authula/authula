@@ -34,6 +34,46 @@ func TestTitle(t *testing.T) {
 			input: "hello WORLD",
 			want:  "Hello WORLD",
 		},
+		{
+			name:  "multi-byte leading character",
+			input: "élan",
+			want:  "Élan",
+		},
+		{
+			name:  "multi-word ASCII only capitalises first character",
+			input: "hello world",
+			want:  "Hello world",
+		},
+		{
+			name:  "multi-byte leading character in each word",
+			input: "élan vital über café",
+			want:  "Élan vital über café",
+		},
+		{
+			name:  "multi-byte leading character in later word",
+			input: "hello élan",
+			want:  "Hello élan",
+		},
+		{
+			name:  "Cyrillic leading character",
+			input: "привет мир",
+			want:  "Привет мир",
+		},
+		{
+			name:  "non-cased script is unchanged",
+			input: "日本語",
+			want:  "日本語",
+		},
+		{
+			name:  "invalid leading byte is left untouched",
+			input: "\xfflan",
+			want:  "\xfflan",
+		},
+		{
+			name:  "literal replacement character is preserved",
+			input: "\uFFFDlan",
+			want:  "\uFFFDlan",
+		},
 	}
 
 	for _, tt := range tests {
