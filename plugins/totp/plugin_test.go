@@ -24,6 +24,62 @@ import (
 	"github.com/Authula/authula/plugins/totp/types"
 )
 
+// stubServices holds the six core services the TOTP plugin requires.
+type stubServices struct {
+	user         *tests.MockUserService
+	account      *tests.MockAccountService
+	session      *tests.MockSessionService
+	verification *tests.MockVerificationService
+	token        *tests.MockTokenService
+	password     *tests.MockPasswordService
+}
+
+func newStubServices() stubServices {
+	return stubServices{
+		user:         &tests.MockUserService{},
+		account:      &tests.MockAccountService{},
+		session:      &tests.MockSessionService{},
+		verification: &tests.MockVerificationService{},
+		token:        &tests.MockTokenService{},
+		password:     &tests.MockPasswordService{},
+	}
+}
+
+// registry returns a registry that serves every stub except the named service.
+func (s stubServices) registry(omit models.ServiceID) *tests.MockServiceRegistry {
+	registry := &tests.MockServiceRegistry{}
+	entries := []struct {
+		id      models.ServiceID
+		service any
+	}{
+		{models.ServiceUser, s.user},
+		{models.ServiceAccount, s.account},
+		{models.ServiceSession, s.session},
+		{models.ServiceVerification, s.verification},
+		{models.ServiceToken, s.token},
+		{models.ServicePassword, s.password},
+	}
+
+	for _, entry := range entries {
+		if entry.id == omit {
+			registry.On("Get", entry.id.String()).Return(nil)
+			continue
+		}
+		registry.On("Get", entry.id.String()).Return(entry.service)
+	}
+
+	return registry
+}
+
+func newPluginContext(registry models.ServiceRegistry, logger models.Logger, cfg *models.Config) *models.PluginContext {
+	return &models.PluginContext{
+		Logger:          logger,
+		EventBus:        &tests.MockEventBus{},
+		ServiceRegistry: registry,
+		GetConfig:       func() *models.Config { return cfg },
+	}
+}
+
 func buildTestPlugin(t *testing.T) (*TOTPPlugin, *tests.MockUserService, *tests.MockTokenService, *tests.MockVerificationService) {
 	t.Helper()
 
@@ -222,4 +278,231 @@ func TestInterceptHook(t *testing.T) {
 			verifSvc.AssertExpectations(t)
 		})
 	}
+}
+
+func TestTOTPPlugin_Config(t *testing.T) {
+	t.Parallel()
+
+	plugin := New(types.TOTPPluginConfig{BackupCodeCount: 4, SameSite: "strict"})
+
+	cfg, ok := plugin.Config().(*types.TOTPPluginConfig)
+	require.True(t, ok)
+	assert.Equal(t, 4, cfg.BackupCodeCount)
+	assert.Equal(t, "strict", cfg.SameSite)
+	assert.Equal(t, 30*24*time.Hour, cfg.TrustedDeviceDuration)
+	assert.Equal(t, 5*time.Minute, cfg.PendingTokenExpiry)
+}
+
+func TestTOTPPlugin_InitMissingService(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		omit    models.ServiceID
+		wantErr string
+	}{
+		{name: "user service", omit: models.ServiceUser, wantErr: "user service not available"},
+		{name: "account service", omit: models.ServiceAccount, wantErr: "account service not available"},
+		{name: "session service", omit: models.ServiceSession, wantErr: "session service not available"},
+		{name: "verification service", omit: models.ServiceVerification, wantErr: "verification service not available"},
+		{name: "token service", omit: models.ServiceToken, wantErr: "token service not available"},
+		{name: "password service", omit: models.ServicePassword, wantErr: "password service not available"},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			registry := newStubServices().registry(tt.omit)
+			plugin := New(types.TOTPPluginConfig{})
+
+			err := plugin.Init(newPluginContext(registry, &tests.MockLogger{}, &models.Config{}))
+
+			require.ErrorContains(t, err, tt.wantErr)
+			assert.Nil(t, plugin.Api)
+		})
+	}
+}
+
+func TestTOTPPlugin_InitWarnsOnInvalidConfig(t *testing.T) {
+	t.Parallel()
+
+	logger := &tests.LevelRecordingLogger{}
+	cfg := &models.Config{
+		Plugins: models.PluginsConfig{
+			models.PluginTOTP.String(): map[string]any{"pending_token_expiry": "not-a-duration"},
+		},
+	}
+	plugin := New(types.TOTPPluginConfig{})
+
+	err := plugin.Init(newPluginContext(newStubServices().registry(""), logger, cfg))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, plugin.Close()) })
+
+	warnings := 0
+	for _, record := range logger.Records() {
+		if record.Level == "warn" && record.Message == "failed to load totp plugin config, using defaults" {
+			warnings++
+		}
+	}
+	assert.Equal(t, 1, warnings)
+	assert.NotNil(t, plugin.Api)
+}
+
+func TestTOTPPlugin_InitWiresServices(t *testing.T) {
+	t.Parallel()
+
+	stubs := newStubServices()
+	plugin := New(types.TOTPPluginConfig{BackupCodeCount: 7})
+
+	err := plugin.Init(newPluginContext(stubs.registry(""), &tests.MockLogger{}, &models.Config{
+		Session: models.SessionConfig{Domain: "example.com"},
+	}))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, plugin.Close()) })
+
+	assert.Equal(t, stubs.user, plugin.userService)
+	assert.Equal(t, stubs.account, plugin.accountService)
+	assert.Equal(t, stubs.session, plugin.sessionService)
+	assert.Equal(t, stubs.verification, plugin.verificationService)
+	assert.Equal(t, stubs.token, plugin.tokenService)
+	assert.Equal(t, stubs.password, plugin.passwordService)
+
+	require.NotNil(t, plugin.totpService)
+	assert.Equal(t, 6, plugin.totpService.Digits)
+	assert.Equal(t, 30, plugin.totpService.PeriodSeconds)
+
+	require.NotNil(t, plugin.backupCodeService)
+	assert.Equal(t, 7, plugin.backupCodeService.Count)
+	assert.Equal(t, stubs.password, plugin.backupCodeService.PasswordService)
+
+	require.NotNil(t, plugin.totpRepo)
+	require.NotNil(t, plugin.cleanupSystem)
+
+	require.NotNil(t, plugin.Api)
+	useCases := plugin.Api.UseCases()
+	require.NotNil(t, useCases)
+	assert.NotNil(t, useCases.Enable)
+	assert.NotNil(t, useCases.Disable)
+	assert.NotNil(t, useCases.GetTOTPURI)
+	assert.NotNil(t, useCases.VerifyTOTP)
+	assert.NotNil(t, useCases.GenerateBackupCodes)
+	assert.NotNil(t, useCases.VerifyBackupCode)
+}
+
+func TestTOTPPlugin_Close(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		cfg    types.TOTPPluginConfig
+		closes int
+	}{
+		{
+			name:   "disabled auto cleanup is repeatable",
+			cfg:    types.TOTPPluginConfig{},
+			closes: 2,
+		},
+		{
+			// Close blocks until the cleanup goroutine has returned.
+			name: "enabled auto cleanup stops the loop",
+			cfg: types.TOTPPluginConfig{
+				TrustedDevicesAutoCleanup:     true,
+				TrustedDevicesCleanupInterval: time.Hour,
+			},
+			closes: 1,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := New(tt.cfg)
+			require.NoError(t, plugin.Init(newPluginContext(newStubServices().registry(""), &tests.MockLogger{}, &models.Config{})))
+
+			for range tt.closes {
+				require.NoError(t, plugin.Close())
+			}
+		})
+	}
+}
+
+func TestTOTPPlugin_Routes(t *testing.T) {
+	t.Parallel()
+
+	plugin, _, _, _ := buildTestPlugin(t)
+
+	routes := plugin.Routes()
+
+	expected := []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodPost, path: "/totp/enable"},
+		{method: http.MethodPost, path: "/totp/disable"},
+		{method: http.MethodGet, path: "/totp/get-uri"},
+		{method: http.MethodPost, path: "/totp/verify"},
+		{method: http.MethodPost, path: "/totp/verify-backup-code"},
+		{method: http.MethodPost, path: "/totp/generate-backup-codes"},
+	}
+
+	require.Len(t, routes, len(expected))
+	for i, tt := range expected {
+		assert.Equal(t, tt.method, routes[i].Method)
+		assert.Equal(t, tt.path, routes[i].Path)
+		assert.NotEmpty(t, routes[i].Middleware)
+		assert.NotNil(t, routes[i].Handler)
+	}
+}
+
+func TestTOTPPlugin_Hooks(t *testing.T) {
+	t.Parallel()
+
+	plugin := New(types.TOTPPluginConfig{})
+	hooks := plugin.Hooks()
+
+	require.Len(t, hooks, 1)
+	assert.Equal(t, models.HookAfter, hooks[0].Stage)
+	assert.Equal(t, HookIDTOTPIntercept.String(), hooks[0].PluginID)
+	assert.Equal(t, 5, hooks[0].Order)
+	require.NotNil(t, hooks[0].Matcher)
+	require.NotNil(t, hooks[0].Handler)
+}
+
+func TestTOTPPlugin_Migrations(t *testing.T) {
+	t.Parallel()
+
+	plugin := New(types.TOTPPluginConfig{})
+
+	tests := []struct {
+		name     string
+		provider string
+		want     int
+	}{
+		{name: "sqlite", provider: "sqlite", want: 1},
+		{name: "postgres", provider: "postgres", want: 1},
+		{name: "mysql", provider: "mysql", want: 1},
+		{name: "unknown provider", provider: "cockroach", want: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Len(t, plugin.Migrations(tt.provider), tt.want)
+		})
+	}
+}
+
+func TestTOTPPlugin_DependsOn(t *testing.T) {
+	t.Parallel()
+
+	assert.Nil(t, New(types.TOTPPluginConfig{}).DependsOn())
+}
+
+func TestTOTPHookID_String(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "totp.intercept", HookIDTOTPIntercept.String())
 }
