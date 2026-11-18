@@ -212,119 +212,127 @@ func TestJWTPlugin_Init_Errors(t *testing.T) {
 func TestJWTPlugin_Init_Success(t *testing.T) {
 	t.Parallel()
 
-	t.Run("without_secondary_storage", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name                 string
+		baseURL              string
+		basePath             string
+		withSecondaryStorage bool
+		wantIssuer           string
+	}{
+		{
+			name:       "without_secondary_storage",
+			baseURL:    "https://auth.example.com/",
+			basePath:   "/api/auth/",
+			wantIssuer: "https://auth.example.com/api/auth",
+		},
+		{
+			name:                 "with_secondary_storage",
+			baseURL:              "https://auth.example.com",
+			withSecondaryStorage: true,
+			wantIssuer:           "https://auth.example.com",
+		},
+	}
 
-		db := newJWTTestDB(t)
-		logger := &internaltests.LevelRecordingLogger{}
-		registry := newJWTTestRegistry(t)
-		plugin := New(types.JWTPluginConfig{})
-		ctx := &models.PluginContext{
-			DB:              db,
-			Logger:          logger,
-			EventBus:        internaltests.NewRecordingEventBus(),
-			ServiceRegistry: registry,
-			GetConfig: func() *models.Config {
-				return &models.Config{BaseURL: "https://auth.example.com/", BasePath: "/api/auth/"}
-			},
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		require.NoError(t, plugin.Init(ctx))
+			db := newJWTTestDB(t)
+			logger := &internaltests.LevelRecordingLogger{}
+			storage := jwttests.NewInMemoryStorage()
+			registry := newJWTTestRegistry(t)
+			if tt.withSecondaryStorage {
+				registry.Register(models.ServiceSecondaryStorage.String(), staticSecondaryStorageService{storage: storage})
+			}
+			cfg := &models.Config{BaseURL: tt.baseURL, BasePath: tt.basePath}
+			plugin := New(types.JWTPluginConfig{})
+			ctx := &models.PluginContext{
+				DB:              db,
+				Logger:          logger,
+				EventBus:        internaltests.NewRecordingEventBus(),
+				ServiceRegistry: registry,
+				GetConfig:       func() *models.Config { return cfg },
+			}
 
-		assert.Same(t, logger, plugin.Logger)
-		assert.NotNil(t, plugin.sessionService)
-		assert.NotNil(t, plugin.tokenService)
-		assert.NotNil(t, plugin.keyService)
-		assert.NotNil(t, plugin.cacheService)
-		assert.NotNil(t, plugin.jwtService)
-		assert.NotNil(t, plugin.refreshService)
-		assert.Nil(t, plugin.secondaryStorage)
-		assert.Nil(t, plugin.blacklistService)
-		assert.Equal(t, "https://auth.example.com/api/auth", plugin.pluginConfig.Issuer)
-		assert.Equal(t, types.DefaultAudience, plugin.pluginConfig.Audience)
+			require.NoError(t, plugin.Init(ctx))
 
-		registered := registry.Get(models.ServiceJWT.String())
-		require.NotNil(t, registered)
-		assert.Same(t, plugin.jwtService, registered)
+			assert.Same(t, logger, plugin.Logger)
+			assert.NotNil(t, plugin.sessionService)
+			assert.NotNil(t, plugin.tokenService)
+			assert.NotNil(t, plugin.keyService)
+			assert.NotNil(t, plugin.cacheService)
+			assert.NotNil(t, plugin.jwtService)
+			assert.NotNil(t, plugin.refreshService)
+			assert.Equal(t, tt.wantIssuer, plugin.pluginConfig.Issuer)
+			assert.Equal(t, types.DefaultAudience, plugin.pluginConfig.Audience)
+			assert.Same(t, plugin.jwtService, registry.Get(models.ServiceJWT.String()))
+			assert.Equal(t, 1, countJWKSKeys(t, db))
 
-		assert.Equal(t, 1, countJWKSKeys(t, db))
-		assert.True(t, hasLogMessage(logger, "token blacklisting will be disabled"))
-	})
+			if tt.withSecondaryStorage {
+				assert.NotNil(t, plugin.secondaryStorage)
+				assert.NotNil(t, plugin.blacklistService)
 
-	t.Run("with_secondary_storage", func(t *testing.T) {
-		t.Parallel()
-
-		db := newJWTTestDB(t)
-		storage := jwttests.NewInMemoryStorage()
-		registry := newJWTTestRegistry(t)
-		registry.Register(models.ServiceSecondaryStorage.String(), staticSecondaryStorageService{storage: storage})
-		plugin := New(types.JWTPluginConfig{})
-		ctx := &models.PluginContext{
-			DB:              db,
-			Logger:          &internaltests.MockLogger{},
-			EventBus:        internaltests.NewRecordingEventBus(),
-			ServiceRegistry: registry,
-			GetConfig:       func() *models.Config { return &models.Config{BaseURL: "https://auth.example.com"} },
-		}
-
-		require.NoError(t, plugin.Init(ctx))
-
-		assert.NotNil(t, plugin.secondaryStorage)
-		assert.NotNil(t, plugin.blacklistService)
-		assert.NotNil(t, registry.Get(models.ServiceJWT.String()))
-
-		cached, err := storage.Get(context.Background(), testJWKSCacheKey)
-		require.NoError(t, err)
-		assert.NotNil(t, cached)
-	})
+				cached, err := storage.Get(context.Background(), testJWKSCacheKey)
+				require.NoError(t, err)
+				assert.NotNil(t, cached)
+			} else {
+				assert.Nil(t, plugin.secondaryStorage)
+				assert.Nil(t, plugin.blacklistService)
+				assert.True(t, hasLogMessage(logger, "token blacklisting will be disabled"))
+			}
+		})
+	}
 }
 
 func TestJWTPlugin_Init_KeyRotation(t *testing.T) {
 	t.Parallel()
 
-	t.Run("rotation_due_rotates_keys", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name           string
+		breakKeyUpdate bool
+		wantKeyCount   int
+		wantLogMessage string
+	}{
+		{
+			name:           "rotation_due_rotates_keys",
+			wantKeyCount:   2,
+			wantLogMessage: "key rotation occurred on startup due to interval expiration",
+		},
+		{
+			name:           "rotation_failure_is_a_warning",
+			breakKeyUpdate: true,
+			wantKeyCount:   1,
+			wantLogMessage: "failed to check/rotate keys on startup",
+		},
+	}
 
-		db := newJWTTestDB(t)
-		insertOldJWKSKey(t, db, "old-key", 48*time.Hour)
-		logger := &internaltests.LevelRecordingLogger{}
-		plugin := New(types.JWTPluginConfig{KeyRotationInterval: time.Hour})
-		ctx := &models.PluginContext{
-			DB:              db,
-			Logger:          logger,
-			EventBus:        internaltests.NewRecordingEventBus(),
-			ServiceRegistry: newJWTTestRegistry(t),
-			GetConfig:       func() *models.Config { return &models.Config{BaseURL: "https://auth.example.com"} },
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		require.NoError(t, plugin.Init(ctx))
+			db := newJWTTestDB(t)
+			insertOldJWKSKey(t, db, "old-key", 48*time.Hour)
+			var pluginDB bun.IDB = db
+			if tt.breakKeyUpdate {
+				pluginDB = &failingUpdateDB{IDB: db, updateDB: newClosedJWTTestDB(t)}
+			}
+			logger := &internaltests.LevelRecordingLogger{}
+			plugin := New(types.JWTPluginConfig{KeyRotationInterval: time.Hour})
+			ctx := &models.PluginContext{
+				DB:              pluginDB,
+				Logger:          logger,
+				EventBus:        internaltests.NewRecordingEventBus(),
+				ServiceRegistry: newJWTTestRegistry(t),
+				GetConfig:       func() *models.Config { return &models.Config{BaseURL: "https://auth.example.com"} },
+			}
 
-		assert.Equal(t, 2, countJWKSKeys(t, db))
-		assert.True(t, hasLogMessage(logger, "key rotation occurred on startup due to interval expiration"))
-	})
+			require.NoError(t, plugin.Init(ctx))
 
-	t.Run("rotation_failure_is_a_warning", func(t *testing.T) {
-		t.Parallel()
-
-		db := newJWTTestDB(t)
-		insertOldJWKSKey(t, db, "old-key", 48*time.Hour)
-		brokenDB := &failingUpdateDB{IDB: db, updateDB: newClosedJWTTestDB(t)}
-		logger := &internaltests.LevelRecordingLogger{}
-		plugin := New(types.JWTPluginConfig{KeyRotationInterval: time.Hour})
-		ctx := &models.PluginContext{
-			DB:              brokenDB,
-			Logger:          logger,
-			EventBus:        internaltests.NewRecordingEventBus(),
-			ServiceRegistry: newJWTTestRegistry(t),
-			GetConfig:       func() *models.Config { return &models.Config{BaseURL: "https://auth.example.com"} },
-		}
-
-		require.NoError(t, plugin.Init(ctx))
-
-		assert.NotNil(t, plugin.jwtService)
-		assert.True(t, hasLogMessage(logger, "failed to check/rotate keys on startup"))
-		assert.Equal(t, 1, countJWKSKeys(t, db))
-	})
+			assert.NotNil(t, plugin.jwtService)
+			assert.Equal(t, tt.wantKeyCount, countJWKSKeys(t, db))
+			assert.True(t, hasLogMessage(logger, tt.wantLogMessage))
+		})
+	}
 }
 
 func TestJWTPlugin_Init_CacheInvalidationFailureIsAWarning(t *testing.T) {
