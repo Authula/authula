@@ -204,33 +204,38 @@ func tableExistsInSchema(t *testing.T, db *bun.DB, table string) bool {
 func TestNewMigrator(t *testing.T) {
 	t.Parallel()
 
-	t.Run("applies defaults", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name      string
+		nilDB     bool
+		opts      []MigratorOption
+		wantTable string
+		wantErr   string
+	}{
+		{name: "applies defaults", wantTable: DefaultSchemaTable},
+		{name: "applies custom table option", opts: []MigratorOption{withSchemaTable("custom_migrations")}, wantTable: "custom_migrations"},
+		{name: "rejects a non bun DB", nilDB: true, wantErr: "migrator requires *bun.DB instance"},
+	}
 
-		db := newTestDB(t)
-		migrator, err := NewMigrator(db, testLogger{t})
-		require.NoError(t, err)
-		require.NotNil(t, migrator)
-		assert.Equal(t, DefaultSchemaTable, migrator.table)
-		assert.Equal(t, "sqlite", migrator.dialect)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("applies custom table option", func(t *testing.T) {
-		t.Parallel()
-
-		db := newTestDB(t)
-		migrator, err := NewMigrator(db, nil, withSchemaTable("custom_migrations"))
-		require.NoError(t, err)
-		assert.Equal(t, "custom_migrations", migrator.table)
-	})
-
-	t.Run("rejects a non bun DB", func(t *testing.T) {
-		t.Parallel()
-
-		migrator, err := NewMigrator(nil, nil)
-		assert.Nil(t, migrator)
-		assert.EqualError(t, err, "migrator requires *bun.DB instance")
-	})
+			var db bun.IDB
+			if !tt.nilDB {
+				db = newTestDB(t)
+			}
+			migrator, err := NewMigrator(db, testLogger{t}, tt.opts...)
+			if tt.wantErr != "" {
+				assert.Nil(t, migrator)
+				assert.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, migrator)
+			assert.Equal(t, tt.wantTable, migrator.table)
+			assert.Equal(t, "sqlite", migrator.dialect)
+		})
+	}
 }
 
 func TestMigrator_createSchemaTable(t *testing.T) {
@@ -302,45 +307,58 @@ func TestMigrator_tableExpr(t *testing.T) {
 func TestExecStatements(t *testing.T) {
 	t.Parallel()
 
-	t.Run("skips blank statements", func(t *testing.T) {
-		t.Parallel()
-
-		db := newTestDB(t)
-		err := db.RunInTx(context.Background(), nil, func(ctx context.Context, tx bun.Tx) error {
-			return ExecStatements(ctx, tx, "", "   ", "\n\t", "  \n ")
-		})
-		assert.NoError(t, err)
-	})
-
-	t.Run("executes multiple statements", func(t *testing.T) {
-		t.Parallel()
-
-		db := newTestDB(t)
-		err := db.RunInTx(context.Background(), nil, func(ctx context.Context, tx bun.Tx) error {
-			return ExecStatements(ctx, tx,
+	tests := []struct {
+		name              string
+		statements        []string
+		wantErr           string
+		wantTables        []string
+		wantMissingTables []string
+	}{
+		{
+			name:       "skips blank statements",
+			statements: []string{"", "   ", "\n\t", "  \n "},
+		},
+		{
+			name: "executes multiple statements",
+			statements: []string{
 				"CREATE TABLE exec_statements_one (id TEXT);",
 				"CREATE TABLE exec_statements_two (id TEXT);",
-			)
-		})
-		require.NoError(t, err)
-		assert.True(t, tableExistsInSchema(t, db, "exec_statements_one"))
-		assert.True(t, tableExistsInSchema(t, db, "exec_statements_two"))
-	})
-
-	t.Run("wraps errors and rolls back", func(t *testing.T) {
-		t.Parallel()
-
-		db := newTestDB(t)
-		err := db.RunInTx(context.Background(), nil, func(ctx context.Context, tx bun.Tx) error {
-			return ExecStatements(ctx, tx,
+			},
+			wantTables: []string{"exec_statements_one", "exec_statements_two"},
+		},
+		{
+			name: "wraps errors and rolls back",
+			statements: []string{
 				"CREATE TABLE exec_statements_rolled_back (id TEXT);",
 				"THIS IS NOT SQL",
-			)
+			},
+			wantErr:           "exec statement failed",
+			wantMissingTables: []string{"exec_statements_rolled_back"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := newTestDB(t)
+			err := db.RunInTx(context.Background(), nil, func(ctx context.Context, tx bun.Tx) error {
+				return ExecStatements(ctx, tx, tt.statements...)
+			})
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			for _, table := range tt.wantTables {
+				assert.True(t, tableExistsInSchema(t, db, table))
+			}
+			for _, table := range tt.wantMissingTables {
+				assert.False(t, tableExistsInSchema(t, db, table))
+			}
 		})
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "exec statement failed")
-		assert.False(t, tableExistsInSchema(t, db, "exec_statements_rolled_back"))
-	})
+	}
 }
 
 func TestValidateSet(t *testing.T) {
@@ -426,30 +444,33 @@ func TestFindMigration(t *testing.T) {
 		},
 	}
 
-	t.Run("finds a known version", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name    string
+		set     MigrationSet
+		version string
+		wantOK  bool
+	}{
+		{name: "finds a known version", set: set, version: "002", wantOK: true},
+		{name: "reports an unknown version", set: set, version: "999"},
+		{name: "reports an empty set", set: MigrationSet{PluginID: "empty"}, version: "001"},
+	}
 
-		migration, ok := findMigration(set, "002")
-		require.True(t, ok)
-		assert.Equal(t, "002", migration.Version)
-		assert.NotNil(t, migration.Up)
-		assert.NotNil(t, migration.Down)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("reports an unknown version", func(t *testing.T) {
-		t.Parallel()
-
-		migration, ok := findMigration(set, "999")
-		assert.False(t, ok)
-		assert.Equal(t, Migration{}, migration)
-	})
-
-	t.Run("reports an empty set", func(t *testing.T) {
-		t.Parallel()
-
-		_, ok := findMigration(MigrationSet{PluginID: "empty"}, "001")
-		assert.False(t, ok)
-	})
+			migration, ok := findMigration(tt.set, tt.version)
+			if !tt.wantOK {
+				assert.False(t, ok)
+				assert.Equal(t, Migration{}, migration)
+				return
+			}
+			require.True(t, ok)
+			assert.Equal(t, tt.version, migration.Version)
+			assert.NotNil(t, migration.Up)
+			assert.NotNil(t, migration.Down)
+		})
+	}
 }
 
 func TestMigrator_MigrateValidation(t *testing.T) {
@@ -1054,73 +1075,105 @@ func TestMigrator_appliedVersions(t *testing.T) {
 func TestMigrator_applyUpErrors(t *testing.T) {
 	t.Parallel()
 
-	t.Run("requires an Up function", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name      string
+		opts      []MigratorOption
+		migration Migration
+		wantErr   string
+	}{
+		{
+			name:      "requires an Up function",
+			migration: Migration{Version: "001"},
+			wantErr:   "migration plugin_a:001 missing Up function",
+		},
+		{
+			name:      "wraps record insert errors",
+			opts:      []MigratorOption{withSchemaTable("missing_schema_table")},
+			migration: Migration{Version: "001", Up: noopMigration},
+			wantErr:   "record migration plugin_a:001",
+		},
+	}
 
-		db := newTestDB(t)
-		migrator := mustNewMigrator(t, db)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		err := migrator.applyUp(context.Background(), "plugin_a", Migration{Version: "001"})
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "migration plugin_a:001 missing Up function")
-	})
+			db := newTestDB(t)
+			migrator := mustNewMigrator(t, db, tt.opts...)
 
-	t.Run("wraps record insert errors", func(t *testing.T) {
-		t.Parallel()
-
-		db := newTestDB(t)
-		migrator := mustNewMigrator(t, db, withSchemaTable("missing_schema_table"))
-
-		err := migrator.applyUp(context.Background(), "plugin_a", Migration{Version: "001", Up: noopMigration})
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "record migration plugin_a:001")
-	})
+			err := migrator.applyUp(context.Background(), "plugin_a", tt.migration)
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tt.wantErr)
+		})
+	}
 }
 
 func TestMigrator_applyDownErrors(t *testing.T) {
 	t.Parallel()
 
-	t.Run("requires a Down function", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name      string
+		opts      []MigratorOption
+		migration Migration
+		wantErr   string
+	}{
+		{
+			name:      "requires a Down function",
+			migration: Migration{Version: "001"},
+			wantErr:   "migration plugin_a:001 missing Down function",
+		},
+		{
+			name:      "wraps record delete errors",
+			opts:      []MigratorOption{withSchemaTable("missing_schema_table")},
+			migration: Migration{Version: "001", Down: noopMigration},
+			wantErr:   "remove migration record plugin_a:001",
+		},
+	}
 
-		db := newTestDB(t)
-		migrator := mustNewMigrator(t, db)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		err := migrator.applyDown(context.Background(), "plugin_a", Migration{Version: "001"})
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "migration plugin_a:001 missing Down function")
-	})
+			db := newTestDB(t)
+			migrator := mustNewMigrator(t, db, tt.opts...)
 
-	t.Run("wraps record delete errors", func(t *testing.T) {
-		t.Parallel()
-
-		db := newTestDB(t)
-		migrator := mustNewMigrator(t, db, withSchemaTable("missing_schema_table"))
-
-		err := migrator.applyDown(context.Background(), "plugin_a", Migration{Version: "001", Down: noopMigration})
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "remove migration record plugin_a:001")
-	})
+			err := migrator.applyDown(context.Background(), "plugin_a", tt.migration)
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tt.wantErr)
+		})
+	}
 }
 
 func TestSortMigrationSets(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns nil for no sets", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name    string
+		sets    []MigrationSet
+		wantErr string
+	}{
+		{name: "returns nil for no sets", sets: nil},
+		{
+			name:    "rejects self dependencies",
+			sets:    []MigrationSet{{PluginID: "self", DependsOn: []string{"self"}}},
+			wantErr: "plugin self cannot depend on itself",
+		},
+	}
 
-		ordered, err := sortMigrationSets(nil)
-		assert.NoError(t, err)
-		assert.Nil(t, ordered)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("rejects self dependencies", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := sortMigrationSets([]MigrationSet{{PluginID: "self", DependsOn: []string{"self"}}})
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "plugin self cannot depend on itself")
-	})
+			ordered, err := sortMigrationSets(tt.sets)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+				assert.Nil(t, ordered)
+				return
+			}
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tt.wantErr)
+		})
+	}
 }
 
 func TestMigrator_DeduplicatesDependencies(t *testing.T) {
