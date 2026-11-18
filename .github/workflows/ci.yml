@@ -64,6 +64,17 @@ jobs:
           files: ./coverage.out
           fail_ci_if_error: false
 
+      - name: Enforce minimum coverage
+        env:
+          MIN_COVERAGE: 80
+        run: |
+          total=$(go tool cover -func=coverage.out | awk '/^total:/ {print $3}' | tr -d '%')
+          echo "Total coverage: ${total}% (minimum: ${MIN_COVERAGE}%)"
+          if awk -v t="$total" -v min="$MIN_COVERAGE" 'BEGIN { exit !(t < min) }'; then
+            echo "❌ Coverage ${total}% is below the ${MIN_COVERAGE}% minimum."
+            exit 1
+          fi
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
