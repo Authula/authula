@@ -9,6 +9,9 @@
   <a href="https://pkg.go.dev/github.com/Authula/authula" target="_parent">
     <img src="https://pkg.go.dev/badge/github.com/Authula/authula.svg" alt="Go Reference" />
   </a>
+  <a href="https://codecov.io/gh/Authula/authula" target="_parent">
+    <img src="https://codecov.io/gh/Authula/authula/graph/badge.svg" alt="Codecov" />
+  </a>
   <a href="https://github.com/Authula/authula/blob/main/LICENSE" target="_parent">
     <img src="https://img.shields.io/github/license/Authula/authula.svg" alt="License" />
   </a>
