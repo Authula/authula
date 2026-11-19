@@ -8,6 +8,9 @@ import (
 	"github.com/Authula/authula/migrations"
 )
 
+// JWTMigrationsForProvider returns the JWT plugin's schema, including the
+// plugin-owned signing keys that other plugins consume through the public
+// services.JWTService contract.
 func JWTMigrationsForProvider(provider string) []migrations.Migration {
 	return migrations.ForProvider(provider, migrations.ProviderVariants{
 		"sqlite":   func() []migrations.Migration { return []migrations.Migration{jwtSQLiteInitial()} },
@@ -23,14 +26,6 @@ func jwtSQLiteInitial() migrations.Migration {
 			return migrations.ExecStatements(
 				ctx,
 				tx,
-				`CREATE TABLE IF NOT EXISTS jwks (
-					id TEXT PRIMARY KEY,
-					public_key TEXT NOT NULL,
-					private_key TEXT NOT NULL,
-					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-					expires_at TIMESTAMP NULL
-				);`,
-				`CREATE INDEX IF NOT EXISTS idx_jwks_expires_at ON jwks(expires_at);`,
 				`CREATE TABLE IF NOT EXISTS refresh_tokens (
 					id TEXT PRIMARY KEY,
 					session_id TEXT NOT NULL,
@@ -45,14 +40,28 @@ func jwtSQLiteInitial() migrations.Migration {
 				`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);`,
 				`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);`,
 				`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_revoked_only ON refresh_tokens(is_revoked) WHERE is_revoked = 1;`,
+				`CREATE TABLE IF NOT EXISTS jwks (
+					id TEXT PRIMARY KEY,
+					key_id TEXT NOT NULL UNIQUE,
+					algorithm VARCHAR(16) NOT NULL,
+					key_purpose VARCHAR(32) NOT NULL,
+					public_key TEXT NOT NULL,
+					private_key TEXT NOT NULL,
+					is_active BOOLEAN NOT NULL DEFAULT 0,
+					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+					expires_at TIMESTAMP NULL
+				);`,
+				`CREATE UNIQUE INDEX IF NOT EXISTS idx_jwks_active_purpose_algorithm ON jwks(key_purpose, algorithm) WHERE is_active = 1;`,
+				`CREATE INDEX IF NOT EXISTS idx_jwks_purpose ON jwks(key_purpose);`,
+				`CREATE INDEX IF NOT EXISTS idx_jwks_expires_at ON jwks(expires_at);`,
 			)
 		},
 		Down: func(ctx context.Context, tx bun.Tx) error {
 			return migrations.ExecStatements(
 				ctx,
 				tx,
-				`DROP TABLE IF EXISTS refresh_tokens;`,
 				`DROP TABLE IF EXISTS jwks;`,
+				`DROP TABLE IF EXISTS refresh_tokens;`,
 			)
 		},
 	}
@@ -65,14 +74,6 @@ func jwtPostgresInitial() migrations.Migration {
 			return migrations.ExecStatements(
 				ctx,
 				tx,
-				`CREATE TABLE IF NOT EXISTS jwks (
-					id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-					public_key TEXT NOT NULL,
-					private_key TEXT NOT NULL,
-					created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-					expires_at TIMESTAMP WITH TIME ZONE NULL
-				);`,
-				`CREATE INDEX IF NOT EXISTS idx_jwks_expires_at ON jwks(expires_at);`,
 				`CREATE TABLE IF NOT EXISTS refresh_tokens (
 					id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 					session_id UUID NOT NULL,
@@ -93,6 +94,20 @@ func jwtPostgresInitial() migrations.Migration {
 					DELETE FROM refresh_tokens WHERE expires_at < NOW();
 				END;
 				$$ LANGUAGE plpgsql;`,
+				`CREATE TABLE IF NOT EXISTS jwks (
+					id UUID PRIMARY KEY,
+					key_id UUID NOT NULL UNIQUE,
+					algorithm VARCHAR(16) NOT NULL,
+					key_purpose VARCHAR(32) NOT NULL,
+					public_key TEXT NOT NULL,
+					private_key TEXT NOT NULL,
+					is_active BOOLEAN NOT NULL DEFAULT FALSE,
+					created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+					expires_at TIMESTAMP WITH TIME ZONE NULL
+				);`,
+				`CREATE UNIQUE INDEX IF NOT EXISTS idx_jwks_active_purpose_algorithm ON jwks(key_purpose, algorithm) WHERE is_active = TRUE;`,
+				`CREATE INDEX IF NOT EXISTS idx_jwks_purpose ON jwks(key_purpose);`,
+				`CREATE INDEX IF NOT EXISTS idx_jwks_expires_at ON jwks(expires_at);`,
 			)
 		},
 		Down: func(ctx context.Context, tx bun.Tx) error {
@@ -100,8 +115,8 @@ func jwtPostgresInitial() migrations.Migration {
 				ctx,
 				tx,
 				`DROP FUNCTION IF EXISTS cleanup_expired_refresh_tokens();`,
-				`DROP TABLE IF EXISTS refresh_tokens;`,
 				`DROP TABLE IF EXISTS jwks;`,
+				`DROP TABLE IF EXISTS refresh_tokens;`,
 			)
 		},
 	}
@@ -114,14 +129,6 @@ func jwtMySQLInitial() migrations.Migration {
 			return migrations.ExecStatements(
 				ctx,
 				tx,
-				`CREATE TABLE IF NOT EXISTS jwks (
-					id BINARY(16) NOT NULL PRIMARY KEY,
-					public_key TEXT NOT NULL,
-					private_key TEXT NOT NULL,
-					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-					expires_at TIMESTAMP NULL
-				);`,
-				`CREATE INDEX idx_jwks_expires_at ON jwks(expires_at);`,
 				`CREATE TABLE IF NOT EXISTS refresh_tokens (
 					id BINARY(16) NOT NULL PRIMARY KEY,
 					session_id BINARY(16) NOT NULL,
@@ -142,6 +149,22 @@ func jwtMySQLInitial() migrations.Migration {
 				BEGIN
 					DELETE FROM refresh_tokens WHERE expires_at < NOW();
 				END;`,
+				`CREATE TABLE IF NOT EXISTS jwks (
+					id VARCHAR(36) NOT NULL PRIMARY KEY,
+					key_id VARCHAR(36) NOT NULL,
+					algorithm VARCHAR(16) NOT NULL,
+					key_purpose VARCHAR(32) NOT NULL,
+					public_key LONGTEXT NOT NULL,
+					private_key LONGTEXT NOT NULL,
+					is_active TINYINT(1) NOT NULL DEFAULT 0,
+					active_purpose_algorithm VARCHAR(64) GENERATED ALWAYS AS (IF(is_active = 1, CONCAT(key_purpose, ':', algorithm), NULL)) STORED,
+					created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+					expires_at TIMESTAMP NULL DEFAULT NULL,
+					UNIQUE KEY idx_jwks_key_id (key_id),
+					UNIQUE KEY idx_jwks_active_purpose_algorithm (active_purpose_algorithm),
+					INDEX idx_jwks_purpose (key_purpose),
+					INDEX idx_jwks_expires_at (expires_at)
+				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 			)
 		},
 		Down: func(ctx context.Context, tx bun.Tx) error {
@@ -149,8 +172,8 @@ func jwtMySQLInitial() migrations.Migration {
 				ctx,
 				tx,
 				`DROP PROCEDURE IF EXISTS cleanup_expired_refresh_tokens;`,
-				`DROP TABLE IF EXISTS refresh_tokens;`,
 				`DROP TABLE IF EXISTS jwks;`,
+				`DROP TABLE IF EXISTS refresh_tokens;`,
 			)
 		},
 	}

@@ -1,21 +1,10 @@
 package tests
 
 import (
-	"context"
-
-	"github.com/stretchr/testify/mock"
-
-	"github.com/Authula/authula/models"
+	internaltests "github.com/Authula/authula/internal/tests"
+	rootservices "github.com/Authula/authula/services"
 )
 
-type MockJWTService struct {
-	mock.Mock
-}
+type MockJWTService = internaltests.MockJWTService
 
-func (m *MockJWTService) ValidateToken(ctx context.Context, token string) (*models.Actor, error) {
-	args := m.Called(ctx, token)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.Actor), args.Error(1)
-}
+var _ rootservices.JWTService = (*MockJWTService)(nil)

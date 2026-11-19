@@ -2,6 +2,8 @@ package jwt
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +19,7 @@ import (
 	"github.com/Authula/authula/models"
 	jwttests "github.com/Authula/authula/plugins/jwt/tests"
 	"github.com/Authula/authula/plugins/jwt/types"
+	rootservices "github.com/Authula/authula/services"
 )
 
 const testJWKSCacheKey = "jwks:public:set"
@@ -41,13 +44,20 @@ func (db *failingUpdateDB) NewUpdate() *bun.UpdateQuery {
 	return db.updateDB.NewUpdate()
 }
 
+func (db *failingUpdateDB) RunInTx(context.Context, *sql.TxOptions, func(context.Context, bun.Tx) error) error {
+	return errors.New("transaction failed")
+}
+
 func newJWTTestDB(t *testing.T) *bun.DB {
 	t.Helper()
 
 	db := internaltests.NewSQLiteIntegrationDB(t)
 	migrator, err := migrations.NewMigrator(db, nil)
 	require.NoError(t, err)
+	coreSet, err := migrations.CoreMigrationSet("sqlite")
+	require.NoError(t, err)
 	require.NoError(t, migrator.Migrate(context.Background(), []migrations.MigrationSet{
+		coreSet,
 		{PluginID: models.PluginJWT.String(), Migrations: JWTMigrationsForProvider("sqlite")},
 	}))
 
@@ -66,10 +76,14 @@ func newClosedJWTTestDB(t *testing.T) *bun.DB {
 func insertOldJWKSKey(t *testing.T, db bun.IDB, id string, age time.Duration) {
 	t.Helper()
 
-	key := &types.JWKS{
+	key := &models.SigningKey{
 		ID:         id,
+		KeyID:      "kid-" + id,
+		Algorithm:  models.SigningKeyAlgorithmRS256,
+		KeyPurpose: models.SigningKeyPurposeJWTPlugin,
 		PublicKey:  "old-public-key",
 		PrivateKey: "old-private-key",
+		IsActive:   true,
 		CreatedAt:  time.Now().Add(-age),
 	}
 	_, err := db.NewInsert().Model(key).Exec(context.Background())
@@ -79,7 +93,7 @@ func insertOldJWKSKey(t *testing.T, db bun.IDB, id string, age time.Duration) {
 func countJWKSKeys(t *testing.T, db bun.IDB) int {
 	t.Helper()
 
-	count, err := db.NewSelect().Model((*types.JWKS)(nil)).Count(context.Background())
+	count, err := db.NewSelect().Model((*models.SigningKey)(nil)).Count(context.Background())
 	require.NoError(t, err)
 
 	return count
@@ -93,6 +107,17 @@ func newJWTTestRegistry(t *testing.T) *internalplugins.DefaultServiceRegistry {
 	registry.Register(models.ServiceToken.String(), jwttests.NopTokenService{})
 
 	return registry
+}
+
+// recordingServiceRegistry counts the services a plugin registers during Init.
+type recordingServiceRegistry struct {
+	*internalplugins.DefaultServiceRegistry
+	registered []string
+}
+
+func (r *recordingServiceRegistry) Register(name string, service any) {
+	r.registered = append(r.registered, name)
+	r.DefaultServiceRegistry.Register(name, service)
 }
 
 func hasLogMessage(logger *internaltests.LevelRecordingLogger, substr string) bool {
@@ -156,8 +181,10 @@ func TestJWTPlugin_Init_Errors(t *testing.T) {
 			config: func() *models.Config {
 				return &models.Config{BaseURL: "https://auth.example.com"}
 			},
-			db:      newJWTTestDB,
-			reg:     func(*testing.T) *internalplugins.DefaultServiceRegistry { return internalplugins.NewServiceRegistry() },
+			db: newJWTTestDB,
+			reg: func(*testing.T) *internalplugins.DefaultServiceRegistry {
+				return internalplugins.NewServiceRegistry()
+			},
 			wantErr: "session service not available",
 		},
 		{
@@ -189,9 +216,10 @@ func TestJWTPlugin_Init_Errors(t *testing.T) {
 			t.Parallel()
 
 			getConfig := tt.config
+			db := tt.db(t)
 			plugin := New(types.JWTPluginConfig{})
 			ctx := &models.PluginContext{
-				DB:              tt.db(t),
+				DB:              db,
 				Logger:          &internaltests.MockLogger{},
 				EventBus:        internaltests.NewRecordingEventBus(),
 				ServiceRegistry: tt.reg(t),
@@ -240,10 +268,11 @@ func TestJWTPlugin_Init_Success(t *testing.T) {
 			db := newJWTTestDB(t)
 			logger := &internaltests.LevelRecordingLogger{}
 			storage := jwttests.NewInMemoryStorage()
-			registry := newJWTTestRegistry(t)
+			baseRegistry := newJWTTestRegistry(t)
 			if tt.withSecondaryStorage {
-				registry.Register(models.ServiceSecondaryStorage.String(), staticSecondaryStorageService{storage: storage})
+				baseRegistry.Register(models.ServiceSecondaryStorage.String(), staticSecondaryStorageService{storage: storage})
 			}
+			registry := &recordingServiceRegistry{DefaultServiceRegistry: baseRegistry}
 			cfg := &models.Config{BaseURL: tt.baseURL, BasePath: tt.basePath}
 			plugin := New(types.JWTPluginConfig{})
 			ctx := &models.PluginContext{
@@ -266,7 +295,16 @@ func TestJWTPlugin_Init_Success(t *testing.T) {
 			assert.Equal(t, tt.wantIssuer, plugin.pluginConfig.Issuer)
 			assert.Equal(t, types.DefaultAudience, plugin.pluginConfig.Audience)
 			assert.Same(t, plugin.jwtService, registry.Get(models.ServiceJWT.String()))
-			assert.Equal(t, 1, countJWKSKeys(t, db))
+			assert.Equal(t, []string{models.ServiceJWT.String()}, registry.registered, "the jwt plugin must register exactly one service")
+
+			jwtService, ok := registry.Get(models.ServiceJWT.String()).(rootservices.JWTService)
+			require.True(t, ok, "the jwt service must satisfy the public contract")
+			activeKey, err := jwtService.GetActiveKey(context.Background(), models.SigningKeyPurposeJWTPlugin, models.SigningKeyAlgorithmRS256)
+			require.NoError(t, err)
+			assert.Equal(t, models.SigningKeyPurposeJWTPlugin, activeKey.KeyPurpose)
+			assert.Equal(t, models.SigningKeyAlgorithmRS256, activeKey.Algorithm)
+
+			assert.Equal(t, 1, countJWKSKeys(t, db), "only the jwt_plugin key is created eagerly")
 
 			if tt.withSecondaryStorage {
 				assert.NotNil(t, plugin.secondaryStorage)

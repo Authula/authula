@@ -18,6 +18,7 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 		RefreshExpiresIn:       7 * 24 * time.Hour,
 		JWKSCacheTTL:           24 * time.Hour,
 		RefreshGracePeriod:     10 * time.Second,
+		SigningAlgorithm:       "RS256",
 	}
 
 	tests := []struct {
@@ -53,6 +54,7 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 				RefreshGracePeriod:     time.Minute,
 				Issuer:                 "https://auth.example.com",
 				Audience:               "my-service",
+				SigningAlgorithm:       "RS256",
 			},
 		},
 		{
@@ -68,6 +70,7 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 				RefreshExpiresIn:       defaults.RefreshExpiresIn,
 				JWKSCacheTTL:           time.Hour,
 				RefreshGracePeriod:     defaults.RefreshGracePeriod,
+				SigningAlgorithm:       defaults.SigningAlgorithm,
 			},
 		},
 		{
@@ -83,6 +86,7 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 				RefreshExpiresIn:       defaults.RefreshExpiresIn,
 				JWKSCacheTTL:           defaults.JWKSCacheTTL,
 				RefreshGracePeriod:     -time.Second,
+				SigningAlgorithm:       defaults.SigningAlgorithm,
 			},
 		},
 	}

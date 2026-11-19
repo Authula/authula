@@ -2,8 +2,11 @@ package types
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
+
+	"github.com/Authula/authula/models"
 )
 
 const DefaultAudience = "authula"
@@ -18,6 +21,7 @@ type JWTPluginConfig struct {
 	RefreshGracePeriod     time.Duration `json:"refresh_grace_period" toml:"refresh_grace_period"`           // Grace period for refresh token reuse, default 10s
 	Issuer                 string        `json:"issuer" toml:"issuer"`                                       // Token issuer; defaults to base_url + base_path
 	Audience               string        `json:"audience" toml:"audience"`                                   // Token audience; defaults to "authula"
+	SigningAlgorithm       string        `json:"signing_algorithm" toml:"signing_algorithm"`                 // RS256 (default), ES256 or PS256
 }
 
 func (c *JWTPluginConfig) ApplyDefaults() {
@@ -38,6 +42,9 @@ func (c *JWTPluginConfig) ApplyDefaults() {
 	}
 	if c.RefreshGracePeriod == 0 {
 		c.RefreshGracePeriod = 10 * time.Second
+	}
+	if c.SigningAlgorithm == "" {
+		c.SigningAlgorithm = models.DefaultSigningKeyAlgorithm
 	}
 }
 
@@ -60,6 +67,12 @@ func (c *JWTPluginConfig) Validate() error {
 	}
 	if strings.TrimSpace(c.Audience) == "" {
 		return errors.New("jwt: audience must not be empty")
+	}
+	if c.SigningAlgorithm == "" {
+		c.SigningAlgorithm = models.DefaultSigningKeyAlgorithm
+	}
+	if err := models.ValidateSigningKeyAlgorithm(c.SigningAlgorithm); err != nil {
+		return fmt.Errorf("jwt: %w", err)
 	}
 	return nil
 }

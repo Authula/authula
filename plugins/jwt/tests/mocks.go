@@ -9,8 +9,8 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/stretchr/testify/mock"
 
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/jwt/repositories"
 	jwtservicesTypes "github.com/Authula/authula/plugins/jwt/types"
 )
 
@@ -78,9 +78,9 @@ func (NopTokenService) Hash(token string) string                 { return token 
 func (NopTokenService) Encrypt(token string) (string, error)     { return token, nil }
 func (NopTokenService) Decrypt(encrypted string) (string, error) { return encrypted, nil }
 
-var _ repositories.JWKSRepository = (*MockJWKSRepository)(nil)
-
-type MockTokenService struct{ mock.Mock }
+type MockTokenService struct {
+	internaltests.MockSigningKeyService
+}
 
 func (m *MockTokenService) GenerateUserToken(ctx context.Context, userID string, sessionID string, extraClaims map[string]any) (*jwtservicesTypes.TokenPair, error) {
 	args := m.Called(ctx, userID, sessionID, extraClaims)
@@ -121,12 +121,20 @@ func (m *MockKeyService) GenerateKeysIfMissing(ctx context.Context) error {
 	return args.Error(0)
 }
 
-func (m *MockKeyService) GetActiveKey(ctx context.Context) (*jwtservicesTypes.JWKS, error) {
+func (m *MockKeyService) GetActiveKey(ctx context.Context) (*models.SigningKey, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*jwtservicesTypes.JWKS), args.Error(1)
+	return args.Get(0).(*models.SigningKey), args.Error(1)
+}
+
+func (m *MockKeyService) GetPublicKeys(ctx context.Context) ([]models.SigningKey, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.SigningKey), args.Error(1)
 }
 
 func (m *MockKeyService) IsKeyRotationDue(ctx context.Context, rotationInterval time.Duration) bool {
@@ -237,44 +245,6 @@ func (m *MockRefreshTokenRepository) CleanupExpiredTokens(ctx context.Context) e
 	return args.Error(0)
 }
 
-type MockJWKSRepository struct{ mock.Mock }
-
-func (m *MockJWKSRepository) GetJWKSKeys(ctx context.Context) ([]*jwtservicesTypes.JWKS, error) {
-	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*jwtservicesTypes.JWKS), args.Error(1)
-}
-
-func (m *MockJWKSRepository) GetJWKSKeyByID(ctx context.Context, id string) (*jwtservicesTypes.JWKS, error) {
-	args := m.Called(ctx, id)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*jwtservicesTypes.JWKS), args.Error(1)
-}
-
-func (m *MockJWKSRepository) StoreJWKSKey(ctx context.Context, key *jwtservicesTypes.JWKS) error {
-	args := m.Called(ctx, key)
-	return args.Error(0)
-}
-
-func (m *MockJWKSRepository) UpdateJWKSKey(ctx context.Context, key *jwtservicesTypes.JWKS) error {
-	args := m.Called(ctx, key)
-	return args.Error(0)
-}
-
-func (m *MockJWKSRepository) MarkKeyExpired(ctx context.Context, id string, expiresAt time.Time) error {
-	args := m.Called(ctx, id, expiresAt)
-	return args.Error(0)
-}
-
-func (m *MockJWKSRepository) PurgeExpiredKeys(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
 type MockRefreshTokenService struct{ mock.Mock }
 
 func (m *MockRefreshTokenService) RefreshTokens(ctx context.Context, refreshToken string) (*jwtservicesTypes.RefreshTokenResponse, error) {
@@ -290,15 +260,8 @@ func (m *MockRefreshTokenService) StoreInitialRefreshToken(ctx context.Context, 
 	return args.Error(0)
 }
 
-type MockJWTService struct{ mock.Mock }
-
-func (m *MockJWTService) ValidateToken(ctx context.Context, token string) (*models.Actor, error) {
-	args := m.Called(ctx, token)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.Actor), args.Error(1)
-}
+type MockSigningKeyService = internaltests.MockSigningKeyService
+type MockJWTService = internaltests.MockJWTService
 
 type MockSessionService struct{ mock.Mock }
 

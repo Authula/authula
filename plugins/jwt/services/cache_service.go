@@ -10,21 +10,20 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 
 	"github.com/Authula/authula/models"
-	"github.com/Authula/authula/plugins/jwt/repositories"
 )
 
 const jwksCacheKey = "jwks:public:set"
 
 type cacheService struct {
-	repo             repositories.JWKSRepository
+	keyService       KeyService
 	secondaryStorage models.SecondaryStorage
 	logger           models.Logger
 	cacheTTL         time.Duration
 }
 
-func NewCacheService(repo repositories.JWKSRepository, secondaryStorage models.SecondaryStorage, logger models.Logger, cacheTTL time.Duration) CacheService {
+func NewCacheService(keyService KeyService, secondaryStorage models.SecondaryStorage, logger models.Logger, cacheTTL time.Duration) CacheService {
 	return &cacheService{
-		repo:             repo,
+		keyService:       keyService,
 		secondaryStorage: secondaryStorage,
 		logger:           logger,
 		cacheTTL:         cacheTTL,
@@ -56,22 +55,31 @@ func (s *cacheService) GetCachedJWKS(ctx context.Context) (jwk.Set, error) {
 }
 
 func (s *cacheService) FetchJWKSFromDatabase(ctx context.Context) (jwk.Set, error) {
-	jwksKeys, err := s.repo.GetJWKSKeys(ctx)
+	keys, err := s.keyService.GetPublicKeys(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch web keys: %w", err)
 	}
 
 	set := jwk.NewSet()
-	for _, wk := range jwksKeys {
-		pubKey, err := jwk.ParseKey([]byte(wk.PublicKey), jwk.WithPEM(true))
+	for _, key := range keys {
+		pubKey, err := jwk.ParseKey([]byte(key.PublicKey), jwk.WithPEM(true))
 		if err != nil {
-			s.logger.Warn("failed to parse public key", "id", wk.ID, "error", err)
+			s.logger.Warn("failed to parse public key", "kid", key.KeyID, "error", err)
 			continue
 		}
 
-		_ = pubKey.Set(jwk.KeyIDKey, wk.ID)
-		_ = pubKey.Set(jwk.AlgorithmKey, "EdDSA")
-		_ = set.AddKey(pubKey)
+		if err := pubKey.Set(jwk.KeyIDKey, key.KeyID); err != nil {
+			s.logger.Warn("failed to set key id on public key", "kid", key.KeyID, "error", err)
+			continue
+		}
+		if err := pubKey.Set(jwk.AlgorithmKey, key.Algorithm); err != nil {
+			s.logger.Warn("failed to set algorithm on public key", "kid", key.KeyID, "error", err)
+			continue
+		}
+		if err := set.AddKey(pubKey); err != nil {
+			s.logger.Warn("failed to add public key to JWKS", "kid", key.KeyID, "error", err)
+			continue
+		}
 	}
 
 	if set.Len() == 0 {
