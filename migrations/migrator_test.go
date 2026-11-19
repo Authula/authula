@@ -281,27 +281,37 @@ func TestMigrator_createSchemaTable(t *testing.T) {
 func TestMigrator_tableExpr(t *testing.T) {
 	t.Parallel()
 
-	migrator := &Migrator{table: DefaultSchemaTable}
-
 	tests := []struct {
 		name      string
+		dialect   string
 		withAlias bool
 		wantExpr  string
 	}{
-		{name: "with alias", withAlias: true, wantExpr: "? AS schema_migration"},
-		{name: "without alias", withAlias: false, wantExpr: "?"},
+		{name: "with alias", dialect: "postgres", withAlias: true, wantExpr: "? AS schema_migration"},
+		{name: "without alias", dialect: "postgres", withAlias: false, wantExpr: "?"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			migrator := &Migrator{table: DefaultSchemaTable, dialect: tt.dialect}
 			expr, args := migrator.tableExpr(tt.withAlias)
 			assert.Equal(t, tt.wantExpr, expr)
 			require.Len(t, args, 1)
 			assert.Equal(t, bun.Ident(DefaultSchemaTable), args[0])
 		})
 	}
+
+	t.Run("mysql insert skips alias", func(t *testing.T) {
+		t.Parallel()
+
+		migrator := &Migrator{table: DefaultSchemaTable, dialect: "mysql"}
+		expr, args := migrator.insertTableExpr()
+		assert.Equal(t, "?", expr)
+		require.Len(t, args, 1)
+		assert.Equal(t, bun.Ident(DefaultSchemaTable), args[0])
+	})
 }
 
 func TestExecStatements(t *testing.T) {
@@ -511,7 +521,7 @@ func TestMigrator_MigrateValidation(t *testing.T) {
 		{
 			name:    "missing dependency",
 			sets:    []MigrationSet{{PluginID: "plugin_a", DependsOn: []string{"missing"}}},
-			wantErr: "plugin plugin_a depends on missing which has no registered migrations",
+			wantErr: "plugin plugin_a depends on missing which is not registered",
 		},
 		{
 			name: "duplicate plugin set",
@@ -871,7 +881,7 @@ func TestMigrator_RollbackAll(t *testing.T) {
 
 		err := migrator.RollbackAll(context.Background(), []MigrationSet{set})
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "has no registered migrations")
+		assert.ErrorContains(t, err, "is not registered")
 	})
 
 	t.Run("returns schema table errors", func(t *testing.T) {
