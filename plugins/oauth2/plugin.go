@@ -36,17 +36,19 @@ type OAuth2Plugin struct {
 	accountService   rootservices.AccountService
 	sessionService   rootservices.SessionService
 	tokenService     rootservices.TokenService
+	jwtService       rootservices.JWTService
 	providerRegistry *services.ProviderRegistry
 	httpClient       *http.Client
 	useCases         *usecases.UseCases
 	Api              *API
 
-	oauthClientRepo       repositories.OAuthClientRepository
-	authorizationCodeRepo repositories.AuthorizationCodeRepository
-	consentRequestRepo    repositories.ConsentRequestRepository
-	consentRepo           repositories.ConsentRepository
-	loginTransactionRepo  repositories.LoginTransactionRepository
-	flowStateRepo         repositories.FlowStateRepository
+	oauthClientRepo    repositories.OAuthClientRepository
+	authRequestRepo    repositories.AuthRequestRepository
+	consentRequestRepo repositories.ConsentRequestRepository
+	consentRepo        repositories.ConsentRepository
+	accessGrantRepo    repositories.AccessGrantRepository
+	refreshTokenRepo   repositories.RefreshTokenRepository
+	flowStateRepo      repositories.FlowStateRepository
 
 	stopCleanup chan struct{}
 	done        chan struct{}
@@ -108,10 +110,11 @@ func (p *OAuth2Plugin) Init(ctx *models.PluginContext) error {
 
 func (p *OAuth2Plugin) initializeRepositories() {
 	p.oauthClientRepo = repositories.NewBunOAuthClientRepository(p.db)
-	p.authorizationCodeRepo = repositories.NewBunAuthorizationCodeRepository(p.db)
+	p.authRequestRepo = repositories.NewBunAuthRequestRepository(p.db)
 	p.consentRequestRepo = repositories.NewBunConsentRequestRepository(p.db)
 	p.consentRepo = repositories.NewBunConsentRepository(p.db)
-	p.loginTransactionRepo = repositories.NewBunLoginTransactionRepository(p.db)
+	p.accessGrantRepo = repositories.NewBunAccessGrantRepository(p.db)
+	p.refreshTokenRepo = repositories.NewBunRefreshTokenRepository(p.db)
 	p.flowStateRepo = repositories.NewBunFlowStateRepository(p.db)
 }
 
@@ -124,7 +127,7 @@ func (p *OAuth2Plugin) Migrations(provider string) []migrations.Migration {
 }
 
 func (p *OAuth2Plugin) DependsOn() []string {
-	return nil
+	return []string{models.PluginJWT.String()}
 }
 
 func (p *OAuth2Plugin) initializeServices(ctx *models.PluginContext) error {
@@ -148,6 +151,11 @@ func (p *OAuth2Plugin) initializeServices(ctx *models.PluginContext) error {
 	p.tokenService, ok = ctx.ServiceRegistry.Get(models.ServiceToken.String()).(rootservices.TokenService)
 	if !ok {
 		return fmt.Errorf("token service not available in service registry")
+	}
+
+	p.jwtService, ok = ctx.ServiceRegistry.Get(models.ServiceJWT.String()).(rootservices.JWTService)
+	if !ok {
+		return fmt.Errorf("jwt service not available in service registry: enable the jwt plugin")
 	}
 
 	return nil
@@ -397,14 +405,17 @@ func (p *OAuth2Plugin) Close() error {
 func (p *OAuth2Plugin) runCleanupLoop(interval time.Duration) {
 	cleanup.RunLoop(p.stopCleanup, p.done, interval, func(ctx context.Context) {
 		now := time.Now().UTC()
-		if _, err := p.authorizationCodeRepo.DeleteExpired(ctx, now); err != nil {
-			p.logger.Error("oauth2 authorization code cleanup failed", "error", err)
+		if _, err := p.authRequestRepo.DeleteExpired(ctx, now); err != nil {
+			p.logger.Error("oauth2 auth request cleanup failed", "error", err)
 		}
 		if _, err := p.consentRequestRepo.DeleteExpired(ctx, now); err != nil {
 			p.logger.Error("oauth2 consent request cleanup failed", "error", err)
 		}
-		if _, err := p.loginTransactionRepo.DeleteExpired(ctx, now); err != nil {
-			p.logger.Error("oauth2 login transaction cleanup failed", "error", err)
+		if _, err := p.accessGrantRepo.DeleteExpired(ctx, now); err != nil {
+			p.logger.Error("oauth2 access grant cleanup failed", "error", err)
+		}
+		if _, err := p.refreshTokenRepo.DeleteExpired(ctx, now); err != nil {
+			p.logger.Error("oauth2 refresh token cleanup failed", "error", err)
 		}
 		if _, err := p.flowStateRepo.DeleteExpired(ctx, now); err != nil {
 			p.logger.Error("oauth2 flow state cleanup failed", "error", err)

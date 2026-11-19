@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Authula/authula/env"
+	internalplugins "github.com/Authula/authula/internal/plugins"
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/oauth2/constants"
@@ -431,5 +432,43 @@ func TestOAuth2PluginImplementsMigrationInterface(t *testing.T) {
 	migratable, ok := plugin.(models.PluginWithMigrations)
 	require.True(t, ok)
 	require.Len(t, migratable.Migrations("sqlite"), 1)
-	require.Nil(t, migratable.DependsOn())
+	require.Equal(t, []string{models.PluginJWT.String()}, migratable.DependsOn())
+}
+
+func TestOAuth2Plugin_DependsOn(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, []string{models.PluginJWT.String()}, New(types.OAuth2PluginConfig{}).DependsOn())
+}
+
+func newOAuth2ServiceRegistry(withJWTService bool) *internalplugins.DefaultServiceRegistry {
+	registry := internalplugins.NewServiceRegistry()
+	registry.Register(models.ServiceUser.String(), new(internaltests.MockUserService))
+	registry.Register(models.ServiceAccount.String(), new(internaltests.MockAccountService))
+	registry.Register(models.ServiceSession.String(), new(internaltests.MockSessionService))
+	registry.Register(models.ServiceToken.String(), new(internaltests.MockTokenService))
+	if withJWTService {
+		registry.Register(models.ServiceJWT.String(), new(internaltests.MockJWTService))
+	}
+	return registry
+}
+
+func TestOAuth2Plugin_initializeServicesRequiresJWTService(t *testing.T) {
+	t.Parallel()
+
+	plugin := New(types.OAuth2PluginConfig{})
+	err := plugin.initializeServices(&models.PluginContext{ServiceRegistry: newOAuth2ServiceRegistry(false)})
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "enable the jwt plugin")
+}
+
+func TestOAuth2Plugin_initializeServicesResolvesJWTService(t *testing.T) {
+	t.Parallel()
+
+	plugin := New(types.OAuth2PluginConfig{})
+	err := plugin.initializeServices(&models.PluginContext{ServiceRegistry: newOAuth2ServiceRegistry(true)})
+
+	require.NoError(t, err)
+	require.NotNil(t, plugin.jwtService)
 }
