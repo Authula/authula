@@ -302,16 +302,32 @@ func TestMigrator_tableExpr(t *testing.T) {
 			assert.Equal(t, bun.Ident(DefaultSchemaTable), args[0])
 		})
 	}
+}
 
-	t.Run("mysql insert skips alias", func(t *testing.T) {
-		t.Parallel()
+func TestMigrator_insertTableExpr(t *testing.T) {
+	t.Parallel()
 
-		migrator := &Migrator{table: DefaultSchemaTable, dialect: "mysql"}
-		expr, args := migrator.insertTableExpr()
-		assert.Equal(t, "?", expr)
-		require.Len(t, args, 1)
-		assert.Equal(t, bun.Ident(DefaultSchemaTable), args[0])
-	})
+	tests := []struct {
+		name     string
+		dialect  string
+		wantExpr string
+	}{
+		{name: "mysql omits the row alias", dialect: "mysql", wantExpr: "?"},
+		{name: "postgres includes the row alias", dialect: "postgres", wantExpr: "? AS schema_migration"},
+		{name: "sqlite includes the row alias", dialect: "sqlite", wantExpr: "? AS schema_migration"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			migrator := &Migrator{table: DefaultSchemaTable, dialect: tt.dialect}
+			expr, args := migrator.insertTableExpr()
+			assert.Equal(t, tt.wantExpr, expr)
+			require.Len(t, args, 1)
+			assert.Equal(t, bun.Ident(DefaultSchemaTable), args[0])
+		})
+	}
 }
 
 func TestExecStatements(t *testing.T) {
