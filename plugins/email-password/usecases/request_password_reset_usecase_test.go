@@ -176,80 +176,138 @@ func TestRequestPasswordResetUseCase_PluginCallback(t *testing.T) {
 		f.verificationSvc.On("Create", mock.Anything, "user-1", "hashed-token", models.TypePasswordResetRequest, "test@example.com", time.Hour).Return(&models.Verification{ID: "verif-1"}, nil).Once()
 	}
 
-	t.Run("successful callback skips the mailer", func(t *testing.T) {
-		t.Parallel()
-		f := newPasswordResetFixture(t)
-		expectVerification(f)
-		f.pluginConfig.SendPasswordResetEmail = func(types.SendPasswordResetEmailParams, *models.RequestContext) error {
-			return nil
-		}
+	tests := []struct {
+		name   string
+		setup  func(*emailPasswordTestFixture, chan struct{})
+		assert func(*testing.T, *emailPasswordTestFixture, *passwordFlowLogger, <-chan struct{})
+	}{
+		{
+			name: "successful callback skips the mailer",
+			setup: func(f *emailPasswordTestFixture, _ chan struct{}) {
+				expectVerification(f)
+				f.pluginConfig.SendPasswordResetEmail = func(types.SendPasswordResetEmailParams, *models.RequestContext) error {
+					return nil
+				}
+			},
+			assert: func(t *testing.T, f *emailPasswordTestFixture, _ *passwordFlowLogger, _ <-chan struct{}) {
+				f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
+			},
+		},
+		{
+			name: "callback failure is logged and falls back to the mailer",
+			setup: func(f *emailPasswordTestFixture, sent chan struct{}) {
+				expectVerification(f)
+				f.pluginConfig.SendPasswordResetEmail = func(types.SendPasswordResetEmailParams, *models.RequestContext) error {
+					return errPasswordFlowBackend
+				}
+				f.mailerSvc.On("SendEmail", mock.Anything, "test@example.com", "Reset Your Password", mock.Anything, mock.Anything).
+					Run(func(mock.Arguments) { close(sent) }).
+					Return(nil).Once()
+			},
+			assert: func(t *testing.T, f *emailPasswordTestFixture, logger *passwordFlowLogger, sent <-chan struct{}) {
+				waitForPasswordFlowSignal(t, sent, "password reset email")
+				require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send password reset email via plugin callback")
+				f.mailerSvc.AssertExpectations(t)
+			},
+		},
+		{
+			name: "render failure in the background is logged",
+			setup: func(f *emailPasswordTestFixture, _ chan struct{}) {
+				expectVerification(f)
+				// A manager without registered templates forces the render path to fail.
+				f.tmplMgr = emailtmpl.NewManager()
+			},
+			assert: func(t *testing.T, f *emailPasswordTestFixture, logger *passwordFlowLogger, _ <-chan struct{}) {
+				waitForPasswordFlowSignal(t, logger.done, "background render error")
+				require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send password reset email via built-in email service")
+				f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
+			},
+		},
+	}
 
-		err := f.requestPasswordResetUseCase().RequestReset(testRequestContext(), "test@example.com", nil)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		require.NoError(t, err)
-		f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
-	})
+			f := newPasswordResetFixture(t)
+			logger := newPasswordFlowLogger()
+			sent := make(chan struct{}, 1)
+			tc.setup(f, sent)
 
-	t.Run("callback failure is logged and falls back to the mailer", func(t *testing.T) {
-		t.Parallel()
-		f := newPasswordResetFixture(t)
-		expectVerification(f)
-		logger := newPasswordFlowLogger()
-		sent := make(chan struct{})
-		f.pluginConfig.SendPasswordResetEmail = func(types.SendPasswordResetEmailParams, *models.RequestContext) error {
-			return errPasswordFlowBackend
-		}
-		f.mailerSvc.On("SendEmail", mock.Anything, "test@example.com", "Reset Your Password", mock.Anything, mock.Anything).
-			Run(func(mock.Arguments) { close(sent) }).
-			Return(nil).Once()
+			uc := NewRequestPasswordResetUseCase(logger, f.globalConfig, f.pluginConfig, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr, f.hooksExecutor)
+			err := uc.RequestReset(testRequestContext(), "test@example.com", nil)
 
-		uc := NewRequestPasswordResetUseCase(logger, f.globalConfig, f.pluginConfig, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr, f.hooksExecutor)
-		err := uc.RequestReset(testRequestContext(), "test@example.com", nil)
-
-		require.NoError(t, err)
-		waitForPasswordFlowSignal(t, sent, "password reset email")
-		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send password reset email via plugin callback")
-		f.mailerSvc.AssertExpectations(t)
-	})
-
-	t.Run("render failure in the background is logged", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailPasswordTestFixture()
-		expectVerification(f)
-		logger := newPasswordFlowLogger()
-		// A manager without registered templates forces the render path to fail.
-		f.tmplMgr = emailtmpl.NewManager()
-
-		uc := NewRequestPasswordResetUseCase(logger, f.globalConfig, f.pluginConfig, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr, f.hooksExecutor)
-		err := uc.RequestReset(testRequestContext(), "test@example.com", nil)
-
-		require.NoError(t, err)
-		waitForPasswordFlowSignal(t, logger.done, "background render error")
-		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send password reset email via built-in email service")
-		f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
-	})
+			require.NoError(t, err)
+			tc.assert(t, f, logger, sent)
+			f.userSvc.AssertExpectations(t)
+			f.verificationSvc.AssertExpectations(t)
+			f.tokenSvc.AssertExpectations(t)
+		})
+	}
 }
 
 func TestRequestPasswordResetUseCase_SendRequestPasswordResetEmail(t *testing.T) {
 	t.Parallel()
 
-	t.Run("renders the template and sends it", func(t *testing.T) {
-		t.Parallel()
-		f := newPasswordResetFixture(t)
-		link := "http://localhost/auth/reset?token=abc"
-		f.mailerSvc.On(
-			"SendEmail",
-			mock.Anything,
-			"test@example.com",
-			"Reset Your Password",
-			mock.MatchedBy(func(body string) bool { return strings.Contains(body, link) }),
-			mock.MatchedBy(func(body string) bool { return strings.Contains(body, link) }),
-		).Return(nil).Once()
+	const (
+		userEmail = "test@example.com"
+		subject   = "Reset Your Password"
+		link      = "http://localhost/auth/reset?token=abc"
+	)
 
-		uc := f.requestPasswordResetUseCase().(*requestPasswordResetUseCase)
-		err := uc.sendRequestPasswordResetEmail(context.Background(), &models.User{ID: "user-1", Email: "test@example.com"}, link)
+	tests := []struct {
+		name    string
+		setup   func(*emailPasswordTestFixture)
+		wantErr string
+		wantLog string
+	}{
+		{
+			name: "renders the template and sends it",
+			setup: func(f *emailPasswordTestFixture) {
+				f.mailerSvc.On(
+					"SendEmail",
+					mock.Anything,
+					userEmail,
+					subject,
+					mock.MatchedBy(func(body string) bool { return strings.Contains(body, link) }),
+					mock.MatchedBy(func(body string) bool { return strings.Contains(body, link) }),
+				).Return(nil).Once()
+			},
+		},
+		{
+			name: "render failure is logged and returned",
+			setup: func(f *emailPasswordTestFixture) {
+				// A manager without registered templates forces the render path to fail.
+				f.tmplMgr = emailtmpl.NewManager()
+			},
+			wantErr: "not found",
+			wantLog: "failed to render password reset template",
+		},
+	}
 
-		require.NoError(t, err)
-		f.mailerSvc.AssertExpectations(t)
-	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newPasswordResetFixture(t)
+			logger := newPasswordFlowLogger()
+			tc.setup(f)
+
+			uc := NewRequestPasswordResetUseCase(logger, f.globalConfig, f.pluginConfig, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr, f.hooksExecutor).(*requestPasswordResetUseCase)
+			err := uc.sendRequestPasswordResetEmail(context.Background(), &models.User{ID: "user-1", Email: userEmail}, link)
+
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tc.wantErr)
+			}
+			if tc.wantLog != "" {
+				require.Contains(t, strings.Join(logger.messages(), "\n"), tc.wantLog)
+			}
+			f.mailerSvc.AssertExpectations(t)
+			if tc.wantErr != "" {
+				f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
+			}
+		})
+	}
 }

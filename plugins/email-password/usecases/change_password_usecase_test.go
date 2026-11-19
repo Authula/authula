@@ -240,86 +240,134 @@ func TestChangePasswordUseCase_CallbackPaths(t *testing.T) {
 		f.verificationSvc.On("Delete", mock.Anything, "verif-1").Return(nil).Once()
 	}
 
-	t.Run("successful callback skips the mailer", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailPasswordTestFixture()
-		expectCommit(f)
-		f.eventBus.On("Publish", mock.Anything).Return(nil).Maybe()
-		f.pluginConfig.SendChangedPasswordEmail = func(types.SendChangedPasswordEmailParams, *models.RequestContext) error {
-			return nil
-		}
+	tests := []struct {
+		name   string
+		setup  func(*emailPasswordTestFixture, *passwordFlowLogger, chan struct{})
+		assert func(*testing.T, *emailPasswordTestFixture, *passwordFlowLogger, <-chan struct{})
+	}{
+		{
+			name: "successful callback skips the mailer",
+			setup: func(f *emailPasswordTestFixture, _ *passwordFlowLogger, _ chan struct{}) {
+				expectCommit(f)
+				f.eventBus.On("Publish", mock.Anything).Return(nil).Maybe()
+				f.pluginConfig.SendChangedPasswordEmail = func(types.SendChangedPasswordEmailParams, *models.RequestContext) error {
+					return nil
+				}
+			},
+			assert: func(t *testing.T, f *emailPasswordTestFixture, _ *passwordFlowLogger, _ <-chan struct{}) {
+				f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
+			},
+		},
+		{
+			name: "callback failure is logged and falls back to the mailer",
+			setup: func(f *emailPasswordTestFixture, _ *passwordFlowLogger, sent chan struct{}) {
+				expectCommit(f)
+				f.eventBus.On("Publish", mock.Anything).Return(nil).Maybe()
+				f.pluginConfig.SendChangedPasswordEmail = func(types.SendChangedPasswordEmailParams, *models.RequestContext) error {
+					return errPasswordFlowBackend
+				}
+				f.mailerSvc.On("SendEmail", mock.Anything, "test@example.com", "Your password has been changed", mock.Anything, mock.Anything).
+					Run(func(mock.Arguments) { close(sent) }).
+					Return(nil).Once()
+			},
+			assert: func(t *testing.T, f *emailPasswordTestFixture, logger *passwordFlowLogger, sent <-chan struct{}) {
+				waitForPasswordFlowSignal(t, sent, "changed password email")
+				require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send changed password email via plugin callback")
+				f.mailerSvc.AssertExpectations(t)
+			},
+		},
+		{
+			name: "background send failure is logged",
+			setup: func(f *emailPasswordTestFixture, _ *passwordFlowLogger, _ chan struct{}) {
+				expectCommit(f)
+				f.eventBus.On("Publish", mock.Anything).Return(nil).Maybe()
+				f.mailerSvc.On("SendEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errPasswordFlowBackend).Once()
+			},
+			assert: func(t *testing.T, f *emailPasswordTestFixture, logger *passwordFlowLogger, _ <-chan struct{}) {
+				waitForPasswordFlowSignal(t, logger.done, "background send error")
+				require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send changed password email via built-in email service")
+				f.mailerSvc.AssertExpectations(t)
+			},
+		},
+	}
 
-		err := f.changePasswordUseCase().ChangePassword(context.Background(), "token-123", "NewPassword1!")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		require.NoError(t, err)
-		f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
-	})
+			f := newEmailPasswordTestFixture()
+			logger := newPasswordFlowLogger()
+			sent := make(chan struct{}, 1)
+			tc.setup(f, logger, sent)
 
-	t.Run("callback failure is logged and falls back to the mailer", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailPasswordTestFixture()
-		expectCommit(f)
-		f.eventBus.On("Publish", mock.Anything).Return(nil).Maybe()
-		logger := newPasswordFlowLogger()
-		sent := make(chan struct{})
-		f.pluginConfig.SendChangedPasswordEmail = func(types.SendChangedPasswordEmailParams, *models.RequestContext) error {
-			return errPasswordFlowBackend
-		}
-		f.mailerSvc.On("SendEmail", mock.Anything, "test@example.com", "Your password has been changed", mock.Anything, mock.Anything).
-			Run(func(mock.Arguments) { close(sent) }).
-			Return(nil).Once()
+			uc := NewChangePasswordUseCase(f.globalConfig, logger, f.pluginConfig, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.passwordSvc, f.mailerSvc, f.eventBus, f.tmplMgr, f.hooksExecutor)
+			err := uc.ChangePassword(context.Background(), "token-123", "NewPassword1!")
 
-		uc := NewChangePasswordUseCase(f.globalConfig, logger, f.pluginConfig, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.passwordSvc, f.mailerSvc, f.eventBus, f.tmplMgr, f.hooksExecutor)
-		err := uc.ChangePassword(context.Background(), "token-123", "NewPassword1!")
-
-		require.NoError(t, err)
-		waitForPasswordFlowSignal(t, sent, "changed password email")
-		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send changed password email via plugin callback")
-		f.mailerSvc.AssertExpectations(t)
-	})
-
-	t.Run("background send failure is logged", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailPasswordTestFixture()
-		expectCommit(f)
-		f.eventBus.On("Publish", mock.Anything).Return(nil).Maybe()
-		logger := newPasswordFlowLogger()
-		f.mailerSvc.On("SendEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errPasswordFlowBackend).Once()
-
-		uc := NewChangePasswordUseCase(f.globalConfig, logger, f.pluginConfig, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.passwordSvc, f.mailerSvc, f.eventBus, f.tmplMgr, f.hooksExecutor)
-		err := uc.ChangePassword(context.Background(), "token-123", "NewPassword1!")
-
-		require.NoError(t, err)
-		waitForPasswordFlowSignal(t, logger.done, "background send error")
-		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send changed password email via built-in email service")
-		f.mailerSvc.AssertExpectations(t)
-	})
+			require.NoError(t, err)
+			tc.assert(t, f, logger, sent)
+			f.userSvc.AssertExpectations(t)
+			f.accountSvc.AssertExpectations(t)
+			f.verificationSvc.AssertExpectations(t)
+			f.tokenSvc.AssertExpectations(t)
+			f.passwordSvc.AssertExpectations(t)
+		})
+	}
 }
 
 func TestChangePasswordUseCase_SendChangedPasswordEmail(t *testing.T) {
 	t.Parallel()
 
-	t.Run("renders the template and sends it", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailPasswordTestFixture()
-		f.mailerSvc.On("SendEmail", mock.Anything, "test@example.com", "Your password has been changed", mock.Anything, mock.Anything).Return(nil).Once()
+	const (
+		userEmail = "test@example.com"
+		subject   = "Your password has been changed"
+	)
 
-		uc := f.changePasswordUseCase().(*changePasswordUseCase)
-		err := uc.sendChangedPasswordEmail(context.Background(), &models.User{ID: "user-1", Email: "test@example.com"})
+	tests := []struct {
+		name    string
+		setup   func(*emailPasswordTestFixture)
+		wantErr string
+		wantLog string
+	}{
+		{
+			name: "renders the template and sends it",
+			setup: func(f *emailPasswordTestFixture) {
+				f.mailerSvc.On("SendEmail", mock.Anything, userEmail, subject, mock.Anything, mock.Anything).Return(nil).Once()
+			},
+		},
+		{
+			name: "render failure is logged and returned",
+			setup: func(f *emailPasswordTestFixture) {
+				// A manager without registered templates forces the render path to fail.
+				f.tmplMgr = emailtmpl.NewManager()
+			},
+			wantErr: "not found",
+			wantLog: "failed to render password changed template",
+		},
+	}
 
-		require.NoError(t, err)
-		f.mailerSvc.AssertExpectations(t)
-	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("render failure is logged and returned", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailPasswordTestFixture()
-		logger := newPasswordFlowLogger()
+			f := newEmailPasswordTestFixture()
+			logger := newPasswordFlowLogger()
+			tc.setup(f)
 
-		uc := NewChangePasswordUseCase(f.globalConfig, logger, f.pluginConfig, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.passwordSvc, nil, f.eventBus, emailtmpl.NewManager(), f.hooksExecutor).(*changePasswordUseCase)
-		err := uc.sendChangedPasswordEmail(context.Background(), &models.User{ID: "user-1", Email: "test@example.com"})
+			uc := NewChangePasswordUseCase(f.globalConfig, logger, f.pluginConfig, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.passwordSvc, f.mailerSvc, f.eventBus, f.tmplMgr, f.hooksExecutor).(*changePasswordUseCase)
+			err := uc.sendChangedPasswordEmail(context.Background(), &models.User{ID: "user-1", Email: userEmail})
 
-		require.ErrorContains(t, err, "not found")
-		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to render password changed template")
-	})
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tc.wantErr)
+			}
+			if tc.wantLog != "" {
+				require.Contains(t, strings.Join(logger.messages(), "\n"), tc.wantLog)
+			}
+			f.mailerSvc.AssertExpectations(t)
+			if tc.wantErr != "" {
+				f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
+			}
+		})
+	}
 }
