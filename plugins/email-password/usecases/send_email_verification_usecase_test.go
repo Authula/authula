@@ -77,6 +77,7 @@ func TestSendEmailVerificationUseCase(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+
 			f := newEmailPasswordTestFixture()
 			if tc.setup != nil {
 				tc.setup(f)
@@ -184,6 +185,7 @@ func TestSendEmailVerificationUseCase_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+
 			f := newEmailPasswordTestFixture()
 			tc.setup(f)
 
@@ -221,92 +223,134 @@ func TestSendEmailVerificationUseCase_MailerFallback(t *testing.T) {
 		f.verificationSvc.On("Create", mock.Anything, "user-1", "hashed-token", models.TypeEmailVerification, "test@example.com", 24*time.Hour).Return(&models.Verification{ID: "verif-1"}, nil).Once()
 	}
 
-	t.Run("plugin callback failure falls back to the mailer", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailPasswordTestFixture()
-		expectVerificationCreated(f)
-		logger := newNotifyingLogger()
-		sent := make(chan struct{})
+	tests := []struct {
+		name   string
+		setup  func(*emailPasswordTestFixture, chan struct{})
+		assert func(*testing.T, *emailPasswordTestFixture, *notifyingLogger, <-chan struct{})
+	}{
+		{
+			name: "plugin callback failure falls back to the mailer",
+			setup: func(f *emailPasswordTestFixture, sent chan struct{}) {
+				expectVerificationCreated(f)
+				f.pluginConfig.SendEmailVerification = func(types.SendEmailVerificationParams, *models.RequestContext) error {
+					return errSendVerificationBackend
+				}
+				f.mailerSvc.On("SendEmail", mock.Anything, "test@example.com", "Verify your email", mock.Anything, mock.Anything).
+					Run(func(mock.Arguments) { close(sent) }).
+					Return(nil).Once()
+			},
+			assert: func(t *testing.T, f *emailPasswordTestFixture, logger *notifyingLogger, sent <-chan struct{}) {
+				waitForSignal(t, sent, "mailer send")
+				require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send email verification via plugin callback")
+				f.mailerSvc.AssertExpectations(t)
+			},
+		},
+		{
+			name: "plugin callback success skips the mailer",
+			setup: func(f *emailPasswordTestFixture, _ chan struct{}) {
+				expectVerificationCreated(f)
+				f.pluginConfig.SendEmailVerification = func(types.SendEmailVerificationParams, *models.RequestContext) error {
+					return nil
+				}
+			},
+			assert: func(t *testing.T, f *emailPasswordTestFixture, _ *notifyingLogger, _ <-chan struct{}) {
+				f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
+			},
+		},
+		{
+			name: "render failure in the background is logged",
+			setup: func(f *emailPasswordTestFixture, _ chan struct{}) {
+				expectVerificationCreated(f)
+				// A manager without registered templates forces the render path to fail.
+				f.tmplMgr = emailtmpl.NewManager()
+			},
+			assert: func(t *testing.T, f *emailPasswordTestFixture, logger *notifyingLogger, _ <-chan struct{}) {
+				waitForSignal(t, logger.done, "background render error")
+				require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send email verification via built-in email service")
+				f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
+			},
+		},
+	}
 
-		f.pluginConfig.SendEmailVerification = func(types.SendEmailVerificationParams, *models.RequestContext) error {
-			return errSendVerificationBackend
-		}
-		f.mailerSvc.On("SendEmail", mock.Anything, "test@example.com", "Verify your email", mock.Anything, mock.Anything).
-			Run(func(mock.Arguments) { close(sent) }).
-			Return(nil).Once()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		uc := NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, logger, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr)
-		require.NoError(t, uc.Send(testRequestContext(), "user-1", nil))
+			f := newEmailPasswordTestFixture()
+			logger := newNotifyingLogger()
+			sent := make(chan struct{})
+			tc.setup(f, sent)
 
-		waitForSignal(t, sent, "mailer send")
-		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send email verification via plugin callback")
-		f.mailerSvc.AssertExpectations(t)
-	})
+			uc := NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, logger, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr)
+			require.NoError(t, uc.Send(testRequestContext(), "user-1", nil))
 
-	t.Run("plugin callback success skips the mailer", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailPasswordTestFixture()
-		expectVerificationCreated(f)
-
-		f.pluginConfig.SendEmailVerification = func(types.SendEmailVerificationParams, *models.RequestContext) error {
-			return nil
-		}
-
-		uc := NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, newNotifyingLogger(), f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr)
-		require.NoError(t, uc.Send(testRequestContext(), "user-1", nil))
-
-		f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
-	})
-
-	t.Run("render failure in the background is logged", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailPasswordTestFixture()
-		expectVerificationCreated(f)
-		// A manager without registered templates forces the render path to fail.
-		f.tmplMgr = emailtmpl.NewManager()
-		logger := newNotifyingLogger()
-
-		uc := NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, logger, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr)
-		require.NoError(t, uc.Send(testRequestContext(), "user-1", nil))
-
-		waitForSignal(t, logger.done, "background render error")
-		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send email verification via built-in email service")
-		f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
-	})
+			tc.assert(t, f, logger, sent)
+			f.userSvc.AssertExpectations(t)
+			f.verificationSvc.AssertExpectations(t)
+			f.tokenSvc.AssertExpectations(t)
+		})
+	}
 }
 
 func TestSendEmailVerificationUseCase_SendEmailVerification(t *testing.T) {
 	t.Parallel()
 
-	t.Run("renders the template and sends it", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailPasswordTestFixture()
-		link := "http://localhost/auth/verify?token=abc"
-		f.mailerSvc.On(
-			"SendEmail",
-			mock.Anything,
-			"test@example.com",
-			"Verify your email",
-			mock.MatchedBy(func(body string) bool { return strings.Contains(body, link) }),
-			mock.MatchedBy(func(body string) bool { return strings.Contains(body, link) }),
-		).Return(nil).Once()
+	const link = "http://localhost/auth/verify?token=abc"
+	user := &models.User{ID: "user-1", Email: "test@example.com"}
 
-		uc := NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, newNotifyingLogger(), f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr).(*sendEmailVerificationUseCase)
-		err := uc.sendEmailVerification(context.Background(), &models.User{ID: "user-1", Email: "test@example.com"}, link)
+	tests := []struct {
+		name    string
+		setup   func(*emailPasswordTestFixture)
+		wantErr string
+		wantLog string
+	}{
+		{
+			name: "renders the template and sends it",
+			setup: func(f *emailPasswordTestFixture) {
+				f.mailerSvc.On(
+					"SendEmail",
+					mock.Anything,
+					"test@example.com",
+					"Verify your email",
+					mock.MatchedBy(func(body string) bool { return strings.Contains(body, link) }),
+					mock.MatchedBy(func(body string) bool { return strings.Contains(body, link) }),
+				).Return(nil).Once()
+			},
+		},
+		{
+			name: "render failure is logged and returned",
+			setup: func(f *emailPasswordTestFixture) {
+				// A manager without registered templates forces the render path to fail.
+				f.tmplMgr = emailtmpl.NewManager()
+			},
+			wantErr: "not found",
+			wantLog: "failed to render email verification template",
+		},
+	}
 
-		require.NoError(t, err)
-		f.mailerSvc.AssertExpectations(t)
-	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("render failure is logged and returned", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailPasswordTestFixture()
-		logger := newNotifyingLogger()
+			f := newEmailPasswordTestFixture()
+			logger := newNotifyingLogger()
+			tc.setup(f)
 
-		uc := NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, logger, f.userSvc, f.verificationSvc, f.tokenSvc, nil, emailtmpl.NewManager()).(*sendEmailVerificationUseCase)
-		err := uc.sendEmailVerification(context.Background(), &models.User{ID: "user-1", Email: "test@example.com"}, "http://localhost/auth/verify?token=abc")
+			uc := NewSendEmailVerificationUseCase(f.globalConfig, f.pluginConfig, logger, f.userSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.tmplMgr).(*sendEmailVerificationUseCase)
+			err := uc.sendEmailVerification(context.Background(), user, link)
 
-		require.ErrorContains(t, err, "not found")
-		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to render email verification template")
-	})
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tc.wantErr)
+			}
+			if tc.wantLog != "" {
+				require.Contains(t, strings.Join(logger.messages(), "\n"), tc.wantLog)
+			}
+			f.mailerSvc.AssertExpectations(t)
+			if tc.wantErr != "" {
+				f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
+			}
+		})
+	}
 }
