@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/Authula/authula/plugins/jwt/repositories"
 	jwtservices "github.com/Authula/authula/plugins/jwt/services"
 	"github.com/Authula/authula/services"
 )
@@ -17,3 +18,5 @@ var _ services.JWTService = (*MockJWTService)(nil)
 var _ services.JWTService = (*MockTokenService)(nil)
 var _ services.SessionService = (*MockSessionService)(nil)
 var _ services.TokenService = (*MockTokenServiceCore)(nil)
+var _ repositories.SigningKeyRepository = (*MockSigningKeyRepository)(nil)
+var _ interface{ Encrypt(string) (string, error) } = (*MockEncryptor)(nil)

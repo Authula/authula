@@ -217,6 +217,15 @@ func TestJWTPluginConfig_Validate(t *testing.T) {
 			},
 			wantErr: "audience must not be empty",
 		},
+		{
+			name: "unsupported_signing_algorithm",
+			config: JWTPluginConfig{
+				Issuer:           "https://auth.example.com",
+				Audience:         DefaultAudience,
+				SigningAlgorithm: "HS256",
+			},
+			wantErr: "unsupported jwt signing algorithm",
+		},
 	}
 
 	for _, tt := range tests {

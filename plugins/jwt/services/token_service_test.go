@@ -457,6 +457,25 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			},
 		},
 		{
+			name: "machine_token_scopes_decoded_as_any",
+			claims: map[string]any{
+				jwt.SubjectKey:    "client-1",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "machine",
+				"scopes":          []any{"read:users", 42, "write:users"},
+				jwt.JwtIDKey:      "jti-scopes-any",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			setupMocks: func(t *testing.T, f *serviceTestFixture) {
+				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-scopes-any").Return(false, nil)
+			},
+			wantActor: func(t *testing.T, actor *models.Actor) {
+				require.Equal(t, "client-1", actor.ID)
+				require.Equal(t, []string{"read:users", "write:users"}, actor.Scopes)
+			},
+		},
+		{
 			name: "machine_token_no_optional_fields",
 			claims: map[string]any{
 				jwt.SubjectKey:    "client-2",

@@ -114,6 +114,54 @@ func (m *MockTokenService) ValidateToken(ctx context.Context, token string) (*mo
 	return args.Get(0).(*models.Actor), args.Error(1)
 }
 
+type MockSigningKeyRepository struct{ mock.Mock }
+
+func (m *MockSigningKeyRepository) GetActiveKey(ctx context.Context, purpose, algorithm string) (*models.SigningKey, error) {
+	args := m.Called(ctx, purpose, algorithm)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.SigningKey), args.Error(1)
+}
+
+func (m *MockSigningKeyRepository) GetKeyByID(ctx context.Context, keyID string) (*models.SigningKey, error) {
+	args := m.Called(ctx, keyID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.SigningKey), args.Error(1)
+}
+
+func (m *MockSigningKeyRepository) GetPublicKeys(ctx context.Context, purpose string, now time.Time) ([]*models.SigningKey, error) {
+	args := m.Called(ctx, purpose, now)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.SigningKey), args.Error(1)
+}
+
+func (m *MockSigningKeyRepository) Create(ctx context.Context, key *models.SigningKey) error {
+	args := m.Called(ctx, key)
+	return args.Error(0)
+}
+
+func (m *MockSigningKeyRepository) Rotate(ctx context.Context, purpose string, key *models.SigningKey, expiresAt time.Time) error {
+	args := m.Called(ctx, purpose, key, expiresAt)
+	return args.Error(0)
+}
+
+func (m *MockSigningKeyRepository) DeleteExpired(ctx context.Context, before time.Time) (int64, error) {
+	args := m.Called(ctx, before)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+type MockEncryptor struct{ mock.Mock }
+
+func (m *MockEncryptor) Encrypt(value string) (string, error) {
+	args := m.Called(value)
+	return args.String(0), args.Error(1)
+}
+
 type MockKeyService struct{ mock.Mock }
 
 func (m *MockKeyService) GenerateKeysIfMissing(ctx context.Context) error {

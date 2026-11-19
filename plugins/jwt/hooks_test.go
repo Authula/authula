@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -131,6 +132,28 @@ func TestIssueTokensHook(t *testing.T) {
 			},
 		},
 		{
+			name:  "user_refresh_store_error",
+			actor: &models.Actor{ID: "user-1", Type: models.ActorUser},
+			setup: func(t *testing.T, reqCtx *models.RequestContext) {
+				reqCtx.Values[models.ContextSessionID.String()] = "sess-1"
+			},
+			mock: func(tokenSvc *jwttests.MockTokenService, refreshSvc *jwttests.MockRefreshTokenService) {
+				pair := &types.TokenPair{AccessToken: "access-token-1", RefreshToken: "refresh-token-1"}
+				tokenSvc.On("GenerateUserToken", mock.Anything, "user-1", "sess-1", mock.Anything).Return(pair, nil)
+				refreshSvc.On("StoreInitialRefreshToken", mock.Anything, "refresh-token-1", "sess-1", mock.Anything).Return(errHookTest)
+			},
+			wantErr: "failed to store refresh token",
+		},
+		{
+			name: "machine_missing_organization",
+			actor: &models.Actor{
+				ID:   "client-4",
+				Type: models.ActorMachine,
+			},
+			mock:    func(tokenSvc *jwttests.MockTokenService, refreshSvc *jwttests.MockRefreshTokenService) {},
+			wantErr: "has no organization_id",
+		},
+		{
 			name: "machine_token_error",
 			actor: &models.Actor{
 				ID:     "client-3",
@@ -178,6 +201,58 @@ func TestIssueTokensHook(t *testing.T) {
 
 			tokenSvc.AssertExpectations(t)
 			refreshSvc.AssertExpectations(t)
+		})
+	}
+}
+
+func TestIssueTokensHookMatcher(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		value any
+		set   bool
+		want  bool
+	}{
+		{name: "missing value", want: false},
+		{name: "non boolean value", value: "true", set: true, want: false},
+		{name: "authentication failed", value: false, set: true, want: false},
+		{name: "authentication succeeded", value: true, set: true, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := newTestPlugin(new(jwttests.MockTokenService), new(jwttests.MockRefreshTokenService))
+			reqCtx := &models.RequestContext{Values: map[string]any{}}
+			if tt.set {
+				reqCtx.Values[models.ContextAuthSuccess.String()] = tt.value
+			}
+
+			require.Equal(t, tt.want, plugin.issueTokensHookMatcher(reqCtx))
+		})
+	}
+}
+
+func TestExtraClaimsFromActor(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		actor *models.Actor
+		want  map[string]any
+	}{
+		{name: "nil actor", actor: nil},
+		{name: "nil claims", actor: &models.Actor{ID: "user-1"}},
+		{name: "claims are returned", actor: &models.Actor{Claims: map[string]any{"role": "admin"}}, want: map[string]any{"role": "admin"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, extraClaimsFromActor(tt.actor))
 		})
 	}
 }
@@ -242,6 +317,19 @@ func TestRespondHook(t *testing.T) {
 				require.True(t, reqCtx.Handled)
 				require.Equal(t, http.StatusOK, reqCtx.ResponseStatus)
 				require.JSONEq(t, `{"access_token":"access-1","token_type":"Bearer","refresh_token":"refresh-1","expires_in":900}`, string(reqCtx.ResponseBody))
+				require.Equal(t, "no-store", reqCtx.ResponseHeaders.Get("Cache-Control"))
+				require.Equal(t, "no-cache", reqCtx.ResponseHeaders.Get("Pragma"))
+			},
+		},
+		{
+			name:  "success_without_headers",
+			actor: &models.Actor{ID: "user-1", Type: models.ActorUser},
+			setup: func(t *testing.T, reqCtx *models.RequestContext) {
+				reqCtx.Values[types.JWTTokenTypeAccess.String()] = "access-1"
+				reqCtx.ResponseHeaders = nil
+			},
+			check: func(t *testing.T, reqCtx *models.RequestContext) {
+				require.True(t, reqCtx.Handled)
 				require.Equal(t, "no-store", reqCtx.ResponseHeaders.Get("Cache-Control"))
 				require.Equal(t, "no-cache", reqCtx.ResponseHeaders.Get("Pragma"))
 			},

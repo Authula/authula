@@ -69,13 +69,15 @@ func TestCacheService_FetchJWKSFromDatabase_UsesStoredAlgorithm(t *testing.T) {
 		testSigningKey(t, "kid-ps", models.SigningKeyAlgorithmPS256),
 	}
 
+	keyService := newCacheTestKeyService(t, keys...)
 	service := new(cacheService)
-	service.keyService = newCacheTestKeyService(t, keys...)
+	service.keyService = keyService
 	service.logger = &internaltests.MockLogger{}
 
 	set, err := service.FetchJWKSFromDatabase(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 3, set.Len())
+	keyService.AssertExpectations(t)
 
 	want := map[string]string{
 		"kid-rs": models.SigningKeyAlgorithmRS256,
@@ -100,27 +102,31 @@ func TestCacheService_FetchJWKSFromDatabase_SkipsInvalidKeys(t *testing.T) {
 	invalid := models.SigningKey{KeyID: "bad", Algorithm: models.SigningKeyAlgorithmRS256, PublicKey: "not a pem"}
 	valid := testSigningKey(t, "good", models.SigningKeyAlgorithmRS256)
 
+	keyService := newCacheTestKeyService(t, invalid, valid)
 	service := &cacheService{
-		keyService: newCacheTestKeyService(t, invalid, valid),
+		keyService: keyService,
 		logger:     &internaltests.MockLogger{},
 	}
 
 	set, err := service.FetchJWKSFromDatabase(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, set.Len())
+	keyService.AssertExpectations(t)
 }
 
 func TestCacheService_FetchJWKSFromDatabase_NoKeys(t *testing.T) {
 	t.Parallel()
 
+	keyService := newCacheTestKeyService(t)
 	service := &cacheService{
-		keyService: newCacheTestKeyService(t),
+		keyService: keyService,
 		logger:     &internaltests.MockLogger{},
 	}
 
 	set, err := service.FetchJWKSFromDatabase(context.Background())
 	require.ErrorContains(t, err, "no valid keys found")
 	assert.Nil(t, set)
+	keyService.AssertExpectations(t)
 }
 
 func TestCacheService_GetCachedJWKS(t *testing.T) {
