@@ -38,7 +38,7 @@ func (s *keyService) GetActiveKey(ctx context.Context) (*models.SigningKey, erro
 	key, err := s.shared.GetActiveKey(ctx, s.purpose, s.algorithm)
 	if err != nil {
 		if errors.Is(err, models.ErrSigningKeyNotFound) {
-			return nil, errors.New("no active key found")
+			return nil, fmt.Errorf("no active key found: %w", err)
 		}
 		return nil, fmt.Errorf("failed to get active key: %w", err)
 	}

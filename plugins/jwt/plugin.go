@@ -129,7 +129,7 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 	}
 
 	if err := p.cacheService.InvalidateCache(context.Background()); err != nil {
-		p.Logger.Warn("failed to pre-populate cache on startup", "error", err)
+		p.Logger.Warn("failed to invalidate JWKS cache on startup", "error", err)
 	}
 
 	p.jwtService = jwtservices.NewJWTService(
@@ -148,11 +148,17 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		},
 	)
 
+	jwtTokenService, ok := p.jwtService.(jwtservices.TokenService)
+	if !ok {
+		p.Logger.Error("jwt service does not implement the token service")
+		return errors.New("jwt service does not implement the token service")
+	}
+
 	p.refreshService = jwtservices.NewRefreshTokenService(
 		p.Logger,
 		ctx.EventBus,
 		p.sessionService,
-		p.jwtService.(jwtservices.TokenService),
+		jwtTokenService,
 		refreshTokenRepo,
 		p.blacklistService,
 		p.pluginConfig.RefreshGracePeriod,

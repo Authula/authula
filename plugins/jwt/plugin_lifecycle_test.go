@@ -397,7 +397,7 @@ func TestJWTPlugin_Init_CacheInvalidationFailureIsAWarning(t *testing.T) {
 
 	assert.NotNil(t, plugin.blacklistService)
 	assert.NotNil(t, plugin.jwtService)
-	assert.True(t, hasLogMessage(logger, "failed to pre-populate cache on startup"))
+	assert.True(t, hasLogMessage(logger, "failed to invalidate JWKS cache on startup"))
 	storage.AssertExpectations(t)
 }
 

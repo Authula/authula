@@ -103,7 +103,7 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 		return nil, errors.New("session id is required to generate tokens")
 	}
 
-	jwksKey, err := s.keyService.GetActiveKey(context.Background())
+	jwksKey, err := s.keyService.GetActiveKey(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active key: %w", err)
 	}
@@ -206,7 +206,7 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 }
 
 func (s *tokenService) GenerateMachineToken(ctx context.Context, clientID string, organizationID string, scopes []string) (*types.TokenPair, error) {
-	jwksKey, err := s.keyService.GetActiveKey(context.Background())
+	jwksKey, err := s.keyService.GetActiveKey(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active key: %w", err)
 	}

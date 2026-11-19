@@ -13,6 +13,8 @@
 ### Fixed
 
 - MySQL migration metadata writes no longer use a row alias, which MySQL rejects on plain `INSERT` statements.
+- JWT token generation now uses the caller's context instead of a detached background context.
+- Missing JWT signing keys preserve `models.ErrSigningKeyNotFound` so callers can match them with `errors.Is`.
 
 ### Upgrade note
 
