@@ -22,9 +22,29 @@ func newTeamHooksExecutor(configure func(*orgtypes.OrganizationTeamServiceHooks)
 	return NewServiceHookExecutor(&orgtypes.OrganizationsServiceHooksConfig{Teams: hooks}, nil, nil)
 }
 
-func newOrganizationTeamServiceWithHooks(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamRepo *orgtests.MockOrganizationTeamRepository, teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository, executor *ServiceHookExecutor) *organizationTeamService {
-	serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, orgTeamRepo: teamRepo}
-	return NewOrganizationTeamService(orgRepo, memberRepo, teamRepo, teamMemberRepo, serviceUtils, &orgtests.MockTxRunner{}, executor)
+type teamHooksFixture struct {
+	orgRepo        *orgtests.MockOrganizationRepository
+	memberRepo     *orgtests.MockOrganizationMemberRepository
+	teamRepo       *orgtests.MockOrganizationTeamRepository
+	teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository
+	executor       *ServiceHookExecutor
+	txRunner       organizationTeamTxRunner
+	beforeSlug     string
+	afterSlug      string
+}
+
+func newTeamHooksFixture() *teamHooksFixture {
+	return &teamHooksFixture{
+		orgRepo:        &orgtests.MockOrganizationRepository{},
+		memberRepo:     &orgtests.MockOrganizationMemberRepository{},
+		teamRepo:       &orgtests.MockOrganizationTeamRepository{},
+		teamMemberRepo: &orgtests.MockOrganizationTeamMemberRepository{},
+	}
+}
+
+func (f *teamHooksFixture) service() *organizationTeamService {
+	serviceUtils := &ServiceUtils{orgRepo: f.orgRepo, orgMemberRepo: f.memberRepo, orgTeamRepo: f.teamRepo}
+	return NewOrganizationTeamService(f.orgRepo, f.memberRepo, f.teamRepo, f.teamMemberRepo, serviceUtils, f.txRunner, f.executor)
 }
 
 func expectTeamOrganization(orgRepo *orgtests.MockOrganizationRepository) {
@@ -46,230 +66,201 @@ func TestOrganizationTeamService_CreateTeamExtra(t *testing.T) {
 	errTeamMemberCreate := errors.New("team member create failed")
 	errTeamCreate := errors.New("team create failed")
 
-	expectCreateBase := func(orgRepo *orgtests.MockOrganizationRepository, memberRepo *orgtests.MockOrganizationMemberRepository, teamRepo *orgtests.MockOrganizationTeamRepository, slug string) {
-		expectTeamOrganization(orgRepo)
-		expectTeamMemberAccess(memberRepo, 1)
-		teamRepo.On("GetByOrganizationIDAndSlug", mock.Anything, "org-1", slug).Return(nil, nil).Once()
+	expectCreateBase := func(f *teamHooksFixture, slug string) {
+		expectTeamOrganization(f.orgRepo)
+		expectTeamMemberAccess(f.memberRepo, 1)
+		f.teamRepo.On("GetByOrganizationIDAndSlug", mock.Anything, "org-1", slug).Return(nil, nil).Once()
 	}
-	expectCreatedTeam := func(teamRepo *orgtests.MockOrganizationTeamRepository, id string) {
-		teamRepo.On("Create", mock.Anything, mock.Anything).
+	expectCreatedTeam := func(f *teamHooksFixture, id string) {
+		f.teamRepo.On("Create", mock.Anything, mock.Anything).
 			Return(&orgtypes.OrganizationTeam{ID: id, OrganizationID: "org-1"}, nil).
 			Once()
 	}
-	expectTeamMemberCreated := func(teamMemberRepo *orgtests.MockOrganizationTeamMemberRepository, memberID string) {
-		teamMemberRepo.On("Create", mock.Anything, mock.MatchedBy(func(member *orgtypes.OrganizationTeamMember) bool {
+	expectTeamMemberCreated := func(f *teamHooksFixture, memberID string) {
+		f.teamMemberRepo.On("Create", mock.Anything, mock.MatchedBy(func(member *orgtypes.OrganizationTeamMember) bool {
 			return member != nil && member.MemberID == memberID
 		})).Return(&orgtypes.OrganizationTeamMember{ID: "team-member-1"}, nil).Once()
 	}
 
-	t.Run("constructor wires the hook executor and an explicit slug is used", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name   string
+		slug   *string
+		actor  *models.Actor
+		setup  func(*teamHooksFixture)
+		assert func(*testing.T, *teamHooksFixture, *orgtypes.OrganizationTeam, error)
+	}{
+		{
+			name: "constructor wires the hook executor and an explicit slug is used",
+			slug: new("custom-slug"),
+			setup: func(f *teamHooksFixture) {
+				expectCreateBase(f, "custom-slug")
+				f.teamRepo.On("Create", mock.Anything, mock.MatchedBy(func(team *orgtypes.OrganizationTeam) bool {
+					return team != nil && team.Slug == "custom-slug"
+				})).Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Slug: "custom-slug"}, nil).Once()
+				expectTeamMemberCreated(f, "mem-1")
+				f.txRunner = &orgtests.MockTxRunner{}
+				f.executor = newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
+					hooks.RegisterBeforeCreate(func(_ context.Context, _ *models.Actor, team *orgtypes.OrganizationTeam) error {
+						f.beforeSlug = team.Slug
+						return nil
+					})
+					hooks.RegisterAfterCreate(func(_ context.Context, _ *models.Actor, team *orgtypes.OrganizationTeam) error {
+						f.afterSlug = team.Slug
+						return nil
+					})
+				})
+			},
+			assert: func(t *testing.T, f *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.NoError(t, err)
+				require.Equal(t, "team-1", team.ID)
+				require.Equal(t, "custom-slug", f.beforeSlug)
+				require.Equal(t, "custom-slug", f.afterSlug)
+			},
+		},
+		{
+			name: "before create hook error is propagated",
+			setup: func(f *teamHooksFixture) {
+				expectCreateBase(f, "acme-platform")
+				f.txRunner = &orgtests.MockTxRunner{}
+				f.executor = newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
+					hooks.RegisterBeforeCreate(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
+						return errBeforeHook
+					})
+				})
+			},
+			assert: func(t *testing.T, f *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.ErrorIs(t, err, errBeforeHook)
+				require.Nil(t, team)
+				f.teamRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+			},
+		},
+		{
+			name:  "machine actor resolves its member inside the transaction",
+			actor: &models.Actor{ID: "machine-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}},
+			setup: func(f *teamHooksFixture) {
+				f.orgRepo.On("GetByID", mock.Anything, "org-1").Return(&orgtypes.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				f.teamRepo.On("GetByOrganizationIDAndSlug", mock.Anything, "org-1", "acme-platform").Return(nil, nil).Once()
+				expectCreatedTeam(f, "team-1")
+				f.memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "machine-1").
+					Return(&orgtypes.OrganizationMember{ID: "mem-machine", OrganizationID: "org-1", UserID: "machine-1"}, nil).Once()
+				expectTeamMemberCreated(f, "mem-machine")
+			},
+			assert: func(t *testing.T, _ *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.NoError(t, err)
+				require.Equal(t, "team-1", team.ID)
+			},
+		},
+		{
+			name:  "machine actor member lookup error is returned",
+			actor: &models.Actor{ID: "machine-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}},
+			setup: func(f *teamHooksFixture) {
+				f.orgRepo.On("GetByID", mock.Anything, "org-1").Return(&orgtypes.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
+				f.teamRepo.On("GetByOrganizationIDAndSlug", mock.Anything, "org-1", "acme-platform").Return(nil, nil).Once()
+				expectCreatedTeam(f, "team-1")
+				f.memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "machine-1").Return(nil, errActorLookup).Once()
+			},
+			assert: func(t *testing.T, f *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.ErrorIs(t, err, errActorLookup)
+				require.Nil(t, team)
+				f.teamMemberRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+			},
+		},
+		{
+			name: "team member create error is returned",
+			setup: func(f *teamHooksFixture) {
+				expectCreateBase(f, "acme-platform")
+				expectCreatedTeam(f, "team-1")
+				f.teamMemberRepo.On("Create", mock.Anything, mock.Anything).Return(nil, errTeamMemberCreate).Once()
+			},
+			assert: func(t *testing.T, _ *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.ErrorIs(t, err, errTeamMemberCreate)
+				require.Nil(t, team)
+			},
+		},
+		{
+			name: "after create hook error is propagated in the transaction path",
+			setup: func(f *teamHooksFixture) {
+				expectCreateBase(f, "acme-platform")
+				expectCreatedTeam(f, "team-1")
+				expectTeamMemberCreated(f, "mem-1")
+				f.txRunner = &orgtests.MockTxRunner{}
+				f.executor = newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
+					hooks.RegisterAfterCreate(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
+						return errAfterHook
+					})
+				})
+			},
+			assert: func(t *testing.T, _ *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.ErrorIs(t, err, errAfterHook)
+				require.Nil(t, team)
+			},
+		},
+		{
+			name: "create error without a transaction runner is returned",
+			setup: func(f *teamHooksFixture) {
+				expectCreateBase(f, "acme-platform")
+				f.teamRepo.On("Create", mock.Anything, mock.Anything).Return(nil, errTeamCreate).Once()
+			},
+			assert: func(t *testing.T, _ *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.ErrorIs(t, err, errTeamCreate)
+				require.Nil(t, team)
+			},
+		},
+		{
+			name: "after create hook error is propagated without a transaction runner",
+			setup: func(f *teamHooksFixture) {
+				expectCreateBase(f, "acme-platform")
+				expectCreatedTeam(f, "team-1")
+				expectTeamMemberCreated(f, "mem-1")
+				f.executor = newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
+					hooks.RegisterAfterCreate(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
+						return errAfterHook
+					})
+				})
+			},
+			assert: func(t *testing.T, _ *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.ErrorIs(t, err, errAfterHook)
+				require.Nil(t, team)
+			},
+		},
+		{
+			name: "success without a transaction runner",
+			setup: func(f *teamHooksFixture) {
+				expectCreateBase(f, "acme-platform")
+				expectCreatedTeam(f, "team-1")
+				expectTeamMemberCreated(f, "mem-1")
+			},
+			assert: func(t *testing.T, _ *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.NoError(t, err)
+				require.Equal(t, "team-1", team.ID)
+			},
+		},
+	}
 
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectCreateBase(orgRepo, memberRepo, teamRepo, "custom-slug")
-		teamRepo.On("Create", mock.Anything, mock.MatchedBy(func(team *orgtypes.OrganizationTeam) bool {
-			return team != nil && team.Slug == "custom-slug"
-		})).Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Slug: "custom-slug"}, nil).Once()
-		expectTeamMemberCreated(teamMemberRepo, "mem-1")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		var beforeSlug, afterSlug string
-		executor := newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
-			hooks.RegisterBeforeCreate(func(_ context.Context, _ *models.Actor, team *orgtypes.OrganizationTeam) error {
-				beforeSlug = team.Slug
-				return nil
+			f := newTeamHooksFixture()
+			tc.setup(f)
+
+			actor := tc.actor
+			if actor == nil {
+				actor = orgtests.Actor("user-1")
+			}
+
+			team, err := f.service().CreateTeam(context.Background(), actor, "org-1", orgtypes.CreateOrganizationTeamRequest{
+				Name: "Acme Platform",
+				Slug: tc.slug,
 			})
-			hooks.RegisterAfterCreate(func(_ context.Context, _ *models.Actor, team *orgtypes.OrganizationTeam) error {
-				afterSlug = team.Slug
-				return nil
-			})
+
+			tc.assert(t, f, team, err)
+			f.orgRepo.AssertExpectations(t)
+			f.memberRepo.AssertExpectations(t)
+			f.teamRepo.AssertExpectations(t)
+			f.teamMemberRepo.AssertExpectations(t)
 		})
-
-		svc := newOrganizationTeamServiceWithHooks(orgRepo, memberRepo, teamRepo, teamMemberRepo, executor)
-		team, err := svc.CreateTeam(context.Background(), orgtests.Actor("user-1"), "org-1", orgtypes.CreateOrganizationTeamRequest{
-			Name: "Acme Platform",
-			Slug: new("custom-slug"),
-		})
-
-		require.NoError(t, err)
-		require.Equal(t, "team-1", team.ID)
-		require.Equal(t, "custom-slug", beforeSlug)
-		require.Equal(t, "custom-slug", afterSlug)
-		teamMemberRepo.AssertExpectations(t)
-	})
-
-	t.Run("before create hook error is propagated", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectCreateBase(orgRepo, memberRepo, teamRepo, "acme-platform")
-
-		executor := newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
-			hooks.RegisterBeforeCreate(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
-				return errBeforeHook
-			})
-		})
-
-		svc := newOrganizationTeamServiceWithHooks(orgRepo, memberRepo, teamRepo, teamMemberRepo, executor)
-		team, err := svc.CreateTeam(context.Background(), orgtests.Actor("user-1"), "org-1", orgtypes.CreateOrganizationTeamRequest{Name: "Acme Platform"})
-
-		require.ErrorIs(t, err, errBeforeHook)
-		require.Nil(t, team)
-		teamRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
-	})
-
-	t.Run("machine actor resolves its member inside the transaction", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		orgRepo.On("GetByID", mock.Anything, "org-1").Return(&orgtypes.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-		teamRepo.On("GetByOrganizationIDAndSlug", mock.Anything, "org-1", "acme-platform").Return(nil, nil).Once()
-		expectCreatedTeam(teamRepo, "team-1")
-		memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "machine-1").
-			Return(&orgtypes.OrganizationMember{ID: "mem-machine", OrganizationID: "org-1", UserID: "machine-1"}, nil).Once()
-		expectTeamMemberCreated(teamMemberRepo, "mem-machine")
-
-		actor := &models.Actor{ID: "machine-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}}
-		svc := newTestOrganizationTeamService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-		team, err := svc.CreateTeam(context.Background(), actor, "org-1", orgtypes.CreateOrganizationTeamRequest{Name: "Acme Platform"})
-
-		require.NoError(t, err)
-		require.Equal(t, "team-1", team.ID)
-		memberRepo.AssertExpectations(t)
-		teamMemberRepo.AssertExpectations(t)
-	})
-
-	t.Run("machine actor member lookup error is returned", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		orgRepo.On("GetByID", mock.Anything, "org-1").Return(&orgtypes.Organization{ID: "org-1", OwnerID: "user-1"}, nil).Once()
-		teamRepo.On("GetByOrganizationIDAndSlug", mock.Anything, "org-1", "acme-platform").Return(nil, nil).Once()
-		expectCreatedTeam(teamRepo, "team-1")
-		memberRepo.On("GetByOrganizationIDAndUserID", mock.Anything, "org-1", "machine-1").Return(nil, errActorLookup).Once()
-
-		actor := &models.Actor{ID: "machine-1", Type: models.ActorMachine, Claims: map[string]any{"organization_id": "org-1"}}
-		svc := newTestOrganizationTeamService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-		team, err := svc.CreateTeam(context.Background(), actor, "org-1", orgtypes.CreateOrganizationTeamRequest{Name: "Acme Platform"})
-
-		require.ErrorIs(t, err, errActorLookup)
-		require.Nil(t, team)
-		teamMemberRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
-	})
-
-	t.Run("team member create error is returned", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectCreateBase(orgRepo, memberRepo, teamRepo, "acme-platform")
-		expectCreatedTeam(teamRepo, "team-1")
-		teamMemberRepo.On("Create", mock.Anything, mock.Anything).Return(nil, errTeamMemberCreate).Once()
-
-		svc := newTestOrganizationTeamService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-		team, err := svc.CreateTeam(context.Background(), orgtests.Actor("user-1"), "org-1", orgtypes.CreateOrganizationTeamRequest{Name: "Acme Platform"})
-
-		require.ErrorIs(t, err, errTeamMemberCreate)
-		require.Nil(t, team)
-	})
-
-	t.Run("after create hook error is propagated in the transaction path", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectCreateBase(orgRepo, memberRepo, teamRepo, "acme-platform")
-		expectCreatedTeam(teamRepo, "team-1")
-		expectTeamMemberCreated(teamMemberRepo, "mem-1")
-
-		executor := newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
-			hooks.RegisterAfterCreate(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
-				return errAfterHook
-			})
-		})
-
-		svc := newOrganizationTeamServiceWithHooks(orgRepo, memberRepo, teamRepo, teamMemberRepo, executor)
-		team, err := svc.CreateTeam(context.Background(), orgtests.Actor("user-1"), "org-1", orgtypes.CreateOrganizationTeamRequest{Name: "Acme Platform"})
-
-		require.ErrorIs(t, err, errAfterHook)
-		require.Nil(t, team)
-	})
-
-	t.Run("create error without a transaction runner is returned", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectCreateBase(orgRepo, memberRepo, teamRepo, "acme-platform")
-		teamRepo.On("Create", mock.Anything, mock.Anything).Return(nil, errTeamCreate).Once()
-
-		svc := newTestOrganizationTeamService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-		team, err := svc.CreateTeam(context.Background(), orgtests.Actor("user-1"), "org-1", orgtypes.CreateOrganizationTeamRequest{Name: "Acme Platform"})
-
-		require.ErrorIs(t, err, errTeamCreate)
-		require.Nil(t, team)
-	})
-
-	t.Run("after create hook error is propagated without a transaction runner", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectCreateBase(orgRepo, memberRepo, teamRepo, "acme-platform")
-		expectCreatedTeam(teamRepo, "team-1")
-		expectTeamMemberCreated(teamMemberRepo, "mem-1")
-
-		executor := newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
-			hooks.RegisterAfterCreate(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
-				return errAfterHook
-			})
-		})
-
-		serviceUtils := &ServiceUtils{orgRepo: orgRepo, orgMemberRepo: memberRepo, orgTeamRepo: teamRepo}
-		svc := NewOrganizationTeamService(orgRepo, memberRepo, teamRepo, teamMemberRepo, serviceUtils, nil, executor)
-		team, err := svc.CreateTeam(context.Background(), orgtests.Actor("user-1"), "org-1", orgtypes.CreateOrganizationTeamRequest{Name: "Acme Platform"})
-
-		require.ErrorIs(t, err, errAfterHook)
-		require.Nil(t, team)
-	})
-
-	t.Run("success without a transaction runner", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectCreateBase(orgRepo, memberRepo, teamRepo, "acme-platform")
-		expectCreatedTeam(teamRepo, "team-1")
-		expectTeamMemberCreated(teamMemberRepo, "mem-1")
-
-		svc := newTestOrganizationTeamService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-		team, err := svc.CreateTeam(context.Background(), orgtests.Actor("user-1"), "org-1", orgtypes.CreateOrganizationTeamRequest{Name: "Acme Platform"})
-
-		require.NoError(t, err)
-		require.Equal(t, "team-1", team.ID)
-		teamMemberRepo.AssertExpectations(t)
-	})
+	}
 }
 
 func TestOrganizationTeamService_GetTeamExtra(t *testing.T) {
@@ -277,61 +268,67 @@ func TestOrganizationTeamService_GetTeamExtra(t *testing.T) {
 
 	errLookup := errors.New("team lookup failed")
 
-	t.Run("team from another organization is not found", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name   string
+		setup  func(*teamHooksFixture)
+		assert func(*testing.T, *teamHooksFixture, *orgtypes.OrganizationTeam, error)
+	}{
+		{
+			name: "team from another organization is not found",
+			setup: func(f *teamHooksFixture) {
+				expectTeamOrganization(f.orgRepo)
+				expectTeamMemberAccess(f.memberRepo, 1)
+				f.teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-2"}, nil).Once()
+			},
+			assert: func(t *testing.T, _ *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.ErrorIs(t, err, coreerrors.ErrNotFound)
+				require.Nil(t, team)
+			},
+		},
+		{
+			name: "second team lookup error is returned",
+			setup: func(f *teamHooksFixture) {
+				expectTeamOrganization(f.orgRepo)
+				expectTeamMemberAccess(f.memberRepo, 2)
+				f.teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
+				f.teamRepo.On("GetByID", mock.Anything, "team-1").Return(nil, errLookup).Once()
+			},
+			assert: func(t *testing.T, _ *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.ErrorIs(t, err, errLookup)
+				require.Nil(t, team)
+			},
+		},
+		{
+			name: "missing team on the second lookup is not found",
+			setup: func(f *teamHooksFixture) {
+				expectTeamOrganization(f.orgRepo)
+				expectTeamMemberAccess(f.memberRepo, 2)
+				f.teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
+				f.teamRepo.On("GetByID", mock.Anything, "team-1").Return(nil, nil).Once()
+			},
+			assert: func(t *testing.T, _ *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.ErrorIs(t, err, coreerrors.ErrNotFound)
+				require.Nil(t, team)
+			},
+		},
+	}
 
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectTeamOrganization(orgRepo)
-		expectTeamMemberAccess(memberRepo, 1)
-		teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-2"}, nil).Once()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		svc := newTestOrganizationTeamService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-		team, err := svc.GetTeam(context.Background(), orgtests.Actor("user-1"), "org-1", "team-1")
+			f := newTeamHooksFixture()
+			tc.setup(f)
 
-		require.ErrorIs(t, err, coreerrors.ErrNotFound)
-		require.Nil(t, team)
-	})
+			team, err := f.service().GetTeam(context.Background(), orgtests.Actor("user-1"), "org-1", "team-1")
 
-	t.Run("second team lookup error is returned", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectTeamOrganization(orgRepo)
-		expectTeamMemberAccess(memberRepo, 2)
-		teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
-		teamRepo.On("GetByID", mock.Anything, "team-1").Return(nil, errLookup).Once()
-
-		svc := newTestOrganizationTeamService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-		team, err := svc.GetTeam(context.Background(), orgtests.Actor("user-1"), "org-1", "team-1")
-
-		require.ErrorIs(t, err, errLookup)
-		require.Nil(t, team)
-	})
-
-	t.Run("missing team on the second lookup is not found", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectTeamOrganization(orgRepo)
-		expectTeamMemberAccess(memberRepo, 2)
-		teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
-		teamRepo.On("GetByID", mock.Anything, "team-1").Return(nil, nil).Once()
-
-		svc := newTestOrganizationTeamService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-		team, err := svc.GetTeam(context.Background(), orgtests.Actor("user-1"), "org-1", "team-1")
-
-		require.ErrorIs(t, err, coreerrors.ErrNotFound)
-		require.Nil(t, team)
-	})
+			tc.assert(t, f, team, err)
+			f.orgRepo.AssertExpectations(t)
+			f.memberRepo.AssertExpectations(t)
+			f.teamRepo.AssertExpectations(t)
+			f.teamMemberRepo.AssertExpectations(t)
+		})
+	}
 }
 
 func TestOrganizationTeamService_UpdateTeamExtra(t *testing.T) {
@@ -340,76 +337,82 @@ func TestOrganizationTeamService_UpdateTeamExtra(t *testing.T) {
 	errBeforeHook := errors.New("before update hook failed")
 	errAfterHook := errors.New("after update hook failed")
 
-	t.Run("team from another organization is rejected before the update", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name   string
+		setup  func(*teamHooksFixture)
+		assert func(*testing.T, *teamHooksFixture, *orgtypes.OrganizationTeam, error)
+	}{
+		{
+			name: "team from another organization is rejected before the update",
+			setup: func(f *teamHooksFixture) {
+				expectTeamOrganization(f.orgRepo)
+				expectTeamMemberAccess(f.memberRepo, 1)
+				f.teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-2"}, nil).Once()
+			},
+			assert: func(t *testing.T, f *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.ErrorIs(t, err, coreerrors.ErrNotFound)
+				require.Nil(t, team)
+				f.teamRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+			},
+		},
+		{
+			name: "before update hook error is propagated",
+			setup: func(f *teamHooksFixture) {
+				expectTeamOrganization(f.orgRepo)
+				expectTeamMemberAccess(f.memberRepo, 2)
+				f.teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Slug: "platform"}, nil).Twice()
+				f.teamRepo.On("GetByOrganizationIDAndSlug", mock.Anything, "org-1", "platform").Return(nil, nil).Once()
+				f.txRunner = &orgtests.MockTxRunner{}
+				f.executor = newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
+					hooks.RegisterBeforeUpdate(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
+						return errBeforeHook
+					})
+				})
+			},
+			assert: func(t *testing.T, f *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.ErrorIs(t, err, errBeforeHook)
+				require.Nil(t, team)
+				f.teamRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+			},
+		},
+		{
+			name: "after update hook error is propagated",
+			setup: func(f *teamHooksFixture) {
+				expectTeamOrganization(f.orgRepo)
+				expectTeamMemberAccess(f.memberRepo, 2)
+				f.teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Slug: "platform"}, nil).Twice()
+				f.teamRepo.On("GetByOrganizationIDAndSlug", mock.Anything, "org-1", "platform").Return(nil, nil).Once()
+				f.teamRepo.On("Update", mock.Anything, mock.Anything).Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
+				f.txRunner = &orgtests.MockTxRunner{}
+				f.executor = newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
+					hooks.RegisterAfterUpdate(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
+						return errAfterHook
+					})
+				})
+			},
+			assert: func(t *testing.T, _ *teamHooksFixture, team *orgtypes.OrganizationTeam, err error) {
+				require.ErrorIs(t, err, errAfterHook)
+				require.Nil(t, team)
+			},
+		},
+	}
 
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectTeamOrganization(orgRepo)
-		expectTeamMemberAccess(memberRepo, 1)
-		teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-2"}, nil).Once()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		svc := newTestOrganizationTeamService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-		team, err := svc.UpdateTeam(context.Background(), orgtests.Actor("user-1"), "org-1", "team-1", orgtypes.UpdateOrganizationTeamRequest{Name: "Platform Revamp"})
+			f := newTeamHooksFixture()
+			tc.setup(f)
 
-		require.ErrorIs(t, err, coreerrors.ErrNotFound)
-		require.Nil(t, team)
-		teamRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
-	})
+			team, err := f.service().UpdateTeam(context.Background(), orgtests.Actor("user-1"), "org-1", "team-1", orgtypes.UpdateOrganizationTeamRequest{Name: "Platform Revamp"})
 
-	t.Run("before update hook error is propagated", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectTeamOrganization(orgRepo)
-		expectTeamMemberAccess(memberRepo, 2)
-		teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Slug: "platform"}, nil).Twice()
-		teamRepo.On("GetByOrganizationIDAndSlug", mock.Anything, "org-1", "platform").Return(nil, nil).Once()
-
-		executor := newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
-			hooks.RegisterBeforeUpdate(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
-				return errBeforeHook
-			})
+			tc.assert(t, f, team, err)
+			f.orgRepo.AssertExpectations(t)
+			f.memberRepo.AssertExpectations(t)
+			f.teamRepo.AssertExpectations(t)
+			f.teamMemberRepo.AssertExpectations(t)
 		})
-
-		svc := newOrganizationTeamServiceWithHooks(orgRepo, memberRepo, teamRepo, teamMemberRepo, executor)
-		team, err := svc.UpdateTeam(context.Background(), orgtests.Actor("user-1"), "org-1", "team-1", orgtypes.UpdateOrganizationTeamRequest{Name: "Platform Revamp"})
-
-		require.ErrorIs(t, err, errBeforeHook)
-		require.Nil(t, team)
-		teamRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
-	})
-
-	t.Run("after update hook error is propagated", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectTeamOrganization(orgRepo)
-		expectTeamMemberAccess(memberRepo, 2)
-		teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1", Slug: "platform"}, nil).Twice()
-		teamRepo.On("GetByOrganizationIDAndSlug", mock.Anything, "org-1", "platform").Return(nil, nil).Once()
-		teamRepo.On("Update", mock.Anything, mock.Anything).Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Once()
-
-		executor := newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
-			hooks.RegisterAfterUpdate(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
-				return errAfterHook
-			})
-		})
-
-		svc := newOrganizationTeamServiceWithHooks(orgRepo, memberRepo, teamRepo, teamMemberRepo, executor)
-		team, err := svc.UpdateTeam(context.Background(), orgtests.Actor("user-1"), "org-1", "team-1", orgtypes.UpdateOrganizationTeamRequest{Name: "Platform Revamp"})
-
-		require.ErrorIs(t, err, errAfterHook)
-		require.Nil(t, team)
-	})
+	}
 }
 
 func TestOrganizationTeamService_DeleteTeamExtra(t *testing.T) {
@@ -418,70 +421,73 @@ func TestOrganizationTeamService_DeleteTeamExtra(t *testing.T) {
 	errBeforeHook := errors.New("before delete hook failed")
 	errAfterHook := errors.New("after delete hook failed")
 
-	t.Run("team from another organization is rejected before the delete", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name   string
+		setup  func(*teamHooksFixture)
+		assert func(*testing.T, *teamHooksFixture, error)
+	}{
+		{
+			name: "team from another organization is rejected before the delete",
+			setup: func(f *teamHooksFixture) {
+				expectTeamOrganization(f.orgRepo)
+				expectTeamMemberAccess(f.memberRepo, 1)
+				f.teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-2"}, nil).Once()
+			},
+			assert: func(t *testing.T, f *teamHooksFixture, err error) {
+				require.ErrorIs(t, err, coreerrors.ErrNotFound)
+				f.teamRepo.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
+			},
+		},
+		{
+			name: "before delete hook error is propagated",
+			setup: func(f *teamHooksFixture) {
+				expectTeamOrganization(f.orgRepo)
+				expectTeamMemberAccess(f.memberRepo, 2)
+				f.teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Twice()
+				f.executor = newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
+					hooks.RegisterBeforeDelete(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
+						return errBeforeHook
+					})
+				})
+			},
+			assert: func(t *testing.T, f *teamHooksFixture, err error) {
+				require.ErrorIs(t, err, errBeforeHook)
+				f.teamRepo.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
+			},
+		},
+		{
+			name: "after delete hook error is propagated",
+			setup: func(f *teamHooksFixture) {
+				expectTeamOrganization(f.orgRepo)
+				expectTeamMemberAccess(f.memberRepo, 2)
+				f.teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Twice()
+				f.teamRepo.On("Delete", mock.Anything, "team-1").Return(nil).Once()
+				f.executor = newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
+					hooks.RegisterAfterDelete(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
+						return errAfterHook
+					})
+				})
+			},
+			assert: func(t *testing.T, _ *teamHooksFixture, err error) {
+				require.ErrorIs(t, err, errAfterHook)
+			},
+		},
+	}
 
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectTeamOrganization(orgRepo)
-		expectTeamMemberAccess(memberRepo, 1)
-		teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-2"}, nil).Once()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		svc := newTestOrganizationTeamService(orgRepo, memberRepo, teamRepo, teamMemberRepo)
-		err := svc.DeleteTeam(context.Background(), orgtests.Actor("user-1"), "org-1", "team-1")
+			f := newTeamHooksFixture()
+			tc.setup(f)
 
-		require.ErrorIs(t, err, coreerrors.ErrNotFound)
-		teamRepo.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
-	})
+			err := f.service().DeleteTeam(context.Background(), orgtests.Actor("user-1"), "org-1", "team-1")
 
-	t.Run("before delete hook error is propagated", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectTeamOrganization(orgRepo)
-		expectTeamMemberAccess(memberRepo, 2)
-		teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Twice()
-
-		executor := newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
-			hooks.RegisterBeforeDelete(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
-				return errBeforeHook
-			})
+			tc.assert(t, f, err)
+			f.orgRepo.AssertExpectations(t)
+			f.memberRepo.AssertExpectations(t)
+			f.teamRepo.AssertExpectations(t)
+			f.teamMemberRepo.AssertExpectations(t)
 		})
-
-		svc := newOrganizationTeamServiceWithHooks(orgRepo, memberRepo, teamRepo, teamMemberRepo, executor)
-		err := svc.DeleteTeam(context.Background(), orgtests.Actor("user-1"), "org-1", "team-1")
-
-		require.ErrorIs(t, err, errBeforeHook)
-		teamRepo.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
-	})
-
-	t.Run("after delete hook error is propagated", func(t *testing.T) {
-		t.Parallel()
-
-		orgRepo := &orgtests.MockOrganizationRepository{}
-		memberRepo := &orgtests.MockOrganizationMemberRepository{}
-		teamRepo := &orgtests.MockOrganizationTeamRepository{}
-		teamMemberRepo := &orgtests.MockOrganizationTeamMemberRepository{}
-		expectTeamOrganization(orgRepo)
-		expectTeamMemberAccess(memberRepo, 2)
-		teamRepo.On("GetByID", mock.Anything, "team-1").Return(&orgtypes.OrganizationTeam{ID: "team-1", OrganizationID: "org-1"}, nil).Twice()
-		teamRepo.On("Delete", mock.Anything, "team-1").Return(nil).Once()
-
-		executor := newTeamHooksExecutor(func(hooks *orgtypes.OrganizationTeamServiceHooks) {
-			hooks.RegisterAfterDelete(func(context.Context, *models.Actor, *orgtypes.OrganizationTeam) error {
-				return errAfterHook
-			})
-		})
-
-		svc := newOrganizationTeamServiceWithHooks(orgRepo, memberRepo, teamRepo, teamMemberRepo, executor)
-		err := svc.DeleteTeam(context.Background(), orgtests.Actor("user-1"), "org-1", "team-1")
-
-		require.ErrorIs(t, err, errAfterHook)
-		teamRepo.AssertExpectations(t)
-	})
+	}
 }
