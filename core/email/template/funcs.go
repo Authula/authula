@@ -3,6 +3,8 @@ package emailtemplate
 import (
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/Authula/authula/util"
 )
@@ -30,7 +32,14 @@ func Title(s string) string {
 	if s == "" {
 		return ""
 	}
-	return strings.ToUpper(s[:1]) + s[1:]
+
+	r, size := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError && size == 1 {
+		// Leave invalid UTF-8 untouched instead of replacing its leading byte.
+		return s
+	}
+
+	return string(unicode.ToUpper(r)) + s[size:]
 }
 
 func CurrentYear() int {
