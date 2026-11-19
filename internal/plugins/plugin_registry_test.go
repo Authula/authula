@@ -29,6 +29,7 @@ type fakePlugin struct {
 
 	providerMigrations map[string][]migrationsmodule.Migration
 	dependsOn          []string
+	initOrder          *[]string
 }
 
 func newFakePlugin(id string) *fakePlugin {
@@ -50,6 +51,9 @@ func (p *fakePlugin) Init(ctx *models.PluginContext) error {
 
 	p.initCalls++
 	p.initCtx = ctx
+	if p.initOrder != nil {
+		*p.initOrder = append(*p.initOrder, p.metadata.ID)
+	}
 	return p.initErr
 }
 
@@ -277,6 +281,138 @@ func TestPluginRegistry_InitAll(t *testing.T) {
 				initCalls, _ := registered[pluginID].stats()
 				assert.Equal(t, wantInits, initCalls, "plugin %q init calls", pluginID)
 			}
+		})
+	}
+}
+
+func TestPluginRegistry_InitAllDependencyValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		config     *models.Config
+		dependsOn  map[string][]string
+		registered []string
+		wantErr    string
+	}{
+		{
+			name: "enabled plugin with disabled dependency",
+			config: configWithPlugins("sqlite", models.PluginsConfig{
+				"alpha": map[string]any{"enabled": true},
+				"beta":  map[string]any{"enabled": false},
+			}),
+			dependsOn:  map[string][]string{"alpha": {"beta"}},
+			registered: []string{"alpha", "beta"},
+			wantErr:    `plugin "alpha" requires plugin "beta" to be enabled`,
+		},
+		{
+			name: "enabled plugin with unregistered dependency",
+			config: configWithPlugins("sqlite", models.PluginsConfig{
+				"alpha": map[string]any{"enabled": true},
+			}),
+			dependsOn:  map[string][]string{"alpha": {"missing"}},
+			registered: []string{"alpha"},
+			wantErr:    `plugin "alpha" requires plugin "missing" to be enabled`,
+		},
+		{
+			name: "core dependency is ignored",
+			config: configWithPlugins("sqlite", models.PluginsConfig{
+				"alpha": map[string]any{"enabled": true},
+			}),
+			dependsOn:  map[string][]string{"alpha": {migrationsmodule.CorePluginID}},
+			registered: []string{"alpha"},
+		},
+		{
+			name: "dependency cycle is detected",
+			config: configWithPlugins("sqlite", models.PluginsConfig{
+				"alpha": map[string]any{"enabled": true},
+				"beta":  map[string]any{"enabled": true},
+			}),
+			dependsOn:  map[string][]string{"alpha": {"beta"}, "beta": {"alpha"}},
+			registered: []string{"alpha", "beta"},
+			wantErr:    "plugin dependency cycle detected",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			registry := plugins.NewPluginRegistry(tt.config, &internaltests.MockLogger{}, nil, nil, nil, nil)
+			registered := make(map[string]*fakePlugin, len(tt.registered))
+			for _, pluginID := range tt.registered {
+				plugin := newFakePlugin(pluginID)
+				plugin.dependsOn = tt.dependsOn[pluginID]
+				require.NoError(t, registry.Register(plugin))
+				registered[pluginID] = plugin
+			}
+
+			err := registry.InitAll()
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				for pluginID, plugin := range registered {
+					initCalls, _ := plugin.stats()
+					assert.Zero(t, initCalls, "plugin %q must not be initialized when validation fails", pluginID)
+				}
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestPluginRegistry_InitAllInitializesDependenciesFirst(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		registered []string
+		dependsOn  map[string][]string
+		wantOrder  []string
+	}{
+		{
+			name:       "reverse registration order still initializes dependencies first",
+			registered: []string{"oauth2", "jwt"},
+			dependsOn:  map[string][]string{"oauth2": {"jwt"}},
+			wantOrder:  []string{"jwt", "oauth2"},
+		},
+		{
+			name:       "resolves a dependency chain",
+			registered: []string{"alpha", "beta", "gamma"},
+			dependsOn:  map[string][]string{"alpha": {"beta"}, "beta": {"gamma"}},
+			wantOrder:  []string{"gamma", "beta", "alpha"},
+		},
+		{
+			name:       "registration order breaks ties",
+			registered: []string{"beta", "alpha"},
+			dependsOn:  map[string][]string{},
+			wantOrder:  []string{"beta", "alpha"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			pluginConfig := make(models.PluginsConfig, len(tt.registered))
+			for _, pluginID := range tt.registered {
+				pluginConfig[pluginID] = map[string]any{"enabled": true}
+			}
+			registry := plugins.NewPluginRegistry(configWithPlugins("sqlite", pluginConfig), &internaltests.MockLogger{}, nil, nil, nil, nil)
+
+			var initOrder []string
+			for _, pluginID := range tt.registered {
+				plugin := newFakePlugin(pluginID)
+				plugin.dependsOn = tt.dependsOn[pluginID]
+				plugin.initOrder = &initOrder
+				require.NoError(t, registry.Register(plugin))
+			}
+
+			require.NoError(t, registry.InitAll())
+			assert.Equal(t, tt.wantOrder, initOrder)
 		})
 	}
 }

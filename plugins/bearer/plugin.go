@@ -56,6 +56,10 @@ func (p *BearerPlugin) Init(ctx *models.PluginContext) error {
 	return nil
 }
 
+func (p *BearerPlugin) DependsOn() []string {
+	return []string{models.PluginJWT.String()}
+}
+
 func (p *BearerPlugin) Close() error {
 	return nil
 }
