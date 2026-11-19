@@ -15,11 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Authula/authula/models"
+	jwttests "github.com/Authula/authula/plugins/jwt/tests"
 	"github.com/Authula/authula/plugins/jwt/types"
-	"github.com/Authula/authula/services"
 )
-
-var _ services.JWTService = (*tokenService)(nil)
 
 func TestNewJWTService(t *testing.T) {
 	t.Parallel()
@@ -32,7 +30,7 @@ func TestNewJWTService(t *testing.T) {
 		Audience:         "test-audience",
 	}
 
-	svc := NewJWTService(f.logger, f.sessionSvc, f.coreTokenSvc, f.keySvc, f.cacheSvc, f.blacklistSvc, config)
+	svc := NewJWTService(f.logger, f.sessionSvc, f.coreTokenSvc, f.keySvc, f.signingKeySvc, f.cacheSvc, f.blacklistSvc, config)
 
 	concrete, ok := svc.(*tokenService)
 	require.True(t, ok, "NewJWTService must return the concrete token service")
@@ -40,6 +38,7 @@ func TestNewJWTService(t *testing.T) {
 	require.Equal(t, f.sessionSvc, concrete.sessionService)
 	require.Equal(t, f.coreTokenSvc, concrete.coreTokenService)
 	require.Equal(t, f.keySvc, concrete.keyService)
+	require.Equal(t, f.signingKeySvc, concrete.signingKeyService)
 	require.Equal(t, f.cacheSvc, concrete.cacheService)
 	require.Equal(t, f.blacklistSvc, concrete.blacklistService)
 	require.Equal(t, config.ExpiresIn, concrete.expiresIn)
@@ -48,13 +47,185 @@ func TestNewJWTService(t *testing.T) {
 	require.Equal(t, config.Audience, concrete.audience)
 }
 
+func TestTokenService_SigningKeyDelegation(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	key := &models.SigningKey{KeyID: "kid-1"}
+	keys := []models.SigningKey{*key}
+
+	tests := []struct {
+		name  string
+		setup func(*jwttests.MockSigningKeyService)
+		call  func(*tokenService) (any, error)
+		want  any
+	}{
+		{
+			name: "GetActiveKey",
+			setup: func(m *jwttests.MockSigningKeyService) {
+				m.On("GetActiveKey", mock.Anything, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256).Return(key, nil)
+			},
+			call: func(s *tokenService) (any, error) {
+				return s.GetActiveKey(ctx, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256)
+			},
+			want: key,
+		},
+		{
+			name: "GetKeyByID",
+			setup: func(m *jwttests.MockSigningKeyService) {
+				m.On("GetKeyByID", mock.Anything, "kid-1").Return(key, nil)
+			},
+			call: func(s *tokenService) (any, error) {
+				return s.GetKeyByID(ctx, "kid-1")
+			},
+			want: key,
+		},
+		{
+			name: "GetPublicKeys",
+			setup: func(m *jwttests.MockSigningKeyService) {
+				m.On("GetPublicKeys", mock.Anything, models.SigningKeyPurposeOIDCIDToken).Return(keys, nil)
+			},
+			call: func(s *tokenService) (any, error) {
+				return s.GetPublicKeys(ctx, models.SigningKeyPurposeOIDCIDToken)
+			},
+			want: keys,
+		},
+		{
+			name: "GenerateKey",
+			setup: func(m *jwttests.MockSigningKeyService) {
+				m.On("GenerateKey", mock.Anything, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmES256).Return(nil)
+			},
+			call: func(s *tokenService) (any, error) {
+				return nil, s.GenerateKey(ctx, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmES256)
+			},
+		},
+		{
+			name: "RotateKey",
+			setup: func(m *jwttests.MockSigningKeyService) {
+				m.On("RotateKey", mock.Anything, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256).Return(nil)
+			},
+			call: func(s *tokenService) (any, error) {
+				return nil, s.RotateKey(ctx, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256)
+			},
+		},
+		{
+			name: "RotateKeyWithGrace",
+			setup: func(m *jwttests.MockSigningKeyService) {
+				m.On("RotateKeyWithGrace", mock.Anything, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256, time.Hour).Return(nil)
+			},
+			call: func(s *tokenService) (any, error) {
+				return nil, s.RotateKeyWithGrace(ctx, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256, time.Hour)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newServiceTestFixture(t)
+			tt.setup(f.signingKeySvc)
+			svc := f.newJWTService()
+
+			got, err := tt.call(svc)
+
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+			f.signingKeySvc.AssertExpectations(t)
+		})
+	}
+}
+
+func TestTokenService_SigningKeyDelegationPropagatesErrors(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	tests := []struct {
+		name  string
+		setup func(*jwttests.MockSigningKeyService)
+		call  func(*tokenService) error
+	}{
+		{
+			name: "GetActiveKey",
+			setup: func(m *jwttests.MockSigningKeyService) {
+				m.On("GetActiveKey", mock.Anything, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256).Return(nil, assert.AnError)
+			},
+			call: func(s *tokenService) error {
+				_, err := s.GetActiveKey(ctx, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256)
+				return err
+			},
+		},
+		{
+			name: "GetKeyByID",
+			setup: func(m *jwttests.MockSigningKeyService) {
+				m.On("GetKeyByID", mock.Anything, "kid-1").Return(nil, assert.AnError)
+			},
+			call: func(s *tokenService) error {
+				_, err := s.GetKeyByID(ctx, "kid-1")
+				return err
+			},
+		},
+		{
+			name: "GetPublicKeys",
+			setup: func(m *jwttests.MockSigningKeyService) {
+				m.On("GetPublicKeys", mock.Anything, models.SigningKeyPurposeOIDCIDToken).Return(nil, assert.AnError)
+			},
+			call: func(s *tokenService) error {
+				_, err := s.GetPublicKeys(ctx, models.SigningKeyPurposeOIDCIDToken)
+				return err
+			},
+		},
+		{
+			name: "GenerateKey",
+			setup: func(m *jwttests.MockSigningKeyService) {
+				m.On("GenerateKey", mock.Anything, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256).Return(assert.AnError)
+			},
+			call: func(s *tokenService) error {
+				return s.GenerateKey(ctx, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256)
+			},
+		},
+		{
+			name: "RotateKey",
+			setup: func(m *jwttests.MockSigningKeyService) {
+				m.On("RotateKey", mock.Anything, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256).Return(assert.AnError)
+			},
+			call: func(s *tokenService) error {
+				return s.RotateKey(ctx, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256)
+			},
+		},
+		{
+			name: "RotateKeyWithGrace",
+			setup: func(m *jwttests.MockSigningKeyService) {
+				m.On("RotateKeyWithGrace", mock.Anything, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256, time.Hour).Return(assert.AnError)
+			},
+			call: func(s *tokenService) error {
+				return s.RotateKeyWithGrace(ctx, models.SigningKeyPurposeOIDCIDToken, models.SigningKeyAlgorithmRS256, time.Hour)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newServiceTestFixture(t)
+			tt.setup(f.signingKeySvc)
+			svc := f.newJWTService()
+
+			require.ErrorIs(t, tt.call(svc), assert.AnError)
+			f.signingKeySvc.AssertExpectations(t)
+		})
+	}
+}
+
 func parseTestToken(t *testing.T, tokenStr string, f *serviceTestFixture) map[string]any {
 	t.Helper()
 
 	pubKey, err := jwk.ParseKey([]byte(f.activeKey.PublicKey), jwk.WithPEM(true))
 	require.NoError(t, err)
 
-	parsed, err := jwt.Parse([]byte(tokenStr), jwt.WithKey(jwa.EdDSA(), pubKey), jwt.WithValidate(false))
+	parsed, err := jwt.Parse([]byte(tokenStr), jwt.WithKey(jwa.RS256(), pubKey), jwt.WithValidate(false))
 	require.NoError(t, err)
 
 	result := make(map[string]any)

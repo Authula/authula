@@ -1,8 +1,8 @@
 package services
 
 import (
-	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -19,7 +19,6 @@ import (
 	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/models"
 	jwttests "github.com/Authula/authula/plugins/jwt/tests"
-	"github.com/Authula/authula/plugins/jwt/types"
 )
 
 const (
@@ -32,10 +31,11 @@ type serviceTestFixture struct {
 	sessionSvc       *jwttests.MockSessionService
 	coreTokenSvc     *jwttests.MockTokenServiceCore
 	keySvc           *jwttests.MockKeyService
+	signingKeySvc    *jwttests.MockSigningKeyService
 	cacheSvc         *jwttests.MockCacheService
 	blacklistSvc     *jwttests.MockBlacklistService
 	refreshTokenRepo *jwttests.MockRefreshTokenRepository
-	activeKey        *types.JWKS
+	activeKey        *models.SigningKey
 	expiresIn        time.Duration
 	refreshExpiresIn time.Duration
 	issuer           string
@@ -45,15 +45,19 @@ type serviceTestFixture struct {
 func newServiceTestFixture(t *testing.T) *serviceTestFixture {
 	t.Helper()
 
-	pubPEM, privPEM, err := generateEd25519KeyPair()
+	pubPEM, privPEM, err := generateRSAKeyPair()
 	if err != nil {
 		t.Fatalf("failed to generate test key: %v", err)
 	}
 
-	activeKey := &types.JWKS{
+	activeKey := &models.SigningKey{
 		ID:         uuid.New().String(),
+		KeyID:      uuid.New().String(),
+		Algorithm:  models.SigningKeyAlgorithmRS256,
+		KeyPurpose: models.SigningKeyPurposeJWTPlugin,
 		PublicKey:  string(pubPEM),
 		PrivateKey: string(privPEM),
+		IsActive:   true,
 		CreatedAt:  time.Now(),
 	}
 
@@ -62,6 +66,7 @@ func newServiceTestFixture(t *testing.T) *serviceTestFixture {
 		sessionSvc:       &jwttests.MockSessionService{},
 		coreTokenSvc:     &jwttests.MockTokenServiceCore{},
 		keySvc:           &jwttests.MockKeyService{},
+		signingKeySvc:    &jwttests.MockSigningKeyService{},
 		cacheSvc:         &jwttests.MockCacheService{},
 		blacklistSvc:     &jwttests.MockBlacklistService{},
 		refreshTokenRepo: &jwttests.MockRefreshTokenRepository{},
@@ -75,16 +80,17 @@ func newServiceTestFixture(t *testing.T) *serviceTestFixture {
 
 func (f *serviceTestFixture) newJWTService() *tokenService {
 	return &tokenService{
-		logger:           f.logger,
-		coreTokenService: f.coreTokenSvc,
-		keyService:       f.keySvc,
-		cacheService:     f.cacheSvc,
-		blacklistService: f.blacklistSvc,
-		sessionService:   f.sessionSvc,
-		expiresIn:        f.expiresIn,
-		refreshExpiresIn: f.refreshExpiresIn,
-		issuer:           f.issuer,
-		audience:         f.audience,
+		logger:            f.logger,
+		coreTokenService:  f.coreTokenSvc,
+		keyService:        f.keySvc,
+		signingKeyService: f.signingKeySvc,
+		cacheService:      f.cacheSvc,
+		blacklistService:  f.blacklistSvc,
+		sessionService:    f.sessionSvc,
+		expiresIn:         f.expiresIn,
+		refreshExpiresIn:  f.refreshExpiresIn,
+		issuer:            f.issuer,
+		audience:          f.audience,
 	}
 }
 
@@ -110,7 +116,7 @@ func (f *serviceTestFixture) signTestTokenRaw(t *testing.T, claims map[string]an
 		t.Fatalf("failed to parse private key: %v", err)
 	}
 
-	if err := privKey.Set(jwk.KeyIDKey, f.activeKey.ID); err != nil {
+	if err := privKey.Set(jwk.KeyIDKey, f.activeKey.KeyID); err != nil {
 		t.Fatalf("failed to set key ID: %v", err)
 	}
 
@@ -121,7 +127,7 @@ func (f *serviceTestFixture) signTestTokenRaw(t *testing.T, claims map[string]an
 		}
 	}
 
-	signed, err := jwt.Sign(token, jwt.WithKey(jwa.EdDSA(), privKey))
+	signed, err := jwt.Sign(token, jwt.WithKey(jwa.RS256(), privKey))
 	if err != nil {
 		t.Fatalf("failed to sign token: %v", err)
 	}
@@ -137,10 +143,10 @@ func (f *serviceTestFixture) setupKeyServiceMock() {
 		panic(err)
 	}
 
-	if err := pubKey.Set(jwk.KeyIDKey, f.activeKey.ID); err != nil {
+	if err := pubKey.Set(jwk.KeyIDKey, f.activeKey.KeyID); err != nil {
 		panic(err)
 	}
-	if err := pubKey.Set(jwk.AlgorithmKey, "EdDSA"); err != nil {
+	if err := pubKey.Set(jwk.AlgorithmKey, f.activeKey.Algorithm); err != nil {
 		panic(err)
 	}
 
@@ -161,8 +167,8 @@ func (f *serviceTestFixture) setupKeyServiceMock() {
 	f.cacheSvc.On("GetJWKSWithFallback", mock.Anything).Return(parsedSet, nil).Maybe()
 }
 
-func generateEd25519KeyPair() (pubPEM, privPEM []byte, err error) {
-	_, priv, err := ed25519.GenerateKey(rand.Reader)
+func generateRSAKeyPair() (pubPEM, privPEM []byte, err error) {
+	priv, err := rsa.GenerateKey(rand.Reader, models.DefaultRSAKeySize)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -177,7 +183,7 @@ func generateEd25519KeyPair() (pubPEM, privPEM []byte, err error) {
 		Bytes: privBytes,
 	})
 
-	pubBytes, err := x509.MarshalPKIXPublicKey(priv.Public())
+	pubBytes, err := x509.MarshalPKIXPublicKey(&priv.PublicKey)
 	if err != nil {
 		return nil, nil, err
 	}

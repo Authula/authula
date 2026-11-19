@@ -63,7 +63,7 @@ func TestSQLiteMigrationsCreateAndDropSchema(t *testing.T) {
 
 	require.NoError(t, migrator.Migrate(ctx, []migrations.MigrationSet{set}))
 
-	for _, table := range []string{"jwks", "refresh_tokens"} {
+	for _, table := range []string{"refresh_tokens", "jwks"} {
 		assertTableExists(t, db, table)
 	}
 
@@ -77,7 +77,7 @@ func TestSQLiteMigrationsCreateAndDropSchema(t *testing.T) {
 
 	require.NoError(t, migrator.RollbackAll(ctx, []migrations.MigrationSet{set}))
 
-	for _, table := range []string{"jwks", "refresh_tokens"} {
+	for _, table := range []string{"refresh_tokens", "jwks"} {
 		assertTableMissing(t, db, table)
 	}
 

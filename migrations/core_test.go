@@ -88,6 +88,7 @@ func TestCoreSQLiteMigrations_ExecuteAndRollback(t *testing.T) {
 	for _, table := range []string{"users", "accounts", "sessions", "verifications"} {
 		assert.Equal(t, 1, countSQLiteObjects(t, db, "table", table), "table %s should exist", table)
 	}
+	assert.Equal(t, 0, countSQLiteObjects(t, db, "table", "jwks"), "core must not own the jwks table")
 
 	for _, index := range []string{
 		"idx_accounts_user_id",

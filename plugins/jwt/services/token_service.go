@@ -33,43 +33,69 @@ var reservedTokenClaims = map[string]struct{}{
 }
 
 type tokenService struct {
-	logger           models.Logger
-	coreTokenService services.TokenService
-	keyService       KeyService
-	cacheService     CacheService
-	blacklistService BlacklistService
-	sessionService   services.SessionService
-	expiresIn        time.Duration
-	refreshExpiresIn time.Duration
-	issuer           string
-	audience         string
+	logger            models.Logger
+	coreTokenService  services.TokenService
+	signingKeyService SigningKeyService
+	keyService        KeyService
+	cacheService      CacheService
+	blacklistService  BlacklistService
+	sessionService    services.SessionService
+	expiresIn         time.Duration
+	refreshExpiresIn  time.Duration
+	issuer            string
+	audience          string
 }
+
+var _ services.JWTService = (*tokenService)(nil)
 
 func NewJWTService(
 	logger models.Logger,
 	sessionService services.SessionService,
 	coreTokenService services.TokenService,
 	keyService KeyService,
+	signingKeyService SigningKeyService,
 	cacheService CacheService,
 	blacklistService BlacklistService,
 	config TokenServiceConfig,
 ) services.JWTService {
 	return &tokenService{
-		logger:           logger,
-		sessionService:   sessionService,
-		coreTokenService: coreTokenService,
-		keyService:       keyService,
-		cacheService:     cacheService,
-		blacklistService: blacklistService,
-		expiresIn:        config.ExpiresIn,
-		refreshExpiresIn: config.RefreshExpiresIn,
-		issuer:           config.Issuer,
-		audience:         config.Audience,
+		logger:            logger,
+		sessionService:    sessionService,
+		coreTokenService:  coreTokenService,
+		keyService:        keyService,
+		signingKeyService: signingKeyService,
+		cacheService:      cacheService,
+		blacklistService:  blacklistService,
+		expiresIn:         config.ExpiresIn,
+		refreshExpiresIn:  config.RefreshExpiresIn,
+		issuer:            config.Issuer,
+		audience:          config.Audience,
 	}
 }
 
-func (s *tokenService) detectAlgorithmFromKey() jwa.SignatureAlgorithm {
-	return jwa.EdDSA()
+func (s *tokenService) signingAlgorithm(key *models.SigningKey) (jwa.SignatureAlgorithm, error) {
+	algorithm, ok := jwa.LookupSignatureAlgorithm(key.Algorithm)
+	if !ok {
+		return jwa.EmptySignatureAlgorithm(), fmt.Errorf("%w: %q", models.ErrUnsupportedSigningAlgorithm, key.Algorithm)
+	}
+	return algorithm, nil
+}
+
+func (s *tokenService) privateKey(key *models.SigningKey) (jwk.Key, error) {
+	privateKeyPEM, err := s.coreTokenService.Decrypt(key.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt private key: %w", err)
+	}
+
+	privKey, err := jwk.ParseKey([]byte(privateKeyPEM), jwk.WithPEM(true))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	if err := privKey.Set(jwk.KeyIDKey, key.KeyID); err != nil {
+		return nil, fmt.Errorf("failed to set key ID: %w", err)
+	}
+	return privKey, nil
 }
 
 func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, sessionID string, extraClaims map[string]any) (*types.TokenPair, error) {
@@ -82,21 +108,15 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 		return nil, fmt.Errorf("failed to get active key: %w", err)
 	}
 
-	privateKeyPEM, err := s.coreTokenService.Decrypt(jwksKey.PrivateKey)
+	privKey, err := s.privateKey(jwksKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt private key: %w", err)
+		return nil, err
 	}
 
-	privKey, err := jwk.ParseKey([]byte(privateKeyPEM), jwk.WithPEM(true))
+	keyAlgorithm, err := s.signingAlgorithm(jwksKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key: %w", err)
+		return nil, err
 	}
-
-	if err := privKey.Set(jwk.KeyIDKey, jwksKey.ID); err != nil {
-		return nil, fmt.Errorf("failed to set key ID: %w", err)
-	}
-
-	keyAlgorithm := s.detectAlgorithmFromKey()
 	now := time.Now()
 	accessJTI := uuid.New().String()
 	refreshJTI := uuid.New().String()
@@ -191,21 +211,15 @@ func (s *tokenService) GenerateMachineToken(ctx context.Context, clientID string
 		return nil, fmt.Errorf("failed to get active key: %w", err)
 	}
 
-	privateKeyPEM, err := s.coreTokenService.Decrypt(jwksKey.PrivateKey)
+	privKey, err := s.privateKey(jwksKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt private key: %w", err)
+		return nil, err
 	}
 
-	privKey, err := jwk.ParseKey([]byte(privateKeyPEM), jwk.WithPEM(true))
+	keyAlgorithm, err := s.signingAlgorithm(jwksKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key: %w", err)
+		return nil, err
 	}
-
-	if err := privKey.Set(jwk.KeyIDKey, jwksKey.ID); err != nil {
-		return nil, fmt.Errorf("failed to set key ID: %w", err)
-	}
-
-	keyAlgorithm := s.detectAlgorithmFromKey()
 	now := time.Now()
 	jti := uuid.New().String()
 

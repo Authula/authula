@@ -6,6 +6,7 @@ import (
 
 	"github.com/lestrrat-go/jwx/v3/jwk"
 
+	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/types"
 )
 
@@ -22,9 +23,22 @@ type TokenService interface {
 	ValidateRefreshToken(ctx context.Context, token string) (map[string]any, error)
 }
 
+// SigningKeyService is the JWT plugin's internal contract for purpose-scoped,
+// algorithm-aware signing keys. The plugin exposes the same operations publicly
+// through services.JWTService.
+type SigningKeyService interface {
+	GetActiveKey(ctx context.Context, purpose, algorithm string) (*models.SigningKey, error)
+	GetKeyByID(ctx context.Context, kid string) (*models.SigningKey, error)
+	GetPublicKeys(ctx context.Context, purpose string) ([]models.SigningKey, error)
+	GenerateKey(ctx context.Context, purpose, algorithm string) error
+	RotateKey(ctx context.Context, purpose, algorithm string) error
+	RotateKeyWithGrace(ctx context.Context, purpose, algorithm string, gracePeriod time.Duration) error
+}
+
 type KeyService interface {
 	GenerateKeysIfMissing(ctx context.Context) error
-	GetActiveKey(ctx context.Context) (*types.JWKS, error)
+	GetActiveKey(ctx context.Context) (*models.SigningKey, error)
+	GetPublicKeys(ctx context.Context) ([]models.SigningKey, error)
 	IsKeyRotationDue(ctx context.Context, rotationInterval time.Duration) bool
 	// RotateKeysIfNeeded rotates keys if they're past the rotation interval
 	// gracePeriod specifies how long old keys remain valid after rotation

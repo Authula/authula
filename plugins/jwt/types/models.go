@@ -6,16 +6,6 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type JWKS struct {
-	bun.BaseModel `bun:"table:jwks"`
-
-	ID         string     `json:"id" bun:"column:id,pk"`
-	PublicKey  string     `json:"public_key" bun:"column:public_key"`
-	PrivateKey string     `json:"private_key" bun:"column:private_key"`
-	ExpiresAt  *time.Time `json:"expires_at" bun:"column:expires_at"`
-	CreatedAt  time.Time  `json:"created_at" bun:"column:created_at,default:current_timestamp"`
-}
-
 type RefreshToken struct {
 	bun.BaseModel `bun:"table:refresh_tokens"`
 

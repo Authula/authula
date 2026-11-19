@@ -38,7 +38,7 @@ func (p *JWTPlugin) Metadata() models.PluginMetadata {
 	return models.PluginMetadata{
 		ID:          models.PluginJWT.String(),
 		Version:     "1.0.0",
-		Description: "JWKS-based JWT authentication with Ed25519 support among other algorithms",
+		Description: "JWKS-based JWT authentication with shared RS256, ES256, and PS256 signing keys",
 	}
 }
 
@@ -83,11 +83,25 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		p.secondaryStorage = ss.GetStorage()
 	}
 
-	jwksRepo := repositories.NewBunJWKSRepository(ctx.DB)
 	refreshTokenRepo := repositories.NewRefreshTokenRepository(ctx.DB)
 
-	p.keyService = jwtservices.NewKeyService(jwksRepo, p.Logger, p.tokenService)
-	p.cacheService = jwtservices.NewCacheService(jwksRepo, p.secondaryStorage, p.Logger, p.pluginConfig.JWKSCacheTTL)
+	signingKeyService := jwtservices.NewSigningKeyService(
+		repositories.NewBunSigningKeyRepository(ctx.DB),
+		p.tokenService,
+		p.Logger,
+		jwtservices.SigningKeyConfig{
+			GracePeriod:      p.pluginConfig.KeyRotationGracePeriod,
+			MaxTokenLifetime: nil,
+		},
+	)
+
+	p.keyService = jwtservices.NewKeyService(
+		signingKeyService,
+		p.Logger,
+		models.SigningKeyPurposeJWTPlugin,
+		p.pluginConfig.SigningAlgorithm,
+	)
+	p.cacheService = jwtservices.NewCacheService(p.keyService, p.secondaryStorage, p.Logger, p.pluginConfig.JWKSCacheTTL)
 
 	if p.secondaryStorage == nil {
 		p.Logger.Warn("secondary storage not available; token blacklisting will be disabled")
@@ -123,6 +137,7 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		p.sessionService,
 		p.tokenService,
 		p.keyService,
+		signingKeyService,
 		p.cacheService,
 		p.blacklistService,
 		jwtservices.TokenServiceConfig{
