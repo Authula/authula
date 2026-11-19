@@ -340,196 +340,229 @@ func TestVerifyEmailUseCase_HandleEmailChangeVerificationEmailErrors(t *testing.
 func TestVerifyEmailUseCase_HandleEmailChangeVerificationEmailSuccess(t *testing.T) {
 	t.Parallel()
 
-	t.Run("updates the user and account and deletes the verification", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailChangeFixture(t)
-		expectEmailChangeHappyPath(f)
-		expectEmailChangeEvent(f)
+	expectMailerMaybe := func(f *emailPasswordTestFixture) {
 		f.mailerSvc.On("SendEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	}
 
-		uc := f.verifyEmailUseCase().(*verifyEmailUseCase)
-		err := uc.handleEmailChangeVerificationEmail(testRequestContext(), emailChangeUserID, "token-123", emailChangeNewEmail)
+	type hookCapture struct {
+		oldEmail  string
+		newEmail  string
+		userEmail string
+	}
 
-		require.NoError(t, err)
-		f.userSvc.AssertExpectations(t)
-		f.accountSvc.AssertExpectations(t)
-		f.verificationSvc.AssertExpectations(t)
-	})
+	type testContext struct {
+		fixture *emailPasswordTestFixture
+		logger  *emailChangeNotifyingLogger
+		sent    chan struct{}
+		hook    hookCapture
+	}
 
-	t.Run("after email changed hook receives the old and new email", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailChangeFixture(t)
-		expectEmailChangeHappyPath(f)
-		expectEmailChangeEvent(f)
-		f.hooksExecutor = services.NewServiceHookExecutor(&types.EmailPasswordServiceHooksConfig{
-			EmailChange: &types.EmailChangeServiceHooksConfig{
-				AfterEmailChanged: func(ctx context.Context, user *models.User, oldEmail, newEmail string) error {
-					require.Equal(t, emailChangeOldEmail, oldEmail)
-					require.Equal(t, emailChangeNewEmail, newEmail)
-					require.Equal(t, emailChangeNewEmail, user.Email)
-					return nil
-				},
+	tests := []struct {
+		name   string
+		setup  func(*testContext)
+		assert func(*testing.T, *testContext)
+	}{
+		{
+			name: "updates the user and account and deletes the verification",
+			setup: func(c *testContext) {
+				expectEmailChangeHappyPath(c.fixture)
+				expectEmailChangeEvent(c.fixture)
+				expectMailerMaybe(c.fixture)
 			},
-		}, f.logger, nil, nil)
-		f.mailerSvc.On("SendEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+			assert: func(*testing.T, *testContext) {},
+		},
+		{
+			name: "after email changed hook receives the old and new email",
+			setup: func(c *testContext) {
+				expectEmailChangeHappyPath(c.fixture)
+				expectEmailChangeEvent(c.fixture)
+				expectMailerMaybe(c.fixture)
+				c.fixture.hooksExecutor = services.NewServiceHookExecutor(&types.EmailPasswordServiceHooksConfig{
+					EmailChange: &types.EmailChangeServiceHooksConfig{
+						AfterEmailChanged: func(_ context.Context, user *models.User, oldEmail, newEmail string) error {
+							c.hook.oldEmail = oldEmail
+							c.hook.newEmail = newEmail
+							c.hook.userEmail = user.Email
+							return nil
+						},
+					},
+				}, c.fixture.logger, nil, nil)
+			},
+			assert: func(t *testing.T, c *testContext) {
+				require.Equal(t, emailChangeOldEmail, c.hook.oldEmail)
+				require.Equal(t, emailChangeNewEmail, c.hook.newEmail)
+				require.Equal(t, emailChangeNewEmail, c.hook.userEmail)
+			},
+		},
+		{
+			name: "mailer fallback sends both notifications",
+			setup: func(c *testContext) {
+				expectEmailChangeHappyPath(c.fixture)
+				expectEmailChangeEvent(c.fixture)
+				record := func(mock.Arguments) { c.sent <- struct{}{} }
+				c.fixture.mailerSvc.On("SendEmail", mock.Anything, emailChangeOldEmail, "Your email has been changed", mock.Anything, mock.Anything).Run(record).Return(nil).Once()
+				c.fixture.mailerSvc.On("SendEmail", mock.Anything, emailChangeNewEmail, "Your email has been changed", mock.Anything, mock.Anything).Run(record).Return(nil).Once()
+			},
+			assert: func(t *testing.T, c *testContext) {
+				waitForEmailChangeSignal(t, c.sent, "notification to the old email")
+				waitForEmailChangeSignal(t, c.sent, "notification to the new email")
+				c.fixture.mailerSvc.AssertExpectations(t)
+			},
+		},
+		{
+			name: "old email callback success skips the mailer",
+			setup: func(c *testContext) {
+				expectEmailChangeHappyPath(c.fixture)
+				expectEmailChangeEvent(c.fixture)
+				c.fixture.pluginConfig.SendChangedEmailToOldEmail = func(types.SendChangedEmailToOldEmailParams, *models.RequestContext) error {
+					return nil
+				}
+			},
+			assert: func(t *testing.T, c *testContext) {
+				c.fixture.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
+			},
+		},
+		{
+			name: "new email callback success skips the mailer",
+			setup: func(c *testContext) {
+				expectEmailChangeHappyPath(c.fixture)
+				expectEmailChangeEvent(c.fixture)
+				c.fixture.pluginConfig.SendChangedEmailToNewEmail = func(types.SendChangedEmailToNewEmailParams, *models.RequestContext) error {
+					return nil
+				}
+			},
+			assert: func(t *testing.T, c *testContext) {
+				c.fixture.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
+			},
+		},
+		{
+			name: "old email callback error is logged",
+			setup: func(c *testContext) {
+				expectEmailChangeHappyPath(c.fixture)
+				expectEmailChangeEvent(c.fixture)
+				c.fixture.pluginConfig.SendChangedEmailToOldEmail = func(types.SendChangedEmailToOldEmailParams, *models.RequestContext) error {
+					return errEmailChangeBackend
+				}
+				// A successful new-email callback marks the flow as handled, so no
+				// background goroutine is started.
+				c.fixture.pluginConfig.SendChangedEmailToNewEmail = func(types.SendChangedEmailToNewEmailParams, *models.RequestContext) error {
+					return nil
+				}
+			},
+			assert: func(t *testing.T, c *testContext) {
+				require.Contains(t, strings.Join(c.logger.messages(), "\n"), "failed to send changed email to old email via plugin callback")
+			},
+		},
+		{
+			name: "new email callback error is logged",
+			setup: func(c *testContext) {
+				expectEmailChangeHappyPath(c.fixture)
+				expectEmailChangeEvent(c.fixture)
+				c.fixture.pluginConfig.SendChangedEmailToOldEmail = func(types.SendChangedEmailToOldEmailParams, *models.RequestContext) error {
+					return nil
+				}
+				c.fixture.pluginConfig.SendChangedEmailToNewEmail = func(types.SendChangedEmailToNewEmailParams, *models.RequestContext) error {
+					return errEmailChangeBackend
+				}
+			},
+			assert: func(t *testing.T, c *testContext) {
+				require.Contains(t, strings.Join(c.logger.messages(), "\n"), "failed to send changed email to new email via plugin callback")
+			},
+		},
+	}
 
-		uc := f.verifyEmailUseCase().(*verifyEmailUseCase)
-		err := uc.handleEmailChangeVerificationEmail(testRequestContext(), emailChangeUserID, "token-123", emailChangeNewEmail)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		require.NoError(t, err)
-		f.userSvc.AssertExpectations(t)
-	})
-
-	t.Run("mailer fallback sends both notifications", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailChangeFixture(t)
-		expectEmailChangeHappyPath(f)
-		expectEmailChangeEvent(f)
-
-		var mu sync.Mutex
-		sent := 0
-		done := make(chan struct{})
-		record := func(mock.Arguments) {
-			mu.Lock()
-			defer mu.Unlock()
-			sent++
-			if sent == 2 {
-				close(done)
+			c := &testContext{
+				fixture: newEmailChangeFixture(t),
+				logger:  newEmailChangeNotifyingLogger(),
+				sent:    make(chan struct{}, 2),
 			}
-		}
-		f.mailerSvc.On("SendEmail", mock.Anything, emailChangeOldEmail, "Your email has been changed", mock.Anything, mock.Anything).Run(record).Return(nil).Once()
-		f.mailerSvc.On("SendEmail", mock.Anything, emailChangeNewEmail, "Your email has been changed", mock.Anything, mock.Anything).Run(record).Return(nil).Once()
+			tc.setup(c)
 
-		uc := f.verifyEmailUseCase().(*verifyEmailUseCase)
-		err := uc.handleEmailChangeVerificationEmail(testRequestContext(), emailChangeUserID, "token-123", emailChangeNewEmail)
-		require.NoError(t, err)
+			uc := NewVerifyEmailUseCase(
+				c.fixture.globalConfig,
+				c.fixture.pluginConfig,
+				c.logger,
+				c.fixture.userSvc,
+				c.fixture.accountSvc,
+				c.fixture.verificationSvc,
+				c.fixture.tokenSvc,
+				c.fixture.mailerSvc,
+				c.fixture.eventBus,
+				c.fixture.tmplMgr,
+				c.fixture.hooksExecutor,
+			).(*verifyEmailUseCase)
+			err := uc.handleEmailChangeVerificationEmail(testRequestContext(), emailChangeUserID, "token-123", emailChangeNewEmail)
 
-		waitForEmailChangeSignal(t, done, "both notification emails")
-		f.mailerSvc.AssertExpectations(t)
-	})
-
-	t.Run("old email callback success skips the mailer", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailChangeFixture(t)
-		expectEmailChangeHappyPath(f)
-		expectEmailChangeEvent(f)
-		f.pluginConfig.SendChangedEmailToOldEmail = func(types.SendChangedEmailToOldEmailParams, *models.RequestContext) error {
-			return nil
-		}
-
-		uc := f.verifyEmailUseCase().(*verifyEmailUseCase)
-		err := uc.handleEmailChangeVerificationEmail(testRequestContext(), emailChangeUserID, "token-123", emailChangeNewEmail)
-
-		require.NoError(t, err)
-		f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
-	})
-
-	t.Run("new email callback success skips the mailer", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailChangeFixture(t)
-		expectEmailChangeHappyPath(f)
-		expectEmailChangeEvent(f)
-		f.pluginConfig.SendChangedEmailToNewEmail = func(types.SendChangedEmailToNewEmailParams, *models.RequestContext) error {
-			return nil
-		}
-
-		uc := f.verifyEmailUseCase().(*verifyEmailUseCase)
-		err := uc.handleEmailChangeVerificationEmail(testRequestContext(), emailChangeUserID, "token-123", emailChangeNewEmail)
-
-		require.NoError(t, err)
-		f.mailerSvc.AssertNumberOfCalls(t, "SendEmail", 0)
-	})
-
-	t.Run("old email callback error is logged", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailChangeFixture(t)
-		expectEmailChangeHappyPath(f)
-		expectEmailChangeEvent(f)
-		logger := newEmailChangeNotifyingLogger()
-		f.pluginConfig.SendChangedEmailToOldEmail = func(types.SendChangedEmailToOldEmailParams, *models.RequestContext) error {
-			return errEmailChangeBackend
-		}
-		// A successful new-email callback marks the flow as handled, so no
-		// background goroutine is started.
-		f.pluginConfig.SendChangedEmailToNewEmail = func(types.SendChangedEmailToNewEmailParams, *models.RequestContext) error {
-			return nil
-		}
-
-		uc := NewVerifyEmailUseCase(f.globalConfig, f.pluginConfig, logger, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.eventBus, f.tmplMgr).(*verifyEmailUseCase)
-		err := uc.handleEmailChangeVerificationEmail(testRequestContext(), emailChangeUserID, "token-123", emailChangeNewEmail)
-
-		require.NoError(t, err)
-		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send changed email to old email via plugin callback")
-	})
-
-	t.Run("new email callback error is logged", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailChangeFixture(t)
-		expectEmailChangeHappyPath(f)
-		expectEmailChangeEvent(f)
-		logger := newEmailChangeNotifyingLogger()
-		f.pluginConfig.SendChangedEmailToOldEmail = func(types.SendChangedEmailToOldEmailParams, *models.RequestContext) error {
-			return nil
-		}
-		f.pluginConfig.SendChangedEmailToNewEmail = func(types.SendChangedEmailToNewEmailParams, *models.RequestContext) error {
-			return errEmailChangeBackend
-		}
-
-		uc := NewVerifyEmailUseCase(f.globalConfig, f.pluginConfig, logger, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.eventBus, f.tmplMgr).(*verifyEmailUseCase)
-		err := uc.handleEmailChangeVerificationEmail(testRequestContext(), emailChangeUserID, "token-123", emailChangeNewEmail)
-
-		require.NoError(t, err)
-		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send changed email to new email via plugin callback")
-	})
+			require.NoError(t, err)
+			tc.assert(t, c)
+			c.fixture.userSvc.AssertExpectations(t)
+			c.fixture.accountSvc.AssertExpectations(t)
+			c.fixture.verificationSvc.AssertExpectations(t)
+			c.fixture.tokenSvc.AssertExpectations(t)
+		})
+	}
 }
 
 func TestVerifyEmailUseCase_SendChangedEmailEmails(t *testing.T) {
 	t.Parallel()
 
-	t.Run("sends a notification to the old and new address", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailChangeFixture(t)
-		f.mailerSvc.On("SendEmail", mock.Anything, emailChangeOldEmail, "Your email has been changed", mock.Anything, mock.Anything).Return(nil).Once()
-		f.mailerSvc.On("SendEmail", mock.Anything, emailChangeNewEmail, "Your email has been changed", mock.Anything, mock.Anything).Return(nil).Once()
+	tests := []struct {
+		name   string
+		setup  func(*emailPasswordTestFixture)
+		assert func(*testing.T, *emailPasswordTestFixture, *emailChangeNotifyingLogger)
+	}{
+		{
+			name: "sends a notification to the old and new address",
+			setup: func(f *emailPasswordTestFixture) {
+				f.mailerSvc.On("SendEmail", mock.Anything, emailChangeOldEmail, "Your email has been changed", mock.Anything, mock.Anything).Return(nil).Once()
+				f.mailerSvc.On("SendEmail", mock.Anything, emailChangeNewEmail, "Your email has been changed", mock.Anything, mock.Anything).Return(nil).Once()
+			},
+			assert: func(t *testing.T, f *emailPasswordTestFixture, _ *emailChangeNotifyingLogger) {
+				f.mailerSvc.AssertExpectations(t)
+			},
+		},
+		{
+			name: "render errors are logged and skipped",
+			setup: func(f *emailPasswordTestFixture) {
+				// A manager without registered templates forces every render to fail.
+				f.tmplMgr = emailtmpl.NewManager()
+			},
+			assert: func(t *testing.T, _ *emailPasswordTestFixture, logger *emailChangeNotifyingLogger) {
+				require.Len(t, logger.messages(), 2)
+				require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to render email changed notification template")
+			},
+		},
+		{
+			name: "send errors are logged",
+			setup: func(f *emailPasswordTestFixture) {
+				f.mailerSvc.On("SendEmail", mock.Anything, emailChangeOldEmail, mock.Anything, mock.Anything, mock.Anything).Return(errEmailChangeBackend).Once()
+				f.mailerSvc.On("SendEmail", mock.Anything, emailChangeNewEmail, mock.Anything, mock.Anything, mock.Anything).Return(errEmailChangeBackend).Once()
+			},
+			assert: func(t *testing.T, f *emailPasswordTestFixture, logger *emailChangeNotifyingLogger) {
+				require.Len(t, logger.messages(), 2)
+				require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send email to address via built-in email service")
+				f.mailerSvc.AssertExpectations(t)
+			},
+		},
+	}
 
-		uc := f.verifyEmailUseCase().(*verifyEmailUseCase)
-		err := uc.sendChangedEmailEmails(context.Background(), emailChangeOldEmail, emailChangeNewEmail)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		require.NoError(t, err)
-		f.mailerSvc.AssertExpectations(t)
-	})
+			f := newEmailChangeFixture(t)
+			logger := newEmailChangeNotifyingLogger()
+			tc.setup(f)
 
-	t.Run("render errors are logged and skipped", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailChangeFixture(t)
-		logger := newEmailChangeNotifyingLogger()
+			uc := NewVerifyEmailUseCase(f.globalConfig, f.pluginConfig, logger, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.eventBus, f.tmplMgr).(*verifyEmailUseCase)
+			err := uc.sendChangedEmailEmails(context.Background(), emailChangeOldEmail, emailChangeNewEmail)
 
-		uc := &verifyEmailUseCase{
-			GlobalConfig:         f.globalConfig,
-			PluginConfig:         f.pluginConfig,
-			Logger:               logger,
-			EmailTemplateManager: emailtmpl.NewManager(),
-		}
-		err := uc.sendChangedEmailEmails(context.Background(), emailChangeOldEmail, emailChangeNewEmail)
-
-		require.NoError(t, err)
-		require.Len(t, logger.messages(), 2)
-		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to render email changed notification template")
-	})
-
-	t.Run("send errors are logged", func(t *testing.T) {
-		t.Parallel()
-		f := newEmailChangeFixture(t)
-		logger := newEmailChangeNotifyingLogger()
-		f.mailerSvc.On("SendEmail", mock.Anything, emailChangeOldEmail, mock.Anything, mock.Anything, mock.Anything).Return(errEmailChangeBackend).Once()
-		f.mailerSvc.On("SendEmail", mock.Anything, emailChangeNewEmail, mock.Anything, mock.Anything, mock.Anything).Return(errEmailChangeBackend).Once()
-
-		uc := NewVerifyEmailUseCase(f.globalConfig, f.pluginConfig, logger, f.userSvc, f.accountSvc, f.verificationSvc, f.tokenSvc, f.mailerSvc, f.eventBus, f.tmplMgr).(*verifyEmailUseCase)
-		err := uc.sendChangedEmailEmails(context.Background(), emailChangeOldEmail, emailChangeNewEmail)
-
-		require.NoError(t, err)
-		require.Len(t, logger.messages(), 2)
-		require.Contains(t, strings.Join(logger.messages(), "\n"), "failed to send email to address via built-in email service")
-		f.mailerSvc.AssertExpectations(t)
-	})
+			require.NoError(t, err)
+			tc.assert(t, f, logger)
+		})
+	}
 }
