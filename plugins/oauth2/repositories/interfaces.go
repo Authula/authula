@@ -42,18 +42,27 @@ type OAuthClientRepository interface {
 	WithTx(tx bun.IDB) OAuthClientRepository
 }
 
-type AuthorizationCodeRepository interface {
-	Create(ctx context.Context, code *types.OAuthAuthorizationCode) (*types.OAuthAuthorizationCode, error)
-	GetByCodeHash(ctx context.Context, codeHash string) (*types.OAuthAuthorizationCode, error)
-	Consume(ctx context.Context, codeHash string, clientID string, consumedAt time.Time) (*types.OAuthAuthorizationCode, error)
+// AuthRequestRepository owns the authorization request and its single-use
+// authorization code. ConsumeCode is atomic: replaying or racing a code
+// exchange cannot succeed twice.
+type AuthRequestRepository interface {
+	Create(ctx context.Context, request *types.OAuthAuthRequest) (*types.OAuthAuthRequest, error)
+	GetByID(ctx context.Context, id string) (*types.OAuthAuthRequest, error)
+	GetByBindingHash(ctx context.Context, bindingHash string) (*types.OAuthAuthRequest, error)
+	GetByCodeHash(ctx context.Context, codeHash string) (*types.OAuthAuthRequest, error)
+	ConsumeCode(ctx context.Context, codeHash string, clientID string, consumedAt time.Time) (*types.OAuthAuthRequest, error)
 	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
-	WithTx(tx bun.IDB) AuthorizationCodeRepository
+	WithTx(tx bun.IDB) AuthRequestRepository
 }
 
+// ConsentRequestRepository owns one-time consent challenges. Consume is atomic
+// so a challenge cannot be completed twice.
 type ConsentRequestRepository interface {
 	Create(ctx context.Context, request *types.OAuthConsentRequest) (*types.OAuthConsentRequest, error)
-	GetByRequestHash(ctx context.Context, requestHash string) (*types.OAuthConsentRequest, error)
-	Consume(ctx context.Context, requestHash string, consumedAt time.Time) (*types.OAuthConsentRequest, error)
+	GetByID(ctx context.Context, id string) (*types.OAuthConsentRequest, error)
+	GetByTokenHash(ctx context.Context, tokenHash string) (*types.OAuthConsentRequest, error)
+	GetByCompletionCodeHash(ctx context.Context, completionCodeHash string) (*types.OAuthConsentRequest, error)
+	Consume(ctx context.Context, tokenHash string, consumedAt time.Time) (*types.OAuthConsentRequest, error)
 	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
 	WithTx(tx bun.IDB) ConsentRequestRepository
 }
@@ -63,19 +72,36 @@ type ConsentRepository interface {
 	GetByID(ctx context.Context, id string) (*types.OAuthConsent, error)
 	GetActiveByUserAndClient(ctx context.Context, userID string, clientID string) (*types.OAuthConsent, error)
 	ListActiveByUser(ctx context.Context, userID string) ([]*types.OAuthConsent, error)
+	UpdateScope(ctx context.Context, id string, scope string, updatedAt time.Time) (*types.OAuthConsent, error)
 	Revoke(ctx context.Context, id string, revokedAt time.Time) (bool, error)
 	RevokeByUserAndClient(ctx context.Context, userID string, clientID string, revokedAt time.Time) (int64, error)
 	RevokeByClient(ctx context.Context, clientID string, revokedAt time.Time) (int64, error)
 	WithTx(tx bun.IDB) ConsentRepository
 }
 
-type LoginTransactionRepository interface {
-	Create(ctx context.Context, transaction *types.OAuthLoginTransaction) (*types.OAuthLoginTransaction, error)
-	GetByTransactionHash(ctx context.Context, transactionHash string) (*types.OAuthLoginTransaction, error)
-	MarkCompleted(ctx context.Context, transactionHash string, completedAt time.Time) (bool, error)
-	Consume(ctx context.Context, transactionHash string, consumedAt time.Time) (*types.OAuthLoginTransaction, error)
+// AccessGrantRepository records issued access tokens and supports family-wide
+// revocation.
+type AccessGrantRepository interface {
+	Create(ctx context.Context, grant *types.OAuthAccessGrant) (*types.OAuthAccessGrant, error)
+	GetByID(ctx context.Context, id string) (*types.OAuthAccessGrant, error)
+	GetByJTI(ctx context.Context, jti string) (*types.OAuthAccessGrant, error)
+	Revoke(ctx context.Context, jti string, revokedAt time.Time) (bool, error)
+	RevokeFamily(ctx context.Context, familyID string, revokedAt time.Time) (int64, error)
 	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
-	WithTx(tx bun.IDB) LoginTransactionRepository
+	WithTx(tx bun.IDB) AccessGrantRepository
+}
+
+// RefreshTokenRepository owns rotating refresh tokens. Rotate consumes the old
+// token and inserts its replacement atomically; RevokeFamily revokes every
+// token in a lineage after suspected reuse.
+type RefreshTokenRepository interface {
+	Create(ctx context.Context, token *types.OAuthRefreshToken) (*types.OAuthRefreshToken, error)
+	GetByID(ctx context.Context, id string) (*types.OAuthRefreshToken, error)
+	GetByTokenHash(ctx context.Context, tokenHash string) (*types.OAuthRefreshToken, error)
+	Rotate(ctx context.Context, oldTokenHash string, replacement *types.OAuthRefreshToken, consumedAt time.Time) (*types.OAuthRefreshToken, error)
+	RevokeFamily(ctx context.Context, familyID string, revokedAt time.Time) (int64, error)
+	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
+	WithTx(tx bun.IDB) RefreshTokenRepository
 }
 
 type FlowStateRepository interface {

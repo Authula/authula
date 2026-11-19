@@ -29,34 +29,43 @@ func (r *BunConsentRequestRepository) Create(ctx context.Context, request *types
 	if err != nil {
 		return nil, err
 	}
-
 	return request, nil
 }
 
-func (r *BunConsentRequestRepository) GetByRequestHash(ctx context.Context, requestHash string) (*types.OAuthConsentRequest, error) {
+func (r *BunConsentRequestRepository) GetByID(ctx context.Context, id string) (*types.OAuthConsentRequest, error) {
+	return r.getBy(ctx, "id", id)
+}
+
+func (r *BunConsentRequestRepository) GetByTokenHash(ctx context.Context, tokenHash string) (*types.OAuthConsentRequest, error) {
+	return r.getBy(ctx, "token_hash", tokenHash)
+}
+
+func (r *BunConsentRequestRepository) GetByCompletionCodeHash(ctx context.Context, completionCodeHash string) (*types.OAuthConsentRequest, error) {
+	return r.getBy(ctx, "completion_code_hash", completionCodeHash)
+}
+
+func (r *BunConsentRequestRepository) getBy(ctx context.Context, column string, value string) (*types.OAuthConsentRequest, error) {
 	request := new(types.OAuthConsentRequest)
-	if err := r.db.NewSelect().Model(request).Where("request_hash = ?", requestHash).Scan(ctx); err != nil {
+	if err := r.db.NewSelect().Model(request).Where("? = ?", bun.Ident(column), value).Scan(ctx); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-
 	return request, nil
 }
 
-func (r *BunConsentRequestRepository) Consume(ctx context.Context, requestHash string, consumedAt time.Time) (*types.OAuthConsentRequest, error) {
+func (r *BunConsentRequestRepository) Consume(ctx context.Context, tokenHash string, consumedAt time.Time) (*types.OAuthConsentRequest, error) {
 	var request *types.OAuthConsentRequest
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		result, err := tx.NewUpdate().
 			Model((*types.OAuthConsentRequest)(nil)).
 			Set("consumed_at = ?", consumedAt.UTC()).
-			Where("request_hash = ? AND consumed_at IS NULL AND expires_at > ?", requestHash, consumedAt.UTC()).
+			Where("token_hash = ? AND consumed_at IS NULL AND expires_at > ?", tokenHash, consumedAt.UTC()).
 			Exec(ctx)
 		if err != nil {
 			return err
 		}
-
 		affected, err := result.RowsAffected()
 		if err != nil {
 			return err
@@ -66,12 +75,11 @@ func (r *BunConsentRequestRepository) Consume(ctx context.Context, requestHash s
 		}
 
 		request = new(types.OAuthConsentRequest)
-		return tx.NewSelect().Model(request).Where("request_hash = ?", requestHash).Scan(ctx)
+		return tx.NewSelect().Model(request).Where("token_hash = ?", tokenHash).Scan(ctx)
 	})
 	if err != nil {
 		return nil, err
 	}
-
 	return request, nil
 }
 
@@ -83,7 +91,6 @@ func (r *BunConsentRequestRepository) DeleteExpired(ctx context.Context, before 
 	if err != nil {
 		return 0, err
 	}
-
 	return result.RowsAffected()
 }
 

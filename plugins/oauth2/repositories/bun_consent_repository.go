@@ -77,6 +77,33 @@ func (r *BunConsentRepository) ListActiveByUser(ctx context.Context, userID stri
 	return consents, nil
 }
 
+func (r *BunConsentRepository) UpdateScope(ctx context.Context, id string, scope string, updatedAt time.Time) (*types.OAuthConsent, error) {
+	consent := new(types.OAuthConsent)
+	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		result, err := tx.NewUpdate().
+			Model((*types.OAuthConsent)(nil)).
+			Set("scope = ?", scope).
+			Set("updated_at = ?", updatedAt.UTC()).
+			Where("id = ? AND revoked_at IS NULL", id).
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if affected == 0 {
+			return nil
+		}
+		return tx.NewSelect().Model(consent).Where("id = ?", id).Scan(ctx)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return consent, nil
+}
+
 func (r *BunConsentRepository) Revoke(ctx context.Context, id string, revokedAt time.Time) (bool, error) {
 	result, err := r.db.NewUpdate().
 		Model((*types.OAuthConsent)(nil)).
