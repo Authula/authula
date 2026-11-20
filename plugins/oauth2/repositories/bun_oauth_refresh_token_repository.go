@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -22,9 +23,12 @@ func NewBunRefreshTokenRepository(db bun.IDB) RefreshTokenRepository {
 func (r *BunRefreshTokenRepository) Create(ctx context.Context, token *types.OAuthRefreshToken) (*types.OAuthRefreshToken, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.NewInsert().Model(token).Exec(ctx); err != nil {
-			return err
+			return fmt.Errorf("insert oauth refresh token: %w", err)
 		}
-		return tx.NewSelect().Model(token).WherePK().Scan(ctx)
+		if err := tx.NewSelect().Model(token).WherePK().Scan(ctx); err != nil {
+			return fmt.Errorf("reload created oauth refresh token: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -44,9 +48,9 @@ func (r *BunRefreshTokenRepository) getBy(ctx context.Context, column string, va
 	token := new(types.OAuthRefreshToken)
 	if err := r.db.NewSelect().Model(token).Where("? = ?", bun.Ident(column), value).Scan(ctx); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, fmt.Errorf("%w: %s=%s", ErrRefreshTokenNotFound, column, value)
 		}
-		return nil, err
+		return nil, fmt.Errorf("get oauth refresh token by %s: %w", column, err)
 	}
 	return token, nil
 }
@@ -67,23 +71,26 @@ func (r *BunRefreshTokenRepository) Rotate(ctx context.Context, oldTokenHash str
 			Where("token_hash = ? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at > ?", oldTokenHash, consumedAt.UTC()).
 			Exec(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("consume oauth refresh token: %w", err)
 		}
 
 		affected, err := result.RowsAffected()
 		if err != nil {
-			return err
+			return fmt.Errorf("read affected rows for oauth refresh token consumption: %w", err)
 		}
 		if affected == 0 {
 			return nil
 		}
 
 		if _, err := tx.NewInsert().Model(replacement).Exec(ctx); err != nil {
-			return err
+			return fmt.Errorf("insert replacement oauth refresh token: %w", err)
 		}
 
 		consumed = new(types.OAuthRefreshToken)
-		return tx.NewSelect().Model(consumed).Where("token_hash = ?", oldTokenHash).Scan(ctx)
+		if err := tx.NewSelect().Model(consumed).Where("token_hash = ?", oldTokenHash).Scan(ctx); err != nil {
+			return fmt.Errorf("reload consumed oauth refresh token: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -98,9 +105,13 @@ func (r *BunRefreshTokenRepository) RevokeFamily(ctx context.Context, familyID s
 		Where("family_id = ? AND revoked_at IS NULL", familyID).
 		Exec(ctx)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("revoke oauth refresh token family: %w", err)
 	}
-	return result.RowsAffected()
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read affected rows for oauth refresh token family revoke: %w", err)
+	}
+	return affected, nil
 }
 
 func (r *BunRefreshTokenRepository) DeleteExpired(ctx context.Context, before time.Time) (int64, error) {
@@ -109,9 +120,13 @@ func (r *BunRefreshTokenRepository) DeleteExpired(ctx context.Context, before ti
 		Where("expires_at < ?", before.UTC()).
 		Exec(ctx)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("delete expired oauth refresh tokens: %w", err)
 	}
-	return result.RowsAffected()
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read affected rows for expired oauth refresh token delete: %w", err)
+	}
+	return affected, nil
 }
 
 func (r *BunRefreshTokenRepository) WithTx(tx bun.IDB) RefreshTokenRepository {

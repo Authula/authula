@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -22,9 +23,12 @@ func NewBunAuthRequestRepository(db bun.IDB) AuthRequestRepository {
 func (r *BunAuthRequestRepository) Create(ctx context.Context, request *types.OAuthAuthRequest) (*types.OAuthAuthRequest, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.NewInsert().Model(request).Exec(ctx); err != nil {
-			return err
+			return fmt.Errorf("insert oauth auth request: %w", err)
 		}
-		return tx.NewSelect().Model(request).WherePK().Scan(ctx)
+		if err := tx.NewSelect().Model(request).WherePK().Scan(ctx); err != nil {
+			return fmt.Errorf("reload created oauth auth request: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -48,9 +52,9 @@ func (r *BunAuthRequestRepository) getBy(ctx context.Context, column string, val
 	request := new(types.OAuthAuthRequest)
 	if err := r.db.NewSelect().Model(request).Where("? = ?", bun.Ident(column), value).Scan(ctx); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, fmt.Errorf("%w: %s=%s", ErrAuthRequestNotFound, column, value)
 		}
-		return nil, err
+		return nil, fmt.Errorf("get oauth auth request by %s: %w", column, err)
 	}
 	return request, nil
 }
@@ -68,18 +72,21 @@ func (r *BunAuthRequestRepository) ConsumeCode(ctx context.Context, codeHash str
 
 		result, err := query.Exec(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("consume oauth authorization code: %w", err)
 		}
 		affected, err := result.RowsAffected()
 		if err != nil {
-			return err
+			return fmt.Errorf("read affected rows for oauth authorization code consumption: %w", err)
 		}
 		if affected == 0 {
 			return nil
 		}
 
 		request = new(types.OAuthAuthRequest)
-		return tx.NewSelect().Model(request).Where("code_hash = ?", codeHash).Scan(ctx)
+		if err := tx.NewSelect().Model(request).Where("code_hash = ?", codeHash).Scan(ctx); err != nil {
+			return fmt.Errorf("reload consumed oauth auth request: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -93,9 +100,13 @@ func (r *BunAuthRequestRepository) DeleteExpired(ctx context.Context, before tim
 		Where("expires_at < ?", before.UTC()).
 		Exec(ctx)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("delete expired oauth auth requests: %w", err)
 	}
-	return result.RowsAffected()
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read affected rows for expired oauth auth request delete: %w", err)
+	}
+	return affected, nil
 }
 
 func (r *BunAuthRequestRepository) WithTx(tx bun.IDB) AuthRequestRepository {

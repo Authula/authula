@@ -473,6 +473,17 @@ func TestCallbackUseCase(t *testing.T) {
 			wantErr: constants.ErrInvalidState,
 		},
 		{
+			name: "flow state load failure",
+			provider: &oauth2tests.MockProvider{
+				ProviderName: "google",
+			},
+			purpose: types.OAuthFlowPurposeLogin,
+			setup: func(f *callbackFixture) {
+				f.repo.GetErr = errors.New("database unavailable")
+			},
+			wantAnyErr: true,
+		},
+		{
 			name: "expired state",
 			provider: &oauth2tests.MockProvider{
 				ProviderName: "google",

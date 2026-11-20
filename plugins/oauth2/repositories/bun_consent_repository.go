@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -22,9 +23,12 @@ func NewBunConsentRepository(db bun.IDB) ConsentRepository {
 func (r *BunConsentRepository) Create(ctx context.Context, consent *types.OAuthConsent) (*types.OAuthConsent, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.NewInsert().Model(consent).Exec(ctx); err != nil {
-			return err
+			return fmt.Errorf("insert oauth consent: %w", err)
 		}
-		return tx.NewSelect().Model(consent).WherePK().Scan(ctx)
+		if err := tx.NewSelect().Model(consent).WherePK().Scan(ctx); err != nil {
+			return fmt.Errorf("reload created oauth consent: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -37,9 +41,9 @@ func (r *BunConsentRepository) GetByID(ctx context.Context, id string) (*types.O
 	consent := new(types.OAuthConsent)
 	if err := r.db.NewSelect().Model(consent).Where("id = ?", id).Scan(ctx); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, fmt.Errorf("%w: id=%s", ErrConsentNotFound, id)
 		}
-		return nil, err
+		return nil, fmt.Errorf("get oauth consent by id: %w", err)
 	}
 
 	return consent, nil
@@ -53,9 +57,9 @@ func (r *BunConsentRepository) GetActiveByUserAndClient(ctx context.Context, use
 		Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, fmt.Errorf("%w: user_id=%s client_id=%s", ErrConsentNotFound, userID, clientID)
 		}
-		return nil, err
+		return nil, fmt.Errorf("get active oauth consent: %w", err)
 	}
 
 	return consent, nil
@@ -68,10 +72,7 @@ func (r *BunConsentRepository) ListActiveByUser(ctx context.Context, userID stri
 		Where("user_id = ? AND revoked_at IS NULL", userID).
 		OrderExpr("created_at DESC, id DESC").
 		Scan(ctx); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return []*types.OAuthConsent{}, nil
-		}
-		return nil, err
+		return nil, fmt.Errorf("list active oauth consents: %w", err)
 	}
 
 	return consents, nil
@@ -79,6 +80,7 @@ func (r *BunConsentRepository) ListActiveByUser(ctx context.Context, userID stri
 
 func (r *BunConsentRepository) UpdateScope(ctx context.Context, id string, scope string, updatedAt time.Time) (*types.OAuthConsent, error) {
 	consent := new(types.OAuthConsent)
+	updated := false
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		result, err := tx.NewUpdate().
 			Model((*types.OAuthConsent)(nil)).
@@ -87,19 +89,26 @@ func (r *BunConsentRepository) UpdateScope(ctx context.Context, id string, scope
 			Where("id = ? AND revoked_at IS NULL", id).
 			Exec(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("update oauth consent scope: %w", err)
 		}
 		affected, err := result.RowsAffected()
 		if err != nil {
-			return err
+			return fmt.Errorf("read affected rows for oauth consent scope update: %w", err)
 		}
 		if affected == 0 {
 			return nil
 		}
-		return tx.NewSelect().Model(consent).Where("id = ?", id).Scan(ctx)
+		updated = true
+		if err := tx.NewSelect().Model(consent).Where("id = ?", id).Scan(ctx); err != nil {
+			return fmt.Errorf("reload updated oauth consent: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
+	}
+	if !updated {
+		return nil, fmt.Errorf("%w: id=%s", ErrConsentNotFound, id)
 	}
 	return consent, nil
 }
@@ -112,12 +121,12 @@ func (r *BunConsentRepository) Revoke(ctx context.Context, id string, revokedAt 
 		Where("id = ? AND revoked_at IS NULL", id).
 		Exec(ctx)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("revoke oauth consent: %w", err)
 	}
 
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("read affected rows for oauth consent revoke: %w", err)
 	}
 
 	return affected > 0, nil
@@ -131,10 +140,15 @@ func (r *BunConsentRepository) RevokeByUserAndClient(ctx context.Context, userID
 		Where("user_id = ? AND client_id = ? AND revoked_at IS NULL", userID, clientID).
 		Exec(ctx)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("revoke oauth consents by user and client: %w", err)
 	}
 
-	return result.RowsAffected()
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read affected rows for oauth consent revoke by user and client: %w", err)
+	}
+
+	return affected, nil
 }
 
 func (r *BunConsentRepository) RevokeByClient(ctx context.Context, clientID string, revokedAt time.Time) (int64, error) {
@@ -145,10 +159,15 @@ func (r *BunConsentRepository) RevokeByClient(ctx context.Context, clientID stri
 		Where("client_id = ? AND revoked_at IS NULL", clientID).
 		Exec(ctx)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("revoke oauth consents by client: %w", err)
 	}
 
-	return result.RowsAffected()
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read affected rows for oauth consent revoke by client: %w", err)
+	}
+
+	return affected, nil
 }
 
 func (r *BunConsentRepository) WithTx(tx bun.IDB) ConsentRepository {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -22,9 +23,12 @@ func NewBunFlowStateRepository(db bun.IDB) FlowStateRepository {
 func (r *BunFlowStateRepository) Create(ctx context.Context, state *types.OAuthFlowState) (*types.OAuthFlowState, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.NewInsert().Model(state).Exec(ctx); err != nil {
-			return err
+			return fmt.Errorf("insert oauth flow state: %w", err)
 		}
-		return tx.NewSelect().Model(state).WherePK().Scan(ctx)
+		if err := tx.NewSelect().Model(state).WherePK().Scan(ctx); err != nil {
+			return fmt.Errorf("reload created oauth flow state: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -37,9 +41,9 @@ func (r *BunFlowStateRepository) GetByStateHash(ctx context.Context, stateHash s
 	state := new(types.OAuthFlowState)
 	if err := r.db.NewSelect().Model(state).Where("state_hash = ?", stateHash).Scan(ctx); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, fmt.Errorf("%w: state_hash=%s", ErrFlowStateNotFound, stateHash)
 		}
-		return nil, err
+		return nil, fmt.Errorf("get oauth flow state by state hash: %w", err)
 	}
 
 	return state, nil
@@ -60,19 +64,22 @@ func (r *BunFlowStateRepository) Consume(ctx context.Context, stateHash string, 
 			).
 			Exec(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("consume oauth flow state: %w", err)
 		}
 
 		affected, err := result.RowsAffected()
 		if err != nil {
-			return err
+			return fmt.Errorf("read affected rows for oauth flow state consumption: %w", err)
 		}
 		if affected == 0 {
 			return nil
 		}
 
 		state = new(types.OAuthFlowState)
-		return tx.NewSelect().Model(state).Where("state_hash = ?", stateHash).Scan(ctx)
+		if err := tx.NewSelect().Model(state).Where("state_hash = ?", stateHash).Scan(ctx); err != nil {
+			return fmt.Errorf("reload consumed oauth flow state: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -87,10 +94,14 @@ func (r *BunFlowStateRepository) DeleteExpired(ctx context.Context, before time.
 		Where("expires_at < ?", before.UTC()).
 		Exec(ctx)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("delete expired oauth flow states: %w", err)
 	}
 
-	return result.RowsAffected()
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read affected rows for expired oauth flow state delete: %w", err)
+	}
+	return affected, nil
 }
 
 func (r *BunFlowStateRepository) WithTx(tx bun.IDB) FlowStateRepository {

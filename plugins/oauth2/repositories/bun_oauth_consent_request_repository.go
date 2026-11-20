@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -22,9 +23,12 @@ func NewBunConsentRequestRepository(db bun.IDB) ConsentRequestRepository {
 func (r *BunConsentRequestRepository) Create(ctx context.Context, request *types.OAuthConsentRequest) (*types.OAuthConsentRequest, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.NewInsert().Model(request).Exec(ctx); err != nil {
-			return err
+			return fmt.Errorf("insert oauth consent request: %w", err)
 		}
-		return tx.NewSelect().Model(request).WherePK().Scan(ctx)
+		if err := tx.NewSelect().Model(request).WherePK().Scan(ctx); err != nil {
+			return fmt.Errorf("reload created oauth consent request: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -48,9 +52,9 @@ func (r *BunConsentRequestRepository) getBy(ctx context.Context, column string, 
 	request := new(types.OAuthConsentRequest)
 	if err := r.db.NewSelect().Model(request).Where("? = ?", bun.Ident(column), value).Scan(ctx); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, fmt.Errorf("%w: %s=%s", ErrConsentRequestNotFound, column, value)
 		}
-		return nil, err
+		return nil, fmt.Errorf("get oauth consent request by %s: %w", column, err)
 	}
 	return request, nil
 }
@@ -64,18 +68,21 @@ func (r *BunConsentRequestRepository) Consume(ctx context.Context, tokenHash str
 			Where("token_hash = ? AND consumed_at IS NULL AND expires_at > ?", tokenHash, consumedAt.UTC()).
 			Exec(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("consume oauth consent request: %w", err)
 		}
 		affected, err := result.RowsAffected()
 		if err != nil {
-			return err
+			return fmt.Errorf("read affected rows for oauth consent request consumption: %w", err)
 		}
 		if affected == 0 {
 			return nil
 		}
 
 		request = new(types.OAuthConsentRequest)
-		return tx.NewSelect().Model(request).Where("token_hash = ?", tokenHash).Scan(ctx)
+		if err := tx.NewSelect().Model(request).Where("token_hash = ?", tokenHash).Scan(ctx); err != nil {
+			return fmt.Errorf("reload consumed oauth consent request: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -89,9 +96,13 @@ func (r *BunConsentRequestRepository) DeleteExpired(ctx context.Context, before 
 		Where("expires_at < ?", before.UTC()).
 		Exec(ctx)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("delete expired oauth consent requests: %w", err)
 	}
-	return result.RowsAffected()
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read affected rows for expired oauth consent request delete: %w", err)
+	}
+	return affected, nil
 }
 
 func (r *BunConsentRequestRepository) WithTx(tx bun.IDB) ConsentRequestRepository {

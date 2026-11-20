@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -22,9 +23,12 @@ func NewBunAccessGrantRepository(db bun.IDB) AccessGrantRepository {
 func (r *BunAccessGrantRepository) Create(ctx context.Context, grant *types.OAuthAccessGrant) (*types.OAuthAccessGrant, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.NewInsert().Model(grant).Exec(ctx); err != nil {
-			return err
+			return fmt.Errorf("insert oauth access grant: %w", err)
 		}
-		return tx.NewSelect().Model(grant).WherePK().Scan(ctx)
+		if err := tx.NewSelect().Model(grant).WherePK().Scan(ctx); err != nil {
+			return fmt.Errorf("reload created oauth access grant: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -44,9 +48,9 @@ func (r *BunAccessGrantRepository) getBy(ctx context.Context, column string, val
 	grant := new(types.OAuthAccessGrant)
 	if err := r.db.NewSelect().Model(grant).Where("? = ?", bun.Ident(column), value).Scan(ctx); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, fmt.Errorf("%w: %s=%s", ErrAccessGrantNotFound, column, value)
 		}
-		return nil, err
+		return nil, fmt.Errorf("get oauth access grant by %s: %w", column, err)
 	}
 	return grant, nil
 }
@@ -58,11 +62,11 @@ func (r *BunAccessGrantRepository) Revoke(ctx context.Context, jti string, revok
 		Where("jti = ? AND revoked_at IS NULL", jti).
 		Exec(ctx)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("revoke oauth access grant: %w", err)
 	}
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("read affected rows for oauth access grant revoke: %w", err)
 	}
 	return affected > 0, nil
 }
@@ -74,9 +78,13 @@ func (r *BunAccessGrantRepository) RevokeFamily(ctx context.Context, familyID st
 		Where("family_id = ? AND revoked_at IS NULL", familyID).
 		Exec(ctx)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("revoke oauth access grant family: %w", err)
 	}
-	return result.RowsAffected()
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read affected rows for oauth access grant family revoke: %w", err)
+	}
+	return affected, nil
 }
 
 func (r *BunAccessGrantRepository) DeleteExpired(ctx context.Context, before time.Time) (int64, error) {
@@ -85,9 +93,13 @@ func (r *BunAccessGrantRepository) DeleteExpired(ctx context.Context, before tim
 		Where("expires_at < ?", before.UTC()).
 		Exec(ctx)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("delete expired oauth access grants: %w", err)
 	}
-	return result.RowsAffected()
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read affected rows for expired oauth access grant delete: %w", err)
+	}
+	return affected, nil
 }
 
 func (r *BunAccessGrantRepository) WithTx(tx bun.IDB) AccessGrantRepository {

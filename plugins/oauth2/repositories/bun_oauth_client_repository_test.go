@@ -151,11 +151,12 @@ func TestBunOAuthClientRepository_GetByID(t *testing.T) {
 			seedOAuthClients(t, ctx, repo, tt.clients, tt.deletedIDs)
 
 			client, err := repo.GetByID(ctx, tt.id)
-			require.NoError(t, err)
 			if !tt.wantFound {
+				require.ErrorIs(t, err, ErrOAuthClientNotFound)
 				assert.Nil(t, client)
 				return
 			}
+			require.NoError(t, err)
 
 			require.NotNil(t, client)
 			assert.Equal(t, tt.id, client.ID)
@@ -208,11 +209,12 @@ func TestBunOAuthClientRepository_GetByIDIncludingDeleted(t *testing.T) {
 			seedOAuthClients(t, ctx, repo, tt.clients, tt.deletedIDs)
 
 			client, err := repo.GetByIDIncludingDeleted(ctx, tt.id)
-			require.NoError(t, err)
 			if !tt.wantFound {
+				require.ErrorIs(t, err, ErrOAuthClientNotFound)
 				assert.Nil(t, client)
 				return
 			}
+			require.NoError(t, err)
 
 			require.NotNil(t, client)
 			assert.Equal(t, tt.id, client.ID)
@@ -268,11 +270,12 @@ func TestBunOAuthClientRepository_GetByClientID(t *testing.T) {
 			seedOAuthClients(t, ctx, repo, tt.clients, tt.deletedIDs)
 
 			client, err := repo.GetByClientID(ctx, tt.clientID)
-			require.NoError(t, err)
 			if tt.wantID == "" {
+				require.ErrorIs(t, err, ErrOAuthClientNotFound)
 				assert.Nil(t, client)
 				return
 			}
+			require.NoError(t, err)
 
 			require.NotNil(t, client)
 			assert.Equal(t, tt.wantID, client.ID)
@@ -324,11 +327,12 @@ func TestBunOAuthClientRepository_GetByClientIDIncludingDeleted(t *testing.T) {
 			seedOAuthClients(t, ctx, repo, tt.clients, tt.deletedIDs)
 
 			client, err := repo.GetByClientIDIncludingDeleted(ctx, tt.clientID)
-			require.NoError(t, err)
 			if tt.wantID == "" {
+				require.ErrorIs(t, err, ErrOAuthClientNotFound)
 				assert.Nil(t, client)
 				return
 			}
+			require.NoError(t, err)
 
 			require.NotNil(t, client)
 			assert.Equal(t, tt.wantID, client.ID)
@@ -577,11 +581,12 @@ func TestBunOAuthClientRepository_SoftDelete(t *testing.T) {
 			assert.Equal(t, tt.wantDeleted, deleted)
 
 			client, err := repo.GetByIDIncludingDeleted(ctx, tt.id)
-			require.NoError(t, err)
 			if !tt.wantExists {
+				require.ErrorIs(t, err, ErrOAuthClientNotFound)
 				assert.Nil(t, client)
 				return
 			}
+			require.NoError(t, err)
 
 			require.NotNil(t, client)
 			assert.NotNil(t, client.DeletedAt)
@@ -628,12 +633,13 @@ func TestBunOAuthClientRepository_WithTx(t *testing.T) {
 			}
 
 			stored, err := repo.GetByID(ctx, client.ID)
-			require.NoError(t, err)
 			if tt.wantStore {
+				require.NoError(t, err)
 				require.NotNil(t, stored)
 				assert.Equal(t, client.ID, stored.ID)
 				return
 			}
+			require.ErrorIs(t, err, ErrOAuthClientNotFound)
 			assert.Nil(t, stored)
 		})
 	}

@@ -33,7 +33,7 @@ func TestBunAuthRequestRepository_CRUD(t *testing.T) {
 	assert.Equal(t, request.ID, byBinding.ID)
 
 	missing, err := repo.GetByID(ctx, "missing")
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrAuthRequestNotFound)
 	assert.Nil(t, missing)
 }
 

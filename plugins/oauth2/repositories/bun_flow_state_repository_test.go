@@ -115,11 +115,12 @@ func TestBunFlowStateRepository_GetByStateHash(t *testing.T) {
 			}
 
 			found, err := repo.GetByStateHash(ctx, tt.stateHash)
-			require.NoError(t, err)
 			if tt.wantID == "" {
+				require.ErrorIs(t, err, ErrFlowStateNotFound)
 				assert.Nil(t, found)
 				return
 			}
+			require.NoError(t, err)
 
 			require.NotNil(t, found)
 			assert.Equal(t, tt.wantID, found.ID)
@@ -287,7 +288,7 @@ func TestBunFlowStateRepository_DeleteExpired(t *testing.T) {
 			}
 			for _, stateHash := range tt.wantRemoved {
 				state, err := repo.GetByStateHash(ctx, stateHash)
-				require.NoError(t, err)
+				require.ErrorIs(t, err, ErrFlowStateNotFound)
 				assert.Nil(t, state, "state %s should be deleted", stateHash)
 			}
 		})
@@ -332,12 +333,13 @@ func TestBunFlowStateRepository_WithTx(t *testing.T) {
 			}
 
 			stored, err := repo.GetByStateHash(ctx, state.StateHash)
-			require.NoError(t, err)
 			if tt.wantStore {
+				require.NoError(t, err)
 				require.NotNil(t, stored)
 				assert.Equal(t, state.ID, stored.ID)
 				return
 			}
+			require.ErrorIs(t, err, ErrFlowStateNotFound)
 			assert.Nil(t, stored)
 		})
 	}

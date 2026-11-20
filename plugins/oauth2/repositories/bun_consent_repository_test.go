@@ -131,11 +131,12 @@ func TestBunConsentRepository_GetByID(t *testing.T) {
 			}
 
 			found, err := repo.GetByID(ctx, tt.consentID)
-			require.NoError(t, err)
 			if !tt.wantFound {
+				require.ErrorIs(t, err, ErrConsentNotFound)
 				assert.Nil(t, found)
 				return
 			}
+			require.NoError(t, err)
 
 			require.NotNil(t, found)
 			assert.Equal(t, tt.consentID, found.ID)
@@ -220,11 +221,12 @@ func TestBunConsentRepository_GetActiveByUserAndClient(t *testing.T) {
 			}
 
 			active, err := repo.GetActiveByUserAndClient(ctx, tt.userID, tt.clientID)
-			require.NoError(t, err)
 			if tt.wantID == "" {
+				require.ErrorIs(t, err, ErrConsentNotFound)
 				assert.Nil(t, active)
 				return
 			}
+			require.NoError(t, err)
 
 			require.NotNil(t, active)
 			assert.Equal(t, tt.wantID, active.ID)
@@ -356,11 +358,12 @@ func TestBunConsentRepository_Revoke(t *testing.T) {
 			assert.Equal(t, tt.wantRevoked, revoked)
 
 			consent, err := repo.GetByID(ctx, tt.revokeID)
-			require.NoError(t, err)
 			if tt.wantMissing {
+				require.ErrorIs(t, err, ErrConsentNotFound)
 				assert.Nil(t, consent)
 				return
 			}
+			require.NoError(t, err)
 
 			require.NotNil(t, consent)
 			assert.NotNil(t, consent.RevokedAt)
@@ -600,12 +603,13 @@ func TestBunConsentRepository_WithTx(t *testing.T) {
 			}
 
 			stored, err := repo.GetByID(ctx, consent.ID)
-			require.NoError(t, err)
 			if tt.wantStore {
+				require.NoError(t, err)
 				require.NotNil(t, stored)
 				assert.Equal(t, consent.ID, stored.ID)
 				return
 			}
+			require.ErrorIs(t, err, ErrConsentNotFound)
 			assert.Nil(t, stored)
 		})
 	}

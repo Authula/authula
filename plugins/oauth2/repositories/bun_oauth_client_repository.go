@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -24,9 +25,12 @@ func NewBunOAuthClientRepository(db bun.IDB) OAuthClientRepository {
 func (r *BunOAuthClientRepository) Create(ctx context.Context, client *types.OAuthClient) (*types.OAuthClient, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.NewInsert().Model(client).Exec(ctx); err != nil {
-			return err
+			return fmt.Errorf("insert oauth client: %w", err)
 		}
-		return tx.NewSelect().Model(client).WherePK().Scan(ctx)
+		if err := tx.NewSelect().Model(client).WherePK().Scan(ctx); err != nil {
+			return fmt.Errorf("reload created oauth client: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -59,9 +63,9 @@ func (r *BunOAuthClientRepository) getBy(ctx context.Context, column string, val
 	}
 	if err := query.Scan(ctx); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, fmt.Errorf("%w: %s=%s", ErrOAuthClientNotFound, column, value)
 		}
-		return nil, err
+		return nil, fmt.Errorf("get oauth client by %s: %w", column, err)
 	}
 
 	return client, nil
@@ -98,10 +102,7 @@ func (r *BunOAuthClientRepository) List(ctx context.Context, filter OAuthClientL
 	}
 
 	if err := query.OrderExpr("created_at DESC, id DESC").Limit(limit).Scan(ctx); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return []*types.OAuthClient{}, nil
-		}
-		return nil, err
+		return nil, fmt.Errorf("list oauth clients: %w", err)
 	}
 
 	return clients, nil
@@ -117,19 +118,22 @@ func (r *BunOAuthClientRepository) Update(ctx context.Context, client *types.OAu
 
 		result, err := query.Exec(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("update oauth client: %w", err)
 		}
 
 		affected, err := result.RowsAffected()
 		if err != nil {
-			return err
+			return fmt.Errorf("read affected rows for oauth client update: %w", err)
 		}
 		if affected == 0 {
 			return nil
 		}
 
 		updated = true
-		return tx.NewSelect().Model(client).WherePK().Scan(ctx)
+		if err := tx.NewSelect().Model(client).WherePK().Scan(ctx); err != nil {
+			return fmt.Errorf("reload updated oauth client: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -150,12 +154,12 @@ func (r *BunOAuthClientRepository) SoftDelete(ctx context.Context, id string, de
 		Where("id = ? AND deleted_at IS NULL", id).
 		Exec(ctx)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("soft delete oauth client: %w", err)
 	}
 
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("read affected rows for oauth client soft delete: %w", err)
 	}
 
 	return affected > 0, nil

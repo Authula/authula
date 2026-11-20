@@ -116,7 +116,11 @@ func (f *FlowStateRepositoryFake) GetByStateHash(_ context.Context, stateHash st
 	if f.GetErr != nil {
 		return nil, f.GetErr
 	}
-	return f.states[stateHash], nil
+	state, exists := f.states[stateHash]
+	if !exists {
+		return nil, fmt.Errorf("%w: state_hash=%s", repositories.ErrFlowStateNotFound, stateHash)
+	}
+	return state, nil
 }
 
 func (f *FlowStateRepositoryFake) Consume(_ context.Context, stateHash string, provider string, purpose string, consumedAt time.Time) (*types.OAuthFlowState, error) {

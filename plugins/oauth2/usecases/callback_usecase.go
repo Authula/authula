@@ -63,6 +63,10 @@ func (uc *callbackUseCase) Callback(ctx context.Context, req *types.CallbackRequ
 	stateHash := util.HashWithSalt(req.State, req.Binding)
 	state, err := uc.FlowStateRepo.GetByStateHash(ctx, stateHash)
 	if err != nil {
+		if errors.Is(err, repositories.ErrFlowStateNotFound) {
+			uc.Logger.Warn("oauth flow state not found", "provider", providerID)
+			return nil, constants.ErrInvalidState
+		}
 		uc.Logger.Error("failed to load oauth flow state", "provider", providerID, "error", err)
 		return nil, fmt.Errorf("failed to load oauth flow state: %w", err)
 	}
