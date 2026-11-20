@@ -19,7 +19,16 @@ import (
 func newTestOAuth2DB(t *testing.T) *bun.DB {
 	t.Helper()
 
-	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
+	return newTestOAuth2DBNamed(t, t.Name())
+}
+
+// newTestOAuth2DBNamed creates an isolated in-memory database. The name must be
+// unique within a test because SQLite shared-cache connections reuse databases
+// with the same DSN.
+func newTestOAuth2DBNamed(t *testing.T, name string) *bun.DB {
+	t.Helper()
+
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(name, "/", "_"))
 	sqlDB, err := sql.Open("sqlite", sqlitedsn.Build(dsn))
 	if err != nil {
 		t.Fatalf("failed to open sqlite db: %v", err)

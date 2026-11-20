@@ -7,6 +7,30 @@ import (
 	"time"
 )
 
+func TestProviderConfig_IsEnabled(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		config ProviderConfig
+		want   bool
+	}{
+		{name: "absent defaults to enabled", config: ProviderConfig{}, want: true},
+		{name: "explicit true", config: ProviderConfig{Enabled: new(true)}, want: true},
+		{name: "explicit false disables", config: ProviderConfig{Enabled: new(false)}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := tt.config.IsEnabled(); got != tt.want {
+				t.Fatalf("IsEnabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestProviderConfig_PKCEEnabled(t *testing.T) {
 	t.Parallel()
 
