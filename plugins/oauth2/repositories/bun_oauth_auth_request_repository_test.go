@@ -53,8 +53,8 @@ func TestBunAuthRequestRepository_ConsumeCode(t *testing.T) {
 			request: func() *types.OAuthAuthRequest {
 				r := createTestAuthRequest("binding-1", "client-1", now.Add(10*time.Minute))
 				r.CodeHash = new("code-hash")
-				r.CodeIssuedAt = &now
-				r.CompletedAt = &now
+				r.CodeIssuedAt = new(now)
+				r.CompletedAt = new(now)
 				return r
 			}(),
 			clientID: "client-1",
@@ -64,8 +64,8 @@ func TestBunAuthRequestRepository_ConsumeCode(t *testing.T) {
 			request: func() *types.OAuthAuthRequest {
 				r := createTestAuthRequest("binding-2", "client-1", now.Add(-time.Minute))
 				r.CodeHash = new("expired-hash")
-				r.CodeIssuedAt = &now
-				r.CompletedAt = &now
+				r.CodeIssuedAt = new(now)
+				r.CompletedAt = new(now)
 				return r
 			}(),
 			clientID: "client-1",

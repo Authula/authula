@@ -356,7 +356,7 @@ func TestBunOAuthClientRepository_List(t *testing.T) {
 			createTestClient("id-2", "client-2", types.OAuthClientOwnerTypeUser, "user-1", base.Add(-2*time.Minute)),
 			createTestClient("id-3", "client-3", types.OAuthClientOwnerTypeOrganization, "org-1", base.Add(-time.Minute)),
 		}
-		clients[2].OrganizationID = &orgID
+		clients[2].OrganizationID = new(orgID)
 		return clients
 	}
 
