@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lestrrat-go/jwx/v3/jwa"
-	"github.com/lestrrat-go/jwx/v3/jwk"
-	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/lestrrat-go/jwx/v4/jwa"
+	"github.com/lestrrat-go/jwx/v4/jwk"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/stretchr/testify/mock"
 
 	internaltests "github.com/Authula/authula/internal/tests"
@@ -105,7 +105,7 @@ func (f *serviceTestFixture) signTestToken(t *testing.T, claims map[string]any) 
 func (f *serviceTestFixture) signTestTokenRaw(t *testing.T, claims map[string]any) string {
 	t.Helper()
 
-	privKey, err := jwk.ParseKey([]byte(f.activeKey.PrivateKey), jwk.WithPEM(true))
+	privKey, err := jwk.ParseKey([]byte(f.activeKey.PrivateKey), jwk.WithX509(true))
 	if err != nil {
 		t.Fatalf("failed to parse private key: %v", err)
 	}
@@ -132,7 +132,7 @@ func (f *serviceTestFixture) signTestTokenRaw(t *testing.T, claims map[string]an
 func (f *serviceTestFixture) setupKeyServiceMock() {
 	f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil).Maybe()
 
-	pubKey, err := jwk.ParseKey([]byte(f.activeKey.PublicKey), jwk.WithPEM(true))
+	pubKey, err := jwk.ParseKey([]byte(f.activeKey.PublicKey), jwk.WithX509(true))
 	if err != nil {
 		panic(err)
 	}
@@ -153,7 +153,7 @@ func (f *serviceTestFixture) setupKeyServiceMock() {
 	if err != nil {
 		panic(err)
 	}
-	parsedSet, err := jwk.Parse(data)
+	parsedSet, err := jwk.Parse(data, jwk.WithStrictKeySetParsing(true))
 	if err != nil {
 		panic(err)
 	}

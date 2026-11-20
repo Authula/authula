@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v4/jwk"
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/repositories"
@@ -46,7 +46,7 @@ func (s *cacheService) GetCachedJWKS(ctx context.Context) (jwk.Set, error) {
 		return nil, errors.New("cached JWKS is empty or invalid type")
 	}
 
-	set, err := jwk.Parse([]byte(valueStr))
+	set, err := jwk.Parse([]byte(valueStr), jwk.WithStrictKeySetParsing(true))
 	if err != nil {
 		s.logger.Warn("failed to parse cached JWKS", "error", err)
 		return nil, fmt.Errorf("failed to parse cached JWKS: %w", err)
@@ -63,7 +63,7 @@ func (s *cacheService) FetchJWKSFromDatabase(ctx context.Context) (jwk.Set, erro
 
 	set := jwk.NewSet()
 	for _, wk := range jwksKeys {
-		pubKey, err := jwk.ParseKey([]byte(wk.PublicKey), jwk.WithPEM(true))
+		pubKey, err := jwk.ParseKey([]byte(wk.PublicKey), jwk.WithX509(true))
 		if err != nil {
 			s.logger.Warn("failed to parse public key", "id", wk.ID, "error", err)
 			continue

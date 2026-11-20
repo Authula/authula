@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v4/jwk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -144,7 +144,7 @@ func (s *stubSecondaryStorage) Close() error { return nil }
 func testJWKSetJSON(t *testing.T) string {
 	t.Helper()
 
-	pubKey, err := jwk.ParseKey([]byte(generateTestJWKS(t).PublicKey), jwk.WithPEM(true))
+	pubKey, err := jwk.ParseKey([]byte(generateTestJWKS(t).PublicKey), jwk.WithX509(true))
 	require.NoError(t, err)
 
 	set := jwk.NewSet()
