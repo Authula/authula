@@ -108,6 +108,20 @@ func (r *refreshTokenRepositoryImpl) RevokeAllSessionTokens(ctx context.Context,
 	return nil
 }
 
+func (r *refreshTokenRepositoryImpl) SetLastReuseAttempt(ctx context.Context, tokenHash string) error {
+	_, err := r.db.NewUpdate().
+		Model(&types.RefreshToken{}).
+		Where("token_hash = ?", tokenHash).
+		Where("last_reuse_attempt IS NULL").
+		Set("last_reuse_attempt = ?", time.Now()).
+		Exec(ctx)
+
+	if err != nil {
+		return fmt.Errorf("failed to update last reuse attempt: %w", err)
+	}
+	return nil
+}
+
 func (r *refreshTokenRepositoryImpl) CleanupExpiredTokens(ctx context.Context) error {
 	_, err := r.db.NewDelete().
 		Model(&types.RefreshToken{}).

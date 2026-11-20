@@ -1,12 +1,61 @@
 package jwt
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/Authula/authula/models"
+	jwttests "github.com/Authula/authula/plugins/jwt/tests"
 	"github.com/Authula/authula/plugins/jwt/types"
 )
+
+func TestJWTPlugin_RevokeToken(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	expiresAt := time.Now().Add(time.Hour)
+
+	t.Run("fails when secondary storage is unavailable", func(t *testing.T) {
+		t.Parallel()
+
+		plugin := New(types.JWTPluginConfig{})
+
+		err := plugin.RevokeToken(ctx, "jti-1", expiresAt)
+
+		require.ErrorContains(t, err, "token revocation is disabled")
+	})
+
+	t.Run("delegates to the blacklist service", func(t *testing.T) {
+		t.Parallel()
+
+		blacklistSvc := new(jwttests.MockBlacklistService)
+		blacklistSvc.On("BlacklistToken", ctx, "jti-1", expiresAt).Return(nil)
+
+		plugin := New(types.JWTPluginConfig{})
+		plugin.blacklistService = blacklistSvc
+
+		require.NoError(t, plugin.RevokeToken(ctx, "jti-1", expiresAt))
+		blacklistSvc.AssertExpectations(t)
+	})
+
+	t.Run("returns the blacklist service error", func(t *testing.T) {
+		t.Parallel()
+
+		revokeErr := errors.New("revoke failed")
+		blacklistSvc := new(jwttests.MockBlacklistService)
+		blacklistSvc.On("BlacklistToken", ctx, "jti-1", expiresAt).Return(revokeErr)
+
+		plugin := New(types.JWTPluginConfig{})
+		plugin.blacklistService = blacklistSvc
+
+		require.ErrorIs(t, plugin.RevokeToken(ctx, "jti-1", expiresAt), revokeErr)
+		blacklistSvc.AssertExpectations(t)
+	})
+}
 
 func TestJWTPluginConfig_DefaultConfig(t *testing.T) {
 	tests := []struct {

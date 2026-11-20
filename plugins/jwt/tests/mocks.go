@@ -200,13 +200,13 @@ func (m *MockRefreshTokenRepository) RotateRefreshToken(ctx context.Context, old
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *MockRefreshTokenRepository) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
-	args := m.Called(ctx, tokenHash)
+func (m *MockRefreshTokenRepository) RevokeAllSessionTokens(ctx context.Context, sessionID string) error {
+	args := m.Called(ctx, sessionID)
 	return args.Error(0)
 }
 
-func (m *MockRefreshTokenRepository) RevokeAllSessionTokens(ctx context.Context, sessionID string) error {
-	args := m.Called(ctx, sessionID)
+func (m *MockRefreshTokenRepository) SetLastReuseAttempt(ctx context.Context, tokenHash string) error {
+	args := m.Called(ctx, tokenHash)
 	return args.Error(0)
 }
 

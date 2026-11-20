@@ -34,7 +34,45 @@ func (p *JWTPlugin) buildHooks() []models.Hook {
 			Handler:  p.respondHook,
 			Order:    10,
 		},
+		{
+			Stage:   models.HookAfter,
+			Matcher: p.signedOutMatcher,
+			Handler: p.revokeSessionOnSignOutHook,
+			Order:   20,
+		},
 	}
+}
+
+func (p *JWTPlugin) signedOutMatcher(reqCtx *models.RequestContext) bool {
+	signedOut, ok := reqCtx.Values[models.ContextAuthSignOut.String()].(bool)
+	return ok && signedOut
+}
+
+// revokeSessionOnSignOutHook revokes the current session's credentials after
+// sign-out. Sign-out-all deletes every session for the user, but only the
+// current session ID is available here; revoking all of a user's sessions is a
+// future enhancement. Revocation failures are logged because session deletion
+// already invalidates these credentials during validation.
+func (p *JWTPlugin) revokeSessionOnSignOutHook(reqCtx *models.RequestContext) error {
+	sessionID, ok := reqCtx.Values[models.ContextSessionID.String()].(string)
+	if !ok || sessionID == "" {
+		return nil
+	}
+
+	ctx := reqCtx.Request.Context()
+
+	if p.blacklistService != nil {
+		expiresAt := time.Now().Add(p.pluginConfig.RefreshExpiresIn)
+		if err := p.blacklistService.BlacklistAllSessionTokens(ctx, sessionID, expiresAt); err != nil {
+			p.Logger.Error("failed to blacklist session tokens on sign-out", "session_id", sessionID, "error", err)
+		}
+	}
+
+	if err := p.refreshService.RevokeSessionTokens(ctx, sessionID); err != nil {
+		p.Logger.Error("failed to revoke session refresh tokens on sign-out", "session_id", sessionID, "error", err)
+	}
+
+	return nil
 }
 
 func (p *JWTPlugin) issueTokensHookMatcher(reqCtx *models.RequestContext) bool {

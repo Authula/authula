@@ -177,7 +177,16 @@ func (s *refreshTokenService) handleRevokedToken(ctx context.Context, tokenHash 
 			"delta_ms", deltaMs,
 			"grace_period_ms", gracePeriodMs,
 		)
-		s.emitTokenReuseThrottledEvent(record.SessionID, tokenHash, deltaMs, gracePeriodMs, auditMeta)
+
+		attemptCount := 1
+		if record.LastReuseAttempt != nil {
+			attemptCount = 2
+		}
+		if err := s.storage.SetLastReuseAttempt(ctx, tokenHash); err != nil {
+			s.logger.Error("failed to record refresh token reuse attempt", "session_id", record.SessionID, "error", err)
+		}
+
+		s.emitTokenReuseThrottledEvent(record.SessionID, tokenHash, deltaMs, gracePeriodMs, attemptCount, auditMeta)
 		return constants.ErrInvalidRefreshToken
 	}
 
@@ -222,7 +231,7 @@ func (s *refreshTokenService) extraClaims(claims map[string]any) map[string]any 
 	return extraClaims
 }
 
-func (s *refreshTokenService) emitTokenReuseThrottledEvent(sessionID, tokenHash string, deltaMs, gracePeriodMs int64, meta events.AuditMetadata) {
+func (s *refreshTokenService) emitTokenReuseThrottledEvent(sessionID, tokenHash string, deltaMs, gracePeriodMs int64, attemptCount int, meta events.AuditMetadata) {
 	if s.eventBus == nil {
 		return
 	}
@@ -233,7 +242,7 @@ func (s *refreshTokenService) emitTokenReuseThrottledEvent(sessionID, tokenHash 
 		TokenHash:         tokenHash,
 		DeltaMs:           deltaMs,
 		GracePeriodConfig: fmt.Sprintf("%dms", gracePeriodMs),
-		AttemptCount:      2,
+		AttemptCount:      attemptCount,
 		Metadata:          meta,
 		Timestamp:         time.Now().UTC().Format(time.RFC3339),
 	}
