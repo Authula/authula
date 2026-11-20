@@ -51,6 +51,13 @@ func (p *JWTPlugin) Config() any {
 	return p.pluginConfig
 }
 
+func (p *JWTPlugin) RevokeToken(ctx context.Context, jti string, expiresAt time.Time) error {
+	if p.blacklistService == nil {
+		return errors.New("jwt: secondary storage is not available; token revocation is disabled")
+	}
+	return p.blacklistService.BlacklistToken(ctx, jti, expiresAt)
+}
+
 func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 	p.Logger = ctx.Logger
 	p.globalConfig = ctx.GetConfig()

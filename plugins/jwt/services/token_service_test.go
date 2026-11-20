@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Authula/authula/models"
+	jwttests "github.com/Authula/authula/plugins/jwt/tests"
 	"github.com/Authula/authula/plugins/jwt/types"
 	"github.com/Authula/authula/services"
 )
@@ -497,6 +498,48 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			f.sessionSvc.AssertExpectations(t)
 		})
 	}
+}
+
+func TestTokenService_RevokedMachineTokenFailsValidation(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	f := newServiceTestFixture(t)
+	f.setupKeyServiceMock()
+	f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
+
+	blacklistSvc := NewBlacklistService(jwttests.NewInMemoryStorage(), f.logger)
+	svc := &tokenService{
+		logger:           f.logger,
+		coreTokenService: f.coreTokenSvc,
+		keyService:       f.keySvc,
+		cacheService:     f.cacheSvc,
+		blacklistService: blacklistSvc,
+		sessionService:   f.sessionSvc,
+		expiresIn:        f.expiresIn,
+		refreshExpiresIn: f.refreshExpiresIn,
+		issuer:           f.issuer,
+		audience:         f.audience,
+	}
+
+	pair, err := svc.GenerateMachineToken(ctx, "client-1", "org-1", []string{"read"})
+	require.NoError(t, err)
+	require.NotNil(t, pair)
+
+	claims := parseTestToken(t, pair.AccessToken, f)
+	jti, ok := claims["jti"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, jti)
+
+	require.NoError(t, blacklistSvc.BlacklistToken(ctx, jti, time.Now().Add(time.Hour)))
+
+	actor, err := svc.ValidateToken(ctx, pair.AccessToken)
+	require.ErrorContains(t, err, "token has been revoked")
+	require.Nil(t, actor)
+
+	f.keySvc.AssertExpectations(t)
+	f.coreTokenSvc.AssertExpectations(t)
+	f.cacheSvc.AssertExpectations(t)
 }
 
 func TestTokenService_GenerateUserToken(t *testing.T) {

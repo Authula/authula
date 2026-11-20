@@ -182,6 +182,11 @@ func (m *MockCacheService) GetJWKSWithFallback(ctx context.Context) (jwk.Set, er
 
 type MockBlacklistService struct{ mock.Mock }
 
+func (m *MockBlacklistService) BlacklistToken(ctx context.Context, jti string, expiresAt time.Time) error {
+	args := m.Called(ctx, jti, expiresAt)
+	return args.Error(0)
+}
+
 func (m *MockBlacklistService) IsBlacklisted(ctx context.Context, jti string) (bool, error) {
 	args := m.Called(ctx, jti)
 	return args.Bool(0), args.Error(1)
@@ -219,6 +224,11 @@ func (m *MockRefreshTokenRepository) RotateRefreshToken(ctx context.Context, old
 
 func (m *MockRefreshTokenRepository) RevokeAllSessionTokens(ctx context.Context, sessionID string) error {
 	args := m.Called(ctx, sessionID)
+	return args.Error(0)
+}
+
+func (m *MockRefreshTokenRepository) SetLastReuseAttempt(ctx context.Context, tokenHash string) error {
+	args := m.Called(ctx, tokenHash)
 	return args.Error(0)
 }
 
@@ -264,6 +274,11 @@ func (m *MockRefreshTokenService) RefreshTokens(ctx context.Context, refreshToke
 
 func (m *MockRefreshTokenService) StoreInitialRefreshToken(ctx context.Context, refreshToken string, sessionID string, expiresAt time.Time) error {
 	args := m.Called(ctx, refreshToken, sessionID, expiresAt)
+	return args.Error(0)
+}
+
+func (m *MockRefreshTokenService) RevokeSessionTokens(ctx context.Context, sessionID string) error {
+	args := m.Called(ctx, sessionID)
 	return args.Error(0)
 }
 

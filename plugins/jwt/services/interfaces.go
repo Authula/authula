@@ -38,17 +38,20 @@ type RefreshTokenRepository interface {
 	GetRefreshToken(ctx context.Context, tokenHash string) (*types.RefreshToken, error)
 	RotateRefreshToken(ctx context.Context, oldTokenHash string, newRecord *types.RefreshToken) (bool, error)
 	RevokeAllSessionTokens(ctx context.Context, sessionID string) error
+	SetLastReuseAttempt(ctx context.Context, tokenHash string) error
 	CleanupExpiredTokens(ctx context.Context) error
 }
 
 type RefreshTokenService interface {
 	RefreshTokens(ctx context.Context, refreshToken string) (*types.RefreshTokenResponse, error)
 	StoreInitialRefreshToken(ctx context.Context, refreshToken string, sessionID string, expiresAt time.Time) error
+	RevokeSessionTokens(ctx context.Context, sessionID string) error
 	CleanupExpiredTokens(ctx context.Context) error
 }
 
 type BlacklistService interface {
 	IsBlacklisted(ctx context.Context, jti string) (bool, error)
+	BlacklistToken(ctx context.Context, jti string, expiresAt time.Time) error
 	BlacklistAllSessionTokens(ctx context.Context, sessionID string, expiresAt time.Time) error
 	CleanupExpired(ctx context.Context) error
 }

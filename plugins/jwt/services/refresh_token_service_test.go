@@ -332,10 +332,11 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 			},
 		},
 		{
-			name: "reuse within grace is throttled without side effects",
+			name: "first reuse within grace is throttled and recorded",
 			setup: func(_ *testing.T, f *refreshTokenTestFixture) {
 				f.tokenSvc.On("ValidateRefreshToken", ctx, testRefreshToken).Return(validRefreshClaims(), nil)
 				f.repo.On("GetRefreshToken", ctx, HashRefreshToken(testRefreshToken)).Return(revokedRefreshRecord(time.Now().Add(-time.Second)), nil)
+				f.repo.On("SetLastReuseAttempt", ctx, HashRefreshToken(testRefreshToken)).Return(nil)
 			},
 			check: func(t *testing.T, f *refreshTokenTestFixture, response *types.RefreshTokenResponse, err error) {
 				assertInvalidRefreshToken(t, f, response, err)
@@ -346,13 +347,52 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 				require.Equal(t, constants.EventTokenReuseThrottled, event.Payload["type"])
 				require.Equal(t, testSessionID, event.Payload["session_id"])
 				require.Equal(t, HashRefreshToken(testRefreshToken), event.Payload["token_hash"])
-				require.Equal(t, float64(2), event.Payload["attempt_count"])
+				require.Equal(t, float64(1), event.Payload["attempt_count"])
 				require.Equal(t, "10000ms", event.Payload["grace_period_config"])
 				require.Positive(t, event.Payload["delta_ms"])
 
+				f.repo.AssertCalled(t, "SetLastReuseAttempt", ctx, HashRefreshToken(testRefreshToken))
 				f.repo.AssertNotCalled(t, "RevokeAllSessionTokens", mock.Anything, mock.Anything)
 				f.blacklistSvc.AssertNotCalled(t, "BlacklistAllSessionTokens", mock.Anything, mock.Anything, mock.Anything)
 				f.sessionSvc.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
+			},
+		},
+		{
+			name: "repeated reuse within grace reports the second attempt",
+			setup: func(_ *testing.T, f *refreshTokenTestFixture) {
+				record := revokedRefreshRecord(time.Now().Add(-time.Second))
+				record.LastReuseAttempt = new(time.Now().Add(-30 * time.Second))
+
+				f.tokenSvc.On("ValidateRefreshToken", ctx, testRefreshToken).Return(validRefreshClaims(), nil)
+				f.repo.On("GetRefreshToken", ctx, HashRefreshToken(testRefreshToken)).Return(record, nil)
+				f.repo.On("SetLastReuseAttempt", ctx, HashRefreshToken(testRefreshToken)).Return(nil)
+			},
+			check: func(t *testing.T, f *refreshTokenTestFixture, response *types.RefreshTokenResponse, err error) {
+				assertInvalidRefreshToken(t, f, response, err)
+				f.assertLogged(t, "[AUTH_REUSE_THROTTLED] Refresh token reuse within the grace period rejected")
+
+				event := f.recorder.NextEvent(t)
+				require.Equal(t, constants.EventTokenReuseThrottled, event.Type)
+				require.Equal(t, float64(2), event.Payload["attempt_count"])
+
+				f.repo.AssertCalled(t, "SetLastReuseAttempt", ctx, HashRefreshToken(testRefreshToken))
+				f.repo.AssertNotCalled(t, "RevokeAllSessionTokens", mock.Anything, mock.Anything)
+			},
+		},
+		{
+			name: "reuse attempt tracking error is logged and does not change the result",
+			setup: func(_ *testing.T, f *refreshTokenTestFixture) {
+				f.tokenSvc.On("ValidateRefreshToken", ctx, testRefreshToken).Return(validRefreshClaims(), nil)
+				f.repo.On("GetRefreshToken", ctx, HashRefreshToken(testRefreshToken)).Return(revokedRefreshRecord(time.Now().Add(-time.Second)), nil)
+				f.repo.On("SetLastReuseAttempt", ctx, HashRefreshToken(testRefreshToken)).Return(errRefreshTest)
+			},
+			check: func(t *testing.T, f *refreshTokenTestFixture, response *types.RefreshTokenResponse, err error) {
+				assertInvalidRefreshToken(t, f, response, err)
+				f.assertLogged(t, "failed to record refresh token reuse attempt")
+
+				event := f.recorder.NextEvent(t)
+				require.Equal(t, constants.EventTokenReuseThrottled, event.Type)
+				require.Equal(t, float64(1), event.Payload["attempt_count"])
 			},
 		},
 		{
@@ -828,7 +868,7 @@ func TestRefreshTokenService_ReuseEvents_WithNilEventBus(t *testing.T) {
 		{
 			name: "throttled event",
 			emit: func(service *refreshTokenService) {
-				service.emitTokenReuseThrottledEvent(testSessionID, "hash", 10, 1000, events.AuditMetadata{})
+				service.emitTokenReuseThrottledEvent(testSessionID, "hash", 10, 1000, 1, events.AuditMetadata{})
 			},
 		},
 		{
@@ -948,6 +988,42 @@ func TestHashRefreshToken(t *testing.T) {
 
 			require.Equal(t, tt.want, HashRefreshToken(tt.token))
 			require.Equal(t, HashRefreshToken(tt.token), HashRefreshToken(tt.token))
+		})
+	}
+}
+
+func TestRefreshTokenService_RevokeSessionTokens(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		wantErr error
+	}{
+		{
+			name: "delegates to the repository",
+		},
+		{
+			name:    "returns the repository error",
+			wantErr: errRefreshTest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			fixture := newRefreshTokenTestFixture()
+			fixture.repo.On("RevokeAllSessionTokens", ctx, testSessionID).Return(tt.wantErr)
+
+			err := fixture.newService().RevokeSessionTokens(ctx, testSessionID)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			fixture.assertExpectations(t)
 		})
 	}
 }

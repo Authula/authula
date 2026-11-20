@@ -414,7 +414,7 @@ func TestJWTPlugin_Hooks(t *testing.T) {
 
 	hooks := plugin.Hooks()
 
-	require.Len(t, hooks, 2)
+	require.Len(t, hooks, 3)
 
 	assert.Equal(t, models.HookAfter, hooks[0].Stage)
 	assert.Equal(t, 15, hooks[0].Order)
@@ -426,6 +426,12 @@ func TestJWTPlugin_Hooks(t *testing.T) {
 	assert.Equal(t, HookIDJWTRespondJSON.String(), hooks[1].PluginID)
 	assert.Equal(t, 10, hooks[1].Order)
 	assert.NotNil(t, hooks[1].Handler)
+
+	assert.Equal(t, models.HookAfter, hooks[2].Stage)
+	assert.Equal(t, 20, hooks[2].Order)
+	assert.Empty(t, hooks[2].PluginID)
+	require.NotNil(t, hooks[2].Matcher)
+	require.NotNil(t, hooks[2].Handler)
 }
 
 func TestJWTPlugin_Close(t *testing.T) {

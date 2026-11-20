@@ -11,6 +11,70 @@ import (
 	internaltests "github.com/Authula/authula/internal/tests"
 )
 
+func TestBlacklistService_BlacklistToken(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		jti       string
+		expiresAt time.Time
+		setupMock func(*internaltests.MockSecondaryStorage)
+		wantErr   string
+	}{
+		{
+			name:      "success",
+			jti:       "test-jti",
+			expiresAt: time.Now().Add(1 * time.Hour),
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Set", mock.Anything, "jwt:blacklist:token:test-jti", "1", mock.MatchedBy(func(ttl *time.Duration) bool {
+					return ttl != nil && *ttl > 59*time.Minute && *ttl <= time.Hour
+				})).Return(nil)
+			},
+		},
+		{
+			name:      "empty jti",
+			jti:       "",
+			expiresAt: time.Now().Add(1 * time.Hour),
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {},
+			wantErr:   "jti cannot be empty",
+		},
+		{
+			name:      "already expired token is a no-op",
+			jti:       "test-jti",
+			expiresAt: time.Now().Add(-1 * time.Hour),
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {},
+		},
+		{
+			name:      "storage error",
+			jti:       "test-jti",
+			expiresAt: time.Now().Add(1 * time.Hour),
+			setupMock: func(storage *internaltests.MockSecondaryStorage) {
+				storage.On("Set", mock.Anything, "jwt:blacklist:token:test-jti", "1", mock.Anything).Return(assert.AnError)
+			},
+			wantErr: "failed to blacklist token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			storage := new(internaltests.MockSecondaryStorage)
+			svc := NewBlacklistService(storage, &internaltests.MockLogger{})
+			tt.setupMock(storage)
+
+			err := svc.BlacklistToken(context.Background(), tt.jti, tt.expiresAt)
+
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+			storage.AssertExpectations(t)
+		})
+	}
+}
+
 func TestBlacklistService_IsBlacklisted(t *testing.T) {
 	t.Parallel()
 
