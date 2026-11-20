@@ -129,6 +129,14 @@ func TestBearerPlugin_Init(t *testing.T) {
 	}
 }
 
+func TestBearerPlugin_DependsOn(t *testing.T) {
+	t.Parallel()
+
+	plugin := New(BearerPluginConfig{})
+
+	require.Equal(t, []string{models.PluginJWT.String()}, plugin.DependsOn())
+}
+
 func TestBearerPlugin_Close(t *testing.T) {
 	t.Parallel()
 

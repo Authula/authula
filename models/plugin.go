@@ -70,10 +70,16 @@ type Plugin interface {
 	Close() error
 }
 
+// PluginWithDependencies is an optional interface for plugins that declare
+// which other plugins must be enabled and initialized first.
+type PluginWithDependencies interface {
+	DependsOn() []string
+}
+
 // PluginWithMigrations is an optional interface for plugins that have database migrations
 type PluginWithMigrations interface {
+	PluginWithDependencies
 	Migrations(provider string) []migrations.Migration
-	DependsOn() []string
 }
 
 // PluginWithRoutes is an optional interface for plugins that provide HTTP routes
