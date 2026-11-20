@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v4/jwk"
 
 	"github.com/Authula/authula/plugins/jwt/types"
 )

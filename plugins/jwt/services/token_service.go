@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lestrrat-go/jwx/v3/jwa"
-	"github.com/lestrrat-go/jwx/v3/jwk"
-	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/lestrrat-go/jwx/v4/jwa"
+	"github.com/lestrrat-go/jwx/v4/jwk"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/types"
@@ -87,7 +88,7 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 		return nil, fmt.Errorf("failed to decrypt private key: %w", err)
 	}
 
-	privKey, err := jwk.ParseKey([]byte(privateKeyPEM), jwk.WithPEM(true))
+	privKey, err := jwk.ParseKey([]byte(privateKeyPEM), jwk.WithX509(true))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
@@ -196,7 +197,7 @@ func (s *tokenService) GenerateMachineToken(ctx context.Context, clientID string
 		return nil, fmt.Errorf("failed to decrypt private key: %w", err)
 	}
 
-	privKey, err := jwk.ParseKey([]byte(privateKeyPEM), jwk.WithPEM(true))
+	privKey, err := jwk.ParseKey([]byte(privateKeyPEM), jwk.WithX509(true))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
@@ -285,8 +286,8 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 		}
 	}
 
-	var actorType string
-	if err := parsedToken.Get("actor_type", &actorType); err != nil || actorType == "" {
+	actorType, err := jwt.Get[string](parsedToken, "actor_type")
+	if err != nil || actorType == "" {
 		return nil, errors.New("missing actor_type claim")
 	}
 
@@ -302,20 +303,19 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 	}
 
 	if actorType == models.ActorMachine.ToString() {
-		var sub string
-		if err := parsedToken.Get(jwt.SubjectKey, &sub); err != nil || sub == "" {
+		sub, err := jwt.Get[string](parsedToken, jwt.SubjectKey)
+		if err != nil || sub == "" {
 			return nil, errors.New("missing subject claim")
 		}
 		actor.ID = sub
 		actor.Type = models.ActorMachine
 
-		var orgID string
-		if err := parsedToken.Get("organization_id", &orgID); err == nil && orgID != "" {
+		orgID, err := jwt.Get[string](parsedToken, "organization_id")
+		if err == nil && orgID != "" {
 			actor.Claims["organization_id"] = orgID
 		}
 
-		var raw any
-		if err := parsedToken.Get("scopes", &raw); err == nil {
+		if raw, ok := parsedToken.Field("scopes"); ok {
 			switch v := raw.(type) {
 			case []string:
 				if len(v) > 0 {
@@ -337,13 +337,13 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 		return actor, nil
 	}
 
-	var userID string
-	if err := parsedToken.Get("user_id", &userID); err != nil || userID == "" {
+	userID, err := jwt.Get[string](parsedToken, "user_id")
+	if err != nil || userID == "" {
 		return nil, errors.New("missing user_id claim")
 	}
 
-	var sessionID string
-	if err := parsedToken.Get("session_id", &sessionID); err != nil || sessionID == "" {
+	sessionID, err := jwt.Get[string](parsedToken, "session_id")
+	if err != nil || sessionID == "" {
 		return nil, errors.New("missing session_id claim")
 	}
 
@@ -367,17 +367,14 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 	actor.Type = models.ActorUser
 
 	// Passthrough any extra claims from the token into Actor.Claims.
-	for _, key := range parsedToken.Keys() {
+	for key, val := range parsedToken.Claims() {
 		switch key {
 		case jwt.SubjectKey, jwt.IssuedAtKey, jwt.ExpirationKey, jwt.JwtIDKey,
 			jwt.IssuerKey, jwt.AudienceKey, "user_id", "session_id", "token_type",
 			"actor_type", "organization_id", "scopes", "client_id":
 			continue
 		default:
-			var val any
-			if err := parsedToken.Get(key, &val); err == nil {
-				actor.Claims[key] = val
-			}
+			actor.Claims[key] = val
 		}
 	}
 
@@ -403,14 +400,7 @@ func (s *tokenService) ValidateRefreshToken(ctx context.Context, token string) (
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
 
-	claims := make(map[string]any, len(parsedToken.Keys()))
-	for _, key := range parsedToken.Keys() {
-		var val any
-		if err := parsedToken.Get(key, &val); err == nil {
-			claims[key] = val
-		}
-	}
-	return claims, nil
+	return maps.Collect(parsedToken.Claims()), nil
 }
 
 func (s *tokenService) accessTokenValidator() jwt.ValidatorFunc {
@@ -419,8 +409,8 @@ func (s *tokenService) accessTokenValidator() jwt.ValidatorFunc {
 			return err
 		}
 
-		var actorType string
-		if err := token.Get("actor_type", &actorType); err != nil || actorType == "" {
+		actorType, err := jwt.Get[string](token, "actor_type")
+		if err != nil || actorType == "" {
 			return errors.New("missing actor_type claim")
 		}
 		switch models.ActorType(actorType) {
@@ -455,8 +445,8 @@ func (s *tokenService) validateTokenPolicy(token jwt.Token, expectedTokenType ty
 		return errors.New("invalid audience claim")
 	}
 
-	var tokenType string
-	if err := token.Get("token_type", &tokenType); err != nil || tokenType == "" {
+	tokenType, err := jwt.Get[string](token, "token_type")
+	if err != nil || tokenType == "" {
 		return errors.New("missing token_type claim")
 	}
 	if tokenType != expectedTokenType.String() {

@@ -2,14 +2,15 @@ package services
 
 import (
 	"context"
+	"maps"
 	"math"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v3/jwa"
-	"github.com/lestrrat-go/jwx/v3/jwk"
-	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/lestrrat-go/jwx/v4/jwa"
+	"github.com/lestrrat-go/jwx/v4/jwk"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -51,20 +52,13 @@ func TestNewJWTService(t *testing.T) {
 func parseTestToken(t *testing.T, tokenStr string, f *serviceTestFixture) map[string]any {
 	t.Helper()
 
-	pubKey, err := jwk.ParseKey([]byte(f.activeKey.PublicKey), jwk.WithPEM(true))
+	pubKey, err := jwk.ParseKey([]byte(f.activeKey.PublicKey), jwk.WithX509(true))
 	require.NoError(t, err)
 
 	parsed, err := jwt.Parse([]byte(tokenStr), jwt.WithKey(jwa.EdDSA(), pubKey), jwt.WithValidate(false))
 	require.NoError(t, err)
 
-	result := make(map[string]any)
-	for _, key := range parsed.Keys() {
-		var value any
-		if err := parsed.Get(key, &value); err == nil {
-			result[key] = value
-		}
-	}
-	return result
+	return maps.Collect(parsed.Claims())
 }
 
 func TestTokenService_ValidateToken(t *testing.T) {
@@ -627,7 +621,7 @@ func TestTokenService_GenerateUserToken(t *testing.T) {
 
 				claims := parseTestToken(t, pair.AccessToken, f)
 				require.Equal(t, f.issuer, claims["iss"])
-				require.Equal(t, []string{f.audience}, claims["aud"])
+				require.EqualValues(t, []string{f.audience}, claims["aud"])
 				require.Equal(t, tt.userID, claims["sub"])
 				require.Equal(t, tt.userID, claims["user_id"])
 				require.Equal(t, tt.sessionID, claims["session_id"])
@@ -637,7 +631,7 @@ func TestTokenService_GenerateUserToken(t *testing.T) {
 
 				refreshClaims := parseTestToken(t, pair.RefreshToken, f)
 				require.Equal(t, f.issuer, refreshClaims["iss"])
-				require.Equal(t, []string{f.audience}, refreshClaims["aud"])
+				require.EqualValues(t, []string{f.audience}, refreshClaims["aud"])
 				require.Equal(t, tt.userID, refreshClaims["user_id"])
 				require.Equal(t, tt.sessionID, refreshClaims["session_id"])
 				require.Equal(t, "refresh_token", refreshClaims["token_type"])
@@ -754,7 +748,7 @@ func TestTokenService_GenerateMachineToken(t *testing.T) {
 
 				claims := parseTestToken(t, pair.AccessToken, f)
 				require.Equal(t, f.issuer, claims["iss"])
-				require.Equal(t, []string{f.audience}, claims["aud"])
+				require.EqualValues(t, []string{f.audience}, claims["aud"])
 				require.Equal(t, tt.clientID, claims["sub"])
 				require.Equal(t, tt.clientID, claims["client_id"])
 				require.Equal(t, "machine", claims["actor_type"])
