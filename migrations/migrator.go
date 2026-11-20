@@ -228,7 +228,7 @@ func (m *Migrator) applyUp(ctx context.Context, pluginID string, migration Migra
 			AppliedAt: time.Now().UTC(),
 		}
 
-		tableExpr, args := m.tableExpr(true)
+		tableExpr, args := m.insertTableExpr()
 		_, err := tx.NewInsert().
 			Model(entry).
 			ModelTableExpr(tableExpr, args...).
@@ -381,7 +381,7 @@ func sortMigrationSets(sets []MigrationSet) ([]MigrationSet, error) {
 			}
 			idx, ok := indices[dep]
 			if !ok {
-				return nil, fmt.Errorf("plugin %s depends on %s which has no registered migrations", set.PluginID, dep)
+				return nil, fmt.Errorf("plugin %s depends on %s which is not registered", set.PluginID, dep)
 			}
 			_ = idx // dependency existence already validated
 			indegree[set.PluginID]++
@@ -488,4 +488,13 @@ func (m *Migrator) tableExpr(withAlias bool) (string, []any) {
 		return fmt.Sprintf("? AS %s", schemaMigrationAlias), []any{bun.Ident(m.table)}
 	}
 	return "?", []any{bun.Ident(m.table)}
+}
+
+// insertTableExpr avoids the row alias on MySQL, which rejects an alias on
+// INSERT unless an ON DUPLICATE KEY clause is present.
+func (m *Migrator) insertTableExpr() (string, []any) {
+	if m.dialect == "mysql" {
+		return "?", []any{bun.Ident(m.table)}
+	}
+	return m.tableExpr(true)
 }

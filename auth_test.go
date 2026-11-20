@@ -379,7 +379,7 @@ func TestNewPanics(t *testing.T) {
 					Plugins: []models.Plugin{plugin},
 				}
 			},
-			want: "failed to run plugin migrations: plugin fake depends on missing which has no registered migrations",
+			want: "failed to run plugin migrations: plugin fake depends on missing which is not registered",
 		},
 		{
 			name: "plugin init failure",

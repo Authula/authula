@@ -281,22 +281,48 @@ func TestMigrator_createSchemaTable(t *testing.T) {
 func TestMigrator_tableExpr(t *testing.T) {
 	t.Parallel()
 
-	migrator := &Migrator{table: DefaultSchemaTable}
-
 	tests := []struct {
 		name      string
+		dialect   string
 		withAlias bool
 		wantExpr  string
 	}{
-		{name: "with alias", withAlias: true, wantExpr: "? AS schema_migration"},
-		{name: "without alias", withAlias: false, wantExpr: "?"},
+		{name: "with alias", dialect: "postgres", withAlias: true, wantExpr: "? AS schema_migration"},
+		{name: "without alias", dialect: "postgres", withAlias: false, wantExpr: "?"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			migrator := &Migrator{table: DefaultSchemaTable, dialect: tt.dialect}
 			expr, args := migrator.tableExpr(tt.withAlias)
+			assert.Equal(t, tt.wantExpr, expr)
+			require.Len(t, args, 1)
+			assert.Equal(t, bun.Ident(DefaultSchemaTable), args[0])
+		})
+	}
+}
+
+func TestMigrator_insertTableExpr(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		dialect  string
+		wantExpr string
+	}{
+		{name: "mysql omits the row alias", dialect: "mysql", wantExpr: "?"},
+		{name: "postgres includes the row alias", dialect: "postgres", wantExpr: "? AS schema_migration"},
+		{name: "sqlite includes the row alias", dialect: "sqlite", wantExpr: "? AS schema_migration"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			migrator := &Migrator{table: DefaultSchemaTable, dialect: tt.dialect}
+			expr, args := migrator.insertTableExpr()
 			assert.Equal(t, tt.wantExpr, expr)
 			require.Len(t, args, 1)
 			assert.Equal(t, bun.Ident(DefaultSchemaTable), args[0])
@@ -511,7 +537,7 @@ func TestMigrator_MigrateValidation(t *testing.T) {
 		{
 			name:    "missing dependency",
 			sets:    []MigrationSet{{PluginID: "plugin_a", DependsOn: []string{"missing"}}},
-			wantErr: "plugin plugin_a depends on missing which has no registered migrations",
+			wantErr: "plugin plugin_a depends on missing which is not registered",
 		},
 		{
 			name: "duplicate plugin set",
@@ -871,7 +897,7 @@ func TestMigrator_RollbackAll(t *testing.T) {
 
 		err := migrator.RollbackAll(context.Background(), []MigrationSet{set})
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "has no registered migrations")
+		assert.ErrorContains(t, err, "is not registered")
 	})
 
 	t.Run("returns schema table errors", func(t *testing.T) {
