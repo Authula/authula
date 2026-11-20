@@ -227,6 +227,7 @@ func TestSecondaryStoragePluginInitDatabaseProvider(t *testing.T) {
 			storage, ok := registered.GetStorage().(*DatabaseSecondaryStorage)
 			require.True(t, ok)
 			assert.Equal(t, tt.wantInterval, storage.cleanupInterval)
+			assert.True(t, storage.cleanupStarted)
 
 			require.NoError(t, storage.Set(context.Background(), "plugin-key", "plugin-value", nil))
 			value, err := storage.Get(context.Background(), "plugin-key")
