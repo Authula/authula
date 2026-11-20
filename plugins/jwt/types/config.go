@@ -16,6 +16,8 @@ type JWTPluginConfig struct {
 	RefreshExpiresIn       time.Duration `json:"refresh_expires_in" toml:"refresh_expires_in"`               // Refresh token TTL
 	JWKSCacheTTL           time.Duration `json:"jwks_cache_ttl" toml:"jwks_cache_ttl"`                       // Cache TTL for JWKS, default 24 hours
 	RefreshGracePeriod     time.Duration `json:"refresh_grace_period" toml:"refresh_grace_period"`           // Grace period for refresh token reuse, default 10s
+	AutoCleanup            *bool         `json:"auto_cleanup,omitempty" toml:"auto_cleanup,omitempty"`       // Schedule credential cleanup, default true
+	CleanupInterval        time.Duration `json:"cleanup_interval" toml:"cleanup_interval"`                   // Interval between cleanup runs, default 1 hour
 	Issuer                 string        `json:"issuer" toml:"issuer"`                                       // Token issuer; defaults to base_url + base_path
 	Audience               string        `json:"audience" toml:"audience"`                                   // Token audience; defaults to "authula"
 }
@@ -38,6 +40,12 @@ func (c *JWTPluginConfig) ApplyDefaults() {
 	}
 	if c.RefreshGracePeriod == 0 {
 		c.RefreshGracePeriod = 10 * time.Second
+	}
+	if c.AutoCleanup == nil {
+		c.AutoCleanup = new(true)
+	}
+	if c.CleanupInterval <= 0 {
+		c.CleanupInterval = time.Hour
 	}
 }
 

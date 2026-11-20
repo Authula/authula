@@ -55,6 +55,53 @@ func TestJWTPluginConfig_DefaultConfig(t *testing.T) {
 			},
 		},
 		{
+			name:   "enables auto cleanup by default",
+			config: types.JWTPluginConfig{},
+			check: func(t *testing.T, c types.JWTPluginConfig) {
+				if c.AutoCleanup == nil {
+					t.Fatal("AutoCleanup = nil, want true")
+				}
+				if !*c.AutoCleanup {
+					t.Errorf("AutoCleanup = %v, want true", *c.AutoCleanup)
+				}
+			},
+		},
+		{
+			name:   "sets default cleanup interval",
+			config: types.JWTPluginConfig{},
+			check: func(t *testing.T, c types.JWTPluginConfig) {
+				expected := time.Hour
+				if c.CleanupInterval != expected {
+					t.Errorf("CleanupInterval = %v, want %v", c.CleanupInterval, expected)
+				}
+			},
+		},
+		{
+			name: "preserves disabled auto cleanup",
+			config: types.JWTPluginConfig{
+				AutoCleanup: new(false),
+			},
+			check: func(t *testing.T, c types.JWTPluginConfig) {
+				if c.AutoCleanup == nil {
+					t.Fatal("AutoCleanup = nil, want false")
+				}
+				if *c.AutoCleanup {
+					t.Errorf("AutoCleanup = %v, want false", *c.AutoCleanup)
+				}
+			},
+		},
+		{
+			name: "preserves custom cleanup interval",
+			config: types.JWTPluginConfig{
+				CleanupInterval: 15 * time.Minute,
+			},
+			check: func(t *testing.T, c types.JWTPluginConfig) {
+				if c.CleanupInterval != 15*time.Minute {
+					t.Errorf("CleanupInterval = %v, want %v", c.CleanupInterval, 15*time.Minute)
+				}
+			},
+		},
+		{
 			name: "preserves custom values",
 			config: types.JWTPluginConfig{
 				KeyRotationInterval: 30 * 24 * time.Hour,

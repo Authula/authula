@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+	"time"
 
+	"github.com/Authula/authula/core/cleanup"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/repositories"
@@ -17,7 +20,6 @@ import (
 type JWTPlugin struct {
 	globalConfig     *models.Config
 	pluginConfig     types.JWTPluginConfig
-	ctx              *models.PluginContext
 	Logger           models.Logger
 	sessionService   services.SessionService
 	tokenService     services.TokenService
@@ -26,7 +28,9 @@ type JWTPlugin struct {
 	keyService       jwtservices.KeyService
 	cacheService     jwtservices.CacheService
 	secondaryStorage models.SecondaryStorage
-	blacklistService jwtservices.BlacklistService
+	cleanupStop      chan struct{}
+	cleanupDone      chan struct{}
+	cleanupOnce      sync.Once
 }
 
 func New(config types.JWTPluginConfig) *JWTPlugin {
@@ -47,13 +51,13 @@ func (p *JWTPlugin) Config() any {
 }
 
 func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
-	p.ctx = ctx
 	p.Logger = ctx.Logger
 	p.globalConfig = ctx.GetConfig()
 
 	if err := util.LoadPluginConfig(ctx.GetConfig(), p.Metadata().ID, &p.pluginConfig); err != nil {
 		return err
 	}
+	p.pluginConfig.ApplyDefaults()
 
 	var baseURL, basePath string
 	if p.globalConfig != nil {
@@ -89,12 +93,6 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 	p.keyService = jwtservices.NewKeyService(jwksRepo, p.Logger, p.tokenService)
 	p.cacheService = jwtservices.NewCacheService(jwksRepo, p.secondaryStorage, p.Logger, p.pluginConfig.JWKSCacheTTL)
 
-	if p.secondaryStorage == nil {
-		p.Logger.Warn("secondary storage not available; token blacklisting will be disabled")
-	} else {
-		p.blacklistService = jwtservices.NewBlacklistService(p.secondaryStorage, p.Logger)
-	}
-
 	if err := p.keyService.GenerateKeysIfMissing(context.Background()); err != nil {
 		p.Logger.Error("failed to generate keys", "error", err)
 		return fmt.Errorf("failed to generate keys: %w", err)
@@ -124,7 +122,6 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		p.tokenService,
 		p.keyService,
 		p.cacheService,
-		p.blacklistService,
 		jwtservices.TokenServiceConfig{
 			ExpiresIn:        p.pluginConfig.ExpiresIn,
 			RefreshExpiresIn: p.pluginConfig.RefreshExpiresIn,
@@ -139,13 +136,18 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		p.sessionService,
 		p.jwtService.(jwtservices.TokenService),
 		refreshTokenRepo,
-		p.blacklistService,
 		p.pluginConfig.RefreshGracePeriod,
 		p.pluginConfig.ExpiresIn,
 		p.pluginConfig.RefreshExpiresIn,
 	)
 
 	ctx.ServiceRegistry.Register(models.ServiceJWT.String(), p.jwtService)
+
+	if p.pluginConfig.AutoCleanup != nil && *p.pluginConfig.AutoCleanup {
+		p.cleanupStop = make(chan struct{})
+		p.cleanupDone = make(chan struct{})
+		go p.runCleanupLoop(p.pluginConfig.CleanupInterval)
+	}
 
 	return nil
 }
@@ -167,5 +169,24 @@ func (p *JWTPlugin) Hooks() []models.Hook {
 }
 
 func (p *JWTPlugin) Close() error {
+	p.cleanupOnce.Do(func() {
+		if p.cleanupStop != nil {
+			close(p.cleanupStop)
+			<-p.cleanupDone
+		}
+	})
 	return nil
+}
+
+func (p *JWTPlugin) runCleanupLoop(interval time.Duration) {
+	cleanup.RunLoop(p.cleanupStop, p.cleanupDone, interval, p.cleanup)
+}
+
+func (p *JWTPlugin) cleanup(ctx context.Context) {
+	if err := p.keyService.PurgeExpiredKeys(ctx); err != nil {
+		p.Logger.Error("jwt expired JWKS key cleanup failed", "error", err)
+	}
+	if err := p.refreshService.CleanupExpiredTokens(ctx); err != nil {
+		p.Logger.Error("jwt expired refresh token cleanup failed", "error", err)
+	}
 }

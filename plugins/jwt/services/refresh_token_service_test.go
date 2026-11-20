@@ -37,7 +37,6 @@ type refreshTokenTestFixture struct {
 	sessionSvc       *tests.MockSessionService
 	tokenSvc         *tests.MockTokenService
 	repo             *tests.MockRefreshTokenRepository
-	blacklistSvc     *tests.MockBlacklistService
 	gracePeriod      time.Duration
 	expiresIn        time.Duration
 	refreshExpiresIn time.Duration
@@ -53,7 +52,6 @@ func newRefreshTokenTestFixture() *refreshTokenTestFixture {
 		sessionSvc:       &tests.MockSessionService{},
 		tokenSvc:         &tests.MockTokenService{},
 		repo:             &tests.MockRefreshTokenRepository{},
-		blacklistSvc:     &tests.MockBlacklistService{},
 		gracePeriod:      10 * time.Second,
 		expiresIn:        15 * time.Minute,
 		refreshExpiresIn: 7 * 24 * time.Hour,
@@ -67,7 +65,6 @@ func (f *refreshTokenTestFixture) newService() *refreshTokenService {
 		f.sessionSvc,
 		f.tokenSvc,
 		f.repo,
-		f.blacklistSvc,
 		f.gracePeriod,
 		f.expiresIn,
 		f.refreshExpiresIn,
@@ -82,7 +79,6 @@ func (f *refreshTokenTestFixture) assertExpectations(t *testing.T) {
 	f.repo.AssertExpectations(t)
 	f.sessionSvc.AssertExpectations(t)
 	f.tokenSvc.AssertExpectations(t)
-	f.blacklistSvc.AssertExpectations(t)
 }
 
 func (f *refreshTokenTestFixture) assertLogged(t *testing.T, message string) {
@@ -172,12 +168,6 @@ func TestNewRefreshTokenService(t *testing.T) {
 			name: "refresh_token_repository",
 			check: func(t *testing.T, f *refreshTokenTestFixture, service *refreshTokenService) {
 				require.Same(t, f.repo, service.storage)
-			},
-		},
-		{
-			name: "blacklist_service",
-			check: func(t *testing.T, f *refreshTokenTestFixture, service *refreshTokenService) {
-				require.Same(t, f.blacklistSvc, service.blacklistService)
 			},
 		},
 		{
@@ -280,7 +270,7 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 			name: "record not found",
 			setup: func(_ *testing.T, f *refreshTokenTestFixture) {
 				f.tokenSvc.On("ValidateRefreshToken", ctx, testRefreshToken).Return(validRefreshClaims(), nil)
-				f.repo.On("GetRefreshToken", ctx, HashRefreshToken(testRefreshToken)).Return(nil, nil)
+				f.repo.On("GetRefreshToken", ctx, HashRefreshToken(testRefreshToken)).Return(nil, constants.ErrRefreshTokenNotFound)
 			},
 			check: assertInvalidRefreshToken,
 		},
@@ -351,7 +341,6 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 				require.Positive(t, event.Payload["delta_ms"])
 
 				f.repo.AssertNotCalled(t, "RevokeAllSessionTokens", mock.Anything, mock.Anything)
-				f.blacklistSvc.AssertNotCalled(t, "BlacklistAllSessionTokens", mock.Anything, mock.Anything, mock.Anything)
 				f.sessionSvc.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
 			},
 		},
@@ -361,7 +350,6 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 				f.tokenSvc.On("ValidateRefreshToken", ctx, testRefreshToken).Return(validRefreshClaims(), nil)
 				f.repo.On("GetRefreshToken", ctx, HashRefreshToken(testRefreshToken)).Return(revokedRefreshRecord(time.Now().Add(-time.Minute)), nil)
 				f.repo.On("RevokeAllSessionTokens", ctx, testSessionID).Return(nil)
-				f.blacklistSvc.On("BlacklistAllSessionTokens", ctx, testSessionID, mock.MatchedBy(isTimeNear(time.Now().Add(f.refreshExpiresIn), 5*time.Second))).Return(nil)
 				f.sessionSvc.On("Delete", ctx, testSessionID).Return(nil)
 			},
 			check: func(t *testing.T, f *refreshTokenTestFixture, response *types.RefreshTokenResponse, err error) {
@@ -498,7 +486,6 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 				}, nil)
 				f.repo.On("RotateRefreshToken", ctx, HashRefreshToken(testRefreshToken), mock.Anything).Return(false, nil)
 				f.repo.On("RevokeAllSessionTokens", ctx, testSessionID).Return(nil)
-				f.blacklistSvc.On("BlacklistAllSessionTokens", ctx, testSessionID, mock.Anything).Return(nil)
 				f.sessionSvc.On("Delete", ctx, testSessionID).Return(nil)
 			},
 			check: func(t *testing.T, f *refreshTokenTestFixture, response *types.RefreshTokenResponse, err error) {
@@ -691,7 +678,7 @@ func TestRefreshTokenService_HandleRotationConflict(t *testing.T) {
 		{
 			name: "missing re-read record is rejected",
 			setup: func(f *refreshTokenTestFixture) {
-				f.repo.On("GetRefreshToken", ctx, tokenHash).Return(nil, nil)
+				f.repo.On("GetRefreshToken", ctx, tokenHash).Return(nil, constants.ErrRefreshTokenNotFound)
 			},
 			check: func(t *testing.T, _ *refreshTokenTestFixture, err error) {
 				require.ErrorIs(t, err, constants.ErrInvalidRefreshToken)
@@ -730,11 +717,10 @@ func TestRefreshTokenService_InvalidateSessionFamily(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name         string
-		revokeErr    error
-		blacklistErr error
-		deleteErr    error
-		wantLog      string
+		name      string
+		revokeErr error
+		deleteErr error
+		wantLog   string
 	}{
 		{
 			name: "success",
@@ -743,11 +729,6 @@ func TestRefreshTokenService_InvalidateSessionFamily(t *testing.T) {
 			name:      "revoke error is logged",
 			revokeErr: errRefreshTest,
 			wantLog:   "failed to revoke session refresh tokens",
-		},
-		{
-			name:         "blacklist error is logged",
-			blacklistErr: errRefreshTest,
-			wantLog:      "failed to blacklist session tokens",
 		},
 		{
 			name:      "delete error is logged",
@@ -762,7 +743,6 @@ func TestRefreshTokenService_InvalidateSessionFamily(t *testing.T) {
 
 			fixture := newRefreshTokenTestFixture()
 			fixture.repo.On("RevokeAllSessionTokens", ctx, testSessionID).Return(tt.revokeErr)
-			fixture.blacklistSvc.On("BlacklistAllSessionTokens", ctx, testSessionID, mock.MatchedBy(isTimeNear(time.Now().Add(fixture.refreshExpiresIn), 5*time.Second))).Return(tt.blacklistErr)
 			fixture.sessionSvc.On("Delete", ctx, testSessionID).Return(tt.deleteErr)
 
 			service := fixture.newService()
@@ -952,12 +932,139 @@ func TestHashRefreshToken(t *testing.T) {
 	}
 }
 
+func TestRefreshTokenService_RevokeRefreshToken(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		token       string
+		getRecord   *types.RefreshToken
+		getErr      error
+		revokeErr   error
+		wantErr     error
+		wantLog     string
+		wantRevoked bool
+	}{
+		{
+			name:        "revokes an existing token by its hash",
+			token:       testRefreshToken,
+			getRecord:   activeRefreshRecord(time.Now().Add(time.Hour)),
+			wantRevoked: true,
+		},
+		{
+			name:    "rejects an empty token",
+			token:   "",
+			wantErr: constants.ErrRefreshTokenIsRequired,
+		},
+		{
+			name:    "returns not found when the token is unknown",
+			token:   testRefreshToken,
+			getErr:  constants.ErrRefreshTokenNotFound,
+			wantErr: constants.ErrRefreshTokenNotFound,
+		},
+		{
+			name:    "returns the lookup error",
+			token:   testRefreshToken,
+			getErr:  errRefreshTest,
+			wantErr: errRefreshTest,
+			wantLog: "refresh token lookup failed",
+		},
+		{
+			name:        "returns the revoke error",
+			token:       testRefreshToken,
+			getRecord:   activeRefreshRecord(time.Now().Add(time.Hour)),
+			revokeErr:   errRefreshTest,
+			wantErr:     errRefreshTest,
+			wantLog:     "failed to revoke refresh token",
+			wantRevoked: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			fixture := newRefreshTokenTestFixture()
+
+			if tt.token == "" {
+				err := fixture.newService().RevokeRefreshToken(ctx, tt.token)
+				require.ErrorIs(t, err, tt.wantErr)
+				fixture.repo.AssertNotCalled(t, "GetRefreshToken", mock.Anything, mock.Anything)
+				fixture.repo.AssertNotCalled(t, "RevokeRefreshToken", mock.Anything, mock.Anything)
+				fixture.assertExpectations(t)
+				return
+			}
+
+			tokenHash := HashRefreshToken(tt.token)
+			fixture.repo.On("GetRefreshToken", ctx, tokenHash).Return(tt.getRecord, tt.getErr)
+			if tt.wantRevoked {
+				fixture.repo.On("RevokeRefreshToken", ctx, tokenHash).Return(tt.revokeErr)
+			}
+
+			err := fixture.newService().RevokeRefreshToken(ctx, tt.token)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tt.wantRevoked {
+				fixture.repo.AssertCalled(t, "RevokeRefreshToken", ctx, tokenHash)
+			} else {
+				fixture.repo.AssertNotCalled(t, "RevokeRefreshToken", mock.Anything, mock.Anything)
+			}
+
+			if tt.wantLog != "" {
+				fixture.assertLogged(t, tt.wantLog)
+			}
+
+			fixture.assertExpectations(t)
+		})
+	}
+}
+
+func TestRefreshTokenService_CleanupExpiredTokens(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		wantErr error
+	}{
+		{
+			name: "delegates to the repository",
+		},
+		{
+			name:    "returns the repository error",
+			wantErr: errRefreshTest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := newRefreshTokenTestFixture()
+			fixture.repo.On("CleanupExpiredTokens", mock.Anything).Return(tt.wantErr)
+
+			err := fixture.newService().CleanupExpiredTokens(context.Background())
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			fixture.assertExpectations(t)
+		})
+	}
+}
+
 func expectReuseAfterGrace(t *testing.T, fixture *refreshTokenTestFixture, ctx context.Context) {
 	t.Helper()
 
 	fixture.tokenSvc.On("ValidateRefreshToken", ctx, testRefreshToken).Return(validRefreshClaims(), nil)
 	fixture.repo.On("GetRefreshToken", ctx, HashRefreshToken(testRefreshToken)).Return(revokedRefreshRecord(time.Now().Add(-time.Minute)), nil)
 	fixture.repo.On("RevokeAllSessionTokens", ctx, testSessionID).Return(nil)
-	fixture.blacklistSvc.On("BlacklistAllSessionTokens", ctx, testSessionID, mock.Anything).Return(nil)
 	fixture.sessionSvc.On("Delete", ctx, testSessionID).Return(nil)
 }

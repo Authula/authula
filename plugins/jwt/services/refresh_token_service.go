@@ -25,7 +25,6 @@ type refreshTokenService struct {
 	sessionService   coreservices.SessionService
 	jwtService       TokenService
 	storage          RefreshTokenRepository
-	blacklistService BlacklistService
 	gracePeriod      time.Duration
 	expiresIn        time.Duration
 	refreshExpiresIn time.Duration
@@ -37,7 +36,6 @@ func NewRefreshTokenService(
 	sessionService coreservices.SessionService,
 	jwtService TokenService,
 	storage RefreshTokenRepository,
-	blacklistService BlacklistService,
 	gracePeriod time.Duration,
 	expiresIn time.Duration,
 	refreshExpiresIn time.Duration,
@@ -48,7 +46,6 @@ func NewRefreshTokenService(
 		sessionService:   sessionService,
 		jwtService:       jwtService,
 		storage:          storage,
-		blacklistService: blacklistService,
 		gracePeriod:      gracePeriod,
 		expiresIn:        expiresIn,
 		refreshExpiresIn: refreshExpiresIn,
@@ -71,10 +68,9 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 
 	record, err := s.storage.GetRefreshToken(ctx, tokenHash)
 	if err != nil {
-		s.logger.Error("refresh token lookup failed", "error", err)
-		return nil, constants.ErrInvalidRefreshToken
-	}
-	if record == nil {
+		if !errors.Is(err, constants.ErrRefreshTokenNotFound) {
+			s.logger.Error("refresh token lookup failed", "error", err)
+		}
 		return nil, constants.ErrInvalidRefreshToken
 	}
 
@@ -152,10 +148,9 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 func (s *refreshTokenService) handleRotationConflict(ctx context.Context, tokenHash string, auditMeta events.AuditMetadata) error {
 	latest, err := s.storage.GetRefreshToken(ctx, tokenHash)
 	if err != nil {
-		s.logger.Error("refresh token re-read failed", "error", err)
-		return constants.ErrInvalidRefreshToken
-	}
-	if latest == nil {
+		if !errors.Is(err, constants.ErrRefreshTokenNotFound) {
+			s.logger.Error("refresh token re-read failed", "error", err)
+		}
 		return constants.ErrInvalidRefreshToken
 	}
 	if latest.IsRevoked {
@@ -203,10 +198,6 @@ func (s *refreshTokenService) handleRevokedToken(ctx context.Context, tokenHash 
 func (s *refreshTokenService) invalidateSessionFamily(ctx context.Context, sessionID string) {
 	if err := s.storage.RevokeAllSessionTokens(ctx, sessionID); err != nil {
 		s.logger.Error("failed to revoke session refresh tokens", "session_id", sessionID, "error", err)
-	}
-
-	if err := s.blacklistService.BlacklistAllSessionTokens(ctx, sessionID, time.Now().Add(s.refreshExpiresIn)); err != nil {
-		s.logger.Error("failed to blacklist session tokens", "session_id", sessionID, "error", err)
 	}
 
 	if err := s.sessionService.Delete(ctx, sessionID); err != nil {
@@ -290,6 +281,34 @@ func (s *refreshTokenService) StoreInitialRefreshToken(ctx context.Context, refr
 	}
 
 	return s.storage.StoreRefreshToken(ctx, record)
+}
+
+func (s *refreshTokenService) RevokeRefreshToken(ctx context.Context, refreshToken string) error {
+	if refreshToken == "" {
+		return constants.ErrRefreshTokenIsRequired
+	}
+
+	tokenHash := HashRefreshToken(refreshToken)
+
+	record, err := s.storage.GetRefreshToken(ctx, tokenHash)
+	if err != nil {
+		if errors.Is(err, constants.ErrRefreshTokenNotFound) {
+			return constants.ErrRefreshTokenNotFound
+		}
+		s.logger.Error("refresh token lookup failed", "error", err)
+		return err
+	}
+
+	if err := s.storage.RevokeRefreshToken(ctx, tokenHash); err != nil {
+		s.logger.Error("failed to revoke refresh token", "session_id", record.SessionID, "error", err)
+		return err
+	}
+
+	return nil
+}
+
+func (s *refreshTokenService) CleanupExpiredTokens(ctx context.Context) error {
+	return s.storage.CleanupExpiredTokens(ctx)
 }
 
 // HashRefreshToken creates a SHA256 hash of a refresh token.

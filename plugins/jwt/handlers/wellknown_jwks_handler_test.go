@@ -60,7 +60,6 @@ func TestWellKnownJWKSHandler(t *testing.T) {
 			}
 
 			handler := &WellKnownJWKSHandler{
-				Logger:      &internaltests.MockLogger{},
 				JWKSUseCase: mockUC,
 			}
 

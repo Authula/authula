@@ -76,6 +76,34 @@ func insertOldJWKSKey(t *testing.T, db bun.IDB, id string, age time.Duration) {
 	require.NoError(t, err)
 }
 
+func insertExpiredCleanupRecords(t *testing.T, db bun.IDB) (*types.JWKS, *types.RefreshToken) {
+	t.Helper()
+
+	ctx := context.Background()
+	expiredAt := time.Now().Add(-48 * time.Hour)
+	expiredKey := &types.JWKS{
+		ID:         "expired-key",
+		PublicKey:  "expired-public-key",
+		PrivateKey: "expired-private-key",
+		CreatedAt:  time.Now(),
+		ExpiresAt:  &expiredAt,
+	}
+	_, err := db.NewInsert().Model(expiredKey).Exec(ctx)
+	require.NoError(t, err)
+
+	expiredToken := &types.RefreshToken{
+		ID:        "expired-refresh-token",
+		SessionID: "session-1",
+		TokenHash: "expired-token-hash",
+		ExpiresAt: time.Now().Add(-time.Hour),
+		CreatedAt: time.Now().Add(-2 * time.Hour),
+	}
+	_, err = db.NewInsert().Model(expiredToken).Exec(ctx)
+	require.NoError(t, err)
+
+	return expiredKey, expiredToken
+}
+
 func countJWKSKeys(t *testing.T, db bun.IDB) int {
 	t.Helper()
 
@@ -255,6 +283,7 @@ func TestJWTPlugin_Init_Success(t *testing.T) {
 			}
 
 			require.NoError(t, plugin.Init(ctx))
+			t.Cleanup(func() { _ = plugin.Close() })
 
 			assert.Same(t, logger, plugin.Logger)
 			assert.NotNil(t, plugin.sessionService)
@@ -270,15 +299,12 @@ func TestJWTPlugin_Init_Success(t *testing.T) {
 
 			if tt.withSecondaryStorage {
 				assert.NotNil(t, plugin.secondaryStorage)
-				assert.NotNil(t, plugin.blacklistService)
 
 				cached, err := storage.Get(context.Background(), testJWKSCacheKey)
 				require.NoError(t, err)
 				assert.NotNil(t, cached)
 			} else {
 				assert.Nil(t, plugin.secondaryStorage)
-				assert.Nil(t, plugin.blacklistService)
-				assert.True(t, hasLogMessage(logger, "token blacklisting will be disabled"))
 			}
 		})
 	}
@@ -327,6 +353,7 @@ func TestJWTPlugin_Init_KeyRotation(t *testing.T) {
 			}
 
 			require.NoError(t, plugin.Init(ctx))
+			t.Cleanup(func() { _ = plugin.Close() })
 
 			assert.NotNil(t, plugin.jwtService)
 			assert.Equal(t, tt.wantKeyCount, countJWKSKeys(t, db))
@@ -335,32 +362,133 @@ func TestJWTPlugin_Init_KeyRotation(t *testing.T) {
 	}
 }
 
-func TestJWTPlugin_Init_CacheInvalidationFailureIsAWarning(t *testing.T) {
+func TestJWTPlugin_Init_CacheInvalidation(t *testing.T) {
 	t.Parallel()
 
-	db := newJWTTestDB(t)
-	errCache := assert.AnError
-	storage := new(internaltests.MockSecondaryStorage)
-	storage.On("Delete", mock.Anything, testJWKSCacheKey).Return(errCache)
-
-	registry := newJWTTestRegistry(t)
-	registry.Register(models.ServiceSecondaryStorage.String(), staticSecondaryStorageService{storage: storage})
-	logger := &internaltests.LevelRecordingLogger{}
-	plugin := New(types.JWTPluginConfig{})
-	ctx := &models.PluginContext{
-		DB:              db,
-		Logger:          logger,
-		EventBus:        internaltests.NewRecordingEventBus(),
-		ServiceRegistry: registry,
-		GetConfig:       func() *models.Config { return &models.Config{BaseURL: "https://auth.example.com"} },
+	tests := []struct {
+		name        string
+		deleteErr   error
+		wantWarning bool
+	}{
+		{
+			name: "cache_delete_succeeds",
+		},
+		{
+			name:        "cache_delete_failure_is_a_warning",
+			deleteErr:   assert.AnError,
+			wantWarning: true,
+		},
 	}
 
-	require.NoError(t, plugin.Init(ctx))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.NotNil(t, plugin.blacklistService)
-	assert.NotNil(t, plugin.jwtService)
-	assert.True(t, hasLogMessage(logger, "failed to pre-populate cache on startup"))
-	storage.AssertExpectations(t)
+			storage := new(internaltests.MockSecondaryStorage)
+			storage.On("Delete", mock.Anything, testJWKSCacheKey).Return(tt.deleteErr)
+			if tt.deleteErr == nil {
+				storage.On("Set", mock.Anything, testJWKSCacheKey, mock.Anything, mock.Anything).Return(nil)
+			}
+
+			registry := newJWTTestRegistry(t)
+			registry.Register(models.ServiceSecondaryStorage.String(), staticSecondaryStorageService{storage: storage})
+			logger := &internaltests.LevelRecordingLogger{}
+			plugin := New(types.JWTPluginConfig{})
+			ctx := &models.PluginContext{
+				DB:              newJWTTestDB(t),
+				Logger:          logger,
+				EventBus:        internaltests.NewRecordingEventBus(),
+				ServiceRegistry: registry,
+				GetConfig:       func() *models.Config { return &models.Config{BaseURL: "https://auth.example.com"} },
+			}
+
+			require.NoError(t, plugin.Init(ctx))
+			t.Cleanup(func() { _ = plugin.Close() })
+
+			assert.NotNil(t, plugin.jwtService)
+			assert.Equal(t, tt.wantWarning, hasLogMessage(logger, "failed to pre-populate cache on startup"))
+			storage.AssertExpectations(t)
+		})
+	}
+}
+
+func TestJWTPlugin_Init_AutoCleanup(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		autoCleanup bool
+		wantStarted bool
+	}{
+		{
+			name:        "enabled_starts_cleanup",
+			autoCleanup: true,
+			wantStarted: true,
+		},
+		{
+			name:        "disabled_does_not_start_cleanup",
+			autoCleanup: false,
+			wantStarted: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := newJWTTestDB(t)
+			expiredKey, expiredToken := insertExpiredCleanupRecords(t, db)
+
+			plugin := New(types.JWTPluginConfig{
+				AutoCleanup:     new(tt.autoCleanup),
+				CleanupInterval: 10 * time.Millisecond,
+			})
+			pluginCtx := &models.PluginContext{
+				DB:              db,
+				Logger:          &internaltests.LevelRecordingLogger{},
+				EventBus:        internaltests.NewRecordingEventBus(),
+				ServiceRegistry: newJWTTestRegistry(t),
+				GetConfig:       func() *models.Config { return &models.Config{BaseURL: "https://auth.example.com"} },
+			}
+
+			require.NoError(t, plugin.Init(pluginCtx))
+			t.Cleanup(func() { _ = plugin.Close() })
+
+			ctx := context.Background()
+
+			if tt.wantStarted {
+				assert.NotNil(t, plugin.cleanupStop)
+				assert.NotNil(t, plugin.cleanupDone)
+
+				require.Eventually(t, func() bool {
+					keyExists, err := db.NewSelect().Model((*types.JWKS)(nil)).Where("id = ?", expiredKey.ID).Exists(ctx)
+					if err != nil || keyExists {
+						return false
+					}
+
+					tokenExists, err := db.NewSelect().Model((*types.RefreshToken)(nil)).Where("id = ?", expiredToken.ID).Exists(ctx)
+					if err != nil || tokenExists {
+						return false
+					}
+
+					return true
+				}, 2*time.Second, 5*time.Millisecond)
+
+				return
+			}
+
+			assert.Nil(t, plugin.cleanupStop)
+			assert.Nil(t, plugin.cleanupDone)
+
+			keyExists, err := db.NewSelect().Model((*types.JWKS)(nil)).Where("id = ?", expiredKey.ID).Exists(ctx)
+			require.NoError(t, err)
+			assert.True(t, keyExists)
+
+			tokenExists, err := db.NewSelect().Model((*types.RefreshToken)(nil)).Where("id = ?", expiredToken.ID).Exists(ctx)
+			require.NoError(t, err)
+			assert.True(t, tokenExists)
+		})
+	}
 }
 
 func TestJWTPlugin_Migrations(t *testing.T) {
@@ -399,36 +527,210 @@ func TestJWTPlugin_Migrations(t *testing.T) {
 func TestJWTPlugin_DependsOn(t *testing.T) {
 	t.Parallel()
 
-	plugin := New(types.JWTPluginConfig{})
+	tests := []struct {
+		name string
+	}{
+		{name: "has_no_dependencies"},
+	}
 
-	assert.Nil(t, plugin.DependsOn())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := New(types.JWTPluginConfig{})
+
+			assert.Empty(t, plugin.DependsOn())
+		})
+	}
 }
 
 func TestJWTPlugin_Hooks(t *testing.T) {
 	t.Parallel()
 
+	tests := []struct {
+		name        string
+		wantStage   models.HookStage
+		wantPlugin  string
+		wantOrder   int
+		wantMatcher bool
+	}{
+		{
+			name:        "issues_tokens_after_auth",
+			wantStage:   models.HookAfter,
+			wantOrder:   15,
+			wantMatcher: true,
+		},
+		{
+			name:       "responds_with_json_on_response",
+			wantStage:  models.HookOnResponse,
+			wantPlugin: HookIDJWTRespondJSON.String(),
+			wantOrder:  10,
+		},
+	}
+
 	plugin := New(types.JWTPluginConfig{})
-
 	hooks := plugin.Hooks()
+	require.Len(t, hooks, len(tests))
 
-	require.Len(t, hooks, 2)
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.wantStage, hooks[i].Stage)
+			assert.Equal(t, tt.wantPlugin, hooks[i].PluginID)
+			assert.Equal(t, tt.wantOrder, hooks[i].Order)
+			require.NotNil(t, hooks[i].Handler)
 
-	assert.Equal(t, models.HookAfter, hooks[0].Stage)
-	assert.Equal(t, 15, hooks[0].Order)
-	assert.Empty(t, hooks[0].PluginID)
-	require.NotNil(t, hooks[0].Matcher)
-	require.NotNil(t, hooks[0].Handler)
-
-	assert.Equal(t, models.HookOnResponse, hooks[1].Stage)
-	assert.Equal(t, HookIDJWTRespondJSON.String(), hooks[1].PluginID)
-	assert.Equal(t, 10, hooks[1].Order)
-	assert.NotNil(t, hooks[1].Handler)
+			if tt.wantMatcher {
+				require.NotNil(t, hooks[i].Matcher)
+				return
+			}
+			assert.Nil(t, hooks[i].Matcher)
+		})
+	}
 }
 
 func TestJWTPlugin_Close(t *testing.T) {
 	t.Parallel()
 
-	plugin := New(types.JWTPluginConfig{})
+	tests := []struct {
+		name              string
+		started           bool
+		recordCleanupCall bool
+		wantMockCalls     bool
+	}{
+		{
+			name: "before_init_is_noop",
+		},
+		{
+			name:    "is_idempotent_after_cleanup_loop_started",
+			started: true,
+		},
+		{
+			name:              "stops_cleanup_loop",
+			started:           true,
+			recordCleanupCall: true,
+			wantMockCalls:     true,
+		},
+	}
 
-	assert.NoError(t, plugin.Close())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := New(types.JWTPluginConfig{CleanupInterval: time.Hour})
+
+			var (
+				keyService     *jwttests.MockKeyService
+				refreshService *jwttests.MockRefreshTokenService
+				calls          chan struct{}
+			)
+
+			if tt.started {
+				keyService = new(jwttests.MockKeyService)
+				refreshService = new(jwttests.MockRefreshTokenService)
+
+				if tt.recordCleanupCall {
+					calls = make(chan struct{}, 100)
+					plugin.pluginConfig.CleanupInterval = 5 * time.Millisecond
+					keyService.On("PurgeExpiredKeys", mock.Anything).
+						Run(func(mock.Arguments) {
+							select {
+							case calls <- struct{}{}:
+							default:
+							}
+						}).
+						Return(nil)
+				} else {
+					keyService.On("PurgeExpiredKeys", mock.Anything).Return(nil)
+				}
+
+				refreshService.On("CleanupExpiredTokens", mock.Anything).Return(nil)
+
+				plugin.keyService = keyService
+				plugin.refreshService = refreshService
+				plugin.cleanupStop = make(chan struct{})
+				plugin.cleanupDone = make(chan struct{})
+				go plugin.runCleanupLoop(plugin.pluginConfig.CleanupInterval)
+			}
+
+			if tt.recordCleanupCall {
+				require.Eventually(t, func() bool { return len(calls) > 0 }, time.Second, 5*time.Millisecond)
+			}
+
+			require.NoError(t, plugin.Close())
+			require.NoError(t, plugin.Close())
+
+			if tt.started {
+				select {
+				case <-plugin.cleanupDone:
+				default:
+					t.Fatal("cleanup loop did not stop")
+				}
+			}
+
+			if tt.recordCleanupCall {
+				for len(calls) > 0 {
+					<-calls
+				}
+				time.Sleep(30 * time.Millisecond)
+				require.Empty(t, calls)
+			}
+
+			if tt.wantMockCalls {
+				keyService.AssertExpectations(t)
+				refreshService.AssertExpectations(t)
+			}
+		})
+	}
+}
+
+func TestJWTPlugin_Cleanup(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		keyErr       error
+		refreshErr   error
+		wantMessages []string
+	}{
+		{
+			name: "succeeds",
+		},
+		{
+			name:         "logs_key_purge_failure",
+			keyErr:       assert.AnError,
+			wantMessages: []string{"jwt expired JWKS key cleanup failed"},
+		},
+		{
+			name:         "logs_refresh_token_cleanup_failure",
+			refreshErr:   assert.AnError,
+			wantMessages: []string{"jwt expired refresh token cleanup failed"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			keyService := new(jwttests.MockKeyService)
+			keyService.On("PurgeExpiredKeys", mock.Anything).Return(tt.keyErr)
+
+			refreshService := new(jwttests.MockRefreshTokenService)
+			refreshService.On("CleanupExpiredTokens", mock.Anything).Return(tt.refreshErr)
+
+			logger := &internaltests.LevelRecordingLogger{}
+			plugin := New(types.JWTPluginConfig{})
+			plugin.Logger = logger
+			plugin.keyService = keyService
+			plugin.refreshService = refreshService
+
+			plugin.cleanup(context.Background())
+
+			keyService.AssertExpectations(t)
+			refreshService.AssertExpectations(t)
+			assert.Len(t, logger.Messages(), len(tt.wantMessages))
+			for _, message := range tt.wantMessages {
+				assert.True(t, hasLogMessage(logger, message))
+			}
+		})
+	}
 }

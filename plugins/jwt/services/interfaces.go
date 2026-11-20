@@ -30,6 +30,7 @@ type KeyService interface {
 	// gracePeriod specifies how long old keys remain valid after rotation
 	// Returns true if rotation occurred, false otherwise
 	RotateKeysIfNeeded(ctx context.Context, rotationInterval time.Duration, gracePeriod time.Duration, invalidateCacheFunc func(context.Context) error) (bool, error)
+	PurgeExpiredKeys(ctx context.Context) error
 }
 
 type RefreshTokenRepository interface {
@@ -38,20 +39,14 @@ type RefreshTokenRepository interface {
 	RotateRefreshToken(ctx context.Context, oldTokenHash string, newRecord *types.RefreshToken) (bool, error)
 	RevokeRefreshToken(ctx context.Context, tokenHash string) error
 	RevokeAllSessionTokens(ctx context.Context, sessionID string) error
-	SetLastReuseAttempt(ctx context.Context, tokenHash string) error
 	CleanupExpiredTokens(ctx context.Context) error
 }
 
 type RefreshTokenService interface {
 	RefreshTokens(ctx context.Context, refreshToken string) (*types.RefreshTokenResponse, error)
 	StoreInitialRefreshToken(ctx context.Context, refreshToken string, sessionID string, expiresAt time.Time) error
-}
-
-type BlacklistService interface {
-	BlacklistToken(ctx context.Context, jti string, expiresAt time.Time) error
-	IsBlacklisted(ctx context.Context, jti string) (bool, error)
-	BlacklistAllSessionTokens(ctx context.Context, sessionID string, expiresAt time.Time) error
-	CleanupExpired(ctx context.Context) error
+	RevokeRefreshToken(ctx context.Context, refreshToken string) error
+	CleanupExpiredTokens(ctx context.Context) error
 }
 
 type CacheService interface {

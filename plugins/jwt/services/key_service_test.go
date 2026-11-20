@@ -579,6 +579,41 @@ func TestKeyService_RotateKeysIfNeeded(t *testing.T) {
 	}
 }
 
+func TestKeyService_PurgeExpiredKeys(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		wantErr error
+	}{
+		{
+			name: "delegates to the repository",
+		},
+		{
+			name:    "returns the repository error",
+			wantErr: assert.AnError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, repo, _ := newKeyServiceTestDeps()
+			repo.On("PurgeExpiredKeys", mock.Anything).Return(tt.wantErr)
+
+			err := svc.PurgeExpiredKeys(context.Background())
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			repo.AssertExpectations(t)
+		})
+	}
+}
+
 func TestGenerateKey(t *testing.T) {
 	t.Parallel()
 
