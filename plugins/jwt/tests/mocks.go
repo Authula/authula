@@ -139,6 +139,11 @@ func (m *MockKeyService) RotateKeysIfNeeded(ctx context.Context, rotationInterva
 	return args.Bool(0), args.Error(1)
 }
 
+func (m *MockKeyService) PurgeExpiredKeys(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
 type MockCacheService struct{ mock.Mock }
 
 func (m *MockCacheService) GetCachedJWKS(ctx context.Context) (jwk.Set, error) {
@@ -259,6 +264,11 @@ func (m *MockRefreshTokenService) RefreshTokens(ctx context.Context, refreshToke
 
 func (m *MockRefreshTokenService) StoreInitialRefreshToken(ctx context.Context, refreshToken string, sessionID string, expiresAt time.Time) error {
 	args := m.Called(ctx, refreshToken, sessionID, expiresAt)
+	return args.Error(0)
+}
+
+func (m *MockRefreshTokenService) CleanupExpiredTokens(ctx context.Context) error {
+	args := m.Called(ctx)
 	return args.Error(0)
 }
 

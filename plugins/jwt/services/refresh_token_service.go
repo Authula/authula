@@ -292,6 +292,10 @@ func (s *refreshTokenService) StoreInitialRefreshToken(ctx context.Context, refr
 	return s.storage.StoreRefreshToken(ctx, record)
 }
 
+func (s *refreshTokenService) CleanupExpiredTokens(ctx context.Context) error {
+	return s.storage.CleanupExpiredTokens(ctx)
+}
+
 // HashRefreshToken creates a SHA256 hash of a refresh token.
 func HashRefreshToken(token string) string {
 	hash := sha256.Sum256([]byte(token))

@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+	"time"
 
+	"github.com/Authula/authula/core/cleanup"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/repositories"
@@ -26,6 +29,9 @@ type JWTPlugin struct {
 	cacheService     jwtservices.CacheService
 	secondaryStorage models.SecondaryStorage
 	blacklistService jwtservices.BlacklistService
+	cleanupStop      chan struct{}
+	cleanupDone      chan struct{}
+	cleanupOnce      sync.Once
 }
 
 func New(config types.JWTPluginConfig) *JWTPlugin {
@@ -52,6 +58,7 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 	if err := util.LoadPluginConfig(ctx.GetConfig(), p.Metadata().ID, &p.pluginConfig); err != nil {
 		return err
 	}
+	p.pluginConfig.ApplyDefaults()
 
 	var baseURL, basePath string
 	if p.globalConfig != nil {
@@ -145,6 +152,12 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 
 	ctx.ServiceRegistry.Register(models.ServiceJWT.String(), p.jwtService)
 
+	if p.pluginConfig.AutoCleanup != nil && *p.pluginConfig.AutoCleanup {
+		p.cleanupStop = make(chan struct{})
+		p.cleanupDone = make(chan struct{})
+		go p.runCleanupLoop(p.pluginConfig.CleanupInterval)
+	}
+
 	return nil
 }
 
@@ -165,5 +178,29 @@ func (p *JWTPlugin) Hooks() []models.Hook {
 }
 
 func (p *JWTPlugin) Close() error {
+	p.cleanupOnce.Do(func() {
+		if p.cleanupStop != nil {
+			close(p.cleanupStop)
+			<-p.cleanupDone
+		}
+	})
 	return nil
+}
+
+func (p *JWTPlugin) runCleanupLoop(interval time.Duration) {
+	cleanup.RunLoop(p.cleanupStop, p.cleanupDone, interval, p.cleanup)
+}
+
+func (p *JWTPlugin) cleanup(ctx context.Context) {
+	if err := p.keyService.PurgeExpiredKeys(ctx); err != nil {
+		p.Logger.Error("jwt expired JWKS key cleanup failed", "error", err)
+	}
+	if err := p.refreshService.CleanupExpiredTokens(ctx); err != nil {
+		p.Logger.Error("jwt expired refresh token cleanup failed", "error", err)
+	}
+	if p.blacklistService != nil {
+		if err := p.blacklistService.CleanupExpired(ctx); err != nil {
+			p.Logger.Error("jwt blacklist cleanup failed", "error", err)
+		}
+	}
 }

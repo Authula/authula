@@ -255,6 +255,7 @@ func TestJWTPlugin_Init_Success(t *testing.T) {
 			}
 
 			require.NoError(t, plugin.Init(ctx))
+			t.Cleanup(func() { _ = plugin.Close() })
 
 			assert.Same(t, logger, plugin.Logger)
 			assert.NotNil(t, plugin.sessionService)
@@ -327,6 +328,7 @@ func TestJWTPlugin_Init_KeyRotation(t *testing.T) {
 			}
 
 			require.NoError(t, plugin.Init(ctx))
+			t.Cleanup(func() { _ = plugin.Close() })
 
 			assert.NotNil(t, plugin.jwtService)
 			assert.Equal(t, tt.wantKeyCount, countJWKSKeys(t, db))
@@ -356,6 +358,7 @@ func TestJWTPlugin_Init_CacheInvalidationFailureIsAWarning(t *testing.T) {
 	}
 
 	require.NoError(t, plugin.Init(ctx))
+	t.Cleanup(func() { _ = plugin.Close() })
 
 	assert.NotNil(t, plugin.blacklistService)
 	assert.NotNil(t, plugin.jwtService)
@@ -431,4 +434,166 @@ func TestJWTPlugin_Close(t *testing.T) {
 	plugin := New(types.JWTPluginConfig{})
 
 	assert.NoError(t, plugin.Close())
+}
+
+func TestJWTPlugin_Init_AutoCleanup(t *testing.T) {
+	t.Parallel()
+
+	db := newJWTTestDB(t)
+	ctx := context.Background()
+
+	expiredAt := time.Now().Add(-48 * time.Hour)
+	expiredKey := &types.JWKS{
+		ID:         "expired-key",
+		PublicKey:  "expired-public-key",
+		PrivateKey: "expired-private-key",
+		CreatedAt:  time.Now(),
+		ExpiresAt:  &expiredAt,
+	}
+	_, err := db.NewInsert().Model(expiredKey).Exec(ctx)
+	require.NoError(t, err)
+
+	expiredToken := &types.RefreshToken{
+		ID:        "expired-refresh-token",
+		SessionID: "session-1",
+		TokenHash: "expired-token-hash",
+		ExpiresAt: time.Now().Add(-time.Hour),
+		CreatedAt: time.Now().Add(-2 * time.Hour),
+	}
+	_, err = db.NewInsert().Model(expiredToken).Exec(ctx)
+	require.NoError(t, err)
+
+	storage := jwttests.NewInMemoryStorage()
+	blacklistKey := "jwt:blacklist:token:expired-jti"
+	require.NoError(t, storage.Set(ctx, blacklistKey, "1", nil))
+
+	registry := newJWTTestRegistry(t)
+	registry.Register(models.ServiceSecondaryStorage.String(), staticSecondaryStorageService{storage: storage})
+
+	plugin := New(types.JWTPluginConfig{
+		AutoCleanup:     new(true),
+		CleanupInterval: 10 * time.Millisecond,
+	})
+	pluginCtx := &models.PluginContext{
+		DB:              db,
+		Logger:          &internaltests.LevelRecordingLogger{},
+		EventBus:        internaltests.NewRecordingEventBus(),
+		ServiceRegistry: registry,
+		GetConfig:       func() *models.Config { return &models.Config{BaseURL: "https://auth.example.com"} },
+	}
+
+	require.NoError(t, plugin.Init(pluginCtx))
+	t.Cleanup(func() { _ = plugin.Close() })
+
+	require.Eventually(t, func() bool {
+		keyExists, err := db.NewSelect().Model((*types.JWKS)(nil)).Where("id = ?", expiredKey.ID).Exists(ctx)
+		if err != nil || keyExists {
+			return false
+		}
+
+		tokenExists, err := db.NewSelect().Model((*types.RefreshToken)(nil)).Where("id = ?", expiredToken.ID).Exists(ctx)
+		if err != nil || tokenExists {
+			return false
+		}
+
+		value, err := storage.Get(ctx, blacklistKey)
+		if err != nil {
+			return false
+		}
+
+		return value == nil
+	}, 2*time.Second, 5*time.Millisecond)
+}
+
+func TestJWTPlugin_Init_AutoCleanupDisabled(t *testing.T) {
+	t.Parallel()
+
+	db := newJWTTestDB(t)
+	plugin := New(types.JWTPluginConfig{AutoCleanup: new(false)})
+	ctx := &models.PluginContext{
+		DB:              db,
+		Logger:          &internaltests.LevelRecordingLogger{},
+		EventBus:        internaltests.NewRecordingEventBus(),
+		ServiceRegistry: newJWTTestRegistry(t),
+		GetConfig:       func() *models.Config { return &models.Config{BaseURL: "https://auth.example.com"} },
+	}
+
+	require.NoError(t, plugin.Init(ctx))
+	t.Cleanup(func() { _ = plugin.Close() })
+
+	assert.Nil(t, plugin.cleanupStop)
+	assert.Nil(t, plugin.cleanupDone)
+}
+
+func TestJWTPlugin_Close_StopsCleanup(t *testing.T) {
+	t.Parallel()
+
+	calls := make(chan struct{}, 100)
+
+	keyService := new(jwttests.MockKeyService)
+	keyService.On("PurgeExpiredKeys", mock.Anything).
+		Run(func(mock.Arguments) {
+			select {
+			case calls <- struct{}{}:
+			default:
+			}
+		}).
+		Return(nil)
+
+	refreshService := new(jwttests.MockRefreshTokenService)
+	refreshService.On("CleanupExpiredTokens", mock.Anything).Return(nil)
+
+	plugin := New(types.JWTPluginConfig{
+		AutoCleanup:     new(true),
+		CleanupInterval: 5 * time.Millisecond,
+	})
+	plugin.keyService = keyService
+	plugin.refreshService = refreshService
+	plugin.cleanupStop = make(chan struct{})
+	plugin.cleanupDone = make(chan struct{})
+	go plugin.runCleanupLoop(plugin.pluginConfig.CleanupInterval)
+
+	require.Eventually(t, func() bool { return len(calls) > 0 }, time.Second, 5*time.Millisecond)
+
+	require.NoError(t, plugin.Close())
+
+	for len(calls) > 0 {
+		<-calls
+	}
+	time.Sleep(30 * time.Millisecond)
+
+	require.Empty(t, calls)
+	refreshService.AssertExpectations(t)
+}
+
+func TestJWTPlugin_Close_Idempotent(t *testing.T) {
+	t.Parallel()
+
+	keyService := new(jwttests.MockKeyService)
+	keyService.On("PurgeExpiredKeys", mock.Anything).Return(nil)
+	refreshService := new(jwttests.MockRefreshTokenService)
+	refreshService.On("CleanupExpiredTokens", mock.Anything).Return(nil)
+
+	plugin := New(types.JWTPluginConfig{
+		AutoCleanup:     new(true),
+		CleanupInterval: time.Hour,
+	})
+	plugin.keyService = keyService
+	plugin.refreshService = refreshService
+	plugin.cleanupStop = make(chan struct{})
+	plugin.cleanupDone = make(chan struct{})
+	go plugin.runCleanupLoop(plugin.pluginConfig.CleanupInterval)
+
+	require.NoError(t, plugin.Close())
+	require.NoError(t, plugin.Close())
+
+	select {
+	case <-plugin.cleanupDone:
+	default:
+		t.Fatal("cleanup loop did not stop")
+	}
+
+	beforeInit := New(types.JWTPluginConfig{})
+	require.NoError(t, beforeInit.Close())
+	require.NoError(t, beforeInit.Close())
 }

@@ -952,6 +952,41 @@ func TestHashRefreshToken(t *testing.T) {
 	}
 }
 
+func TestRefreshTokenService_CleanupExpiredTokens(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		wantErr error
+	}{
+		{
+			name: "delegates to the repository",
+		},
+		{
+			name:    "returns the repository error",
+			wantErr: errRefreshTest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := newRefreshTokenTestFixture()
+			fixture.repo.On("CleanupExpiredTokens", mock.Anything).Return(tt.wantErr)
+
+			err := fixture.newService().CleanupExpiredTokens(context.Background())
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			fixture.assertExpectations(t)
+		})
+	}
+}
+
 func expectReuseAfterGrace(t *testing.T, fixture *refreshTokenTestFixture, ctx context.Context) {
 	t.Helper()
 
