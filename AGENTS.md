@@ -4,9 +4,9 @@
 
 - Always write clean code that is easy to read and maintain.
 - Follow consistent naming conventions for variables, functions, and structs.
-- Include comments where necessary to explain complex logic. DO NOT write comments for every line of code, only for parts that are not immediately clear. The code should be self-explanatory as much as possible.
+- Avoid writing comments in general in favour of making code self-explanatory. ONLY write comments if it's absolutely crucial and to make a note of something that the code can't explain.
 - Ensure proper error handling throughout the codebase.
-- Follow best practices and concepts from SOLID principles for better software design.
+- Follow best practices and concepts from S.O.L.I.D principles for better software design.
 - Use Go modules for dependency management.
 - Adhere to idiomatic Go practices as outlined in the official Go documentation.
 - Use `gofmt` to format your code and run `make lint` and fix any linting errors before committing.
