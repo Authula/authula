@@ -17,6 +17,7 @@
 - MySQL migration metadata writes no longer use a row alias, which MySQL rejects on plain `INSERT` statements.
 - JWT token generation now uses the caller's context instead of a detached background context.
 - Missing JWT signing keys preserve `models.ErrSigningKeyNotFound` so callers can match them with `errors.Is`.
+- OAuth2 single-record repository getters return exported sentinel errors (`ErrOAuthClientNotFound`, `ErrFlowStateNotFound`, and peers) wrapped with operation context, and `ConsentRepository.UpdateScope` reports `ErrConsentNotFound` instead of a zero-value record. `ConsumeCode`, `Consume`, and `Rotate` still return `(nil, nil)` for expected "not consumable" outcomes.
 
 ### Upgrade note
 

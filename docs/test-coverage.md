@@ -102,11 +102,22 @@ Deficit is the number of statements needed for that package to reach 90%.
 
 Total deficit: **173 statements** across 9 packages.
 
-### Excluded: OAuth2
+### OAuth2 rewrite
 
-All `plugins/oauth2/...` packages are left out on purpose. The plugin is being rewritten as a full
-OAuth 2.1 / OIDC plugin that implements the RFCs listed in the OAuth2 plugin docs. Tests written
-against the current code would be thrown away, so measure and test OAuth2 after that rewrite lands.
+The OAuth 2.1 / OIDC rewrite now covers the plugin lifecycle and authorization-server persistence. Measured on `feat/oauth2-oidc-persistence` for the `plugins/oauth2/...` packages:
+
+| Package | Coverage |
+| --- | ---: |
+| `plugins/oauth2` | 98.0% |
+| `plugins/oauth2/repositories` | 95.1% |
+| `plugins/oauth2/types` | 100% |
+| `plugins/oauth2/usecases` | 92.8% |
+| `plugins/oauth2/services` | 84.2% |
+| `plugins/oauth2/handlers` | 81.6% |
+
+The remaining repository gaps are defensive `RowsAffected` error branches that SQLite does not
+produce. Mutation and reload failures are exercised with database triggers; see
+`plugins/oauth2/repositories/repository_compliance_test.go`.
 
 ### Uncovered code by package
 
@@ -191,6 +202,6 @@ These were documented by the slices that encountered them and are not excluded f
 
 1. Write unit tests for the gaps above, largest deficit first: `email-password/usecases`,
    `organizations/services`, then `email-password` and `email-password/handlers`.
-2. Re-measure and test the `oauth2` packages after the OAuth 2.1 / OIDC rewrite lands.
+2. Keep the OAuth2 plugin coverage above its current branch levels as the OIDC handlers land.
 3. Once coverage has been above 90% for a release, raise the Codecov gate in `codecov.yml` from
    80% to 90%. CI configuration is unchanged by this effort.
