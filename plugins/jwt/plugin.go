@@ -17,7 +17,6 @@ import (
 type JWTPlugin struct {
 	globalConfig     *models.Config
 	pluginConfig     types.JWTPluginConfig
-	ctx              *models.PluginContext
 	Logger           models.Logger
 	sessionService   services.SessionService
 	tokenService     services.TokenService
@@ -47,7 +46,6 @@ func (p *JWTPlugin) Config() any {
 }
 
 func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
-	p.ctx = ctx
 	p.Logger = ctx.Logger
 	p.globalConfig = ctx.GetConfig()
 

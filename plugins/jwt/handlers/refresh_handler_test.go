@@ -93,7 +93,6 @@ func TestRefreshTokenHandler(t *testing.T) {
 			}
 
 			handler := &RefreshTokenHandler{
-				Logger:              &internaltests.MockLogger{},
 				RefreshTokenUseCase: mockUC,
 			}
 
@@ -116,7 +115,6 @@ func TestRefreshTokenHandler_RequiresRequestContext(t *testing.T) {
 
 	mockUC := &mockRefreshTokenUseCase{}
 	handler := &RefreshTokenHandler{
-		Logger:              &internaltests.MockLogger{},
 		RefreshTokenUseCase: mockUC,
 	}
 
@@ -135,7 +133,6 @@ func TestRefreshTokenHandler_InitializesResponseHeadersOnPanic(t *testing.T) {
 	t.Parallel()
 
 	handler := &RefreshTokenHandler{
-		Logger:              &internaltests.MockLogger{},
 		RefreshTokenUseCase: &panickingRefreshTokenUseCase{message: "refresh use case exploded"},
 	}
 

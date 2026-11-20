@@ -79,20 +79,6 @@ func (r *refreshTokenRepositoryImpl) RotateRefreshToken(ctx context.Context, old
 	return rotated, nil
 }
 
-func (r *refreshTokenRepositoryImpl) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
-	now := time.Now()
-	_, err := r.db.NewUpdate().
-		Model(&types.RefreshToken{}).
-		Where("token_hash = ?", tokenHash).
-		Set("is_revoked = ?, revoked_at = ?", true, now).
-		Exec(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to revoke refresh token: %w", err)
-	}
-	return nil
-}
-
 func (r *refreshTokenRepositoryImpl) RevokeAllSessionTokens(ctx context.Context, sessionID string) error {
 	now := time.Now()
 	_, err := r.db.NewUpdate().
@@ -103,20 +89,6 @@ func (r *refreshTokenRepositoryImpl) RevokeAllSessionTokens(ctx context.Context,
 
 	if err != nil {
 		return fmt.Errorf("failed to revoke session tokens: %w", err)
-	}
-	return nil
-}
-
-func (r *refreshTokenRepositoryImpl) SetLastReuseAttempt(ctx context.Context, tokenHash string) error {
-	_, err := r.db.NewUpdate().
-		Model(&types.RefreshToken{}).
-		Where("token_hash = ?", tokenHash).
-		Where("last_reuse_attempt IS NULL").
-		Set("last_reuse_attempt = ?", time.Now()).
-		Exec(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to update last reuse attempt: %w", err)
 	}
 	return nil
 }

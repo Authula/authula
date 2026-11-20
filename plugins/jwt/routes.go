@@ -11,22 +11,18 @@ import (
 
 func Routes(plugin *JWTPlugin) []models.Route {
 	refreshUseCase := usecases.NewRefreshTokenUseCase(
-		plugin.Logger,
 		plugin.refreshService,
 	)
 
 	jwksUseCase := usecases.NewJWKSUseCase(
-		plugin.Logger,
 		plugin.cacheService,
 	)
 
 	refreshHandler := &handlers.RefreshTokenHandler{
-		Logger:              plugin.Logger,
 		RefreshTokenUseCase: refreshUseCase,
 	}
 
 	jwksHandler := &handlers.WellKnownJWKSHandler{
-		Logger:      plugin.Logger,
 		JWKSUseCase: jwksUseCase,
 	}
 

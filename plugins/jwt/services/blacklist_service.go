@@ -21,26 +21,6 @@ func NewBlacklistService(storage models.SecondaryStorage, logger models.Logger) 
 	}
 }
 
-func (s *blacklistService) BlacklistToken(ctx context.Context, jti string, expiresAt time.Time) error {
-	if jti == "" {
-		return fmt.Errorf("jti cannot be empty")
-	}
-
-	ttl := time.Until(expiresAt)
-	if ttl <= 0 {
-		return nil
-	}
-
-	key := s.blacklistKey(jti)
-
-	if err := s.storage.Set(ctx, key, "1", &ttl); err != nil {
-		s.logger.Error("failed to blacklist token", "jti", jti, "error", err)
-		return fmt.Errorf("failed to blacklist token: %w", err)
-	}
-
-	return nil
-}
-
 func (s *blacklistService) IsBlacklisted(ctx context.Context, jti string) (bool, error) {
 	if jti == "" {
 		return false, nil

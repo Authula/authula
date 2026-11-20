@@ -177,11 +177,6 @@ func (m *MockCacheService) GetJWKSWithFallback(ctx context.Context) (jwk.Set, er
 
 type MockBlacklistService struct{ mock.Mock }
 
-func (m *MockBlacklistService) BlacklistToken(ctx context.Context, jti string, expiresAt time.Time) error {
-	args := m.Called(ctx, jti, expiresAt)
-	return args.Error(0)
-}
-
 func (m *MockBlacklistService) IsBlacklisted(ctx context.Context, jti string) (bool, error) {
 	args := m.Called(ctx, jti)
 	return args.Bool(0), args.Error(1)
@@ -217,18 +212,8 @@ func (m *MockRefreshTokenRepository) RotateRefreshToken(ctx context.Context, old
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *MockRefreshTokenRepository) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
-	args := m.Called(ctx, tokenHash)
-	return args.Error(0)
-}
-
 func (m *MockRefreshTokenRepository) RevokeAllSessionTokens(ctx context.Context, sessionID string) error {
 	args := m.Called(ctx, sessionID)
-	return args.Error(0)
-}
-
-func (m *MockRefreshTokenRepository) SetLastReuseAttempt(ctx context.Context, tokenHash string) error {
-	args := m.Called(ctx, tokenHash)
 	return args.Error(0)
 }
 
@@ -247,20 +232,7 @@ func (m *MockJWKSRepository) GetJWKSKeys(ctx context.Context) ([]*jwtservicesTyp
 	return args.Get(0).([]*jwtservicesTypes.JWKS), args.Error(1)
 }
 
-func (m *MockJWKSRepository) GetJWKSKeyByID(ctx context.Context, id string) (*jwtservicesTypes.JWKS, error) {
-	args := m.Called(ctx, id)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*jwtservicesTypes.JWKS), args.Error(1)
-}
-
 func (m *MockJWKSRepository) StoreJWKSKey(ctx context.Context, key *jwtservicesTypes.JWKS) error {
-	args := m.Called(ctx, key)
-	return args.Error(0)
-}
-
-func (m *MockJWKSRepository) UpdateJWKSKey(ctx context.Context, key *jwtservicesTypes.JWKS) error {
 	args := m.Called(ctx, key)
 	return args.Error(0)
 }
@@ -288,16 +260,6 @@ func (m *MockRefreshTokenService) RefreshTokens(ctx context.Context, refreshToke
 func (m *MockRefreshTokenService) StoreInitialRefreshToken(ctx context.Context, refreshToken string, sessionID string, expiresAt time.Time) error {
 	args := m.Called(ctx, refreshToken, sessionID, expiresAt)
 	return args.Error(0)
-}
-
-type MockJWTService struct{ mock.Mock }
-
-func (m *MockJWTService) ValidateToken(ctx context.Context, token string) (*models.Actor, error) {
-	args := m.Called(ctx, token)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.Actor), args.Error(1)
 }
 
 type MockSessionService struct{ mock.Mock }

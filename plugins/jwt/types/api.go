@@ -17,22 +17,6 @@ func (t JWTTokenType) String() string {
 	return string(t)
 }
 
-type TokenClaims struct {
-	Subject        string   `json:"sub"`
-	Issuer         string   `json:"iss"`
-	Audience       []string `json:"aud"`
-	UserID         string   `json:"user_id,omitempty"`
-	SessionID      string   `json:"session_id,omitempty"`
-	TokenType      string   `json:"token_type"`
-	ActorType      string   `json:"actor_type,omitempty"`
-	ClientID       string   `json:"client_id,omitempty"`
-	OrganizationID string   `json:"organization_id,omitempty"`
-	Scopes         []string `json:"scopes,omitempty"`
-	JTI            string   `json:"jti"`
-	IssuedAt       int64    `json:"iat"`
-	Expiration     int64    `json:"exp"`
-}
-
 type TokenPair struct {
 	AccessToken  string        `json:"access_token"`
 	RefreshToken string        `json:"refresh_token"`
