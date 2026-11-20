@@ -9,6 +9,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/Authula/authula/plugins/jwt/constants"
 	"github.com/Authula/authula/plugins/jwt/types"
 )
 
@@ -32,7 +33,7 @@ func (r *refreshTokenRepositoryImpl) GetRefreshToken(ctx context.Context, tokenH
 	err := r.db.NewSelect().Model(&record).Where("token_hash = ?", tokenHash).Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, constants.ErrRefreshTokenNotFound
 		}
 		return nil, fmt.Errorf("failed to get refresh token: %w", err)
 	}
@@ -103,20 +104,6 @@ func (r *refreshTokenRepositoryImpl) RevokeAllSessionTokens(ctx context.Context,
 
 	if err != nil {
 		return fmt.Errorf("failed to revoke session tokens: %w", err)
-	}
-	return nil
-}
-
-func (r *refreshTokenRepositoryImpl) SetLastReuseAttempt(ctx context.Context, tokenHash string) error {
-	_, err := r.db.NewUpdate().
-		Model(&types.RefreshToken{}).
-		Where("token_hash = ?", tokenHash).
-		Where("last_reuse_attempt IS NULL").
-		Set("last_reuse_attempt = ?", time.Now()).
-		Exec(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to update last reuse attempt: %w", err)
 	}
 	return nil
 }

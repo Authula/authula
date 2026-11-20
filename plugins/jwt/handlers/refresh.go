@@ -10,7 +10,6 @@ import (
 )
 
 type RefreshTokenHandler struct {
-	Logger              models.Logger
 	RefreshTokenUseCase usecases.RefreshTokenUseCase
 }
 

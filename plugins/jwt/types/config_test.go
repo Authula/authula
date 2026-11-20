@@ -18,6 +18,8 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 		RefreshExpiresIn:       7 * 24 * time.Hour,
 		JWKSCacheTTL:           24 * time.Hour,
 		RefreshGracePeriod:     10 * time.Second,
+		AutoCleanup:            new(true),
+		CleanupInterval:        time.Hour,
 	}
 
 	tests := []struct {
@@ -40,6 +42,8 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 				RefreshExpiresIn:       14 * 24 * time.Hour,
 				JWKSCacheTTL:           2 * time.Hour,
 				RefreshGracePeriod:     time.Minute,
+				AutoCleanup:            new(false),
+				CleanupInterval:        30 * time.Minute,
 				Issuer:                 "https://auth.example.com",
 				Audience:               "my-service",
 			},
@@ -51,6 +55,8 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 				RefreshExpiresIn:       14 * 24 * time.Hour,
 				JWKSCacheTTL:           2 * time.Hour,
 				RefreshGracePeriod:     time.Minute,
+				AutoCleanup:            new(false),
+				CleanupInterval:        30 * time.Minute,
 				Issuer:                 "https://auth.example.com",
 				Audience:               "my-service",
 			},
@@ -68,6 +74,8 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 				RefreshExpiresIn:       defaults.RefreshExpiresIn,
 				JWKSCacheTTL:           time.Hour,
 				RefreshGracePeriod:     defaults.RefreshGracePeriod,
+				AutoCleanup:            defaults.AutoCleanup,
+				CleanupInterval:        defaults.CleanupInterval,
 			},
 		},
 		{
@@ -83,6 +91,24 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 				RefreshExpiresIn:       defaults.RefreshExpiresIn,
 				JWKSCacheTTL:           defaults.JWKSCacheTTL,
 				RefreshGracePeriod:     -time.Second,
+				AutoCleanup:            defaults.AutoCleanup,
+				CleanupInterval:        defaults.CleanupInterval,
+			},
+		},
+		{
+			name: "non_positive_cleanup_interval_gets_default",
+			config: JWTPluginConfig{
+				CleanupInterval: -time.Minute,
+			},
+			want: JWTPluginConfig{
+				KeyRotationInterval:    defaults.KeyRotationInterval,
+				KeyRotationGracePeriod: defaults.KeyRotationGracePeriod,
+				ExpiresIn:              defaults.ExpiresIn,
+				RefreshExpiresIn:       defaults.RefreshExpiresIn,
+				JWKSCacheTTL:           defaults.JWKSCacheTTL,
+				RefreshGracePeriod:     defaults.RefreshGracePeriod,
+				AutoCleanup:            defaults.AutoCleanup,
+				CleanupInterval:        defaults.CleanupInterval,
 			},
 		},
 	}

@@ -3,21 +3,17 @@ package usecases
 import (
 	"context"
 
-	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/services"
 )
 
 type JWKSUseCaseImpl struct {
-	Logger  models.Logger
 	Service services.CacheService
 }
 
 func NewJWKSUseCase(
-	logger models.Logger,
 	service services.CacheService,
 ) JWKSUseCase {
 	return &JWKSUseCaseImpl{
-		Logger:  logger,
 		Service: service,
 	}
 }

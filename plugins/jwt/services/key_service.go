@@ -113,6 +113,10 @@ func (s *keyService) RotateKeysIfNeeded(ctx context.Context, rotationInterval ti
 	return true, nil
 }
 
+func (s *keyService) PurgeExpiredKeys(ctx context.Context) error {
+	return s.repo.PurgeExpiredKeys(ctx)
+}
+
 func generateKey() (priv any, pub any, err error) {
 	var seed [32]byte
 	if _, err := rand.Read(seed[:]); err != nil {

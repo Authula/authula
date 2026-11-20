@@ -33,7 +33,6 @@ type serviceTestFixture struct {
 	coreTokenSvc     *jwttests.MockTokenServiceCore
 	keySvc           *jwttests.MockKeyService
 	cacheSvc         *jwttests.MockCacheService
-	blacklistSvc     *jwttests.MockBlacklistService
 	refreshTokenRepo *jwttests.MockRefreshTokenRepository
 	activeKey        *types.JWKS
 	expiresIn        time.Duration
@@ -63,7 +62,6 @@ func newServiceTestFixture(t *testing.T) *serviceTestFixture {
 		coreTokenSvc:     &jwttests.MockTokenServiceCore{},
 		keySvc:           &jwttests.MockKeyService{},
 		cacheSvc:         &jwttests.MockCacheService{},
-		blacklistSvc:     &jwttests.MockBlacklistService{},
 		refreshTokenRepo: &jwttests.MockRefreshTokenRepository{},
 		activeKey:        activeKey,
 		expiresIn:        15 * time.Minute,
@@ -79,7 +77,6 @@ func (f *serviceTestFixture) newJWTService() *tokenService {
 		coreTokenService: f.coreTokenSvc,
 		keyService:       f.keySvc,
 		cacheService:     f.cacheSvc,
-		blacklistService: f.blacklistSvc,
 		sessionService:   f.sessionSvc,
 		expiresIn:        f.expiresIn,
 		refreshExpiresIn: f.refreshExpiresIn,

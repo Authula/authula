@@ -8,7 +8,6 @@ import (
 )
 
 type WellKnownJWKSHandler struct {
-	Logger      models.Logger
 	JWKSUseCase usecases.JWKSUseCase
 }
 

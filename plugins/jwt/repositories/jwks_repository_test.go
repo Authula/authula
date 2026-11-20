@@ -50,10 +50,10 @@ func TestNewBunJWKSRepository(t *testing.T) {
 
 	require.NoError(t, repo.StoreJWKSKey(ctx, key))
 
-	found, err := repo.GetJWKSKeyByID(ctx, key.ID)
+	found, err := repo.GetJWKSKeys(ctx)
 	require.NoError(t, err)
-	require.NotNil(t, found)
-	require.Equal(t, key.ID, found.ID)
+	require.Len(t, found, 1)
+	require.Equal(t, key.ID, found[0].ID)
 }
 
 func TestBunJWKSRepository_DatabaseErrors(t *testing.T) {
@@ -73,26 +73,11 @@ func TestBunJWKSRepository_DatabaseErrors(t *testing.T) {
 			wantErrMsg: "failed to get jwks keys",
 		},
 		{
-			name: "GetJWKSKeyByID wraps the select failure",
-			call: func(ctx context.Context, repo *bunJWKSRepository) error {
-				_, err := repo.GetJWKSKeyByID(ctx, "any-id")
-				return err
-			},
-			wantErrMsg: "failed to get jwks key by id",
-		},
-		{
 			name: "StoreJWKSKey wraps the insert failure",
 			call: func(ctx context.Context, repo *bunJWKSRepository) error {
 				return repo.StoreJWKSKey(ctx, newJWKSRecord())
 			},
 			wantErrMsg: "failed to store jwks key",
-		},
-		{
-			name: "UpdateJWKSKey wraps the update failure",
-			call: func(ctx context.Context, repo *bunJWKSRepository) error {
-				return repo.UpdateJWKSKey(ctx, newJWKSRecord())
-			},
-			wantErrMsg: "failed to update jwks key",
 		},
 		{
 			name: "MarkKeyExpired wraps the update failure",
@@ -149,16 +134,6 @@ func TestBunJWKSRepository_MissingKeyUpdates(t *testing.T) {
 		call func(ctx context.Context, repo *bunJWKSRepository) error
 	}{
 		{
-			name: "updating a missing key is a no-op",
-			call: func(ctx context.Context, repo *bunJWKSRepository) error {
-				return repo.UpdateJWKSKey(ctx, &types.JWKS{
-					ID:         "missing-key",
-					PublicKey:  "public-key",
-					PrivateKey: "private-key",
-				})
-			},
-		},
-		{
 			name: "marking a missing key expired is a no-op",
 			call: func(ctx context.Context, repo *bunJWKSRepository) error {
 				return repo.MarkKeyExpired(ctx, "missing-key", time.Now().Add(-time.Hour))
@@ -175,9 +150,9 @@ func TestBunJWKSRepository_MissingKeyUpdates(t *testing.T) {
 
 			require.NoError(t, tt.call(ctx, repo))
 
-			found, err := repo.GetJWKSKeyByID(ctx, "missing-key")
+			keys, err := repo.GetJWKSKeys(ctx)
 			require.NoError(t, err)
-			require.Nil(t, found)
+			require.Empty(t, keys)
 		})
 	}
 }
@@ -216,7 +191,7 @@ func TestBunJWKSRepository_PurgeExpiredKeys(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, repo := setupJWKSRepo(t)
+			db, repo := setupJWKSRepo(t)
 			ctx := context.Background()
 
 			key := newJWKSRecord()
@@ -225,13 +200,9 @@ func TestBunJWKSRepository_PurgeExpiredKeys(t *testing.T) {
 
 			require.NoError(t, repo.PurgeExpiredKeys(ctx))
 
-			found, err := repo.GetJWKSKeyByID(ctx, key.ID)
+			exists, err := db.NewSelect().Model((*types.JWKS)(nil)).Where("id = ?", key.ID).Exists(ctx)
 			require.NoError(t, err)
-			if tt.wantPurge {
-				require.Nil(t, found)
-			} else {
-				require.NotNil(t, found)
-			}
+			require.Equal(t, !tt.wantPurge, exists)
 		})
 	}
 }
@@ -260,33 +231,6 @@ func TestBunJWKSRepository(t *testing.T) {
 				require.Equal(t, key.PrivateKey, keys[0].PrivateKey)
 				require.NotZero(t, keys[0].CreatedAt)
 				require.Nil(t, keys[0].ExpiresAt)
-			},
-		},
-		{
-			name: "GetJWKSKeyByID",
-			run: func(t *testing.T, repo *bunJWKSRepository, ctx context.Context) {
-				key := &types.JWKS{
-					ID:         uuid.New().String(),
-					PublicKey:  "public-key-2",
-					PrivateKey: "private-key-2",
-				}
-				err := repo.StoreJWKSKey(ctx, key)
-				require.NoError(t, err)
-
-				found, err := repo.GetJWKSKeyByID(ctx, key.ID)
-				require.NoError(t, err)
-				require.NotNil(t, found)
-				require.Equal(t, key.ID, found.ID)
-				require.Equal(t, key.PublicKey, found.PublicKey)
-				require.Equal(t, key.PrivateKey, found.PrivateKey)
-			},
-		},
-		{
-			name: "GetJWKSKeyByID_not_found",
-			run: func(t *testing.T, repo *bunJWKSRepository, ctx context.Context) {
-				found, err := repo.GetJWKSKeyByID(ctx, "non-existent-id")
-				require.NoError(t, err)
-				require.Nil(t, found)
 			},
 		},
 		{
@@ -355,31 +299,9 @@ func TestBunJWKSRepository(t *testing.T) {
 				err = repo.PurgeExpiredKeys(ctx)
 				require.NoError(t, err)
 
-				keys, err := repo.GetJWKSKeys(ctx)
+				exists, err := repo.db.NewSelect().Model((*types.JWKS)(nil)).Where("id = ?", key.ID).Exists(ctx)
 				require.NoError(t, err)
-				require.Len(t, keys, 0)
-			},
-		},
-		{
-			name: "UpdateJWKSKey",
-			run: func(t *testing.T, repo *bunJWKSRepository, ctx context.Context) {
-				key := &types.JWKS{
-					ID:         uuid.New().String(),
-					PublicKey:  "original-public-key",
-					PrivateKey: "original-private-key",
-				}
-				err := repo.StoreJWKSKey(ctx, key)
-				require.NoError(t, err)
-
-				key.PublicKey = "updated-public-key"
-				err = repo.UpdateJWKSKey(ctx, key)
-				require.NoError(t, err)
-
-				found, err := repo.GetJWKSKeyByID(ctx, key.ID)
-				require.NoError(t, err)
-				require.NotNil(t, found)
-				require.Equal(t, "updated-public-key", found.PublicKey)
-				require.Equal(t, "original-private-key", found.PrivateKey)
+				require.False(t, exists)
 			},
 		},
 	}

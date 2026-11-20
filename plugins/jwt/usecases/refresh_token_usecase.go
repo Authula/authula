@@ -3,21 +3,17 @@ package usecases
 import (
 	"context"
 
-	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/services"
 )
 
 type RefreshTokenUseCaseImpl struct {
-	Logger  models.Logger
 	Service services.RefreshTokenService
 }
 
 func NewRefreshTokenUseCase(
-	logger models.Logger,
 	service services.RefreshTokenService,
 ) RefreshTokenUseCase {
 	return &RefreshTokenUseCaseImpl{
-		Logger:  logger,
 		Service: service,
 	}
 }

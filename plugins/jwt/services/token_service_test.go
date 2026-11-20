@@ -33,7 +33,7 @@ func TestNewJWTService(t *testing.T) {
 		Audience:         "test-audience",
 	}
 
-	svc := NewJWTService(f.logger, f.sessionSvc, f.coreTokenSvc, f.keySvc, f.cacheSvc, f.blacklistSvc, config)
+	svc := NewJWTService(f.logger, f.sessionSvc, f.coreTokenSvc, f.keySvc, f.cacheSvc, config)
 
 	concrete, ok := svc.(*tokenService)
 	require.True(t, ok, "NewJWTService must return the concrete token service")
@@ -42,7 +42,6 @@ func TestNewJWTService(t *testing.T) {
 	require.Equal(t, f.coreTokenSvc, concrete.coreTokenService)
 	require.Equal(t, f.keySvc, concrete.keyService)
 	require.Equal(t, f.cacheSvc, concrete.cacheService)
-	require.Equal(t, f.blacklistSvc, concrete.blacklistService)
 	require.Equal(t, config.ExpiresIn, concrete.expiresIn)
 	require.Equal(t, config.RefreshExpiresIn, concrete.refreshExpiresIn)
 	require.Equal(t, config.Issuer, concrete.issuer)
@@ -87,8 +86,6 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
 			},
 			setupMocks: func(t *testing.T, f *serviceTestFixture) {
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-1").Return(false, nil)
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "session:sess-1").Return(false, nil)
 				f.sessionSvc.On("GetByID", mock.Anything, "sess-1").Return(&models.Session{ID: "sess-1", ExpiresAt: time.Now().Add(time.Hour)}, nil)
 			},
 			wantActor: func(t *testing.T, actor *models.Actor) {
@@ -112,8 +109,6 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
 			},
 			setupMocks: func(t *testing.T, f *serviceTestFixture) {
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-leak").Return(false, nil)
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "session:sess-1").Return(false, nil)
 				f.sessionSvc.On("GetByID", mock.Anything, "sess-1").Return(&models.Session{ID: "sess-1", ExpiresAt: time.Now().Add(time.Hour)}, nil)
 			},
 			wantActor: func(t *testing.T, actor *models.Actor) {
@@ -267,7 +262,6 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
 			},
 			setupMocks: func(t *testing.T, f *serviceTestFixture) {
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-3").Return(false, nil)
 			},
 			wantActor: func(t *testing.T, actor *models.Actor) {
 				require.Equal(t, "client-1", actor.ID)
@@ -290,7 +284,6 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
 			},
 			setupMocks: func(t *testing.T, f *serviceTestFixture) {
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-4").Return(false, nil)
 			},
 			wantActor: func(t *testing.T, actor *models.Actor) {
 				require.Equal(t, "client-2", actor.ID)
@@ -317,23 +310,6 @@ func TestTokenService_ValidateToken(t *testing.T) {
 			wantErr:    "failed to parse token",
 		},
 		{
-			name: "blacklisted_token",
-			claims: map[string]any{
-				jwt.SubjectKey:    "user-1",
-				"user_id":         "user-1",
-				"session_id":      "sess-1",
-				"token_type":      types.JWTTokenTypeAccess.String(),
-				"actor_type":      "user",
-				jwt.JwtIDKey:      "jti-6",
-				jwt.IssuedAtKey:   time.Now(),
-				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
-			},
-			setupMocks: func(t *testing.T, f *serviceTestFixture) {
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-6").Return(true, nil)
-			},
-			wantErr: "token has been revoked",
-		},
-		{
 			name: "missing_user_id",
 			claims: map[string]any{
 				jwt.SubjectKey:    "user-1",
@@ -345,7 +321,6 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
 			},
 			setupMocks: func(t *testing.T, f *serviceTestFixture) {
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-7").Return(false, nil)
 			},
 			wantErr: "missing user_id claim",
 		},
@@ -362,8 +337,6 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
 			},
 			setupMocks: func(t *testing.T, f *serviceTestFixture) {
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-8").Return(false, nil)
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "session:sess-1").Return(false, nil)
 				f.sessionSvc.On("GetByID", mock.Anything, "sess-1").Return(nil, nil)
 			},
 			wantErr: "session not found or invalid",
@@ -381,8 +354,6 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
 			},
 			setupMocks: func(t *testing.T, f *serviceTestFixture) {
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-9").Return(false, nil)
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "session:sess-1").Return(false, nil)
 				f.sessionSvc.On("GetByID", mock.Anything, "sess-1").Return(&models.Session{
 					ID: "sess-1", ExpiresAt: time.Now().Add(-time.Minute),
 				}, nil)
@@ -401,27 +372,8 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
 			},
 			setupMocks: func(t *testing.T, f *serviceTestFixture) {
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-missing-session").Return(false, nil)
 			},
 			wantErr: "missing session_id claim",
-		},
-		{
-			name: "blacklisted_session",
-			claims: map[string]any{
-				jwt.SubjectKey:    "user-1",
-				"user_id":         "user-1",
-				"session_id":      "sess-revoked",
-				"token_type":      types.JWTTokenTypeAccess.String(),
-				"actor_type":      "user",
-				jwt.JwtIDKey:      "jti-revoked-session",
-				jwt.IssuedAtKey:   time.Now(),
-				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
-			},
-			setupMocks: func(t *testing.T, f *serviceTestFixture) {
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-revoked-session").Return(false, nil)
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "session:sess-revoked").Return(true, nil)
-			},
-			wantErr: "session has been revoked",
 		},
 		{
 			name: "machine_token_missing_subject",
@@ -433,7 +385,6 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
 			},
 			setupMocks: func(t *testing.T, f *serviceTestFixture) {
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-machine-no-sub").Return(false, nil)
 			},
 			wantErr: "missing subject claim",
 		},
@@ -452,8 +403,6 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
 			},
 			setupMocks: func(t *testing.T, f *serviceTestFixture) {
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "jti-extra-claims").Return(false, nil)
-				f.blacklistSvc.On("IsBlacklisted", mock.Anything, "session:sess-1").Return(false, nil)
 				f.sessionSvc.On("GetByID", mock.Anything, "sess-1").Return(&models.Session{
 					ID: "sess-1", ExpiresAt: time.Now().Add(time.Hour),
 				}, nil)
@@ -493,7 +442,6 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				tt.wantActor(t, actor)
 			}
 
-			f.blacklistSvc.AssertExpectations(t)
 			f.sessionSvc.AssertExpectations(t)
 		})
 	}

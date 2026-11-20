@@ -38,7 +38,6 @@ type tokenService struct {
 	coreTokenService services.TokenService
 	keyService       KeyService
 	cacheService     CacheService
-	blacklistService BlacklistService
 	sessionService   services.SessionService
 	expiresIn        time.Duration
 	refreshExpiresIn time.Duration
@@ -52,7 +51,6 @@ func NewJWTService(
 	coreTokenService services.TokenService,
 	keyService KeyService,
 	cacheService CacheService,
-	blacklistService BlacklistService,
 	config TokenServiceConfig,
 ) services.JWTService {
 	return &tokenService{
@@ -61,7 +59,6 @@ func NewJWTService(
 		coreTokenService: coreTokenService,
 		keyService:       keyService,
 		cacheService:     cacheService,
-		blacklistService: blacklistService,
 		expiresIn:        config.ExpiresIn,
 		refreshExpiresIn: config.RefreshExpiresIn,
 		issuer:           config.Issuer,
@@ -278,14 +275,6 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
 
-	jti, ok := parsedToken.JwtID()
-	if ok && jti != "" && s.blacklistService != nil {
-		isBlacklisted, err := s.blacklistService.IsBlacklisted(ctx, jti)
-		if err == nil && isBlacklisted {
-			return nil, errors.New("token has been revoked")
-		}
-	}
-
 	actorType, err := jwt.Get[string](parsedToken, "actor_type")
 	if err != nil || actorType == "" {
 		return nil, errors.New("missing actor_type claim")
@@ -345,13 +334,6 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 	sessionID, err := jwt.Get[string](parsedToken, "session_id")
 	if err != nil || sessionID == "" {
 		return nil, errors.New("missing session_id claim")
-	}
-
-	if s.blacklistService != nil {
-		isBlacklisted, err := s.blacklistService.IsBlacklisted(ctx, "session:"+sessionID)
-		if err == nil && isBlacklisted {
-			return nil, errors.New("session has been revoked")
-		}
 	}
 
 	session, err := s.sessionService.GetByID(ctx, sessionID)
