@@ -41,6 +41,10 @@ type OAuth2Plugin struct {
 	useCases         *usecases.UseCases
 	Api              *API
 
+	clientSecretService     services.ClientSecretService
+	clientService           services.ClientService
+	clientCredentialsIssuer rootservices.ClientCredentialsTokenIssuer
+
 	oauthClientRepo       repositories.OAuthClientRepository
 	authorizationCodeRepo repositories.AuthorizationCodeRepository
 	consentRequestRepo    repositories.ConsentRequestRepository
@@ -62,7 +66,7 @@ func New(config types.OAuth2PluginConfig) *OAuth2Plugin {
 func (p *OAuth2Plugin) Metadata() models.PluginMetadata {
 	return models.PluginMetadata{
 		ID:          models.PluginOAuth2.String(),
-		Version:     "1.1.0",
+		Version:     "1.2.0",
 		Description: "OAuth2 authentication plugin with support for various providers.",
 	}
 }
@@ -81,12 +85,18 @@ func (p *OAuth2Plugin) Init(ctx *models.PluginContext) error {
 		return fmt.Errorf("failed to load oauth2 config: %w", err)
 	}
 	p.pluginConfig.ApplyDefaults()
+	if err := p.pluginConfig.Validate(); err != nil {
+		return fmt.Errorf("invalid oauth2 config: %w", err)
+	}
 
 	if err := p.initializeServices(ctx); err != nil {
 		return err
 	}
 
 	p.initializeRepositories()
+	if err := p.initializeClientCredentials(ctx); err != nil {
+		return err
+	}
 
 	p.httpClient = &http.Client{Timeout: p.pluginConfig.HTTPTimeout}
 	p.providerRegistry = services.NewProviderRegistry()
@@ -115,6 +125,23 @@ func (p *OAuth2Plugin) initializeRepositories() {
 	p.flowStateRepo = repositories.NewBunFlowStateRepository(p.db)
 }
 
+func (p *OAuth2Plugin) initializeClientCredentials(ctx *models.PluginContext) error {
+	if !p.pluginConfig.AuthorizationServerEnabled {
+		return nil
+	}
+
+	p.clientSecretService = services.NewSHA256ClientSecretService(p.pluginConfig.ClientSecretValuePrefix)
+	p.clientService = services.NewClientService(p.oauthClientRepo, p.clientSecretService)
+
+	issuer, ok := ctx.ServiceRegistry.Get(models.ServiceJWT.String()).(rootservices.ClientCredentialsTokenIssuer)
+	if !ok {
+		return fmt.Errorf("jwt plugin does not provide a client credentials token issuer; the jwt plugin must be enabled")
+	}
+	p.clientCredentialsIssuer = issuer
+
+	return nil
+}
+
 func (p *OAuth2Plugin) Routes() []models.Route {
 	return Routes(p)
 }
@@ -123,7 +150,12 @@ func (p *OAuth2Plugin) Migrations(provider string) []migrations.Migration {
 	return oauth2MigrationsForProvider(provider)
 }
 
+// DependsOn runs before Init, so it relies on the constructor-loaded plugin
+// config rather than the config reloaded during Init.
 func (p *OAuth2Plugin) DependsOn() []string {
+	if p.pluginConfig.AuthorizationServerEnabled {
+		return []string{models.PluginJWT.String()}
+	}
 	return nil
 }
 

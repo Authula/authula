@@ -6,6 +6,7 @@ import (
 )
 
 var _ jwtservices.TokenService = (*MockTokenService)(nil)
+var _ services.ClientCredentialsTokenIssuer = (*MockTokenService)(nil)
 var _ jwtservices.KeyService = (*MockKeyService)(nil)
 var _ jwtservices.CacheService = (*MockCacheService)(nil)
 var _ jwtservices.RefreshTokenRepository = (*MockRefreshTokenRepository)(nil)

@@ -1,6 +1,7 @@
 package usecases
 
 type UseCases struct {
-	AuthorizeUseCase AuthorizeUseCase
-	CallbackUseCase  CallbackUseCase
+	AuthorizeUseCase         AuthorizeUseCase
+	CallbackUseCase          CallbackUseCase
+	ClientCredentialsUseCase ClientCredentialsUseCase
 }

@@ -23,4 +23,12 @@ var (
 	ErrSessionNotFound              = errors.New("session not found")
 	ErrProviderConfigInvalid        = errors.New("invalid oauth provider configuration")
 	ErrProviderConfigurationPartial = errors.New("partial oauth provider credentials")
+
+	ErrInvalidClient        = errors.New("client authentication failed")
+	ErrClientLookupFailed   = errors.New("oauth client lookup failed")
+	ErrUnauthorizedClient   = errors.New("client is not allowed to use this grant type")
+	ErrInvalidScope         = errors.New("requested scope is not allowed")
+	ErrUnsupportedGrantType = errors.New("unsupported grant type")
+	ErrInvalidTokenRequest  = errors.New("invalid token request")
+	ErrTokenIssuanceFailed  = errors.New("token issuance failed")
 )

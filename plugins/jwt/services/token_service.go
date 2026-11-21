@@ -15,8 +15,11 @@ import (
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/types"
+	oauth2types "github.com/Authula/authula/plugins/oauth2/types"
 	"github.com/Authula/authula/services"
 )
+
+var _ services.ClientCredentialsTokenIssuer = (*tokenService)(nil)
 
 var reservedTokenClaims = map[string]struct{}{
 	jwt.IssuerKey:     {},
@@ -184,6 +187,28 @@ func (s *tokenService) GenerateUserToken(ctx context.Context, userID string, ses
 }
 
 func (s *tokenService) GenerateMachineToken(ctx context.Context, clientID string, organizationID string, scopes []string) (*types.TokenPair, error) {
+	return s.generateMachineToken(ctx, clientID, organizationID, scopes, s.expiresIn)
+}
+
+func (s *tokenService) IssueClientCredentialsToken(ctx context.Context, req services.ClientCredentialsTokenRequest) (*services.ClientCredentialsToken, error) {
+	ttl := req.ExpiresIn
+	if ttl <= 0 {
+		ttl = s.expiresIn
+	}
+
+	pair, err := s.generateMachineToken(ctx, req.ClientID, req.OrganizationID, req.Scopes, ttl)
+	if err != nil {
+		return nil, err
+	}
+
+	return &services.ClientCredentialsToken{
+		AccessToken: pair.AccessToken,
+		ExpiresIn:   ttl,
+		TokenType:   pair.TokenType,
+	}, nil
+}
+
+func (s *tokenService) generateMachineToken(ctx context.Context, clientID string, organizationID string, scopes []string, ttl time.Duration) (*types.TokenPair, error) {
 	jwksKey, err := s.keyService.GetActiveKey(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active key: %w", err)
@@ -207,6 +232,10 @@ func (s *tokenService) GenerateMachineToken(ctx context.Context, clientID string
 	now := time.Now()
 	jti := uuid.New().String()
 
+	if scopes == nil {
+		scopes = []string{}
+	}
+
 	accessClaims := jwt.New()
 	if err := accessClaims.Set(jwt.SubjectKey, clientID); err != nil {
 		return nil, fmt.Errorf("failed to set subject: %w", err)
@@ -214,7 +243,7 @@ func (s *tokenService) GenerateMachineToken(ctx context.Context, clientID string
 	if err := accessClaims.Set(jwt.IssuedAtKey, now); err != nil {
 		return nil, fmt.Errorf("failed to set issued at: %w", err)
 	}
-	if err := accessClaims.Set(jwt.ExpirationKey, now.Add(s.expiresIn)); err != nil {
+	if err := accessClaims.Set(jwt.ExpirationKey, now.Add(ttl)); err != nil {
 		return nil, fmt.Errorf("failed to set expiration: %w", err)
 	}
 	if err := accessClaims.Set(jwt.JwtIDKey, jti); err != nil {
@@ -236,9 +265,12 @@ func (s *tokenService) GenerateMachineToken(ctx context.Context, clientID string
 		}
 	}
 
+	if err := accessClaims.Set("scopes", scopes); err != nil {
+		return nil, fmt.Errorf("failed to set scopes: %w", err)
+	}
 	if len(scopes) > 0 {
-		if err := accessClaims.Set("scopes", scopes); err != nil {
-			return nil, fmt.Errorf("failed to set scopes: %w", err)
+		if err := accessClaims.Set("scope", oauth2types.JoinScope(scopes)); err != nil {
+			return nil, fmt.Errorf("failed to set scope: %w", err)
 		}
 	}
 
@@ -254,7 +286,7 @@ func (s *tokenService) GenerateMachineToken(ctx context.Context, clientID string
 	return &types.TokenPair{
 		AccessToken:  string(accessTokenBytes),
 		RefreshToken: "",
-		ExpiresIn:    s.expiresIn,
+		ExpiresIn:    ttl,
 		TokenType:    "Bearer",
 	}, nil
 }

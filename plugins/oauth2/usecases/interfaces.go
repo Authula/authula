@@ -15,3 +15,9 @@ type AuthorizeUseCase interface {
 type CallbackUseCase interface {
 	Callback(ctx context.Context, req *types.CallbackRequest, ipAddress *string, userAgent *string) (*types.CallbackResult, error)
 }
+
+// ClientCredentialsUseCase is the handler-facing contract for the OAuth 2.0
+// client credentials grant.
+type ClientCredentialsUseCase interface {
+	IssueToken(ctx context.Context, req *types.TokenRequest) (*types.TokenResult, error)
+}

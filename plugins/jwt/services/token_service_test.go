@@ -17,6 +17,7 @@ import (
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/types"
+	oauth2types "github.com/Authula/authula/plugins/oauth2/types"
 	"github.com/Authula/authula/services"
 )
 
@@ -713,13 +714,150 @@ func TestTokenService_GenerateMachineToken(t *testing.T) {
 					scopes, ok := claims["scopes"].([]any)
 					require.True(t, ok)
 					require.ElementsMatch(t, tt.wantScopes, scopes)
+					require.Equal(t, oauth2types.JoinScope(tt.scopes), claims["scope"])
 				} else {
-					require.Nil(t, claims["scopes"])
+					scopes, ok := claims["scopes"].([]any)
+					require.True(t, ok)
+					require.Empty(t, scopes)
+					require.NotContains(t, claims, "scope")
 				}
 			}
 
 			f.keySvc.AssertExpectations(t)
 			f.coreTokenSvc.AssertExpectations(t)
+		})
+	}
+}
+
+func TestTokenService_IssueClientCredentialsToken(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		request     services.ClientCredentialsTokenRequest
+		setupMocks  func(*serviceTestFixture)
+		wantErr     string
+		wantExpires time.Duration
+	}{
+		{
+			name: "uses caller ttl",
+			request: services.ClientCredentialsTokenRequest{
+				ClientID:       "client-1",
+				OrganizationID: "org-1",
+				Scopes:         []string{"read", "write"},
+				ExpiresIn:      5 * time.Minute,
+			},
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
+				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
+			},
+			wantExpires: 5 * time.Minute,
+		},
+		{
+			name: "falls back to configured ttl",
+			request: services.ClientCredentialsTokenRequest{
+				ClientID: "client-1",
+			},
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
+				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
+			},
+			wantExpires: 15 * time.Minute,
+		},
+		{
+			name: "propagates signing errors",
+			request: services.ClientCredentialsTokenRequest{
+				ClientID:  "client-1",
+				ExpiresIn: time.Minute,
+			},
+			setupMocks: func(f *serviceTestFixture) {
+				f.keySvc.On("GetActiveKey", mock.Anything).Return(nil, assert.AnError)
+			},
+			wantErr: "failed to get active key",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newServiceTestFixture(t)
+			svc := f.newJWTService()
+			tt.setupMocks(f)
+
+			token, err := svc.IssueClientCredentialsToken(context.Background(), tt.request)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+				require.Nil(t, token)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, token)
+			require.NotEmpty(t, token.AccessToken)
+			require.Equal(t, tt.wantExpires, token.ExpiresIn)
+			require.Equal(t, "Bearer", token.TokenType)
+
+			claims := parseTestToken(t, token.AccessToken, f)
+			pubKey, err := jwk.ParseKey([]byte(f.activeKey.PublicKey), jwk.WithX509(true))
+			require.NoError(t, err)
+			parsed, err := jwt.Parse([]byte(token.AccessToken), jwt.WithKey(jwa.EdDSA(), pubKey), jwt.WithValidate(false))
+			require.NoError(t, err)
+			expiresAt, ok := parsed.Expiration()
+			require.True(t, ok)
+			issuedAt, ok := parsed.IssuedAt()
+			require.True(t, ok)
+			require.InDelta(t, tt.wantExpires.Seconds(), expiresAt.Sub(issuedAt).Seconds(), 1)
+
+			if len(tt.request.Scopes) > 0 {
+				require.Equal(t, oauth2types.JoinScope(tt.request.Scopes), claims["scope"])
+			} else {
+				require.NotContains(t, claims, "scope")
+			}
+		})
+	}
+}
+
+func TestTokenService_ClientCredentialsTokenRoundTrip(t *testing.T) {
+
+	tests := []struct {
+		name    string
+		scopes  []string
+		wantOrg string
+	}{
+		{name: "empty scopes", scopes: nil, wantOrg: "org-1"},
+		{name: "granted scopes", scopes: []string{"read", "write"}, wantOrg: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newServiceTestFixture(t)
+			f.setupKeyServiceMock()
+			f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
+			svc := f.newJWTService()
+
+			token, err := svc.IssueClientCredentialsToken(context.Background(), services.ClientCredentialsTokenRequest{
+				ClientID:       "client-1",
+				OrganizationID: tt.wantOrg,
+				Scopes:         tt.scopes,
+				ExpiresIn:      10 * time.Minute,
+			})
+			require.NoError(t, err)
+
+			actor, err := svc.ValidateToken(context.Background(), token.AccessToken)
+			require.NoError(t, err)
+			require.NotNil(t, actor)
+			require.Equal(t, models.ActorMachine, actor.Type)
+			require.Equal(t, "client-1", actor.ID)
+			require.Equal(t, tt.scopes, actor.Scopes)
+
+			if tt.wantOrg != "" {
+				require.Equal(t, tt.wantOrg, actor.Claims["organization_id"])
+			}
 		})
 	}
 }

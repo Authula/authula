@@ -2516,6 +2516,67 @@
         }
       }
     },
+    "/oauth2/token": {
+      "post": {
+        "tags": [
+          "OAuth2 Plugin"
+        ],
+        "summary": "OAuth2 client credentials token",
+        "description": "Authenticates a confidential OAuth client and returns a Bearer access token using the client credentials grant.",
+        "operationId": "oauthToken",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/FormDataTokenEndpointRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/organizations": {
       "get": {
         "tags": [
@@ -4952,6 +5013,23 @@
         ],
         "type": "object"
       },
+      "FormDataTokenEndpointRequest": {
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "client_secret": {
+            "type": "string"
+          },
+          "grant_type": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "GenerateBackupCodesResponse": {
         "properties": {
           "backup_codes": {
@@ -6220,6 +6298,43 @@
         },
         "required": [
           "message"
+        ],
+        "type": "object"
+      },
+      "TokenErrorResponse": {
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "error_description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "expires_in": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in"
         ],
         "type": "object"
       },

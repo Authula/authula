@@ -24,9 +24,12 @@ const (
 	OAuthFlowPurposeLogin = "login"
 	OAuthFlowPurposeLink  = "link"
 
-	ScopeOpenID  = "openid"
-	ScopeProfile = "profile"
-	ScopeEmail   = "email"
+	ScopeOpenID        = "openid"
+	ScopeProfile       = "profile"
+	ScopeEmail         = "email"
+	ScopeAddress       = "address"
+	ScopePhone         = "phone"
+	ScopeOfflineAccess = "offline_access"
 )
 
 // OAuthClient is a registered OAuth 2.0 client. Client secrets and other

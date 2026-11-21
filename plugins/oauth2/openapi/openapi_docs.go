@@ -42,5 +42,18 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 			openapi.WithResponseStatus(http.StatusBadGateway, &types.ErrorResponse{}),
 			openapi.WithResponseStatus(http.StatusInternalServerError, &types.ErrorResponse{}),
 		),
+		svc.AddOperation(
+			http.MethodPost,
+			"/oauth2/token",
+			openapi.WithOperationID("oauthToken"),
+			openapi.WithSummary("OAuth2 client credentials token"),
+			openapi.WithDescription("Authenticates a confidential OAuth client and returns a Bearer access token using the client credentials grant."),
+			openapi.WithTags("OAuth2 Plugin"),
+			openapi.WithRequest(&types.TokenEndpointRequest{}, openapi.WithFormContentType()),
+			openapi.WithResponseStatus(http.StatusOK, &types.TokenResponse{}),
+			openapi.WithResponseStatus(http.StatusBadRequest, &types.TokenErrorResponse{}),
+			openapi.WithResponseStatus(http.StatusUnauthorized, &types.TokenErrorResponse{}),
+			openapi.WithResponseStatus(http.StatusInternalServerError, &types.ErrorResponse{}),
+		),
 	)
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/lestrrat-go/jwx/v4/jwk"
 
 	"github.com/Authula/authula/plugins/jwt/types"
+	"github.com/Authula/authula/services"
 )
 
 type TokenServiceConfig struct {
@@ -19,6 +20,7 @@ type TokenServiceConfig struct {
 type TokenService interface {
 	GenerateUserToken(ctx context.Context, userID string, sessionID string, extraClaims map[string]any) (*types.TokenPair, error)
 	GenerateMachineToken(ctx context.Context, clientID string, organizationID string, scopes []string) (*types.TokenPair, error)
+	IssueClientCredentialsToken(ctx context.Context, req services.ClientCredentialsTokenRequest) (*services.ClientCredentialsToken, error)
 	ValidateRefreshToken(ctx context.Context, token string) (map[string]any, error)
 }
 

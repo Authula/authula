@@ -58,3 +58,8 @@ func WithResponseStatus(status int, resp any) OperationOption {
 func WithJSONContentType() swaggestopenapi.ContentOption {
 	return swaggestopenapi.WithContentType("application/json")
 }
+
+// WithFormContentType sets the content type to application/x-www-form-urlencoded.
+func WithFormContentType() swaggestopenapi.ContentOption {
+	return swaggestopenapi.WithContentType("application/x-www-form-urlencoded")
+}
