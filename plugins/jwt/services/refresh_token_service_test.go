@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -114,8 +115,8 @@ func activeSession() *models.Session {
 
 func validRefreshClaims() map[string]any {
 	return map[string]any{
-		"session_id": testSessionID,
-		"user_id":    testUserID,
+		"session_id":   testSessionID,
+		jwt.SubjectKey: testUserID,
 	}
 }
 
@@ -424,10 +425,10 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 			},
 		},
 		{
-			name: "missing user claim",
+			name: "missing subject claim",
 			setup: func(_ *testing.T, f *refreshTokenTestFixture) {
 				claims := validRefreshClaims()
-				delete(claims, "user_id")
+				delete(claims, jwt.SubjectKey)
 				f.tokenSvc.On("ValidateRefreshToken", ctx, testRefreshToken).Return(claims, nil)
 				f.repo.On("GetRefreshToken", ctx, HashRefreshToken(testRefreshToken)).Return(activeRefreshRecord(time.Now().Add(time.Hour)), nil)
 				f.sessionSvc.On("GetByID", ctx, testSessionID).Return(activeSession(), nil)
@@ -435,10 +436,10 @@ func TestRefreshTokenService_RefreshTokens(t *testing.T) {
 			check: assertInvalidRefreshToken,
 		},
 		{
-			name: "user claim does not match session",
+			name: "subject claim does not match session",
 			setup: func(_ *testing.T, f *refreshTokenTestFixture) {
 				claims := validRefreshClaims()
-				claims["user_id"] = "user-2"
+				claims[jwt.SubjectKey] = "user-2"
 				f.tokenSvc.On("ValidateRefreshToken", ctx, testRefreshToken).Return(claims, nil)
 				f.repo.On("GetRefreshToken", ctx, HashRefreshToken(testRefreshToken)).Return(activeRefreshRecord(time.Now().Add(time.Hour)), nil)
 				f.sessionSvc.On("GetByID", ctx, testSessionID).Return(activeSession(), nil)
@@ -518,7 +519,7 @@ func TestRefreshTokenService_RefreshTokens_ExtraClaims(t *testing.T) {
 
 	ctx := context.Background()
 
-	reservedClaims := map[string]any{
+	disallowedClaims := map[string]any{
 		"iss":             "https://issuer",
 		"aud":             []string{"authula"},
 		"sub":             testUserID,
@@ -531,8 +532,9 @@ func TestRefreshTokenService_RefreshTokens_ExtraClaims(t *testing.T) {
 		"token_type":      "refresh",
 		"actor_type":      "user",
 		"organization_id": "org-1",
-		"scopes":          []string{"read"},
+		"scope":           "read",
 		"client_id":       "client-1",
+		"tenant":          "acme",
 	}
 
 	tests := []struct {
@@ -541,28 +543,28 @@ func TestRefreshTokenService_RefreshTokens_ExtraClaims(t *testing.T) {
 		wantExtra map[string]any
 	}{
 		{
-			name: "custom claims are forwarded",
+			name: "allowlisted claims are forwarded",
 			claims: func() map[string]any {
 				claims := validRefreshClaims()
-				claims["role"] = "admin"
-				claims["tenant"] = "acme"
+				claims["impersonator_id"] = "admin-1"
+				claims["impersonator_scope"] = "read write"
 				return claims
 			}(),
-			wantExtra: map[string]any{"role": "admin", "tenant": "acme"},
+			wantExtra: map[string]any{"impersonator_id": "admin-1", "impersonator_scope": "read write"},
 		},
 		{
-			name: "reserved claims are filtered",
+			name: "disallowed claims are filtered",
 			claims: func() map[string]any {
 				claims := validRefreshClaims()
-				maps.Copy(claims, reservedClaims)
-				claims["role"] = "admin"
+				maps.Copy(claims, disallowedClaims)
+				claims["impersonator_id"] = "admin-1"
 				return claims
 			}(),
-			wantExtra: map[string]any{"role": "admin"},
+			wantExtra: map[string]any{"impersonator_id": "admin-1"},
 		},
 		{
-			name:      "only_reserved_claims_produce_nil",
-			claims:    reservedClaims,
+			name:      "only_disallowed_claims_produce_nil",
+			claims:    disallowedClaims,
 			wantExtra: nil,
 		},
 	}
@@ -756,7 +758,7 @@ func TestRefreshTokenService_InvalidateSessionFamily(t *testing.T) {
 	}
 }
 
-func TestRefreshTokenService_ExtraClaims(t *testing.T) {
+func TestFilterAllowedExtraClaims(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -770,19 +772,25 @@ func TestRefreshTokenService_ExtraClaims(t *testing.T) {
 			want:   nil,
 		},
 		{
-			name:   "only reserved claims",
-			claims: map[string]any{"user_id": testUserID, "session_id": testSessionID, "iss": "issuer"},
-			want:   nil,
+			name: "only disallowed claims",
+			claims: map[string]any{
+				"sub":        testUserID,
+				"user_id":    testUserID,
+				"session_id": testSessionID,
+				"iss":        "issuer",
+				"tenant":     "acme",
+			},
+			want: nil,
 		},
 		{
-			name:   "custom claims",
-			claims: map[string]any{"role": "admin", "tenant": "acme"},
-			want:   map[string]any{"role": "admin", "tenant": "acme"},
+			name:   "allowlisted claims",
+			claims: map[string]any{"impersonator_id": "admin-1", "impersonator_scope": "read write"},
+			want:   map[string]any{"impersonator_id": "admin-1", "impersonator_scope": "read write"},
 		},
 		{
 			name:   "mixed claims",
-			claims: map[string]any{"user_id": testUserID, "role": "admin"},
-			want:   map[string]any{"role": "admin"},
+			claims: map[string]any{"impersonator_id": "admin-1", "tenant": "acme"},
+			want:   map[string]any{"impersonator_id": "admin-1"},
 		},
 	}
 
@@ -790,10 +798,7 @@ func TestRefreshTokenService_ExtraClaims(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			fixture := newRefreshTokenTestFixture()
-			service := fixture.newService()
-
-			require.Equal(t, tt.want, service.extraClaims(tt.claims))
+			require.Equal(t, tt.want, filterAllowedExtraClaims(tt.claims))
 		})
 	}
 }

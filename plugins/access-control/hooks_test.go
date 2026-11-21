@@ -109,6 +109,33 @@ func TestHasAllScopes(t *testing.T) {
 	}
 }
 
+func TestHasAllExactScopes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		assignedScopes []string
+		requiredScopes []string
+		want           bool
+	}{
+		{name: "all_exact_match", assignedScopes: []string{"read", "write"}, requiredScopes: []string{"read", "write"}, want: true},
+		{name: "universal_wildcard_does_not_match", assignedScopes: []string{"*"}, requiredScopes: []string{"read"}, want: false},
+		{name: "prefix_wildcard_does_not_match", assignedScopes: []string{"admin:*"}, requiredScopes: []string{"admin:users:list"}, want: false},
+		{name: "missing_permission", assignedScopes: []string{"read"}, requiredScopes: []string{"read", "write"}, want: false},
+		{name: "empty_required", assignedScopes: []string{}, requiredScopes: []string{}, want: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := hasAllExactScopes(tc.assignedScopes, tc.requiredScopes)
+			if got != tc.want {
+				t.Errorf("hasAllExactScopes(%v, %v) = %v, want %v", tc.assignedScopes, tc.requiredScopes, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestAccessControlPluginHooksIncludesGlobalAssignRoleHook(t *testing.T) {
 	t.Parallel()
 
@@ -140,6 +167,10 @@ func TestAccessControlPluginAssignRoleFromContextHook(t *testing.T) {
 		{
 			name:         "missing context is a no-op",
 			contextValue: nil,
+		},
+		{
+			name:         "unsupported context value is a no-op",
+			contextValue: "invalid",
 		},
 		{
 			name:         "already assigned role is skipped",
@@ -252,6 +283,26 @@ func TestAccessControlPluginRequireAccessControl(t *testing.T) {
 		{
 			name:           "machine actor missing required permission is forbidden",
 			actor:          &authmodels.Actor{ID: "machine-1", Type: authmodels.ActorMachine, Scopes: []string{"other:read"}},
+			requiredScopes: []string{"users:read"},
+			wantHandled:    true,
+			wantStatus:     http.StatusForbidden,
+		},
+		{
+			name:           "machine actor with exact permission is allowed",
+			actor:          &authmodels.Actor{ID: "machine-1", Type: authmodels.ActorMachine, Scopes: []string{"users:read"}},
+			requiredScopes: []string{"users:read"},
+			wantScopes:     []string{"users:read"},
+		},
+		{
+			name:           "machine actor wildcard scope is forbidden",
+			actor:          &authmodels.Actor{ID: "machine-1", Type: authmodels.ActorMachine, Scopes: []string{"*"}},
+			requiredScopes: []string{"users:read"},
+			wantHandled:    true,
+			wantStatus:     http.StatusForbidden,
+		},
+		{
+			name:           "machine actor prefix wildcard scope is forbidden",
+			actor:          &authmodels.Actor{ID: "machine-1", Type: authmodels.ActorMachine, Scopes: []string{"users:*"}},
 			requiredScopes: []string{"users:read"},
 			wantHandled:    true,
 			wantStatus:     http.StatusForbidden,

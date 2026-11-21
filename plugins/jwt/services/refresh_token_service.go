@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 
 	coreerrors "github.com/Authula/authula/core/errors"
 	"github.com/Authula/authula/models"
@@ -104,12 +105,12 @@ func (s *refreshTokenService) RefreshTokensWithMetadata(ctx context.Context, ref
 		return nil, constants.ErrInvalidRefreshToken
 	}
 
-	claimUserID, _ := claims["user_id"].(string)
+	claimUserID, _ := claims[jwt.SubjectKey].(string)
 	if claimUserID == "" || claimUserID != session.UserID {
 		return nil, constants.ErrInvalidRefreshToken
 	}
 
-	extraClaims := s.extraClaims(claims)
+	extraClaims := filterAllowedExtraClaims(claims)
 
 	tokenPair, err := s.jwtService.GenerateUserToken(ctx, session.UserID, record.SessionID, extraClaims)
 	if err != nil {
@@ -203,23 +204,6 @@ func (s *refreshTokenService) invalidateSessionFamily(ctx context.Context, sessi
 	if err := s.sessionService.Delete(ctx, sessionID); err != nil {
 		s.logger.Error("failed to delete invalidated session", "session_id", sessionID, "error", err)
 	}
-}
-
-func (s *refreshTokenService) extraClaims(claims map[string]any) map[string]any {
-	extraClaims := make(map[string]any)
-	for k, v := range claims {
-		switch k {
-		case "iss", "aud", "sub", "user_id", "session_id", "iat", "exp", "nbf", "jti",
-			"token_type", "actor_type", "organization_id", "scopes", "client_id":
-			continue
-		default:
-			extraClaims[k] = v
-		}
-	}
-	if len(extraClaims) == 0 {
-		return nil
-	}
-	return extraClaims
 }
 
 func (s *refreshTokenService) emitTokenReuseThrottledEvent(sessionID, tokenHash string, deltaMs, gracePeriodMs int64, meta events.AuditMetadata) {

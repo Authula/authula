@@ -1,14 +1,20 @@
 package types
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 const (
-	defaultHTTPTimeout          = 10 * time.Second
-	defaultAuthorizationCodeTTL = 90 * time.Second
-	defaultConsentRequestTTL    = 10 * time.Minute
-	defaultFlowStateTTL         = 5 * time.Minute
-	defaultIDTokenTTL           = 5 * time.Minute
-	defaultCleanupInterval      = time.Minute
+	defaultHTTPTimeout               = 10 * time.Second
+	defaultAuthorizationCodeTTL      = 90 * time.Second
+	defaultConsentRequestTTL         = 10 * time.Minute
+	defaultFlowStateTTL              = 5 * time.Minute
+	defaultIDTokenTTL                = 5 * time.Minute
+	defaultCleanupInterval           = time.Minute
+	defaultClientCredentialsTokenTTL = 15 * time.Minute
+	defaultClientSecretValuePrefix   = "authula_cs_"
+	maxClientSecretValuePrefixLength = 32
 )
 
 func defaultAllowedScopes() []string {
@@ -33,6 +39,9 @@ type OAuth2PluginConfig struct {
 	ConsentRequestTTL    time.Duration `json:"consent_request_ttl" toml:"consent_request_ttl"`
 	FlowStateTTL         time.Duration `json:"flow_state_ttl" toml:"flow_state_ttl"`
 	IDTokenTTL           time.Duration `json:"id_token_ttl" toml:"id_token_ttl"`
+
+	ClientCredentialsTokenTTL time.Duration `json:"client_credentials_token_ttl" toml:"client_credentials_token_ttl"`
+	ClientSecretValuePrefix   string        `json:"client_secret_value_prefix" toml:"client_secret_value_prefix"`
 
 	AutoCleanup     bool          `json:"auto_cleanup" toml:"auto_cleanup"`
 	CleanupInterval time.Duration `json:"cleanup_interval" toml:"cleanup_interval"`
@@ -64,6 +73,75 @@ func (c *OAuth2PluginConfig) ApplyDefaults() {
 	if c.CleanupInterval <= 0 {
 		c.CleanupInterval = defaultCleanupInterval
 	}
+	if c.ClientCredentialsTokenTTL <= 0 {
+		c.ClientCredentialsTokenTTL = defaultClientCredentialsTokenTTL
+	}
+	if c.ClientSecretValuePrefix == "" {
+		c.ClientSecretValuePrefix = defaultClientSecretValuePrefix
+	}
+}
+
+// Validate checks the OAuth2 plugin configuration after defaults are applied.
+func (c *OAuth2PluginConfig) Validate() error {
+	if c.ClientSecretValuePrefix == "" {
+		return fmt.Errorf("client_secret_value_prefix must not be empty")
+	}
+	if len(c.ClientSecretValuePrefix) > maxClientSecretValuePrefixLength {
+		return fmt.Errorf("client_secret_value_prefix must be at most %d characters", maxClientSecretValuePrefixLength)
+	}
+	for _, char := range c.ClientSecretValuePrefix {
+		if !isClientSecretPrefixRune(char) {
+			return fmt.Errorf("client_secret_value_prefix may only contain [A-Za-z0-9_-]")
+		}
+	}
+
+	if err := validateAllowedScopes(c.AllowedScopes); err != nil {
+		return err
+	}
+
+	if !c.AuthorizationServerEnabled {
+		return nil
+	}
+
+	if c.ClientCredentialsTokenTTL < time.Second {
+		return fmt.Errorf("client_credentials_token_ttl must be at least one second")
+	}
+
+	for _, scope := range c.AllowedScopes {
+		if !IsOIDCScope(scope) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("allowed_scopes must contain at least one non-OIDC scope when the authorization server is enabled")
+}
+
+func validateAllowedScopes(scopes []string) error {
+	seen := make(map[string]struct{}, len(scopes))
+	for _, scope := range scopes {
+		parsed, ok := ParseScope(scope)
+		if !ok || len(parsed) != 1 || parsed[0] != scope {
+			return fmt.Errorf("invalid allowed scope %q", scope)
+		}
+		if _, exists := seen[scope]; exists {
+			return fmt.Errorf("duplicate allowed scope %q", scope)
+		}
+		seen[scope] = struct{}{}
+	}
+	return nil
+}
+
+func isClientSecretPrefixRune(char rune) bool {
+	if char >= 'a' && char <= 'z' {
+		return true
+	}
+	if char >= 'A' && char <= 'Z' {
+		return true
+	}
+	if char >= '0' && char <= '9' {
+		return true
+	}
+	return char == '_' || char == '-'
 }
 
 // ProviderConfig represents configuration for an OAuth2 provider

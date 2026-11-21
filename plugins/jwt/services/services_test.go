@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v4/jwa"
 	"github.com/lestrrat-go/jwx/v4/jwk"
+	"github.com/lestrrat-go/jwx/v4/jws"
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/stretchr/testify/mock"
 
@@ -28,17 +29,18 @@ const (
 )
 
 type serviceTestFixture struct {
-	logger           models.Logger
-	sessionSvc       *jwttests.MockSessionService
-	coreTokenSvc     *jwttests.MockTokenServiceCore
-	keySvc           *jwttests.MockKeyService
-	cacheSvc         *jwttests.MockCacheService
-	refreshTokenRepo *jwttests.MockRefreshTokenRepository
-	activeKey        *types.JWKS
-	expiresIn        time.Duration
-	refreshExpiresIn time.Duration
-	issuer           string
-	audience         string
+	logger              models.Logger
+	sessionSvc          *jwttests.MockSessionService
+	coreTokenSvc        *jwttests.MockTokenServiceCore
+	keySvc              *jwttests.MockKeyService
+	cacheSvc            *jwttests.MockCacheService
+	refreshTokenRepo    *jwttests.MockRefreshTokenRepository
+	activeKey           *types.JWKS
+	expiresIn           time.Duration
+	refreshExpiresIn    time.Duration
+	issuer              string
+	audience            string
+	accessTokenClientID string
 }
 
 func newServiceTestFixture(t *testing.T) *serviceTestFixture {
@@ -57,31 +59,33 @@ func newServiceTestFixture(t *testing.T) *serviceTestFixture {
 	}
 
 	return &serviceTestFixture{
-		logger:           &internaltests.MockLogger{},
-		sessionSvc:       &jwttests.MockSessionService{},
-		coreTokenSvc:     &jwttests.MockTokenServiceCore{},
-		keySvc:           &jwttests.MockKeyService{},
-		cacheSvc:         &jwttests.MockCacheService{},
-		refreshTokenRepo: &jwttests.MockRefreshTokenRepository{},
-		activeKey:        activeKey,
-		expiresIn:        15 * time.Minute,
-		refreshExpiresIn: 7 * 24 * time.Hour,
-		issuer:           testIssuer,
-		audience:         testAudience,
+		logger:              &internaltests.MockLogger{},
+		sessionSvc:          &jwttests.MockSessionService{},
+		coreTokenSvc:        &jwttests.MockTokenServiceCore{},
+		keySvc:              &jwttests.MockKeyService{},
+		cacheSvc:            &jwttests.MockCacheService{},
+		refreshTokenRepo:    &jwttests.MockRefreshTokenRepository{},
+		activeKey:           activeKey,
+		expiresIn:           15 * time.Minute,
+		refreshExpiresIn:    7 * 24 * time.Hour,
+		issuer:              testIssuer,
+		audience:            testAudience,
+		accessTokenClientID: types.DefaultAccessTokenClientID,
 	}
 }
 
 func (f *serviceTestFixture) newJWTService() *tokenService {
 	return &tokenService{
-		logger:           f.logger,
-		coreTokenService: f.coreTokenSvc,
-		keyService:       f.keySvc,
-		cacheService:     f.cacheSvc,
-		sessionService:   f.sessionSvc,
-		expiresIn:        f.expiresIn,
-		refreshExpiresIn: f.refreshExpiresIn,
-		issuer:           f.issuer,
-		audience:         f.audience,
+		logger:              f.logger,
+		coreTokenService:    f.coreTokenSvc,
+		keyService:          f.keySvc,
+		cacheService:        f.cacheSvc,
+		sessionService:      f.sessionSvc,
+		expiresIn:           f.expiresIn,
+		refreshExpiresIn:    f.refreshExpiresIn,
+		issuer:              f.issuer,
+		audience:            f.audience,
+		accessTokenClientID: f.accessTokenClientID,
 	}
 }
 
@@ -94,12 +98,26 @@ func (f *serviceTestFixture) signTestToken(t *testing.T, claims map[string]any) 
 	merged := map[string]any{
 		jwt.IssuerKey:   f.issuer,
 		jwt.AudienceKey: []string{f.audience},
+		"client_id":     f.accessTokenClientID,
 	}
 	maps.Copy(merged, claims)
 	return f.signTestTokenRaw(t, merged)
 }
 
 func (f *serviceTestFixture) signTestTokenRaw(t *testing.T, claims map[string]any) string {
+	t.Helper()
+
+	headers := jws.NewHeaders()
+	_ = headers.Set(jws.TypeKey, types.AccessTokenJWTType)
+	return f.signTestTokenWithHeaders(t, claims, headers)
+}
+
+func (f *serviceTestFixture) signTestTokenWithoutType(t *testing.T, claims map[string]any) string {
+	t.Helper()
+	return f.signTestTokenWithHeaders(t, claims, nil)
+}
+
+func (f *serviceTestFixture) signTestTokenWithHeaders(t *testing.T, claims map[string]any, headers jws.Headers) string {
 	t.Helper()
 
 	privKey, err := jwk.ParseKey([]byte(f.activeKey.PrivateKey), jwk.WithX509(true))
@@ -118,7 +136,14 @@ func (f *serviceTestFixture) signTestTokenRaw(t *testing.T, claims map[string]an
 		}
 	}
 
-	signed, err := jwt.Sign(token, jwt.WithKey(jwa.EdDSA(), privKey))
+	var options []jwt.SignOption
+	if headers == nil {
+		options = append(options, jwt.WithKey(jwa.EdDSA(), privKey))
+	} else {
+		options = append(options, jwt.WithKey(jwa.EdDSA(), privKey, jws.WithProtectedHeaders(headers)))
+	}
+
+	signed, err := jwt.Sign(token, options...)
 	if err != nil {
 		t.Fatalf("failed to sign token: %v", err)
 	}

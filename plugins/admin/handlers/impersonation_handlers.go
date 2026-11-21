@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/admin/constants"
@@ -138,13 +139,17 @@ func (h *StartImpersonationHandler) Handler() http.HandlerFunc {
 			})
 		}
 
+		actorClaims := map[string]any{
+			constants.ImpersonatorID: result.ImpersonatorUserID,
+		}
+		if len(result.ImpersonatorScopes) > 0 {
+			actorClaims[constants.ImpersonatorScope] = strings.Join(result.ImpersonatorScopes, " ")
+		}
+
 		reqCtx.SetActorInContext(&models.Actor{
-			ID:   result.TargetUserID,
-			Type: models.ActorUser,
-			Claims: map[string]any{
-				constants.ImpersonatorID:     result.ImpersonatorUserID,
-				constants.ImpersonatorScopes: result.ImpersonatorScopes,
-			},
+			ID:     result.TargetUserID,
+			Type:   models.ActorUser,
+			Claims: actorClaims,
 		})
 		if result.SessionID != nil && *result.SessionID != "" {
 			reqCtx.Values[models.ContextSessionID.String()] = *result.SessionID

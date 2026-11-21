@@ -1,6 +1,7 @@
 package oauth2
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/Authula/authula/plugins/oauth2/constants"
 	"github.com/Authula/authula/plugins/oauth2/services"
 	"github.com/Authula/authula/plugins/oauth2/types"
+	"github.com/Authula/authula/plugins/oauth2/usecases"
 	"github.com/Authula/authula/util"
 )
 
@@ -432,4 +434,98 @@ func TestOAuth2PluginImplementsMigrationInterface(t *testing.T) {
 	require.True(t, ok)
 	require.Len(t, migratable.Migrations("sqlite"), 1)
 	require.Nil(t, migratable.DependsOn())
+}
+
+func TestOAuth2PluginDependsOnJWTWhenAuthorizationServerEnabled(t *testing.T) {
+	t.Parallel()
+
+	plugin := New(types.OAuth2PluginConfig{AuthorizationServerEnabled: true})
+
+	require.Equal(t, []string{models.PluginJWT.String()}, plugin.DependsOn())
+}
+
+type stubClientCredentialsUseCase struct{}
+
+func (stubClientCredentialsUseCase) IssueToken(context.Context, *types.TokenRequest) (*types.TokenResult, error) {
+	return nil, nil
+}
+
+func TestRoutes_TokenEndpointGatedOnAuthorizationServer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		enabled   bool
+		wantToken bool
+	}{
+		{name: "disabled", enabled: false, wantToken: false},
+		{name: "enabled", enabled: true, wantToken: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			plugin := &OAuth2Plugin{
+				globalConfig: &models.Config{},
+				pluginConfig: types.OAuth2PluginConfig{AuthorizationServerEnabled: tt.enabled},
+				logger:       &internaltests.MockLogger{},
+				useCases: &usecases.UseCases{
+					ClientCredentialsUseCase: stubClientCredentialsUseCase{},
+				},
+			}
+
+			routes := Routes(plugin)
+
+			found := false
+			for _, route := range routes {
+				if route.Method == "POST" && route.Path == "/oauth2/token" {
+					found = true
+					assert.Empty(t, route.Middleware)
+				}
+			}
+			assert.Equal(t, tt.wantToken, found)
+		})
+	}
+}
+
+func TestInitializeClientCredentials(t *testing.T) {
+	t.Parallel()
+
+	t.Run("disabled leaves services unset", func(t *testing.T) {
+		t.Parallel()
+
+		plugin := &OAuth2Plugin{pluginConfig: types.OAuth2PluginConfig{}}
+		require.NoError(t, plugin.initializeClientCredentials(&models.PluginContext{
+			ServiceRegistry: &internaltests.TestServiceRegistry{},
+		}))
+		assert.Nil(t, plugin.clientService)
+		assert.Nil(t, plugin.clientCredentialsIssuer)
+	})
+
+	t.Run("missing jwt issuer fails clearly", func(t *testing.T) {
+		t.Parallel()
+
+		plugin := &OAuth2Plugin{pluginConfig: types.OAuth2PluginConfig{AuthorizationServerEnabled: true}}
+		err := plugin.initializeClientCredentials(&models.PluginContext{
+			ServiceRegistry: &internaltests.TestServiceRegistry{},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "jwt plugin must be enabled")
+	})
+
+	t.Run("uses jwt issuer from registry", func(t *testing.T) {
+		t.Parallel()
+
+		issuer := &recordingTokenIssuer{}
+		plugin := &OAuth2Plugin{pluginConfig: types.OAuth2PluginConfig{AuthorizationServerEnabled: true}}
+		require.NoError(t, plugin.initializeClientCredentials(&models.PluginContext{
+			ServiceRegistry: &internaltests.TestServiceRegistry{
+				Services: map[string]any{models.ServiceJWT.String(): issuer},
+			},
+		}))
+		assert.NotNil(t, plugin.clientSecretService)
+		assert.NotNil(t, plugin.clientService)
+		assert.Equal(t, issuer, plugin.clientCredentialsIssuer)
+	})
 }

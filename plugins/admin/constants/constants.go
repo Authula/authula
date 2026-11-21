@@ -2,7 +2,7 @@ package constants
 
 const (
 	ImpersonatorID                   = "impersonator_id"
-	ImpersonatorScopes               = "impersonator_scopes"
+	ImpersonatorScope                = "impersonator_scope"
 	ImpersonatorOriginalSessionToken = "impersonator_original_session_token"
 	OriginalSessionCookieSuffix      = ".original"
 )
