@@ -80,17 +80,17 @@ func newTokenIntegrationFixture(t *testing.T, prefix string) *tokenIntegrationFi
 func (f *tokenIntegrationFixture) seedClient(t *testing.T, prefix string, configure func(*types.OAuthClient)) (string, string) {
 	t.Helper()
 
-	secret, err := f.secrets.Generate()
-	require.NoError(t, err)
-	hash, salt, err := f.secrets.Hash(secret)
+	generated, err := f.secrets.Generate()
 	require.NoError(t, err)
 
 	client := &types.OAuthClient{
 		ID:                 util.GenerateUUID(),
 		ClientID:           "client-" + util.GenerateUUID(),
-		ClientSecretHash:   hash,
-		ClientSecretSalt:   salt,
-		ClientSecretPrefix: f.secrets.Prefix(secret),
+		ClientSecretHash:   generated.Hash,
+		ClientSecretSalt:   generated.Salt,
+		ClientSecretPrefix: generated.Prefix,
+		ClientSecretStart:  generated.Start,
+		ClientSecretLast:   generated.Last,
 		Name:               "integration client",
 		RedirectURIs:       []string{},
 		AllowedGrants:      []string{types.OAuthGrantTypeClientCredentials},
@@ -106,10 +106,10 @@ func (f *tokenIntegrationFixture) seedClient(t *testing.T, prefix string, config
 
 	_, err = f.repo.Create(context.Background(), client)
 	require.NoError(t, err)
-	require.True(t, strings.HasPrefix(secret, prefix))
-	require.Equal(t, f.secrets.Prefix(secret), client.ClientSecretPrefix)
+	require.True(t, strings.HasPrefix(generated.Value, prefix))
+	require.Equal(t, prefix, client.ClientSecretPrefix)
 
-	return client.ClientID, secret
+	return client.ClientID, generated.Value
 }
 
 func (f *tokenIntegrationFixture) request(t *testing.T, body string, headers map[string][]string) (*models.RequestContext, map[string]any) {
@@ -158,6 +158,14 @@ func assertClientAuthFailure(t *testing.T, reqCtx *models.RequestContext, payloa
 	assertNoStoreHeaders(t, reqCtx)
 }
 
+func assertPostClientAuthFailure(t *testing.T, reqCtx *models.RequestContext, payload map[string]any) {
+	t.Helper()
+	assert.Equal(t, http.StatusBadRequest, reqCtx.ResponseStatus)
+	assert.Equal(t, "invalid_client", payload["error"])
+	assert.Empty(t, reqCtx.ResponseHeaders.Get("WWW-Authenticate"))
+	assertNoStoreHeaders(t, reqCtx)
+}
+
 func TestClientCredentialsTokenEndpoint_Integration(t *testing.T) {
 	t.Parallel()
 
@@ -184,6 +192,46 @@ func TestClientCredentialsTokenEndpoint_Integration(t *testing.T) {
 		require.Equal(t, 1, f.issuer.calls)
 		assert.Equal(t, []string{"read", "write"}, f.issuer.request.Scopes)
 		assert.Equal(t, "org-1", f.issuer.request.OrganizationID)
+	})
+
+	t.Run("client secret basic with reserved characters", func(t *testing.T) {
+		t.Parallel()
+
+		f := newTokenIntegrationFixture(t, "authula_cs_")
+		clientID := "client id%&+:"
+		clientSecret := "secret id%&+:"
+
+		generated, err := f.secrets.Generate()
+		require.NoError(t, err)
+		hash, salt, err := f.secrets.Hash(clientSecret)
+		require.NoError(t, err)
+
+		_, err = f.repo.Create(context.Background(), &types.OAuthClient{
+			ID:                 util.GenerateUUID(),
+			ClientID:           clientID,
+			ClientSecretHash:   hash,
+			ClientSecretSalt:   salt,
+			ClientSecretPrefix: generated.Prefix,
+			ClientSecretStart:  generated.Start,
+			ClientSecretLast:   generated.Last,
+			Name:               "reserved character client",
+			RedirectURIs:       []string{},
+			AllowedGrants:      []string{types.OAuthGrantTypeClientCredentials},
+			AllowedScopes:      []string{"read"},
+			OwnerType:          types.OAuthClientOwnerTypeOrganization,
+			OwnerID:            "org-1",
+			CreatorID:          "user-1",
+			IsActive:           true,
+		})
+		require.NoError(t, err)
+
+		reqCtx, payload := f.request(t, "grant_type=client_credentials", map[string][]string{
+			"Content-Type":  {"application/x-www-form-urlencoded"},
+			"Authorization": {basicHeader(clientID, clientSecret)},
+		})
+
+		require.Equal(t, http.StatusOK, reqCtx.ResponseStatus)
+		assert.Equal(t, "signed-access-token", payload["access_token"])
 	})
 
 	t.Run("client secret post", func(t *testing.T) {
@@ -276,7 +324,21 @@ func TestClientCredentialsTokenEndpoint_Integration(t *testing.T) {
 
 		reqCtx, payload := f.request(t, "grant_type=client_credentials", formHeaders)
 
-		assertClientAuthFailure(t, reqCtx, payload)
+		assertPostClientAuthFailure(t, reqCtx, payload)
+	})
+
+	t.Run("wrong post secret", func(t *testing.T) {
+		t.Parallel()
+
+		f := newTokenIntegrationFixture(t, "authula_cs_")
+		clientID, _ := f.seedClient(t, "authula_cs_", nil)
+
+		reqCtx, payload := f.request(t,
+			"grant_type=client_credentials&client_id="+url.QueryEscape(clientID)+"&client_secret=wrong-secret",
+			formHeaders,
+		)
+
+		assertPostClientAuthFailure(t, reqCtx, payload)
 	})
 
 	t.Run("malformed basic credentials", func(t *testing.T) {
@@ -406,8 +468,9 @@ func TestClientCredentialsTokenEndpoint_Integration(t *testing.T) {
 		})
 
 		assert.Equal(t, http.StatusInternalServerError, reqCtx.ResponseStatus)
-		assert.Equal(t, "internal server error", payload["message"])
-		assert.NotContains(t, payload, "error")
+		assert.Equal(t, "server_error", payload["error"])
+		assert.Equal(t, "The authorization server encountered an unexpected condition.", payload["error_description"])
+		assert.NotContains(t, payload, "message")
 		assertNoStoreHeaders(t, reqCtx)
 	})
 

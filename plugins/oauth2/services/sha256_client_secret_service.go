@@ -13,30 +13,50 @@ import (
 const (
 	clientSecretRandomLength = 48
 	clientSecretSaltLength   = 16
-	clientSecretPrefixLength = 12
+	clientSecretHintLength   = 4
 )
 
 type sha256ClientSecretService struct {
-	prefix string
+	prefix       string
+	randomString func(int) (string, error)
+	readRandom   func([]byte) (int, error)
 }
 
 // NewSHA256ClientSecretService returns a client secret service that prefixes
 // generated secrets with prefix and stores salted SHA-256 hashes.
 func NewSHA256ClientSecretService(prefix string) ClientSecretService {
-	return &sha256ClientSecretService{prefix: prefix}
+	return &sha256ClientSecretService{
+		prefix:       prefix,
+		randomString: util.GenerateRandomString,
+		readRandom:   rand.Read,
+	}
 }
 
-func (s *sha256ClientSecretService) Generate() (string, error) {
-	random, err := util.GenerateRandomString(clientSecretRandomLength)
+func (s *sha256ClientSecretService) Generate() (*GeneratedClientSecret, error) {
+	random, err := s.randomString(clientSecretRandomLength)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate client secret: %w", err)
+		return nil, fmt.Errorf("failed to generate client secret: %w", err)
 	}
-	return s.prefix + random, nil
+
+	value := s.prefix + random
+	hash, salt, err := s.Hash(value)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GeneratedClientSecret{
+		Value:  value,
+		Hash:   hash,
+		Salt:   salt,
+		Prefix: s.prefix,
+		Start:  random[:clientSecretHintLength],
+		Last:   random[len(random)-clientSecretHintLength:],
+	}, nil
 }
 
 func (s *sha256ClientSecretService) Hash(secret string) (string, string, error) {
 	saltBytes := make([]byte, clientSecretSaltLength)
-	if _, err := rand.Read(saltBytes); err != nil {
+	if _, err := s.readRandom(saltBytes); err != nil {
 		return "", "", fmt.Errorf("failed to generate client secret salt: %w", err)
 	}
 
@@ -60,11 +80,4 @@ func (s *sha256ClientSecretService) Verify(secret, hash, salt string) bool {
 
 	sum := sha256.Sum256(append(saltBytes, []byte(secret)...))
 	return subtle.ConstantTimeCompare(expected, sum[:]) == 1
-}
-
-func (s *sha256ClientSecretService) Prefix(secret string) string {
-	if len(secret) <= clientSecretPrefixLength {
-		return secret
-	}
-	return secret[:clientSecretPrefixLength]
 }

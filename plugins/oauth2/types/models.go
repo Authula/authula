@@ -42,6 +42,8 @@ type OAuthClient struct {
 	ClientSecretHash   string     `json:"-" bun:"column:client_secret_hash" required:"true" nullable:"false"`
 	ClientSecretSalt   string     `json:"-" bun:"column:client_secret_salt" required:"true" nullable:"false"`
 	ClientSecretPrefix string     `json:"client_secret_prefix" bun:"column:client_secret_prefix" required:"true" nullable:"false"`
+	ClientSecretStart  string     `json:"client_secret_start" bun:"column:client_secret_start" required:"true" nullable:"false"`
+	ClientSecretLast   string     `json:"client_secret_last" bun:"column:client_secret_last" required:"true" nullable:"false"`
 	Name               string     `json:"name" bun:"column:name" required:"true" nullable:"false"`
 	RedirectURIs       []string   `json:"redirect_uris" bun:"column:redirect_uris" required:"true" nullable:"false"`
 	AllowedGrants      []string   `json:"allowed_grants" bun:"column:allowed_grants" required:"true" nullable:"false"`

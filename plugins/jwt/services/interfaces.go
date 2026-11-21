@@ -11,10 +11,11 @@ import (
 )
 
 type TokenServiceConfig struct {
-	ExpiresIn        time.Duration
-	RefreshExpiresIn time.Duration
-	Issuer           string
-	Audience         string
+	ExpiresIn           time.Duration
+	RefreshExpiresIn    time.Duration
+	Issuer              string
+	Audience            string
+	AccessTokenClientID string
 }
 
 type TokenService interface {

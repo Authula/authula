@@ -53,7 +53,7 @@ func RegisterOpenAPIDocs(svc openapi.OpenAPIService) error {
 			openapi.WithResponseStatus(http.StatusOK, &types.TokenResponse{}),
 			openapi.WithResponseStatus(http.StatusBadRequest, &types.TokenErrorResponse{}),
 			openapi.WithResponseStatus(http.StatusUnauthorized, &types.TokenErrorResponse{}),
-			openapi.WithResponseStatus(http.StatusInternalServerError, &types.ErrorResponse{}),
+			openapi.WithResponseStatus(http.StatusInternalServerError, &types.TokenErrorResponse{}),
 		),
 	)
 }

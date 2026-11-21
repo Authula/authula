@@ -46,4 +46,16 @@ func TestRegisterOpenAPIDocs_TokenEndpointFormBody(t *testing.T) {
 	for _, status := range []string{"200", "400", "401", "500"} {
 		require.Contains(t, responses, status)
 	}
+
+	internalError, ok := responses["500"].(map[string]any)
+	require.True(t, ok)
+	internalContent, ok := internalError["content"].(map[string]any)
+	require.True(t, ok)
+	internalJSON, ok := internalContent["application/json"].(map[string]any)
+	require.True(t, ok)
+	internalSchema, ok := internalJSON["schema"].(map[string]any)
+	require.True(t, ok)
+	internalRef, ok := internalSchema["$ref"].(string)
+	require.True(t, ok)
+	require.Contains(t, internalRef, "TokenErrorResponse")
 }

@@ -51,7 +51,7 @@ func (h *TokenHandler) Handle() http.HandlerFunc {
 
 		authHeaders := r.Header.Values("Authorization")
 		if len(authHeaders) > 1 {
-			h.writeClientError(reqCtx)
+			h.writeClientError(reqCtx, true)
 			return
 		}
 
@@ -59,7 +59,7 @@ func (h *TokenHandler) Handle() http.HandlerFunc {
 		if len(authHeaders) == 1 {
 			basicID, basicSecret, ok := parseBasicCredentials(authHeaders[0])
 			if !ok {
-				h.writeClientError(reqCtx)
+				h.writeClientError(reqCtx, true)
 				return
 			}
 			basicUsed = true
@@ -76,7 +76,7 @@ func (h *TokenHandler) Handle() http.HandlerFunc {
 				return
 			}
 		} else if !clientIDPresent || !clientSecretPresent || clientID == "" || clientSecret == "" {
-			h.writeClientError(reqCtx)
+			h.writeClientError(reqCtx, false)
 			return
 		}
 
@@ -105,7 +105,7 @@ func (h *TokenHandler) Handle() http.HandlerFunc {
 
 		result, err := h.UseCase.IssueToken(r.Context(), req)
 		if err != nil {
-			h.writeUseCaseError(reqCtx, err)
+			h.writeUseCaseError(reqCtx, err, basicUsed)
 			return
 		}
 
@@ -138,10 +138,10 @@ func (h *TokenHandler) parseForm(reqCtx *models.RequestContext, r *http.Request)
 	return r.PostForm, true
 }
 
-func (h *TokenHandler) writeUseCaseError(reqCtx *models.RequestContext, err error) {
+func (h *TokenHandler) writeUseCaseError(reqCtx *models.RequestContext, err error, basicUsed bool) {
 	switch {
 	case errors.Is(err, constants.ErrInvalidClient):
-		h.writeClientError(reqCtx)
+		h.writeClientError(reqCtx, basicUsed)
 	case errors.Is(err, constants.ErrUnauthorizedClient):
 		h.writeError(reqCtx, http.StatusBadRequest, types.TokenErrorResponse{
 			Error:            "unauthorized_client",
@@ -153,35 +153,36 @@ func (h *TokenHandler) writeUseCaseError(reqCtx *models.RequestContext, err erro
 			ErrorDescription: "requested scope is not allowed",
 		}, nil)
 	default:
-		h.writeError(reqCtx, http.StatusInternalServerError, types.TokenErrorResponse{}, err)
+		h.writeError(reqCtx, http.StatusInternalServerError, types.TokenErrorResponse{
+			Error:            "server_error",
+			ErrorDescription: "The authorization server encountered an unexpected condition.",
+		}, err)
 	}
 }
 
-func (h *TokenHandler) writeClientError(reqCtx *models.RequestContext) {
-	h.writeError(reqCtx, http.StatusUnauthorized, types.TokenErrorResponse{
+func (h *TokenHandler) writeClientError(reqCtx *models.RequestContext, basicUsed bool) {
+	status := http.StatusBadRequest
+	if basicUsed {
+		status = http.StatusUnauthorized
+	}
+
+	h.writeError(reqCtx, status, types.TokenErrorResponse{
 		Error:            "invalid_client",
 		ErrorDescription: "client authentication failed",
 	}, nil)
 }
 
 func (h *TokenHandler) writeError(reqCtx *models.RequestContext, status int, payload types.TokenErrorResponse, cause error) {
-	if status >= http.StatusInternalServerError {
-		if h.Logger != nil && cause != nil {
-			h.Logger.Error("oauth2 token request failed", "error", cause)
-		}
-		reqCtx.SetJSONResponse(status, &types.ErrorResponse{Message: "internal server error"})
-	} else {
-		reqCtx.SetJSONResponse(status, payload)
+	if status >= http.StatusInternalServerError && h.Logger != nil && cause != nil {
+		h.Logger.Error("oauth2 token request failed", "error", cause)
 	}
 
+	reqCtx.SetJSONResponse(status, payload)
 	setTokenResponseHeaders(reqCtx, status)
 	reqCtx.Handled = true
 }
 
 func setTokenResponseHeaders(reqCtx *models.RequestContext, status int) {
-	if reqCtx.ResponseHeaders == nil {
-		reqCtx.ResponseHeaders = make(http.Header)
-	}
 	reqCtx.ResponseHeaders.Set("Cache-Control", "no-store")
 	reqCtx.ResponseHeaders.Set("Pragma", "no-cache")
 	if status == http.StatusUnauthorized {

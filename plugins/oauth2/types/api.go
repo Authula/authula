@@ -92,7 +92,7 @@ type TokenResponse struct {
 	Scope       string `json:"scope,omitempty"`
 }
 
-// TokenErrorResponse is the OAuth 2.0 error body returned with a 4xx response.
+// TokenErrorResponse is the OAuth 2.0 error body returned with a 4xx or 5xx response.
 type TokenErrorResponse struct {
 	Error            string `json:"error" required:"true" nullable:"false"`
 	ErrorDescription string `json:"error_description,omitempty"`

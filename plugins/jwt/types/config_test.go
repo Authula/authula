@@ -20,6 +20,7 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 		RefreshGracePeriod:     10 * time.Second,
 		AutoCleanup:            new(true),
 		CleanupInterval:        time.Hour,
+		AccessTokenClientID:    DefaultAccessTokenClientID,
 	}
 
 	tests := []struct {
@@ -46,6 +47,7 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 				CleanupInterval:        30 * time.Minute,
 				Issuer:                 "https://auth.example.com",
 				Audience:               "my-service",
+				AccessTokenClientID:    "custom-client",
 			},
 			want: JWTPluginConfig{
 				Enabled:                true,
@@ -59,6 +61,7 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 				CleanupInterval:        30 * time.Minute,
 				Issuer:                 "https://auth.example.com",
 				Audience:               "my-service",
+				AccessTokenClientID:    "custom-client",
 			},
 		},
 		{
@@ -76,6 +79,7 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 				RefreshGracePeriod:     defaults.RefreshGracePeriod,
 				AutoCleanup:            defaults.AutoCleanup,
 				CleanupInterval:        defaults.CleanupInterval,
+				AccessTokenClientID:    defaults.AccessTokenClientID,
 			},
 		},
 		{
@@ -93,6 +97,7 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 				RefreshGracePeriod:     -time.Second,
 				AutoCleanup:            defaults.AutoCleanup,
 				CleanupInterval:        defaults.CleanupInterval,
+				AccessTokenClientID:    defaults.AccessTokenClientID,
 			},
 		},
 		{
@@ -109,6 +114,7 @@ func TestJWTPluginConfig_ApplyDefaults(t *testing.T) {
 				RefreshGracePeriod:     defaults.RefreshGracePeriod,
 				AutoCleanup:            defaults.AutoCleanup,
 				CleanupInterval:        defaults.CleanupInterval,
+				AccessTokenClientID:    defaults.AccessTokenClientID,
 			},
 		},
 	}
@@ -205,8 +211,9 @@ func TestJWTPluginConfig_Validate(t *testing.T) {
 		{
 			name: "valid",
 			config: JWTPluginConfig{
-				Issuer:   "https://auth.example.com",
-				Audience: DefaultAudience,
+				Issuer:              "https://auth.example.com",
+				Audience:            DefaultAudience,
+				AccessTokenClientID: DefaultAccessTokenClientID,
 			},
 		},
 		{
@@ -238,6 +245,23 @@ func TestJWTPluginConfig_Validate(t *testing.T) {
 				Audience: " ",
 			},
 			wantErr: "audience must not be empty",
+		},
+		{
+			name: "missing_access_token_client_id",
+			config: JWTPluginConfig{
+				Issuer:   "https://auth.example.com",
+				Audience: DefaultAudience,
+			},
+			wantErr: "access_token_client_id must not be empty",
+		},
+		{
+			name: "blank_access_token_client_id",
+			config: JWTPluginConfig{
+				Issuer:              "https://auth.example.com",
+				Audience:            DefaultAudience,
+				AccessTokenClientID: " ",
+			},
+			wantErr: "access_token_client_id must not be empty",
 		},
 	}
 

@@ -22,6 +22,8 @@ func assertOAuthClientEqual(t *testing.T, want *types.OAuthClient, got *types.OA
 	assert.Equal(t, want.ClientSecretHash, got.ClientSecretHash)
 	assert.Equal(t, want.ClientSecretSalt, got.ClientSecretSalt)
 	assert.Equal(t, want.ClientSecretPrefix, got.ClientSecretPrefix)
+	assert.Equal(t, want.ClientSecretStart, got.ClientSecretStart)
+	assert.Equal(t, want.ClientSecretLast, got.ClientSecretLast)
 	assert.Equal(t, want.Name, got.Name)
 	assert.Equal(t, want.RedirectURIs, got.RedirectURIs)
 	assert.Equal(t, want.AllowedGrants, got.AllowedGrants)

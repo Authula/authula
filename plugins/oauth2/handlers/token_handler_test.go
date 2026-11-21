@@ -181,6 +181,85 @@ func TestTokenHandler_Success(t *testing.T) {
 	}
 }
 
+func TestTokenHandler_ClientSecretBasicEncoding(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		clientID     string
+		clientSecret string
+	}{
+		{name: "space", clientID: "client id", clientSecret: "s3 cret"},
+		{name: "percent", clientID: "client%id", clientSecret: "s3%cret"},
+		{name: "ampersand", clientID: "client&id", clientSecret: "s3&cret"},
+		{name: "plus", clientID: "client+id", clientSecret: "s3+cret"},
+		{name: "colon", clientID: "client:id", clientSecret: "s3:cret"},
+		{name: "all special characters", clientID: "c %&+:", clientSecret: "s %&+:"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			useCase := &fakeTokenUseCase{result: &types.TokenResult{
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+				ExpiresIn:   time.Minute,
+			}}
+			handler := newTokenHandlerFixture(t, useCase)
+
+			reqCtx, _ := performTokenRequest(t, handler,
+				"grant_type=client_credentials",
+				map[string][]string{
+					"Content-Type":  {"application/x-www-form-urlencoded"},
+					"Authorization": {basicCredentials(tt.clientID, tt.clientSecret)},
+				},
+			)
+
+			require.Equal(t, http.StatusOK, reqCtx.ResponseStatus)
+			require.Len(t, useCase.requests, 1)
+			assert.Equal(t, tt.clientID, useCase.requests[0].ClientID)
+			assert.Equal(t, tt.clientSecret, useCase.requests[0].ClientSecret)
+		})
+	}
+}
+
+func TestTokenHandler_MalformedBasicCredentials(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		header string
+	}{
+		{name: "missing space", header: "Basic"},
+		{name: "missing colon", header: "Basic " + base64.StdEncoding.EncodeToString([]byte("clientsecret"))},
+		{name: "invalid client id escape", header: "Basic " + base64.StdEncoding.EncodeToString([]byte("%zz:secret"))},
+		{name: "invalid secret escape", header: "Basic " + base64.StdEncoding.EncodeToString([]byte("client:%zz"))},
+		{name: "empty client id", header: "Basic " + base64.StdEncoding.EncodeToString([]byte(":secret"))},
+		{name: "empty client secret", header: "Basic " + base64.StdEncoding.EncodeToString([]byte("client:"))},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			handler := newTokenHandlerFixture(t, &fakeTokenUseCase{})
+
+			reqCtx, _ := performTokenRequest(t, handler,
+				"grant_type=client_credentials",
+				map[string][]string{
+					"Content-Type":  {"application/x-www-form-urlencoded"},
+					"Authorization": {tt.header},
+				},
+			)
+
+			assert.Equal(t, http.StatusUnauthorized, reqCtx.ResponseStatus)
+			assert.Equal(t, "invalid_client", decodeTokenError(t, reqCtx).Error)
+			assert.Equal(t, `Basic realm="oauth2/token", charset="UTF-8"`, reqCtx.ResponseHeaders.Get("WWW-Authenticate"))
+		})
+	}
+}
+
 func TestTokenHandler_SuccessResponseScopeIsString(t *testing.T) {
 	t.Parallel()
 
@@ -273,14 +352,14 @@ func TestTokenHandler_Errors(t *testing.T) {
 			name:       "missing post credentials",
 			body:       "grant_type=client_credentials",
 			headers:    map[string][]string{"Content-Type": {"application/x-www-form-urlencoded"}},
-			wantStatus: http.StatusUnauthorized,
+			wantStatus: http.StatusBadRequest,
 			wantError:  "invalid_client",
 		},
 		{
 			name:       "missing post secret",
 			body:       "grant_type=client_credentials&client_id=c",
 			headers:    map[string][]string{"Content-Type": {"application/x-www-form-urlencoded"}},
-			wantStatus: http.StatusUnauthorized,
+			wantStatus: http.StatusBadRequest,
 			wantError:  "invalid_client",
 		},
 		{
@@ -305,9 +384,17 @@ func TestTokenHandler_Errors(t *testing.T) {
 			wantError:  "invalid_client",
 		},
 		{
-			name:       "invalid client from use case",
+			name:       "invalid client from use case with post auth",
 			body:       "grant_type=client_credentials&client_id=c&client_secret=s",
 			headers:    map[string][]string{"Content-Type": {"application/x-www-form-urlencoded"}},
+			useCaseErr: constants.ErrInvalidClient,
+			wantStatus: http.StatusBadRequest,
+			wantError:  "invalid_client",
+		},
+		{
+			name:       "invalid client from use case with basic auth",
+			body:       "grant_type=client_credentials",
+			headers:    map[string][]string{"Content-Type": {"application/x-www-form-urlencoded"}, "Authorization": {basicCredentials("c", "s")}},
 			useCaseErr: constants.ErrInvalidClient,
 			wantStatus: http.StatusUnauthorized,
 			wantError:  "invalid_client",
@@ -355,7 +442,7 @@ func TestTokenHandler_Errors(t *testing.T) {
 	}
 }
 
-func TestTokenHandler_InternalErrorUsesProjectShape(t *testing.T) {
+func TestTokenHandler_InternalErrorUsesOAuthErrorShape(t *testing.T) {
 	t.Parallel()
 
 	useCase := &fakeTokenUseCase{err: errors.New("signing failed")}
@@ -369,11 +456,12 @@ func TestTokenHandler_InternalErrorUsesProjectShape(t *testing.T) {
 	require.Equal(t, http.StatusInternalServerError, reqCtx.ResponseStatus)
 	assert.Equal(t, "no-store", reqCtx.ResponseHeaders.Get("Cache-Control"))
 	assert.Equal(t, "no-cache", reqCtx.ResponseHeaders.Get("Pragma"))
+	assert.Empty(t, reqCtx.ResponseHeaders.Get("WWW-Authenticate"))
 
-	var payload map[string]any
-	require.NoError(t, json.Unmarshal(reqCtx.ResponseBody, &payload))
-	assert.Equal(t, "internal server error", payload["message"])
-	assert.NotContains(t, payload, "error")
+	payload := decodeTokenError(t, reqCtx)
+	assert.Equal(t, "server_error", payload.Error)
+	assert.Equal(t, "The authorization server encountered an unexpected condition.", payload.ErrorDescription)
+	assert.NotContains(t, string(reqCtx.ResponseBody), "signing failed")
 }
 
 func TestTokenHandler_OversizedBody(t *testing.T) {
