@@ -14,6 +14,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/Authula/authula/internal/sqlitedsn"
+	internaltests "github.com/Authula/authula/internal/tests"
 	"github.com/Authula/authula/migrations"
 	"github.com/Authula/authula/plugins/oauth2/types"
 )
@@ -55,6 +56,12 @@ func TestSQLiteInitialMigrationCreatesOAuth2Schema(t *testing.T) {
 		err := db.NewRaw("SELECT COUNT(*) FROM ?", bun.Ident(name)).Scan(ctx, &count)
 		assert.NoError(t, err, "table %s should be queryable", name)
 	}
+
+	var names []string
+	require.NoError(t, db.NewRaw("SELECT name FROM pragma_table_info(?)", "oauth_clients").Scan(ctx, &names))
+	assert.Contains(t, names, "client_secret_prefix")
+	assert.Contains(t, names, "client_secret_start")
+	assert.Contains(t, names, "client_secret_last")
 }
 
 func TestSQLiteInitialMigrationEnforcesSingleActiveConsent(t *testing.T) {
@@ -90,6 +97,50 @@ func TestSQLiteInitialMigrationEnforcesSingleActiveConsent(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, insert("consent-2"))
+}
+
+// TestDialectVariantsRunAgainstSQLite executes the postgres and mysql migration
+// functions so their statements are exercised. The dialect-specific DDL cannot
+// fully apply to SQLite, which is exactly what the expected errors capture.
+func TestDialectVariantsRunAgainstSQLite(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		provider    string
+		wantUpErr   bool
+		wantDownErr bool
+	}{
+		{name: "postgres", provider: "postgres", wantUpErr: true, wantDownErr: true},
+		{name: "mysql", provider: "mysql", wantUpErr: true, wantDownErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := internaltests.NewSQLiteIntegrationDB(t)
+
+			for _, migration := range ForProvider(tt.provider) {
+				require.NotNil(t, migration.Up)
+				require.NotNil(t, migration.Down)
+
+				upTx, err := db.BeginTx(ctx, nil)
+				require.NoError(t, err)
+				upErr := migration.Up(ctx, upTx)
+				require.NoError(t, upTx.Rollback())
+				assert.Equal(t, tt.wantUpErr, upErr != nil, "up error: %v", upErr)
+
+				downTx, err := db.BeginTx(ctx, nil)
+				require.NoError(t, err)
+				downErr := migration.Down(ctx, downTx)
+				require.NoError(t, downTx.Rollback())
+				assert.Equal(t, tt.wantDownErr, downErr != nil, "down error: %v", downErr)
+			}
+		})
+	}
 }
 
 func TestSQLiteInitialMigrationRollsBack(t *testing.T) {

@@ -6,7 +6,10 @@ import (
 	"time"
 )
 
-const DefaultAudience = "authula"
+const (
+	DefaultAudience            = "authula"
+	DefaultAccessTokenClientID = "authula"
+)
 
 type JWTPluginConfig struct {
 	Enabled                bool          `json:"enabled" toml:"enabled"`
@@ -20,6 +23,7 @@ type JWTPluginConfig struct {
 	CleanupInterval        time.Duration `json:"cleanup_interval" toml:"cleanup_interval"`                   // Interval between cleanup runs, default 1 hour
 	Issuer                 string        `json:"issuer" toml:"issuer"`                                       // Token issuer; defaults to base_url + base_path
 	Audience               string        `json:"audience" toml:"audience"`                                   // Token audience; defaults to "authula"
+	AccessTokenClientID    string        `json:"access_token_client_id" toml:"access_token_client_id"`       // First-party client ID used on access tokens; defaults to "authula"
 }
 
 func (c *JWTPluginConfig) ApplyDefaults() {
@@ -47,6 +51,9 @@ func (c *JWTPluginConfig) ApplyDefaults() {
 	if c.CleanupInterval <= 0 {
 		c.CleanupInterval = time.Hour
 	}
+	if c.AccessTokenClientID == "" {
+		c.AccessTokenClientID = DefaultAccessTokenClientID
+	}
 }
 
 // ApplyDefaultsFromGlobal fills the issuer and audience when they are not
@@ -68,6 +75,9 @@ func (c *JWTPluginConfig) Validate() error {
 	}
 	if strings.TrimSpace(c.Audience) == "" {
 		return errors.New("jwt: audience must not be empty")
+	}
+	if strings.TrimSpace(c.AccessTokenClientID) == "" {
+		return errors.New("jwt: access_token_client_id must not be empty")
 	}
 	return nil
 }

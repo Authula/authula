@@ -12,6 +12,7 @@ import (
 	"github.com/Authula/authula/models"
 	"github.com/Authula/authula/plugins/jwt/repositories"
 	jwtservicesTypes "github.com/Authula/authula/plugins/jwt/types"
+	"github.com/Authula/authula/services"
 )
 
 type InMemoryStorage struct {
@@ -104,6 +105,14 @@ func (m *MockTokenService) GenerateMachineToken(ctx context.Context, clientID st
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*jwtservicesTypes.TokenPair), args.Error(1)
+}
+
+func (m *MockTokenService) IssueClientCredentialsToken(ctx context.Context, req services.ClientCredentialsTokenRequest) (*services.ClientCredentialsToken, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*services.ClientCredentialsToken), args.Error(1)
 }
 
 func (m *MockTokenService) ValidateToken(ctx context.Context, token string) (*models.Actor, error) {

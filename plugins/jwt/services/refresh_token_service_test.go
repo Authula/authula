@@ -531,6 +531,7 @@ func TestRefreshTokenService_RefreshTokens_ExtraClaims(t *testing.T) {
 		"token_type":      "refresh",
 		"actor_type":      "user",
 		"organization_id": "org-1",
+		"scope":           "read",
 		"scopes":          []string{"read"},
 		"client_id":       "client-1",
 	}

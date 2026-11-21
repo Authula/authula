@@ -30,7 +30,7 @@ func Routes(plugin *OAuth2Plugin) []models.Route {
 		Logger:  plugin.logger,
 	}
 
-	return []models.Route{
+	routes := []models.Route{
 		{
 			Method: "GET",
 			Path:   "/oauth2/authorize/{provider}",
@@ -48,4 +48,18 @@ func Routes(plugin *OAuth2Plugin) []models.Route {
 			Handler: callbackHandler.Handle(),
 		},
 	}
+
+	if plugin.pluginConfig.AuthorizationServerEnabled && useCases != nil && useCases.ClientCredentialsUseCase != nil {
+		tokenHandler := &handlers.TokenHandler{
+			UseCase: useCases.ClientCredentialsUseCase,
+			Logger:  plugin.logger,
+		}
+		routes = append(routes, models.Route{
+			Method:  "POST",
+			Path:    "/oauth2/token",
+			Handler: tokenHandler.Handle(),
+		})
+	}
+
+	return routes
 }
