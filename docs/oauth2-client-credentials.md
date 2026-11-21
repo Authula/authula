@@ -186,8 +186,7 @@ Machine access tokens are signed with the JWT plugin's active key and carry:
 | `iat`, `exp`, `jti` | Issued-at, expiry, and unique token ID. |
 | `token_type` | `access_token`. |
 | `actor_type` | `machine`. |
-| `scopes` | JSON array of granted scopes. Always present, including `[]`. |
-| `scope` | Space-delimited string derived from `scopes`. Omitted when empty. |
+| `scope` | Canonical RFC 9068 space-delimited scope string. Omitted when empty. |
 | `organization_id` | Present when the client belongs to an organization. |
 
 Never present: `user_id`, `session_id`, refresh-token claims, or ID-token
@@ -223,7 +222,12 @@ rejects `typ: JWT`, so an ID token cannot be used as an access token.
 - `iss`, `aud`, and `exp` are valid for this deployment;
 - `sub`, `client_id`, `iat`, and `jti` are present;
 - `token_type` is `access_token`;
-- `actor_type` is `user` or `machine`.
+- `actor_type` is `user` or `machine`;
+- `scope`, when present, is a valid space-delimited OAuth scope string.
+
+There is no separate `scopes` array claim. The bearer and access-control layers
+parse `scope` into a slice when they perform permission checks. This keeps
+`scope` as the single source of truth.
 
 `ValidateRefreshToken` does not require `typ: at+jwt`.
 

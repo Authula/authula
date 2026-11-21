@@ -210,7 +210,7 @@ func (s *refreshTokenService) extraClaims(claims map[string]any) map[string]any 
 	for k, v := range claims {
 		switch k {
 		case "iss", "aud", "sub", "user_id", "session_id", "iat", "exp", "nbf", "jti",
-			"token_type", "actor_type", "organization_id", "scopes", "client_id":
+			"token_type", "actor_type", "organization_id", "scope", "scopes", "client_id":
 			continue
 		default:
 			extraClaims[k] = v

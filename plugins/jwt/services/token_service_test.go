@@ -291,7 +291,7 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				"token_type":      types.JWTTokenTypeAccess.String(),
 				"actor_type":      "machine",
 				"organization_id": "org-1",
-				"scopes":          []string{"read:users", "write:users"},
+				"scope":           "read:users write:users",
 				jwt.JwtIDKey:      "jti-3",
 				jwt.IssuedAtKey:   time.Now(),
 				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
@@ -328,6 +328,32 @@ func TestTokenService_ValidateToken(t *testing.T) {
 				require.Nil(t, actor.Scopes)
 				require.Equal(t, "jwt_bearer", actor.Claims["auth_mechanism"])
 			},
+		},
+		{
+			name: "machine_token_scope_not_string",
+			claims: map[string]any{
+				jwt.SubjectKey:    "client-2",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "machine",
+				"scope":           []string{"read"},
+				jwt.JwtIDKey:      "jti-machine-scope-type",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			wantErr: "invalid scope claim",
+		},
+		{
+			name: "machine_token_scope_malformed",
+			claims: map[string]any{
+				jwt.SubjectKey:    "client-2",
+				"token_type":      types.JWTTokenTypeAccess.String(),
+				"actor_type":      "machine",
+				"scope":           "read  write",
+				jwt.JwtIDKey:      "jti-machine-scope-malformed",
+				jwt.IssuedAtKey:   time.Now(),
+				jwt.ExpirationKey: time.Now().Add(15 * time.Minute),
+			},
+			wantErr: "invalid scope claim",
 		},
 		{
 			name: "expired_token",
@@ -827,7 +853,7 @@ func TestTokenService_GenerateMachineToken(t *testing.T) {
 		setupMocks     func(*serviceTestFixture)
 		wantErr        string
 		wantOrgID      string
-		wantScopes     []any
+		wantScope      string
 	}{
 		{
 			name:           "success",
@@ -838,8 +864,8 @@ func TestTokenService_GenerateMachineToken(t *testing.T) {
 				f.keySvc.On("GetActiveKey", mock.Anything).Return(f.activeKey, nil)
 				f.coreTokenSvc.On("Decrypt", f.activeKey.PrivateKey).Return(f.activeKey.PrivateKey, nil)
 			},
-			wantOrgID:  "org-1",
-			wantScopes: []any{"read", "write"},
+			wantOrgID: "org-1",
+			wantScope: "read write",
 		},
 		{
 			name:           "no optional fields",
@@ -924,17 +950,12 @@ func TestTokenService_GenerateMachineToken(t *testing.T) {
 					require.Empty(t, claims["organization_id"])
 				}
 
-				if tt.wantScopes != nil {
-					scopes, ok := claims["scopes"].([]any)
-					require.True(t, ok)
-					require.ElementsMatch(t, tt.wantScopes, scopes)
-					require.Equal(t, oauth2types.JoinScope(tt.scopes), claims["scope"])
+				if tt.wantScope != "" {
+					require.Equal(t, tt.wantScope, claims["scope"])
 				} else {
-					scopes, ok := claims["scopes"].([]any)
-					require.True(t, ok)
-					require.Empty(t, scopes)
 					require.NotContains(t, claims, "scope")
 				}
+				require.NotContains(t, claims, "scopes")
 			}
 
 			f.keySvc.AssertExpectations(t)
@@ -1025,6 +1046,7 @@ func TestTokenService_IssueClientCredentialsToken(t *testing.T) {
 			require.True(t, ok)
 			require.InDelta(t, tt.wantExpires.Seconds(), expiresAt.Sub(issuedAt).Seconds(), 1)
 
+			require.NotContains(t, claims, "scopes")
 			if len(tt.request.Scopes) > 0 {
 				require.Equal(t, oauth2types.JoinScope(tt.request.Scopes), claims["scope"])
 			} else {

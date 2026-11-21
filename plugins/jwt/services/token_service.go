@@ -35,6 +35,7 @@ var reservedTokenClaims = map[string]struct{}{
 	"user_id":         {},
 	"session_id":      {},
 	"client_id":       {},
+	"scope":           {},
 }
 
 type tokenService struct {
@@ -158,8 +159,7 @@ func (s *tokenService) generateMachineToken(ctx context.Context, clientID string
 		scopes = []string{}
 	}
 
-	accessClaims := jwt.New()
-	setClaims(accessClaims, map[string]any{
+	claims := map[string]any{
 		jwt.SubjectKey:    clientID,
 		jwt.IssuedAtKey:   time.Now(),
 		jwt.ExpirationKey: time.Now().Add(ttl),
@@ -167,17 +167,18 @@ func (s *tokenService) generateMachineToken(ctx context.Context, clientID string
 		"token_type":      types.JWTTokenTypeAccess.String(),
 		"actor_type":      string(models.ActorMachine),
 		"client_id":       clientID,
-		"scopes":          scopes,
 		jwt.IssuerKey:     s.issuer,
 		jwt.AudienceKey:   []string{s.audience},
-	})
-
+	}
 	if organizationID != "" {
-		setClaims(accessClaims, map[string]any{"organization_id": organizationID})
+		claims["organization_id"] = organizationID
 	}
 	if len(scopes) > 0 {
-		setClaims(accessClaims, map[string]any{"scope": oauth2types.JoinScope(scopes)})
+		claims["scope"] = oauth2types.JoinScope(scopes)
 	}
+
+	accessClaims := jwt.New()
+	setClaims(accessClaims, claims)
 
 	return s.signMachineToken(accessClaims, ttl)
 }
@@ -299,18 +300,16 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 			actor.Claims["organization_id"] = orgID
 		}
 
-		if raw, ok := parsedToken.Field("scopes"); ok {
-			if values, ok := raw.([]any); ok {
-				scopes := make([]string, 0, len(values))
-				for _, value := range values {
-					if scope, ok := value.(string); ok {
-						scopes = append(scopes, scope)
-					}
-				}
-				if len(scopes) > 0 {
-					actor.Scopes = scopes
-				}
+		if rawScope, ok := parsedToken.Field("scope"); ok {
+			scope, ok := rawScope.(string)
+			if !ok {
+				return nil, errors.New("invalid scope claim")
 			}
+			scopes, ok := oauth2types.ParseScope(scope)
+			if !ok {
+				return nil, errors.New("invalid scope claim")
+			}
+			actor.Scopes = scopes
 		}
 
 		return actor, nil
@@ -343,7 +342,7 @@ func (s *tokenService) ValidateToken(ctx context.Context, token string) (*models
 		switch key {
 		case jwt.SubjectKey, jwt.IssuedAtKey, jwt.ExpirationKey, jwt.JwtIDKey,
 			jwt.IssuerKey, jwt.AudienceKey, "user_id", "session_id", "token_type",
-			"actor_type", "organization_id", "scopes", "client_id":
+			"actor_type", "organization_id", "scope", "scopes", "client_id":
 			continue
 		default:
 			actor.Claims[key] = val
