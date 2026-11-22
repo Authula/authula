@@ -9,6 +9,15 @@ import (
 	"github.com/Authula/authula/openapi"
 )
 
+func TestWithFormContentType(t *testing.T) {
+	t.Parallel()
+
+	unit := new(swaggestopenapi.ContentUnit)
+	openapi.WithFormContentType()(unit)
+
+	assert.Equal(t, "application/x-www-form-urlencoded", unit.ContentType)
+}
+
 func TestWithJSONContentType(t *testing.T) {
 	t.Parallel()
 

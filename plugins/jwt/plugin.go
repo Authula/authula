@@ -123,10 +123,11 @@ func (p *JWTPlugin) Init(ctx *models.PluginContext) error {
 		p.keyService,
 		p.cacheService,
 		jwtservices.TokenServiceConfig{
-			ExpiresIn:        p.pluginConfig.ExpiresIn,
-			RefreshExpiresIn: p.pluginConfig.RefreshExpiresIn,
-			Issuer:           p.pluginConfig.Issuer,
-			Audience:         p.pluginConfig.Audience,
+			ExpiresIn:           p.pluginConfig.ExpiresIn,
+			RefreshExpiresIn:    p.pluginConfig.RefreshExpiresIn,
+			Issuer:              p.pluginConfig.Issuer,
+			Audience:            p.pluginConfig.Audience,
+			AccessTokenClientID: p.pluginConfig.AccessTokenClientID,
 		},
 	)
 

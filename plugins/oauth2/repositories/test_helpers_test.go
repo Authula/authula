@@ -57,6 +57,8 @@ func createTestClient(id string, clientID string, ownerType string, ownerID stri
 		ClientSecretHash:   "secret-hash",
 		ClientSecretSalt:   "secret-salt",
 		ClientSecretPrefix: "authula_ab",
+		ClientSecretStart:  "wxyz",
+		ClientSecretLast:   "abcd",
 		Name:               "client " + id,
 		RedirectURIs:       []string{"https://app.example.com/callback"},
 		AllowedGrants:      []string{types.OAuthGrantTypeAuthorizationCode},

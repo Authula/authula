@@ -67,3 +67,41 @@ type ErrorResponse struct {
 
 // RedirectResponse documents the empty body returned with a 302 response.
 type RedirectResponse struct{}
+
+// TokenRequest is the use-case input for a client credentials token request.
+// Scope is a pointer so an omitted scope is distinguishable from scope=.
+type TokenRequest struct {
+	ClientID     string
+	ClientSecret string
+	Scope        *string
+}
+
+// TokenResult is the use-case result for a client credentials token request.
+type TokenResult struct {
+	AccessToken string
+	TokenType   string
+	ExpiresIn   time.Duration
+	Scopes      []string
+}
+
+// TokenResponse is the successful token endpoint response.
+type TokenResponse struct {
+	AccessToken string `json:"access_token" required:"true" nullable:"false"`
+	TokenType   string `json:"token_type" required:"true" nullable:"false"`
+	ExpiresIn   int64  `json:"expires_in" required:"true" nullable:"false"`
+	Scope       string `json:"scope,omitempty"`
+}
+
+// TokenErrorResponse is the OAuth 2.0 error body returned with a 4xx or 5xx response.
+type TokenErrorResponse struct {
+	Error            string `json:"error" required:"true" nullable:"false"`
+	ErrorDescription string `json:"error_description,omitempty"`
+}
+
+// TokenEndpointRequest documents the token endpoint form body.
+type TokenEndpointRequest struct {
+	GrantType    string `json:"grant_type" formData:"grant_type"`
+	ClientID     string `json:"client_id" formData:"client_id"`
+	ClientSecret string `json:"client_secret" formData:"client_secret"`
+	Scope        string `json:"scope" formData:"scope"`
+}

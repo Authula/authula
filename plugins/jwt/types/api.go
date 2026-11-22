@@ -11,6 +11,11 @@ type JWTTokenType string
 const (
 	JWTTokenTypeAccess  JWTTokenType = "access_token"
 	JWTTokenTypeRefresh JWTTokenType = "refresh_token"
+
+	// AccessTokenJWTType is the RFC 9068 protected header type for access tokens.
+	AccessTokenJWTType = "at+jwt"
+	// AccessTokenJWTTypeMedia is the media type form accepted during validation.
+	AccessTokenJWTTypeMedia = "application/at+jwt"
 )
 
 func (t JWTTokenType) String() string {

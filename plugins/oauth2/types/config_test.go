@@ -115,3 +115,155 @@ func TestOAuth2PluginConfig_ApplyDefaultsPreservesExplicitValues(t *testing.T) {
 		t.Fatalf("explicit config values were overwritten: %+v", config)
 	}
 }
+
+func TestOAuth2PluginConfig_ClientCredentialsDefaults(t *testing.T) {
+	t.Parallel()
+
+	config := OAuth2PluginConfig{}
+	config.ApplyDefaults()
+
+	if config.ClientCredentialsTokenTTL != 15*time.Minute {
+		t.Fatalf("ClientCredentialsTokenTTL = %v, want 15m", config.ClientCredentialsTokenTTL)
+	}
+	if config.ClientSecretValuePrefix != "authula_cs_" {
+		t.Fatalf("ClientSecretValuePrefix = %q, want authula_cs_", config.ClientSecretValuePrefix)
+	}
+
+	explicit := OAuth2PluginConfig{
+		ClientCredentialsTokenTTL: time.Minute,
+		ClientSecretValuePrefix:   "custom_",
+	}
+	explicit.ApplyDefaults()
+
+	if explicit.ClientCredentialsTokenTTL != time.Minute || explicit.ClientSecretValuePrefix != "custom_" {
+		t.Fatalf("explicit client credentials config values were overwritten: %+v", explicit)
+	}
+}
+
+func TestOAuth2PluginConfig_Validate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		config  OAuth2PluginConfig
+		wantErr bool
+	}{
+		{
+			name: "auth server disabled with OIDC only ceiling",
+			config: OAuth2PluginConfig{
+				AllowedScopes:             []string{"openid", "profile", "email"},
+				ClientSecretValuePrefix:   "authula_cs_",
+				ClientCredentialsTokenTTL: time.Minute,
+			},
+		},
+		{
+			name: "auth server enabled with non-OIDC scope",
+			config: OAuth2PluginConfig{
+				AuthorizationServerEnabled: true,
+				AllowedScopes:              []string{"openid", "read", "write"},
+				ClientSecretValuePrefix:    "authula_cs_",
+				ClientCredentialsTokenTTL:  time.Minute,
+			},
+		},
+		{
+			name: "auth server enabled with OIDC only ceiling",
+			config: OAuth2PluginConfig{
+				AuthorizationServerEnabled: true,
+				AllowedScopes:              []string{"openid", "profile"},
+				ClientSecretValuePrefix:    "authula_cs_",
+				ClientCredentialsTokenTTL:  time.Minute,
+			},
+			wantErr: true,
+		},
+		{
+			name: "auth server enabled with sub-second ttl",
+			config: OAuth2PluginConfig{
+				AuthorizationServerEnabled: true,
+				AllowedScopes:              []string{"read"},
+				ClientSecretValuePrefix:    "authula_cs_",
+				ClientCredentialsTokenTTL:  time.Millisecond,
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty prefix",
+			config: OAuth2PluginConfig{
+				AllowedScopes:             []string{"read"},
+				ClientCredentialsTokenTTL: time.Minute,
+			},
+			wantErr: true,
+		},
+		{
+			name: "prefix too long",
+			config: OAuth2PluginConfig{
+				AllowedScopes:             []string{"read"},
+				ClientSecretValuePrefix:   strings.Repeat("a", 33),
+				ClientCredentialsTokenTTL: time.Minute,
+			},
+			wantErr: true,
+		},
+		{
+			name: "prefix with invalid characters",
+			config: OAuth2PluginConfig{
+				AllowedScopes:             []string{"read"},
+				ClientSecretValuePrefix:   "bad prefix!",
+				ClientCredentialsTokenTTL: time.Minute,
+			},
+			wantErr: true,
+		},
+		{
+			name: "duplicate allowed scope",
+			config: OAuth2PluginConfig{
+				AllowedScopes:             []string{"read", "read"},
+				ClientSecretValuePrefix:   "authula_cs_",
+				ClientCredentialsTokenTTL: time.Minute,
+			},
+			wantErr: true,
+		},
+		{
+			name: "wildcard allowed scope",
+			config: OAuth2PluginConfig{
+				AllowedScopes:             []string{"*"},
+				ClientSecretValuePrefix:   "authula_cs_",
+				ClientCredentialsTokenTTL: time.Minute,
+			},
+			wantErr: true,
+		},
+		{
+			name: "allowed scope with space",
+			config: OAuth2PluginConfig{
+				AllowedScopes:             []string{"read write"},
+				ClientSecretValuePrefix:   "authula_cs_",
+				ClientCredentialsTokenTTL: time.Minute,
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty allowed scope",
+			config: OAuth2PluginConfig{
+				AllowedScopes:             []string{""},
+				ClientSecretValuePrefix:   "authula_cs_",
+				ClientCredentialsTokenTTL: time.Minute,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.config.Validate()
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected validation error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected validation error: %v", err)
+			}
+		})
+	}
+}

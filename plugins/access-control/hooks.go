@@ -2,6 +2,7 @@ package accesscontrol
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 
 	coreerrors "github.com/Authula/authula/core/errors"
@@ -41,7 +42,11 @@ func (p *AccessControlPlugin) requireAccessControl(reqCtx *models.RequestContext
 		return nil
 	}
 
-	if !hasAllScopes(reqCtx.Actor.Scopes, requiredPermissions) {
+	allowed := hasAllScopes(reqCtx.Actor.Scopes, requiredPermissions)
+	if reqCtx.Actor.Type == models.ActorMachine {
+		allowed = hasAllExactScopes(reqCtx.Actor.Scopes, requiredPermissions)
+	}
+	if !allowed {
 		reqCtx.SetJSONResponse(http.StatusForbidden, map[string]any{"message": "Forbidden"})
 		reqCtx.Handled = true
 	}
@@ -146,6 +151,15 @@ func hasScope(scopes []string, target string) bool {
 func hasAllScopes(assignedScopes []string, requiredPermissions []string) bool {
 	for _, req := range requiredPermissions {
 		if !hasScope(assignedScopes, req) {
+			return false
+		}
+	}
+	return true
+}
+
+func hasAllExactScopes(assignedScopes []string, requiredPermissions []string) bool {
+	for _, req := range requiredPermissions {
+		if !slices.Contains(assignedScopes, req) {
 			return false
 		}
 	}

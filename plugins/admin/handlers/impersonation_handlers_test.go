@@ -180,7 +180,11 @@ func TestStartImpersonationHandler(t *testing.T) {
 			name: "success sets context values",
 			prepare: func(t *testing.T, req *http.Request, reqCtx *models.RequestContext) {
 				req.Header.Set("User-Agent", userAgent)
-				reqCtx.Actor = &models.Actor{ID: "actor-1", Type: models.ActorUser}
+				reqCtx.Actor = &models.Actor{
+					ID:     "actor-1",
+					Type:   models.ActorUser,
+					Scopes: []string{"scope1", "scope2"},
+				}
 				reqCtx.Values[models.ContextSessionID.String()] = actorSessionID
 			},
 			setup: func(impRepo *admintests.MockImpersonationRepository, sessionStateRepo *admintests.MockSessionStateRepository, sessionSvc *internaltests.MockSessionService, tokenSvc *internaltests.MockTokenService) {
@@ -203,6 +207,9 @@ func TestStartImpersonationHandler(t *testing.T) {
 			assertResponse: func(t *testing.T, reqCtx *models.RequestContext) {
 				if reqCtx.Actor == nil || reqCtx.Actor.ID != "target-1" {
 					t.Fatalf("expected user id to be target-1, got %v", reqCtx.Actor.ID)
+				}
+				if got := reqCtx.Actor.Claims[adminconstants.ImpersonatorScope]; got != "scope1 scope2" {
+					t.Fatalf("expected impersonator_scope to be a space-delimited string, got %v", got)
 				}
 				if reqCtx.Values[models.ContextSessionID.String()] != sessionID {
 					t.Fatalf("expected session id to be updated, got %v", reqCtx.Values[models.ContextSessionID.String()])
